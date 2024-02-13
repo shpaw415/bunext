@@ -1,16 +1,5 @@
 # bunext
 
-To install dependencies:
+## React download url
 
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.0.25. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
-# bunext
+- [text](https://unpkg.com/react-dom@18/umd/)

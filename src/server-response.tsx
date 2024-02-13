@@ -1,5 +1,17 @@
-export function createRootPage(jsxStack: JSX.Element) {
-  return <div id="root">{jsxStack}</div>;
+import { StrictMode } from "react";
+import { Head } from "./head";
+
+export function App({ children }: { children?: JSX.Element }) {
+  return (
+    <StrictMode>
+      <html>
+        <Head />
+        <body>
+          <div id="root">{children}</div>
+        </body>
+      </html>
+    </StrictMode>
+  );
 }
 
 export function addScriptToResponse(
@@ -9,7 +21,7 @@ export function addScriptToResponse(
   globalThis.scripts.push(...ScriptElement);
 }
 
-export function addJSXElementToResponse(Element: JSX.Element) {
+export function setJSXElementToResponse(Element: JSX.Element) {
   globalThis.responseData = Element;
 }
 

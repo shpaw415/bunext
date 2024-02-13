@@ -1,0 +1,11 @@
+// hydrate.ts
+/// <reference lib="dom" />
+
+import <DEFAULT> from "<PATH>";
+import { hydrateRoot } from "react-dom/client";
+import init from "./shared";
+const App = require("./server-response").App as ({children}: {children?: JSX.Element | string}) => JSX.Element;
+
+init();
+
+hydrateRoot(document, App({children: <DEFAULT>()}));
