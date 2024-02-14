@@ -1,7 +1,8 @@
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { Head } from "./head";
 
 export function App({ children }: { children?: JSX.Element }) {
+  const [val, call] = useState("t");
   return (
     <StrictMode>
       <html>
@@ -10,6 +11,7 @@ export function App({ children }: { children?: JSX.Element }) {
           <div id="root">{children}</div>
         </body>
       </html>
+      {globalThis.scripts}
     </StrictMode>
   );
 }

@@ -1,12 +1,11 @@
 import { type MatchedRoute } from "bun";
 import { _assetFileRouter, _fileRouter } from "./fileRouter";
-import {
-  renderToReadableStream,
+import ReactDOMServer, {
   type ReactDOMServerReadableStream,
 } from "react-dom/server";
 import { App } from "./server-response";
 import { webToken } from "@bunpmjs/json-webtoken";
-import { basePagePath, bunextPath } from "./globals";
+import { basePagePath, bunextSharedPath } from "./globals";
 import { readdirSync } from "fs";
 
 interface _fileRouterStruct {
@@ -26,55 +25,62 @@ const buildsMatchers = new Map<string, () => Response>();
 
 async function createBuildFile(relativePathToIndex: string, url: string = "/") {
   const pagesDir = process.cwd() + "/src/pages";
-  const pageDefault = require(pagesDir + "/" + relativePathToIndex).default as
+  const indexPagePath = pagesDir + "/" + relativePathToIndex;
+  const pageDefault = require(indexPagePath).default as
     | (() => JSX.Element)
     | undefined;
-
   if (!pageDefault)
     throw new Error(relativePathToIndex + " missing default export");
   const name = pageDefault.name;
 
-  let hydrateBasicFile = await Bun.file(bunextPath + "/hydrate.tsx.txt").text();
+  let hydrateBasicFile = await Bun.file(
+    bunextSharedPath + "/hydrate.tsx.txt"
+  ).text();
 
   const mods: { [key: string]: string } = {
     "<DEFAULT>": name,
-    "<PATH>": pagesDir + relativePathToIndex,
+    "<PATH>": indexPagePath,
   };
 
   for await (const i of Object.keys(mods)) {
     hydrateBasicFile = hydrateBasicFile.replaceAll(i, mods[i]);
   }
   const modifiedHydrateFile = hydrateBasicFile;
-  await Bun.write(`.bunext/${url}/hydrate.tsx`, modifiedHydrateFile);
+  const hydratePath = `.bunext/${url == "/" ? "" : `${url}/`}hydrate.tsx`;
+  await Bun.write(hydratePath, modifiedHydrateFile);
+  return hydratePath;
 }
 
 const init = async () => {
+  let buildsPaths: string[] = [];
   const dirs = readdirSync(basePagePath, {
     recursive: true,
   });
-  console.log(dirs);
   for await (const i of dirs as string[]) {
     if (!i.includes("index.")) continue;
-    const pathList = i.split("/").splice(-1).join("/");
-
-    await createBuildFile(i, pathList.length == 0 ? undefined : pathList);
+    const pathList = i.split("/").slice(0, -1).join("/");
+    buildsPaths.push(
+      await createBuildFile(i, pathList.length == 0 ? undefined : pathList)
+    );
   }
-  //await createBuildFile("/index.tsx", "test");
 
   const builds = await Bun.build({
-    entrypoints: [`.bunext/hydrate.tsx`],
+    entrypoints: buildsPaths,
     target: "browser",
     splitting: true,
-    minify: {
+    /*minify: {
       identifiers: true,
       syntax: true,
       whitespace: true,
-    },
+    },*/
   });
 
-  for (const build of builds.outputs) {
+  for await (const build of builds.outputs) {
+    const buildFormated = build.path.replace("./", "");
     buildsMatchers.set(
-      build.path.substring(1),
+      buildFormated.startsWith("/")
+        ? buildFormated.substring(1)
+        : buildFormated,
       () =>
         new Response(build.stream(), {
           headers: {
@@ -87,14 +93,13 @@ const init = async () => {
 
 const serveBuild = (req: Request) => {
   const { pathname } = new URL(req.url);
-  console.log(pathname, buildsMatchers);
-  const buildFileRequest = buildsMatchers.get(pathname);
+  const buildFileRequest = buildsMatchers.get(pathname.slice(1));
   if (buildFileRequest) {
     return buildFileRequest();
   }
 };
 
-const serveDemoPage = async (req: Request) => {
+const serveRequestedPage = async (req: Request) => {
   const { pathname } = new URL(req.url);
 
   const asset = await _assetFileRouter.match(pathname);
@@ -106,13 +111,13 @@ const serveDemoPage = async (req: Request) => {
     const page = (await import(`${route.filePath}`)) as _fileRouterStruct;
     if (!page.default) throw new Error("no default was set");
     const pageContent = await page.default(route);
-    console.log(pageContent);
     const AppComponent = App({ children: pageContent });
-    globalThis.pageContent = pageContent;
-
-    const renderReactStream = await renderToReadableStream(AppComponent, {
-      bootstrapModules: ["./hydrate.js"],
-    });
+    const renderReactStream = await ReactDOMServer.renderToReadableStream(
+      AppComponent,
+      {
+        bootstrapModules: [`${pathname === "/" ? "" : pathname}/hydrate.js`],
+      }
+    );
 
     const { readable, writable } = new TransformStream({
       transform(chunk, controller) {
@@ -148,10 +153,11 @@ function createServer() {
       const buildFileRequest = serveBuild(req);
       if (buildFileRequest) return buildFileRequest;
 
-      const demoPageRequest = await serveDemoPage(req);
+      const pageRequest = await serveRequestedPage(req);
 
-      if (demoPageRequest) {
-        return demoPageRequest;
+      if (pageRequest) {
+        if (!globalThis.setSession) return pageRequest;
+        return globalThis.session.setCookie(pageRequest, globalThis.setSession);
       }
 
       return new Response(

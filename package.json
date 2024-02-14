@@ -1,21 +1,32 @@
 {
+  "version": "0.0.103",
   "name": "bunext",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "bin": {
     "bunext": "bin/run.sh"
   },
   "devDependencies": {
-    "@types/react": "^18.2.55",
-    "@types/bun": "latest",
-    "@types/react-dom": "^18.2.19"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
   },
   "dependencies": {
-    "@bunpmjs/json-webtoken": "^0.0.21",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  }
+    "@bunpmjs/json-webtoken": "^0.0.21"
+  },
+  "description": "Next.js framwork modded to work with Bun",
+  "keywords": [
+    "framwork",
+    "next.js",
+    "next",
+    "bun",
+    "bun-framwork"
+  ],
+  "author": {
+    "name": "Justin halle"
+  },
+  "license": "MIT"
 }

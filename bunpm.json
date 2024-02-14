@@ -1,0 +1,12 @@
+{
+  "version": "0.0.103",
+  "include": [
+    "src",
+    "bin",
+    "dev",
+    "features",
+    "shared",
+    "react",
+    "README.md"
+  ]
+}

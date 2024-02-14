@@ -12,7 +12,6 @@ declare global {
   var responseData: JSX.Element;
   var scripts: JSX.Element[];
   var compiledScript: JSX.Element;
-  var pageContent: JSX.Element;
 
   // session
   var session: webToken<unknown>;
