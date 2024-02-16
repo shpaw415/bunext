@@ -1,18 +1,22 @@
 {
-  "version": "0.0.103",
+  "version": "0.0.2",
   "name": "bunext",
   "module": "src/index.ts",
   "type": "module",
   "bin": {
-    "bunext": "bin/run.sh"
+    "bunext": "bin/index.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/react": "18.2.55",
+    "@types/react-dom": "^18.2.19"
   },
   "peerDependencies": {
     "typescript": "^5.0.0",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react": "*",
+    "react-dom": "*",
+    "bun-react-ssr": "0.2.2",
+    "bunext": "link:bunext"
   },
   "dependencies": {
     "@bunpmjs/json-webtoken": "^0.0.21"
