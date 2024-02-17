@@ -1,9 +1,3 @@
-import React from "react";
-type _Script = {
-  fn: Function;
-  call?: boolean;
-};
-
 declare global {
   var scriptsList: Function[];
 }
@@ -17,5 +11,5 @@ export function LoadScript() {
  * @param fn (use \\\\\\n to insert \\n in string)
  */
 export function addScriptToList(fn: Function) {
-  globalThis.scriptsList.push(fn);
+  globalThis.scriptsList.includes(fn) ? null : globalThis.scriptsList.push(fn);
 }

@@ -1,5 +1,5 @@
 import { Head } from "@bunpmjs/bunext/componants/head";
-import { LoadScript } from "@bunpmjs/bunext/componants/script";
+import { LoadScript, addScriptToList } from "@bunpmjs/bunext/componants/script";
 import React from "react";
 import "./global";
 export const Shell: React.FC<{ children: React.ReactElement }> = ({
@@ -11,3 +11,7 @@ export const Shell: React.FC<{ children: React.ReactElement }> = ({
     <LoadScript />
   </html>
 );
+
+addScriptToList(() => {
+  console.log("test");
+});

@@ -4,7 +4,7 @@ import { router } from "./routes";
 import { Shell } from "./shell";
 import type { Server, ServerWebSocket } from "bun";
 import "./global";
-import { names, paths } from "../globals";
+import { names, paths } from "@bunpmjs/bunext/globals";
 declare global {
   var bunext_Session: webToken<any>;
   var bunext_SessionData: { [key: string]: any } | undefined;
