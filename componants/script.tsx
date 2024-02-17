@@ -1,3 +1,4 @@
+import React from "react";
 type _Script = {
   fn: Function;
   call?: boolean;

@@ -11,7 +11,7 @@ export const Shell: React.FC<{ children: React.ReactElement }> = ({
     {globalThis.mode === "dev" && (
       <Script
         fn={() => {
-          const ws = new WebSocket("/:3001");
+          const ws = new WebSocket(window.location.origin + ":3001");
           ws.on("message", (data) => {
             const message = data.toString();
             console.log(message);
