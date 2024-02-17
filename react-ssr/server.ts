@@ -83,7 +83,7 @@ function serveScript(request: Request) {
   const scriptsStr = globalThis.scriptsList.map((sc) => {
     const variable = generateRandomString(5);
     const scriptStr = transpiler.transformSync(`${sc}`);
-
+    console.log(scriptStr);
     return `const ${variable} = ${scriptStr}; ${variable}();`;
   });
   return new Response(scriptsStr.join("\n"));
