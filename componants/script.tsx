@@ -12,3 +12,6 @@ export function LoadScript() {
 export function addScript(fn: Function) {
   globalThis.scriptsList.includes(fn) ? null : globalThis.scriptsList.push(fn);
 }
+export function resetScript() {
+  globalThis.scriptsList = [];
+}

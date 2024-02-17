@@ -6,32 +6,29 @@ import type { Server, ServerWebSocket } from "bun";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
-import { addScript } from "@bunpmjs/bunext/componants/script";
+import { addScript, resetScript } from "@bunpmjs/bunext/componants/script";
+import { ClientsetHotServer } from "@bunpmjs/bunext/dev/dev";
+
 declare global {
   var bunext_Session: webToken<any>;
   var bunext_SessionData: { [key: string]: any } | undefined;
   var bunext_SessionDelete: boolean;
   var hotServer: Server;
   var socketList: ServerWebSocket<unknown>[];
-  var dryRun: boolean;
 }
 
-globalThis.bunext_SessionDelete ??= false;
+globalThis.bunext_SessionDelete = false;
 globalThis.socketList ??= [];
-globalThis.dryRun ??= true;
 
 await doBuild();
-
-dryRun &&
-  addScript(() => {
-    console.log("allo");
-  });
 
 try {
   const server = Bun.serve({
     port: 3000,
     async fetch(request) {
       initSession(request);
+      resetScript();
+      globalThis.mode === "dev" && ClientsetHotServer();
 
       if (!request.url.endsWith(".js")) await doBuild();
       const response =
@@ -111,4 +108,3 @@ function setSessionToken(response: Response) {
   }
   return response;
 }
-globalThis.dryRun = false;
