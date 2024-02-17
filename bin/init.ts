@@ -59,6 +59,7 @@ async function install() {
     "@types/react": "18.2.55",
     "@types/react-dom": "18.2.19",
   };
-  await Bun.write("package.json", JSON.stringify(packageJson));
+  const beautify = require("json-beautify");
+  await Bun.write("package.json", beautify(packageJson, null, 2, 80));
   await $`bun i`;
 }
