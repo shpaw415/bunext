@@ -43,14 +43,8 @@ try {
   });
   Bun.serve({
     websocket: {
-      open: (ws) => {
-        console.log("Client connected");
-      },
       message: (ws, message) => {
         console.log("Client sent message", message);
-      },
-      close: (ws) => {
-        console.log("Client disconnected");
       },
     },
     fetch(req, server) {
