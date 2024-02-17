@@ -10,8 +10,16 @@ export function ClientsetHotServer() {
     const ws = new WebSocket(
       `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${3001}`
     );
-    ws.addEventListener("message", (ev) => {
-      console.log(ev.data);
-    });
+    ws.addEventListener(
+      "message",
+      (ev) => ev.data == "reload" && window.location.reload()
+    );
+    ws.addEventListener("close", () => window.location.reload());
   });
+}
+
+export function sendSignal() {
+  for (const ws of globalThis.socketList) {
+    ws.send("reload");
+  }
 }

@@ -7,7 +7,7 @@ import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import { resetScript } from "@bunpmjs/bunext/componants/script";
-import { ClientsetHotServer } from "@bunpmjs/bunext/dev/dev";
+import { ClientsetHotServer, sendSignal } from "@bunpmjs/bunext/dev/dev";
 
 declare global {
   var bunext_Session: webToken<any>;
@@ -21,6 +21,8 @@ globalThis.bunext_SessionDelete = false;
 globalThis.socketList ??= [];
 
 await doBuild();
+
+sendSignal();
 
 try {
   const server = Bun.serve({
@@ -41,21 +43,28 @@ try {
       });
     },
   });
-  Bun.serve({
+  const hotServer = Bun.serve({
     websocket: {
       message: (ws, message) => {
         console.log("Client sent message", message);
       },
       open(ws) {
         ws.send("welcome");
+        socketList.push(ws);
+      },
+      close(ws) {
+        globalThis.socketList.splice(
+          socketList.findIndex((s) => s == ws),
+          1
+        );
       },
     },
     fetch(req, server) {
       const upgraded = server.upgrade(req);
       if (!upgraded) {
-        return new Response("Upgrade failed", { status: 400 });
+        return new Response("Error", { status: 400 });
       }
-      return new Response("Hello World");
+      return new Response("OK");
     },
     port: 3001,
   });
