@@ -5,6 +5,7 @@ import { names, paths } from "../globals";
 import { $ } from "bun";
 await (async () => {
   try {
+    throw new Error();
     lstatSync(paths.bunextDirName).isDirectory();
   } catch {
     try {
@@ -20,10 +21,10 @@ interface packageJson {
 }
 
 async function install() {
-  /*rmSync(paths.bunextDirName, {
+  rmSync(paths.bunextDirName, {
     recursive: true,
     force: true,
-  });*/
+  });
   mkdirSync(paths.bunextDirName);
   mkdirSync(paths.basePagePath, {
     recursive: true,
