@@ -73,7 +73,9 @@ async function serveStatic(request: Request) {
 function serveScript(request: Request) {
   const path = new URL(request.url).pathname;
   if (names.loadScriptPath != path) return null;
-  return new Response(globalThis.scriptsList.map((sc) => `${sc}`).join("\n"));
+  return new Response(
+    `eval(${globalThis.scriptsList.map((sc) => `${sc}`).join("\n")})`
+  );
 }
 
 function initSession(request: Request) {

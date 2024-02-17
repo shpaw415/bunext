@@ -9,9 +9,6 @@ export function LoadScript() {
   return <script type="text/javascript" src="/bunext-scripts" />;
 }
 
-/**
- * @param fn (use \\\\\\n to insert \\n in string)
- */
-export function addScriptToList(fn: Function) {
+export function addScript(fn: Function) {
   globalThis.scriptsList.includes(fn) ? null : globalThis.scriptsList.push(fn);
 }

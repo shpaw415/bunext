@@ -1,9 +1,9 @@
 import { Head } from "@bunpmjs/bunext/componants/head";
-import { LoadScript, addScriptToList } from "@bunpmjs/bunext/componants/script";
+import { LoadScript, addScript } from "@bunpmjs/bunext/componants/script";
 import React from "react";
 import "./global";
 
-addScriptToList(() => {
+addScript(() => {
   console.log("test");
 });
 
