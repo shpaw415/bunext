@@ -46,6 +46,9 @@ try {
       message: (ws, message) => {
         console.log("Client sent message", message);
       },
+      open(ws) {
+        ws.send("welcome");
+      },
     },
     fetch(req, server) {
       const upgraded = server.upgrade(req);
