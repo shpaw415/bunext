@@ -9,8 +9,11 @@ type _Script = {
 export function Script({ fn, call }: _Script) {
   const fnString = `${fn}`.replaceAll("\\n", "\n").replaceAll("\\\\\\n", "\\n");
   return (
-    <script type="text/javascript">
-      {fnString} {call && fn.name + "();"}
+    <script
+      type="text/javascript"
+      dangerouslySetInnerHTML={{ __html: `const Bunextfn = ${fnString}` }}
+    >
+      {call && "Bunextfn();"}
     </script>
   );
 }
