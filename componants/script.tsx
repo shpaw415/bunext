@@ -11,9 +11,9 @@ export function Script({ fn, call }: _Script) {
   return (
     <script
       type="text/javascript"
-      dangerouslySetInnerHTML={{ __html: `const Bunextfn = ${fnString}` }}
-    >
-      {call && "Bunextfn();"}
-    </script>
+      dangerouslySetInnerHTML={{
+        __html: `const Bunextfn = ${fnString}; ${call && "Bunextfn();"}`,
+      }}
+    />
   );
 }
