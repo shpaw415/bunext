@@ -20,7 +20,9 @@ globalThis.socketList ??= [];
 
 await doBuild();
 
-addScript(() => {});
+addScript(() => {
+  console.log("allo");
+});
 
 try {
   const server = Bun.serve({
@@ -81,7 +83,6 @@ function serveScript(request: Request) {
   const _scriptsStr = globalThis.scriptsList.map((sc) => {
     const variable = generateRandomString(5);
     const scriptStr = transpiler.transformSync(`${sc}`);
-    console.log("script >", scriptStr.length);
     return `const ${variable} = ${scriptStr}; ${variable}();`;
   });
   return new Response(_scriptsStr.join("\n"));
