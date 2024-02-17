@@ -5,7 +5,7 @@ import { Shell } from "./shell";
 import type { Server, ServerWebSocket } from "bun";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
-import { generateRandomString } from "../features/utils";
+import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 declare global {
   var bunext_Session: webToken<any>;
   var bunext_SessionData: { [key: string]: any } | undefined;
