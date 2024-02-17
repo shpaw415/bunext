@@ -4,6 +4,7 @@ import { router } from "./routes";
 import { Shell } from "./shell";
 import type { Server, ServerWebSocket } from "bun";
 import "./global";
+import { names, paths } from "../globals";
 declare global {
   var bunext_Session: webToken<any>;
   var bunext_SessionData: { [key: string]: any } | undefined;
@@ -24,8 +25,11 @@ try {
       initSession(request);
 
       if (!request.url.endsWith(".js")) await doBuild();
-      const response = serve(request);
-      if (await response) return setSessionToken((await response) as Response);
+      const response =
+        (await serve(request)) ||
+        (await serveStatic(request)) ||
+        serveScript(request);
+      if (response) return setSessionToken(response as Response);
       return new Response("Not found", {
         status: 404,
       });
@@ -57,6 +61,19 @@ function serve(request: Request) {
     Shell: Shell,
     bootstrapModules: [".bunext/react-ssr/hydrate.js"],
   });
+}
+
+async function serveStatic(request: Request) {
+  const path = new URL(request.url).pathname;
+  const file = Bun.file(paths.staticPath + path);
+  if (!(await file.exists())) return null;
+  return new Response(file);
+}
+
+function serveScript(request: Request) {
+  const path = new URL(request.url).pathname;
+  if (names.loadScriptPath != path) return null;
+  return new Response(globalThis.scriptsList.map((sc) => `${sc}`).join("\n"));
 }
 
 function initSession(request: Request) {

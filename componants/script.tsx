@@ -4,17 +4,18 @@ type _Script = {
   call?: boolean;
 };
 
+declare global {
+  var scriptsList: Function[];
+}
+globalThis.scriptsList ??= [];
+
+export function LoadScript() {
+  return <script type="text/javascript" src="/bunext-scripts" />;
+}
+
 /**
  * @param fn (use \\\\\\n to insert \\n in string)
  */
-export function Script({ fn, call }: _Script) {
-  const fnString = `${fn}`.replaceAll("\\n", "\n").replaceAll("\\\\\\n", "\\n");
-  return (
-    <script
-      type="text/javascript"
-      dangerouslySetInnerHTML={{
-        __html: `const Bunextfn = ${fnString}; ${call && "Bunextfn();"}`,
-      }}
-    />
-  );
+export function addScriptToList(fn: Function) {
+  globalThis.scriptsList.push(fn);
 }
