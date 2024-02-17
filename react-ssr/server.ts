@@ -2,20 +2,24 @@ import { webToken } from "@bunpmjs/json-webtoken";
 import { doBuild } from "./build";
 import { router } from "./routes";
 import { Shell } from "./shell";
+import type { Server, ServerWebSocket } from "bun";
 
 declare global {
   var bunext_Session: webToken<any>;
   var bunext_SessionData: { [key: string]: any } | undefined;
   var bunext_SessionDelete: boolean;
+  var hotServer: Server;
+  var socketList: ServerWebSocket<unknown>[];
 }
 
 globalThis.bunext_SessionDelete ??= false;
+globalThis.socketList ??= [];
 
 await doBuild();
 
 try {
   const server = Bun.serve({
-    port: "3000",
+    port: 3000,
     async fetch(request) {
       initSession(request);
 
@@ -26,6 +30,21 @@ try {
         status: 404,
       });
     },
+  });
+  const hotServer = Bun.serve({
+    fetch(req, server) {
+      if (server.upgrade(req)) {
+        return; // do not return a Response
+      }
+      return new Response("Upgrade failed :(", { status: 500 });
+    },
+    websocket: {
+      open(ws) {
+        globalThis.socketList.push(ws);
+      },
+      message(ws, message) {},
+    },
+    port: 3001,
   });
   console.log("Serve on port:", server.port);
 } catch (e) {
