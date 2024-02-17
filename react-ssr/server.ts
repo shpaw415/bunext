@@ -5,6 +5,7 @@ import { Shell } from "./shell";
 import type { Server, ServerWebSocket } from "bun";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
+import { generateRandomString } from "../features/utils";
 declare global {
   var bunext_Session: webToken<any>;
   var bunext_SessionData: { [key: string]: any } | undefined;
@@ -73,9 +74,11 @@ async function serveStatic(request: Request) {
 function serveScript(request: Request) {
   const path = new URL(request.url).pathname;
   if (names.loadScriptPath != path) return null;
-  return new Response(
-    `eval(${globalThis.scriptsList.map((sc) => `${sc}`).join("\n")})`
-  );
+  const scriptsStr = globalThis.scriptsList.map((sc) => {
+    const variable = generateRandomString(5);
+    `const ${variable} = ${sc}; ${variable}();`;
+  });
+  return new Response();
 }
 
 function initSession(request: Request) {
