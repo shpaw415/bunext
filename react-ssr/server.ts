@@ -78,13 +78,13 @@ function serveScript(request: Request) {
   const path = new URL(request.url).pathname;
   if (names.loadScriptPath != path) return null;
   const transpiler = new Bun.Transpiler();
-  const scriptsStr = globalThis.scriptsList.map((sc) => {
+  const _scriptsStr = globalThis.scriptsList.map((sc) => {
     const variable = generateRandomString(5);
     const scriptStr = transpiler.transformSync(`${sc}`);
-    console.log("script >", scriptStr);
+    console.log("script >", scriptStr.length);
     return `const ${variable} = ${scriptStr}; ${variable}();`;
   });
-  return new Response(scriptsStr.join("\n"));
+  return new Response(_scriptsStr.join("\n"));
 }
 
 function initSession(request: Request) {
