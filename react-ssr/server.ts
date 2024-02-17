@@ -79,11 +79,9 @@ async function serveStatic(request: Request) {
 function serveScript(request: Request) {
   const path = new URL(request.url).pathname;
   if (names.loadScriptPath != path) return null;
-  const transpiler = new Bun.Transpiler();
   const _scriptsStr = globalThis.scriptsList.map((sc) => {
-    const variable = generateRandomString(5);
-    const scriptStr = transpiler.transformSync(`${sc}`);
-    return `const ${variable} = ${scriptStr}; ${variable}();`;
+    const variable = `__${generateRandomString(5)}__`;
+    return `const ${variable} = ${sc}; ${variable}();`;
   });
   return new Response(_scriptsStr.join("\n"));
 }
