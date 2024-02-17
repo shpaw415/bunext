@@ -12,7 +12,9 @@ export const Shell: React.FC<{ children: React.ReactElement }> = ({
 }) => (
   <html>
     <Head />
-    <body>{children}</body>
-    <LoadScript />
+    <body>
+      {children}
+      <LoadScript />
+    </body>
   </html>
 );

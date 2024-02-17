@@ -1,3 +1,5 @@
+import React from "react";
+
 declare global {
   var scriptsList: Function[];
 }
