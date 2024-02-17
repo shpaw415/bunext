@@ -8,7 +8,7 @@ export function ClientsetHotServer() {
   addScript(() => {
     const p = window.location;
     const ws = new WebSocket(
-      `${p.protocol === "http" ? "ws" : "wss"}://${p.hostname}:${3001}`
+      `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${3001}`
     );
     ws.addEventListener("message", (ev) => {
       console.log(ev.data);
