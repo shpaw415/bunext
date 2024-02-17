@@ -1,4 +1,4 @@
-import { Head } from "bunext/componants/head";
+import { Head } from "@bunpmjs/bunext/componants/head";
 
 export const Shell: React.FC<{ children: React.ReactElement }> = ({
   children,

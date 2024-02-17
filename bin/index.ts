@@ -7,25 +7,32 @@ const cmd = process.argv[2] as _cmd;
 
 switch (cmd) {
   case "init":
-    await import("./init");
+    await init();
     break;
   case "build":
-    Bun.spawn({
-      cmd: ["bun", `${paths.bunextDirName}/react-ssr/build.ts`],
-      stdout: "inherit",
-    });
+    build();
     break;
   case "dev":
-    Bun.spawn({
-      cmd: [
-        "bun",
-        "--watch",
-        `${paths.bunextDirName}/react-ssr/server.ts`,
-        "dev",
-      ],
-      stdout: "inherit",
-    });
+    await init();
+    build();
+    dev();
     break;
   default:
     console.log(`Bunext: '${cmd}' is not a function`);
+}
+
+function build() {
+  Bun.spawn({
+    cmd: ["bun", `${paths.bunextDirName}/react-ssr/build.ts`],
+    stdout: "inherit",
+  });
+}
+function dev() {
+  Bun.spawn({
+    cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`, "dev"],
+    stdout: "inherit",
+  });
+}
+function init() {
+  return import("./init");
 }

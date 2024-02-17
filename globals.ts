@@ -1,6 +1,6 @@
 export const paths = {
   bunextDirName: ".bunext",
-  bunextModulePath: "node_modules/bunext",
+  bunextModulePath: "node_modules/@bunpmjs/bunext",
   basePagePath: "src/pages",
 } as const;
 

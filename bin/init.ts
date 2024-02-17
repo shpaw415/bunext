@@ -1,23 +1,29 @@
 #!/bin/env bun
 
-import { lstatSync, cpSync, mkdirSync } from "fs";
+import { lstatSync, cpSync, mkdirSync, rmSync } from "fs";
 import { names, paths } from "../globals";
 import { $ } from "bun";
 await (async () => {
   try {
     lstatSync(paths.bunextDirName).isDirectory();
   } catch {
-    console.log("install");
-    await install();
+    try {
+      await install();
+    } catch {}
   }
 })();
 
 interface packageJson {
   scripts: { [key: string]: string };
   dependencies: { [key: string]: string };
+  devDependencies: { [key: string]: string };
 }
 
 async function install() {
+  /*rmSync(paths.bunextDirName, {
+    recursive: true,
+    force: true,
+  });*/
   mkdirSync(paths.bunextDirName);
   mkdirSync(paths.basePagePath, {
     recursive: true,
@@ -46,16 +52,14 @@ async function install() {
     "bun-react-ssr": "^0.2.2",
     react: "18.2.0",
     "react-dom": "18.2.0",
+    "@bunpmjs/bunext": "latest",
+    "@bunpmjs/json-webtoken": "latest",
+  };
+  packageJson.devDependencies = {
+    ...packageJson.devDependencies,
+    "@types/react": "18.2.55",
+    "@types/react-dom": "18.2.19",
   };
   await Bun.write("package.json", JSON.stringify(packageJson));
   await $`bun i`;
-  //await modShell();
-}
-async function modShell() {
-  const shellpath = `${paths.bunextDirName}/react-ssr/shell.tsx`;
-  const fileContent = (await Bun.file(shellpath).text()).replace(
-    "../componants/head",
-    `${names.bunextModuleName}/componants/head`
-  );
-  await Bun.write(shellpath, fileContent);
 }

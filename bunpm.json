@@ -1,11 +1,12 @@
 {
-  "version": "0.0.106",
+  "version": "0.0.224",
   "include": [
-    "src",
     "bin",
+    "componants",
     "dev",
     "features",
-    "shared",
+    "react-ssr",
+    "globals.ts",
     "README.md"
   ]
 }
