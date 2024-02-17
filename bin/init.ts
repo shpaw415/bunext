@@ -52,7 +52,6 @@ async function install() {
     "bun-react-ssr": "^0.2.2",
     react: "18.2.0",
     "react-dom": "18.2.0",
-    "@bunpmjs/bunext": "latest",
     "@bunpmjs/json-webtoken": "latest",
   };
   packageJson.devDependencies = {
