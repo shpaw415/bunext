@@ -78,7 +78,7 @@ function serveScript(request: Request) {
     const variable = generateRandomString(5);
     `const ${variable} = ${sc}; ${variable}();`;
   });
-  return new Response();
+  return new Response(scriptsStr.join("\n"));
 }
 
 function initSession(request: Request) {
