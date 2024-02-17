@@ -13,16 +13,19 @@ declare global {
   var bunext_SessionDelete: boolean;
   var hotServer: Server;
   var socketList: ServerWebSocket<unknown>[];
+  var dryRun: boolean;
 }
 
 globalThis.bunext_SessionDelete ??= false;
 globalThis.socketList ??= [];
+globalThis.dryRun ??= true;
 
 await doBuild();
 
-addScript(() => {
-  console.log("allo");
-});
+dryRun &&
+  addScript(() => {
+    console.log("allo");
+  });
 
 try {
   const server = Bun.serve({
@@ -108,3 +111,4 @@ function setSessionToken(response: Response) {
   }
   return response;
 }
+globalThis.dryRun = false;
