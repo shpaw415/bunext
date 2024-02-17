@@ -4,3 +4,5 @@ declare global {
   var head: _Head;
   var mode: "dev" | "release";
 }
+
+globalThis.mode ??= "dev";

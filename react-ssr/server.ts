@@ -3,7 +3,7 @@ import { doBuild } from "./build";
 import { router } from "./routes";
 import { Shell } from "./shell";
 import type { Server, ServerWebSocket } from "bun";
-
+import "./global";
 declare global {
   var bunext_Session: webToken<any>;
   var bunext_SessionData: { [key: string]: any } | undefined;
