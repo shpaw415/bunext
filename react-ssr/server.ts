@@ -6,6 +6,7 @@ import type { Server, ServerWebSocket } from "bun";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
+import { addScript } from "../componants/script";
 declare global {
   var bunext_Session: webToken<any>;
   var bunext_SessionData: { [key: string]: any } | undefined;
@@ -18,6 +19,8 @@ globalThis.bunext_SessionDelete ??= false;
 globalThis.socketList ??= [];
 
 await doBuild();
+
+addScript(() => {});
 
 try {
   const server = Bun.serve({
@@ -74,9 +77,14 @@ async function serveStatic(request: Request) {
 function serveScript(request: Request) {
   const path = new URL(request.url).pathname;
   if (names.loadScriptPath != path) return null;
+  const transpiler = new Bun.Transpiler({
+    loader: "ts",
+  });
   const scriptsStr = globalThis.scriptsList.map((sc) => {
     const variable = generateRandomString(5);
-    return `const ${variable} = ${sc}; ${variable}();`;
+    const scriptStr = transpiler.transformSync(`${sc}`);
+
+    return `const ${variable} = ${scriptStr}; ${variable}();`;
   });
   return new Response(scriptsStr.join("\n"));
 }
