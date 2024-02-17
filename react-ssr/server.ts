@@ -76,9 +76,8 @@ function serveScript(request: Request) {
   if (names.loadScriptPath != path) return null;
   const scriptsStr = globalThis.scriptsList.map((sc) => {
     const variable = generateRandomString(5);
-    `const ${variable} = ${sc}; ${variable}();`;
+    return `const ${variable} = ${sc}; ${variable}();`;
   });
-  console.log("scriptStr", scriptsStr);
   return new Response(scriptsStr.join("\n"));
 }
 
