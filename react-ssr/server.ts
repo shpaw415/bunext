@@ -6,7 +6,7 @@ import type { Server, ServerWebSocket } from "bun";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
-import { addScript, resetScript } from "@bunpmjs/bunext/componants/script";
+import { resetScript } from "@bunpmjs/bunext/componants/script";
 import { ClientsetHotServer } from "@bunpmjs/bunext/dev/dev";
 
 declare global {
@@ -41,18 +41,24 @@ try {
       });
     },
   });
-  const hotServer = Bun.serve({
-    fetch(req, server) {
-      if (server.upgrade(req)) {
-        return; // do not return a Response
-      }
-      return new Response("Upgrade failed :(", { status: 500 });
-    },
+  Bun.serve({
     websocket: {
-      open(ws) {
-        globalThis.socketList.push(ws);
+      open: (ws) => {
+        console.log("Client connected");
       },
-      message(ws, message) {},
+      message: (ws, message) => {
+        console.log("Client sent message", message);
+      },
+      close: (ws) => {
+        console.log("Client disconnected");
+      },
+    },
+    fetch(req, server) {
+      const upgraded = server.upgrade(req);
+      if (!upgraded) {
+        return new Response("Upgrade failed", { status: 400 });
+      }
+      return new Response("Hello World");
     },
     port: 3001,
   });
