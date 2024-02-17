@@ -78,6 +78,7 @@ function serveScript(request: Request) {
     const variable = generateRandomString(5);
     `const ${variable} = ${sc}; ${variable}();`;
   });
+  console.log("scriptStr", scriptsStr);
   return new Response(scriptsStr.join("\n"));
 }
 
