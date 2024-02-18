@@ -1,7 +1,7 @@
 #!/bin/env bun
 
 import { lstatSync, cpSync, mkdirSync, rmSync } from "fs";
-import { names, paths } from "../globals";
+import { paths } from "../globals";
 import { $ } from "bun";
 await (async () => {
   try {
@@ -50,7 +50,7 @@ async function install() {
   };
   packageJson.dependencies = {
     ...packageJson.dependencies,
-    "bun-react-ssr": "^0.2.2",
+    //"bun-react-ssr": "^0.2.2",
     react: "18.2.0",
     "react-dom": "18.2.0",
     "@bunpmjs/json-webtoken": "latest",

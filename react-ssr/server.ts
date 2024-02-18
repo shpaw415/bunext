@@ -1,23 +1,18 @@
-import { webToken } from "@bunpmjs/json-webtoken";
 import { doBuild } from "./build";
 import { router } from "./routes";
 import { Shell } from "./shell";
-import type { Server, ServerWebSocket } from "bun";
+import type { ServerWebSocket } from "bun";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
-import { resetScript } from "@bunpmjs/bunext/componants/script";
 import { ClientsetHotServer, sendSignal } from "@bunpmjs/bunext/dev/dev";
+import { getScriptsList } from "@bunpmjs/bunext/componants/script";
+import { webToken } from "@bunpmjs/json-webtoken";
 
 declare global {
-  var bunext_Session: webToken<any>;
-  var bunext_SessionData: { [key: string]: any } | undefined;
-  var bunext_SessionDelete: boolean;
-  var hotServer: Server;
   var socketList: ServerWebSocket<unknown>[];
 }
 
-globalThis.bunext_SessionDelete = false;
 globalThis.socketList ??= [];
 
 await doBuild();
@@ -28,22 +23,36 @@ try {
   const server = Bun.serve({
     port: 3000,
     async fetch(request) {
-      initSession(request);
-      resetScript();
+      const controller = new middleWare({ req: request });
       globalThis.mode === "dev" && ClientsetHotServer();
 
       if (!request.url.endsWith(".js")) await doBuild();
       const response =
-        (await serve(request)) ||
+        (await serve(request, controller)) ||
         (await serveStatic(request)) ||
         serveScript(request);
-      if (response) return setSessionToken(response as Response);
+      if (response) return controller.setSessionToken(response as Response);
       return new Response("Not found", {
         status: 404,
       });
     },
   });
-  const hotServer = Bun.serve({
+  globalThis.mode === "dev" && serveHotServer();
+  console.log("Serve on port:", server.port);
+} catch (e) {
+  console.log(e);
+  process.exit(0);
+}
+
+function serve(request: Request, controller: middleWare) {
+  return router.serve(request, {
+    Shell: Shell,
+    bootstrapModules: [".bunext/react-ssr/hydrate.js"],
+  });
+}
+
+function serveHotServer() {
+  Bun.serve({
     websocket: {
       message: (ws, message) => {
         console.log("Client sent message", message);
@@ -68,17 +77,6 @@ try {
     },
     port: 3001,
   });
-  console.log("Serve on port:", server.port);
-} catch (e) {
-  console.log(e);
-  process.exit(0);
-}
-
-function serve(request: Request) {
-  return router.serve(request, {
-    Shell: Shell,
-    bootstrapModules: [".bunext/react-ssr/hydrate.js"],
-  });
 }
 
 async function serveStatic(request: Request) {
@@ -91,32 +89,48 @@ async function serveStatic(request: Request) {
 function serveScript(request: Request) {
   const path = new URL(request.url).pathname;
   if (names.loadScriptPath != path) return null;
-  const _scriptsStr = globalThis.scriptsList.map((sc) => {
+  const _scriptsStr = getScriptsList().map((sc) => {
     const variable = `__${generateRandomString(5)}__`;
     return `const ${variable} = ${sc}; ${variable}();`;
   });
   return new Response(_scriptsStr.join("\n"));
 }
 
-function initSession(request: Request) {
-  globalThis.bunext_Session = new webToken(request, {
-    cookieName: "bunext_session_token",
-  });
-}
+export class middleWare {
+  public _session: webToken<any>;
+  public _sessionData?: { [key: string]: any };
+  public _deleteSesion = false;
+  private request: Request;
 
-function setSessionToken(response: Response) {
-  if (globalThis.bunext_SessionData) {
-    return globalThis.bunext_Session.setCookie(response, {
-      expire: 3600,
-      httpOnly: true,
-      secure: false,
-    });
-  } else if (globalThis.bunext_SessionDelete) {
-    return globalThis.bunext_Session.setCookie(response, {
-      expire: -10000,
-      httpOnly: true,
-      secure: false,
+  constructor({ req }: { req: Request }) {
+    this.request = req;
+    this._session = new webToken<unknown>(req, {
+      cookieName: "bunext_session_token",
     });
   }
-  return response;
+
+  setSessionData(data: { [key: string]: any }) {
+    this._sessionData = data;
+  }
+
+  setSessionToken(response: Response) {
+    if (this._sessionData) {
+      return this._session.setCookie(response, {
+        expire: 3600,
+        httpOnly: true,
+        secure: false,
+      });
+    } else if (this._deleteSesion) {
+      return this._session.setCookie(response, {
+        expire: -10000,
+        httpOnly: true,
+        secure: false,
+      });
+    }
+    return response;
+  }
+
+  getSessionData<_Data>() {
+    return this._session.session() as _Data | undefined;
+  }
 }

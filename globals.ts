@@ -8,4 +8,4 @@ export const paths = {
 export const names = {
   bunextModuleName: "bunext",
   loadScriptPath: "/bunext-scripts",
-};
+} as const;

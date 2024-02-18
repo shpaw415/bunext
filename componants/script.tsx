@@ -1,17 +1,15 @@
 import React from "react";
 
-declare global {
-  var scriptsList: Function[];
-}
-globalThis.scriptsList ??= [];
+let scriptsList: Function[] = [];
 
 export function LoadScript() {
   return <script type="text/javascript" src="/bunext-scripts" />;
 }
 
 export function addScript(fn: Function) {
-  globalThis.scriptsList.includes(fn) ? null : globalThis.scriptsList.push(fn);
+  scriptsList.includes(fn) ? null : scriptsList.push(fn);
 }
-export function resetScript() {
-  globalThis.scriptsList = [];
+
+export function getScriptsList() {
+  return scriptsList;
 }
