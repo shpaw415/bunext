@@ -15,7 +15,7 @@
     "typescript": "^5.0.0",
     "react": "*",
     "react-dom": "*",
-    "bun-react-ssr": "0.2.2",
+    "bun-react-ssr": "link:bun-react-ssr",
     "@bunpmjs/bunext": "latest"
   },
   "dependencies": {
