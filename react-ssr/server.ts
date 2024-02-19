@@ -56,7 +56,7 @@ async function init() {
 function serve(request: Request, controller: middleWare) {
   return router.serve(request, {
     Shell: Shell,
-    bootstrapModules: [".bunext/react-ssr/hydrate.js"],
+    bootstrapModules: ["/.bunext/react-ssr/hydrate.js"],
   });
 }
 
