@@ -13,7 +13,7 @@ switch (cmd) {
     build();
     break;
   case "dev":
-    await init();
+    //await init();
     build();
     dev();
     break;
