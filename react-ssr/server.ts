@@ -17,16 +17,13 @@ declare global {
 globalThis.socketList ??= [];
 globalThis.dryRun ??= true;
 
-await doBuild();
-
-sendSignal();
+await init();
 
 try {
   const server = Bun.serve({
     port: 3000,
     async fetch(request) {
       const controller = new middleWare({ req: request });
-      globalThis.mode === "dev" && ClientsetHotServer();
 
       if (!request.url.endsWith(".js")) await doBuild();
       const response =
@@ -41,11 +38,19 @@ try {
       });
     },
   });
-  globalThis.mode === "dev" && serveHotServer();
   console.log("Serve on port:", server.port);
 } catch (e) {
   console.log(e);
   process.exit(0);
+}
+
+async function init() {
+  await doBuild();
+  if (globalThis.mode === "dev") {
+    serveHotServer();
+    ClientsetHotServer();
+  }
+  sendSignal();
 }
 
 function serve(request: Request, controller: middleWare) {
