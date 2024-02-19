@@ -1,5 +1,4 @@
 import { Head } from "@bunpmjs/bunext/componants/head";
-import { LoadScript } from "@bunpmjs/bunext/componants/script";
 import React from "react";
 import "./global";
 
@@ -8,9 +7,6 @@ export const Shell: React.FC<{ children: React.ReactElement }> = ({
 }) => (
   <html>
     <Head />
-    <body>
-      {children}
-      <LoadScript />
-    </body>
+    <body>{children}</body>
   </html>
 );

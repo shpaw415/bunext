@@ -56,7 +56,7 @@ async function init() {
 function serve(request: Request, controller: middleWare) {
   return router.serve(request, {
     Shell: Shell,
-    bootstrapModules: ["/.bunext/react-ssr/hydrate.js"],
+    bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
   });
 }
 
@@ -102,7 +102,11 @@ function serveScript(request: Request) {
     const variable = `__${generateRandomString(5)}__`;
     return `const ${variable} = ${sc}; ${variable}();`;
   });
-  return new Response(_scriptsStr.join("\n"));
+  return new Response(_scriptsStr.join("\n"), {
+    headers: {
+      "Content-Type": "text/javascript;charset=utf-8",
+    },
+  });
 }
 
 export class middleWare {
