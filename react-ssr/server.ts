@@ -11,9 +11,11 @@ import { webToken } from "@bunpmjs/json-webtoken";
 
 declare global {
   var socketList: ServerWebSocket<unknown>[];
+  var dryRun: boolean;
 }
 
 globalThis.socketList ??= [];
+globalThis.dryRun ??= true;
 
 await doBuild();
 
@@ -32,6 +34,8 @@ try {
         (await serveStatic(request)) ||
         serveScript(request);
       if (response) return controller.setSessionToken(response as Response);
+
+      globalThis.dryRun = false;
       return new Response("Not found", {
         status: 404,
       });
