@@ -5,7 +5,6 @@ export function setDevEnvironement() {
 }
 
 export function ClientsetHotServer() {
-  if (!globalThis.dryRun) return;
   addScript(() => {
     const p = window.location;
     const ws = new WebSocket(

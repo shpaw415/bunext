@@ -45,11 +45,11 @@ try {
 }
 
 async function init() {
-  await doBuild();
-  if (globalThis.mode === "dev") {
+  if (globalThis.mode === "dev" && globalThis.dryRun) {
     serveHotServer();
     ClientsetHotServer();
   }
+  await doBuild();
   sendSignal();
 }
 
