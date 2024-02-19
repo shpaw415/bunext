@@ -1,4 +1,4 @@
-import { hydrate } from "bun-react-ssr/hydrate";
+import { hydrate } from "bun-react-ssr/src/hydrate";
 import { Shell } from "./shell";
 import "./global";
 

@@ -1,4 +1,4 @@
-import { build } from "bun-react-ssr/build";
+import { build } from "bun-react-ssr/src/build";
 
 export async function doBuild() {
   const result = await build({
