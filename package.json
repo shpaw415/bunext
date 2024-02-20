@@ -15,7 +15,7 @@
     "typescript": "^5.0.0",
     "react": "*",
     "react-dom": "*",
-    "bun-react-ssr": "link:bun-react-ssr",
+    "bun-react-ssr": "git@github.com:shpaw415/bun-react-ssr.git#nextjs",
     "@bunpmjs/bunext": "latest"
   },
   "dependencies": {
