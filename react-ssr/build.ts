@@ -1,6 +1,6 @@
-import { plugin, type BunPlugin } from "bun";
+import { Transpiler, type BunPlugin } from "bun";
 import { build } from "bun-react-ssr/src/build";
-
+import ReactDOMServer from "react-dom/server";
 export async function doBuild() {
   const result = await build({
     baseDir: process.cwd(),
@@ -34,16 +34,28 @@ function useServerPlugin() {
           let _content = content;
           let module: any;
           const lines = content.split("\n");
-          for (const line of lines) {
+          for await (const line of lines) {
             const l = line.trim();
             if (l.length == 0) continue;
             else if (
-              l.startsWith("'use server'") ||
-              l.startsWith('"use server"')
-            ) {
+              l.startsWith("'use client'") ||
+              l.startsWith('"use client"')
+            )
+              break;
+            else if (l.startsWith('"use server"')) {
+              const transpiler = new Transpiler({
+                target: "browser",
+              });
               module = await import(props.path);
-              console.log(module);
-            } else break;
+              const importList = transpiler.scan(content);
+
+              const stringified = ReactDOMServer.renderToString(
+                await module.default()
+              );
+
+              console.log(stringified);
+              //_content = `export default Page() {}`;
+            }
           }
           return {
             contents: _content,
@@ -53,4 +65,8 @@ function useServerPlugin() {
       );
     },
   } as BunPlugin;
+}
+
+function getImports(content: string) {
+  const lines = content.split("\n");
 }
