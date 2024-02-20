@@ -16,7 +16,7 @@
     "react": "*",
     "react-dom": "*",
     "bun-react-ssr": "git@github.com:shpaw415/bun-react-ssr.git#nextjs",
-    "@bunpmjs/bunext": "latest"
+    "@bunpmjs/bunext": "git@github.com:shpaw415/bunext.git"
   },
   "dependencies": {
     "@bunpmjs/json-webtoken": "^0.0.21",
