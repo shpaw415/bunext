@@ -7,6 +7,8 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 export * from "./deprecated_build";
 
+globalThis.pages ??= [];
+
 type _Builderoptions = {
   baseDir: string;
   buildDir?: string;
@@ -17,6 +19,13 @@ type _Builderoptions = {
   define?: Record<string, string>;
   plugins?: import("bun").BunPlugin[];
 };
+
+type _bypassOptions = {
+  useServer: {
+    pageName: string[];
+  };
+};
+
 type _requiredBuildoptions = {
   outdir: string;
   entrypoints: string[];
@@ -26,12 +35,19 @@ type _otherOptions = {
 };
 export class Builder {
   private options: _Builderoptions;
-  constructor(options: _Builderoptions) {
+  private bypassoptions: _bypassOptions;
+  constructor(options: _Builderoptions, bypassOptions?: _bypassOptions) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
       pageDir: "pages",
       buildDir: ".build",
       ...options,
+    };
+    this.bypassoptions = {
+      useServer: {
+        pageName: [],
+      },
+      ...bypassOptions,
     };
   }
   async build() {
@@ -107,10 +123,11 @@ export class Builder {
       },
     } as BunPlugin;
   }
+  private ServerActionPluginExt() {}
   private UseServerPlugin(pageDir: string) {
     const self = this;
     return {
-      name: "use-server-and-revalidate",
+      name: "use-server-revalidate-serverAction",
       target: "browser",
       setup(build) {
         build.onLoad(
@@ -118,16 +135,19 @@ export class Builder {
             filter: /\.tsx$/,
           },
           async (props) => {
+            const pageBasePath = props.path
+              .split(self.options.pageDir as string)
+              .at(1);
+
             const relativePath = normalize(
-              "/" +
-                props.path
-                  .split(self.options.pageDir as string)[1]
-                  .split("/")
-                  .slice(0, -1)
-                  .join("/")
+              "/" + (pageBasePath?.split("/").slice(0, -1).join("/") || "")
             );
-            if (globalThis.pages.find((e) => e.path === relativePath)) {
+            if (
+              globalThis.pages.find((e) => e.path === relativePath) &&
+              pageBasePath
+            ) {
               const { baseDir, buildDir, pageDir } = self.options;
+
               return {
                 contents: await Bun.file(
                   normalize(
@@ -151,11 +171,15 @@ export class Builder {
                 !props.path.startsWith(
                   normalize(`${process.cwd()}/${pageDir}`)
                 ) ||
-                props.path.endsWith("layout.tsx")
+                (props.path.includes(pageDir) &&
+                  self.bypassoptions.useServer.pageName.includes(
+                    props.path.split("/").at(-1) || ""
+                  ))
               ) {
                 _content = content;
                 break;
               }
+
               const _module = await import(props.path);
               const transpiler = new Transpiler({
                 loader: "tsx",
@@ -165,7 +189,10 @@ export class Builder {
               const { imports, exports } = transpiler.scan(content);
               const bypassImports = ["bun", "fs", "crypto"];
               for await (const i of imports) {
-                if (bypassImports.includes(i.path)) continue;
+                if (bypassImports.includes(i.path)) {
+                  self.ServerActionPluginExt();
+                  continue;
+                }
                 const _modulePath = normalize(
                   `${props.path.split("/").slice(0, -1).join("/")}/${i.path}`
                 );
@@ -181,7 +208,6 @@ export class Builder {
                   .filter((e) => e !== "default")
                   .join(", ")}} from "${i.path}.tsx?importer";\n`;
               }
-
               for await (const i of exports) {
                 const functionStr = (_module[i].toString() as string).trim();
                 const noParamsFunctionStr = `function ${
@@ -191,6 +217,10 @@ export class Builder {
                   _content += `export ${_module[i].toString()}`;
                   continue;
                 }
+
+                const params = functionStr.match(/\(([^)]+)\)/);
+                //console.log("params", params);
+
                 const element = (await _module[i]()) as JSX.Element;
                 if (!isValidElement(element)) continue;
                 const jsxString = reactElementToJSXString(element);
@@ -246,9 +276,11 @@ export class Builder {
     const { baseDir, plugins, pageDir, define } = this.options;
     const absPageDir = join(baseDir, pageDir as string);
     return Bun.build({
+      ...options,
       publicPath: "./",
       plugins: [
         ...(plugins ?? []),
+        ...(options.plugins ?? []),
         this.UseServerPlugin(pageDir as string),
         this.BunReactSsrPlugin(absPageDir),
       ],
@@ -260,7 +292,6 @@ export class Builder {
         ...define,
       },
       splitting: true,
-      ...options,
     });
   }
   private glob(

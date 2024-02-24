@@ -1,6 +1,6 @@
 #!/bin/env bun
 
-import { lstatSync, cpSync } from "fs";
+import { lstatSync, cpSync, mkdirSync } from "fs";
 import { paths } from "../globals";
 import { $ } from "bun";
 import { generateUuid } from "../features/utils";
@@ -64,6 +64,8 @@ async function install() {
       ".env",
       `${envFileContent}\nWEB_TOKEN_SECRET="${generateUuid()}"`
     ));
+
+  mkdirSync("static");
 
   await $`bun i`;
 }

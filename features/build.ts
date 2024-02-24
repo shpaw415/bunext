@@ -1,11 +1,18 @@
 import { Builder } from "@bunpmjs/bunext/bun-react-ssr/build";
 
-export const builder = new Builder({
-  baseDir: process.cwd(),
-  buildDir: ".bunext/build",
-  pageDir: "src/pages",
-  hydrate: ".bunext/react-ssr/hydrate.ts",
-});
+export const builder = new Builder(
+  {
+    baseDir: process.cwd(),
+    buildDir: ".bunext/build",
+    pageDir: "src/pages",
+    hydrate: ".bunext/react-ssr/hydrate.ts",
+  },
+  {
+    useServer: {
+      pageName: ["layout.tsx"],
+    },
+  }
+);
 
 export async function doBuild() {
   const result = await builder.build();
