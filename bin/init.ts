@@ -1,8 +1,9 @@
 #!/bin/env bun
 
-import { lstatSync, cpSync, mkdirSync, rmSync } from "fs";
+import { lstatSync, cpSync } from "fs";
 import { paths } from "../globals";
 import { $ } from "bun";
+import { generateUuid } from "../features/utils";
 await (async () => {
   try {
     throw new Error();
@@ -21,25 +22,18 @@ interface packageJson {
 }
 
 async function install() {
-  rmSync(paths.bunextDirName, {
+  cpSync(
+    `${paths.bunextModulePath}/componants/exemple.tsx`,
+    `${paths.basePagePath}/index.tsx`,
+    {
+      recursive: true,
+      force: true,
+    }
+  );
+  cpSync(`${paths.bunextModulePath}/.bunext`, `.bunext`, {
     recursive: true,
     force: true,
   });
-  mkdirSync(paths.bunextDirName);
-  mkdirSync(paths.basePagePath, {
-    recursive: true,
-  });
-  cpSync(
-    `${paths.bunextModulePath}/componants/exemple.tsx`,
-    `${paths.basePagePath}/index.tsx`
-  );
-  cpSync(
-    `${paths.bunextModulePath}/react-ssr`,
-    `${paths.bunextDirName}/react-ssr`,
-    {
-      recursive: true,
-    }
-  );
 
   const packageJson = (await Bun.file("package.json").json()) as packageJson;
   packageJson.scripts = {
@@ -50,10 +44,8 @@ async function install() {
   };
   packageJson.dependencies = {
     ...packageJson.dependencies,
-    //"bun-react-ssr": "^0.2.2",
     react: "18.2.0",
     "react-dom": "18.2.0",
-    "@bunpmjs/json-webtoken": "latest",
   };
   packageJson.devDependencies = {
     ...packageJson.devDependencies,
@@ -61,6 +53,17 @@ async function install() {
     "@types/react-dom": "18.2.19",
   };
   const beautify = require("json-beautify");
-  await Bun.write("package.json", beautify(packageJson, null, 2, 80));
+  const beatifiedJson = beautify(packageJson, null, 2, 50);
+  await Bun.write("package.json", beatifiedJson);
+
+  const envFile = Bun.file(".env");
+  let envFileContent = (await envFile.exists()) ? await envFile.text() : "";
+
+  envFileContent.includes("WEB_TOKEN_SECRET=") === false &&
+    (await Bun.write(
+      ".env",
+      `${envFileContent}\nWEB_TOKEN_SECRET="${generateUuid()}"`
+    ));
+
   await $`bun i`;
 }

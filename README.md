@@ -1,13 +1,31 @@
 # bunext
 
-Looking to make a Next app but it does not work as you would like?
-BuNext is the go to choice! It's at this time in progress and won't be ready for production
-for now. But will be soon enaugh!
+    - Nextjs Framwork compatible with Bun Runtime
 
-## -- what is Ready --
+## What is ready
 
-- [x] File router
-- [x] Session cookie
-- [ ] React full compatibility (now only partial, but activly working on it)
-- [ ] Documentation (to be implemented)
-- [ ] Database management (to be implemented with the sqlite bun API)
+    - SSR and CSR
+    - React
+    - Static assets
+    - Server componants ("use server" & "use client")
+    - Hot reload
+    - Revalidate
+
+## What is planed
+
+    - Server action (planed to be more permissive then the Nextjs version)
+    - Links
+    - Error fallback
+    - notFound fallback
+    - Hot reload (performance tweek is planed)
+    - Server componants (performance tweek is planed)
+    - React (some tweek needed to full compatibility)
+
+### To install and run
+
+```Bash
+#!/bin/env bash
+bun i
+bun bunext init
+bun run dev
+```

@@ -1,3 +1,4 @@
+"use client";
 import type { _Head } from "@bunpmjs/bunext/componants/head";
 
 declare global {

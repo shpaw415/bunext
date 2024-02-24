@@ -1,4 +1,4 @@
-import { Head } from "@bunpmjs/bunext/componants/head";
+"use client";
 import React from "react";
 import "./global";
 
@@ -6,7 +6,7 @@ export const Shell: React.FC<{ children: React.ReactElement }> = ({
   children,
 }) => (
   <html>
-    <Head />
+    <head></head>
     <body>{children}</body>
   </html>
 );

@@ -1,3 +1,19 @@
+// TODO: make it only avalable from the request and not global
+
+export type _Head = {
+  title?: string;
+  author?: string;
+  publisher?: string;
+  meta?: {
+    name: string;
+    content: string;
+  }[];
+};
+
+declare global {
+  var head: _Head;
+}
+
 export function Head() {
   const data = globalThis.head;
   return (
@@ -15,17 +31,7 @@ export function Head() {
     </head>
   );
 }
-
-export function setHead(data: _Head) {
-  globalThis.head = data;
+/** @param [reset=false] true for wipe the head data false to update already setted data */
+export function setHead(data: _Head, reset: boolean = false) {
+  globalThis.head = reset ? data : { ...globalThis.head, ...data };
 }
-
-export type _Head = {
-  title?: string;
-  author?: string;
-  publisher?: string;
-  meta?: {
-    name: string;
-    content: string;
-  }[];
-};

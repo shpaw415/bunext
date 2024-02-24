@@ -1,4 +1,4 @@
-import { StaticRouters } from "bun-react-ssr";
+import { StaticRouters } from "@bunpmjs/bunext/bun-react-ssr";
 
 export const router = new StaticRouters(
   process.cwd(),
@@ -7,5 +7,6 @@ export const router = new StaticRouters(
   {
     displayMode: "nextjs",
     layoutName: "layout.tsx",
+    ssrMode: "nextjs",
   }
 );

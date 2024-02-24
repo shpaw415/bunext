@@ -1,21 +1,14 @@
-import { doBuild } from "./build";
+import { builder, doBuild } from "@bunpmjs/bunext/features/build";
 import { router } from "./routes";
 import { Shell } from "./shell";
-import type { ServerWebSocket } from "bun";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import { ClientsetHotServer, sendSignal } from "@bunpmjs/bunext/dev/dev";
-import { getScriptsList } from "@bunpmjs/bunext/componants/script";
-import { webToken } from "@bunpmjs/json-webtoken";
-
-declare global {
-  var socketList: ServerWebSocket<unknown>[];
-  var dryRun: boolean;
-}
-
-globalThis.socketList ??= [];
-globalThis.dryRun ??= true;
+import { webToken } from "@bunpmjs/bunext";
+import "@bunpmjs/bunext/server_global";
+import { renderToReadableStream } from "react-dom/server";
+import { ErrorFallback } from "./fallback";
 
 await init();
 
@@ -24,8 +17,6 @@ try {
     port: 3000,
     async fetch(request) {
       const controller = new middleWare({ req: request });
-
-      if (!request.url.endsWith(".js")) await doBuild();
       const response =
         (await serve(request, controller)) ||
         (await serveStatic(request)) ||
@@ -43,21 +34,38 @@ try {
   console.log(e);
   process.exit(0);
 }
+globalThis.dryRun = false;
 
 async function init() {
   if (globalThis.mode === "dev" && globalThis.dryRun) {
     serveHotServer();
     ClientsetHotServer();
   }
-  await doBuild();
+  if (globalThis.dryRun) await doBuild();
   sendSignal();
 }
 
-function serve(request: Request, controller: middleWare) {
-  return router.serve(request, {
-    Shell: Shell,
-    bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
-  });
+async function serve(request: Request, controller: middleWare) {
+  try {
+    const route = router.server.match(request);
+    if (route && globalThis.mode === "dev") {
+      await builder.buildPath(route.pathname);
+      router.updateRoute(route.pathname);
+    }
+    const response = await router.serve(request, {
+      Shell: Shell,
+      bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
+    });
+    return response;
+  } catch (e) {
+    const res = async () =>
+      new Response(
+        await renderToReadableStream(ErrorFallback(), {
+          bootstrapModules: ["/bunext-scripts"],
+        })
+      );
+    return res();
+  }
 }
 
 function serveHotServer() {
@@ -98,7 +106,7 @@ async function serveStatic(request: Request) {
 function serveScript(request: Request) {
   const path = new URL(request.url).pathname;
   if (names.loadScriptPath != path) return null;
-  const _scriptsStr = getScriptsList().map((sc) => {
+  const _scriptsStr = globalThis.scriptsList.map((sc) => {
     const variable = `__${generateRandomString(5)}__`;
     return `const ${variable} = ${sc}; ${variable}();`;
   });

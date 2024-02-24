@@ -1,7 +1,7 @@
 #!/bin/env bun
 
 import { paths } from "../globals";
-
+import { $ } from "bun";
 type _cmd = "init" | "build" | "dev";
 const cmd = process.argv[2] as _cmd;
 
@@ -10,7 +10,7 @@ switch (cmd) {
     await init();
     break;
   case "build":
-    build();
+    await build();
     break;
   case "dev":
     //await init();
@@ -21,11 +21,8 @@ switch (cmd) {
     console.log(`Bunext: '${cmd}' is not a function`);
 }
 
-function build() {
-  Bun.spawn({
-    cmd: ["bun", `${paths.bunextDirName}/react-ssr/build.ts`],
-    stdout: "inherit",
-  });
+async function build() {
+  await $`bun ${paths.bunextModulePath}/features/build.ts`;
 }
 function dev() {
   Bun.spawn({
