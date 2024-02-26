@@ -176,7 +176,7 @@ export class Builder {
     isDefault: boolean
   ): string | null {
     if (!func.name.startsWith("Server")) return null;
-    const path = ModulePath.split(this.options.baseDir).at(1);
+    const path = ModulePath.split(this.options.pageDir as string).at(1);
     if (!path) return null;
 
     return `export ${isDefault ? "default " : ""}async function ${
@@ -187,14 +187,14 @@ export class Builder {
     return async function (...props: Array<any>) {
       const response = await fetch("<!URLPATH!>", {
         headers: {
-          serverActionID: "<!ModulePath!>.<!FuncName!>",
+          serverActionID: "<!ModulePath!>:<!FuncName!>",
         },
         method: "POST",
-        body: encodeURI(JSON.stringify(props)),
+        body: JSON.stringify(encodeURI(JSON.stringify(props))),
       });
       if (!response.ok)
         throw new Error(
-          "error when Calling server action <!ModulePath!>.<!FuncName!>"
+          "error when Calling server action <!ModulePath!>:<!FuncName!>"
         );
       return response.json();
     }

@@ -1,4 +1,9 @@
-import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
+import {
+  FileSystemRouter,
+  type MatchedRoute,
+  Glob,
+  readableStreamToText,
+} from "bun";
 import { NJSON } from "next-json";
 import { statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -77,7 +82,8 @@ export class StaticRouters {
     }
   ): Promise<Response | null> {
     const { pathname, search } = new URL(request.url);
-    console.log(pathname);
+    const serverAction = await this.serverActionGetter(request);
+    if (serverAction) return serverAction;
 
     const staticResponse = await serveFromDir({
       directory: this.buildDir,
@@ -184,6 +190,33 @@ export class StaticRouters {
         "Cache-Control": "no-store",
       },
     });
+  }
+
+  private async serverActionGetter(request: Request): Promise<Response | null> {
+    const { pathname } = new URL(request.url);
+    if (pathname !== "/ServerActionGetter") return null;
+    const reqData = this.extractServerActionHeader(request);
+    if (!reqData) return null;
+    const props = await this.extractPostData(request);
+    const module = globalThis.serverActions.find(
+      (s) => s.path === reqData.path.slice(1)
+    );
+    if (!module) return null;
+    const call = module.actions.find((f) => f.name === reqData.call);
+    if (!call) return null;
+    const result = JSON.stringify(call(...props));
+    return new Response(result);
+  }
+  private extractServerActionHeader(request: Request) {
+    const serverActionData = request.headers.get("serveractionid")?.split(":");
+    if (!serverActionData) return null;
+    return {
+      path: serverActionData[0],
+      call: serverActionData[1],
+    };
+  }
+  private async extractPostData(request: Request) {
+    return JSON.parse(decodeURI(await request.json()));
   }
 
   updateRoute(path: string) {
