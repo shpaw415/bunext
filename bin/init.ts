@@ -23,8 +23,8 @@ interface packageJson {
 
 async function install() {
   cpSync(
-    `${paths.bunextModulePath}/componants/exemple.tsx`,
-    `${paths.basePagePath}/index.tsx`,
+    `${paths.bunextModulePath}/componants/exemple`,
+    `${paths.basePagePath}`,
     {
       recursive: true,
       force: true,

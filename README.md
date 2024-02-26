@@ -10,15 +10,14 @@
     - Server componants ("use server" & "use client")
     - Hot reload
     - Revalidate
+    - Server action
 
 ## What is planed
 
-    - Server action (planed to be more permissive then the Nextjs version)
     - Links
     - Error fallback
     - notFound fallback
     - Hot reload (performance tweek is planed)
-    - Server componants (performance tweek is planed)
     - React (some tweek needed to full compatibility)
 
 ### To install and run

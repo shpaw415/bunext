@@ -9,7 +9,7 @@ type _GlobalData = {
   __INITIAL_ROUTE__: string;
   __ROUTES__: Record<string, string>;
   __SERVERSIDE_PROPS__?: any;
-  __DISPLAY_MODE__: _DisplayMode;
+  __DISPLAY_MODE__: keyof _DisplayMode;
   __LAYOUT_NAME__: string;
 };
 
