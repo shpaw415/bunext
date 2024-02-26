@@ -34,6 +34,10 @@ async function install() {
     recursive: true,
     force: true,
   });
+  cpSync(`${paths.bunextModulePath}/componants/static`, "static", {
+    recursive: true,
+    force: true,
+  });
 
   const packageJson = (await Bun.file("package.json").json()) as packageJson;
   packageJson.scripts = {
@@ -64,8 +68,6 @@ async function install() {
       ".env",
       `${envFileContent}\nWEB_TOKEN_SECRET="${generateUuid()}"`
     ));
-
-  mkdirSync("static");
 
   await $`bun i`;
 }
