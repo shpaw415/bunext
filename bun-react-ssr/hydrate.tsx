@@ -87,7 +87,6 @@ async function NextJsLayoutStacker({
   const layoutPath = global.__ROUTES__["/" + global.__LAYOUT_NAME__];
   if (matched.path === "/" && typeof layoutPath !== "undefined") {
     const Layout__ = await import(layoutPath);
-    console.log(Layout__);
     return await Layout__.default({ children: pageJsx });
   }
   const splitedRoute = matched.path.split("/");
