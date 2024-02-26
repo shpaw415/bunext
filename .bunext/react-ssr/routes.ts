@@ -5,8 +5,13 @@ export const router = new StaticRouters(
   ".bunext/build",
   "src/pages",
   {
-    displayMode: "nextjs",
-    layoutName: "layout.tsx",
+    displayMode: {
+      nextjs: {
+        layout: "layout.tsx",
+      },
+    },
     ssrMode: "nextjs",
   }
 );
+
+await router.InitServerActions();
