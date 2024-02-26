@@ -223,6 +223,7 @@ export class Builder {
             const relativePath = normalize(
               "/" + (pageBasePath?.split("/").slice(0, -1).join("/") || "")
             );
+
             if (
               globalThis.pages.find((e) => e.path === relativePath) &&
               pageBasePath
@@ -278,6 +279,8 @@ export class Builder {
 
             const _module = await import(props.path);
 
+            !pageBasePath && console.log(_module);
+
             const bypassImports = ["bun", "fs", "crypto"];
             for await (const i of imports) {
               if (bypassImports.includes(i.path)) continue;
@@ -330,6 +333,7 @@ export class Builder {
               compilerType = "jsx";
               break;
             }
+            return makeReturn();
           }
         );
         build.onResolve(
