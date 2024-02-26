@@ -1,6 +1,6 @@
 #!/bin/env bun
 
-import { lstatSync, cpSync, mkdirSync } from "fs";
+import { lstatSync, cpSync } from "fs";
 import { paths } from "../globals";
 import { $ } from "bun";
 import { generateUuid } from "../features/utils";

@@ -6,6 +6,7 @@ import { normalize } from "path";
 import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "./types";
+import { isUseClient } from ".";
 export * from "./deprecated_build";
 
 globalThis.pages ??= [];
@@ -238,95 +239,97 @@ export class Builder {
                 loader: "jsx",
               };
             }
+            ///////////////////////////////////////////////////////////////////
             const content = await Bun.file(props.path).text();
             let _content = "";
             let compilerType: "tsx" | "jsx" | "ts" | "js" = "tsx";
-            const lines = content.split("\n");
-            for await (const line of lines) {
-              const l = line.trim();
-              if (l.length == 0) continue;
-              else if (
-                l.startsWith("'use client'") ||
-                l.startsWith('"use client"') ||
-                !props.path.startsWith(
-                  normalize(`${process.cwd()}/${pageDir}`)
-                ) ||
-                (props.path.includes(pageDir) &&
-                  self.bypassoptions.useServer.pageName.includes(
-                    props.path.split("/").at(-1) || ""
-                  ))
-              ) {
-                _content = content;
-                break;
+            const makeReturn = () => {
+              return {
+                contents: _content,
+                loader: compilerType,
+              };
+            };
+            const transpiler = new Transpiler({
+              loader: "tsx",
+              trimUnusedImports: true,
+              target: "browser",
+            });
+            const { imports, exports } = transpiler.scan(content);
+
+            /*console.log({
+              isClient: isUseClient(content),
+              path: props.path,
+              exports: exports,
+            });*/
+
+            if (
+              isUseClient(content) ||
+              !props.path.startsWith(
+                normalize(`${process.cwd()}/${pageDir}`)
+              ) ||
+              (props.path.includes(pageDir) &&
+                self.bypassoptions.useServer.pageName.includes(
+                  props.path.split("/").at(-1) || ""
+                ))
+            ) {
+              _content = content;
+              return makeReturn();
+            }
+
+            const _module = await import(props.path);
+
+            const bypassImports = ["bun", "fs", "crypto"];
+            for await (const i of imports) {
+              if (bypassImports.includes(i.path)) continue;
+              const _modulePath = normalize(
+                `${props.path.split("/").slice(0, -1).join("/")}/${i.path}`
+              );
+              const _module = transpiler.scan(
+                await Bun.file(import.meta.resolveSync(_modulePath)).text()
+              );
+              const _default = import.meta.require(_modulePath);
+              const defaultName =
+                typeof _default?.default?.name === "undefined"
+                  ? ""
+                  : _default.default.name;
+              _content += `import ${defaultName} {${_module.exports
+                .filter((e) => e !== "default")
+                .join(", ")}} from "${i.path}.tsx?importer";\n`;
+            }
+            for await (const i of exports) {
+              const exportName = i === "default" ? _module[i].name : i;
+
+              const functionStr = (_module[i].toString() as string).trim();
+              const noParamsFunctionStr = `function ${exportName}()`;
+              const serverActionString = self.ServerActionPluginExt(
+                _module[i],
+                props.path,
+                _module[i].name === _module?.default?.name
+              );
+              if (serverActionString) {
+                _content += serverActionString + "\n";
+                continue;
               }
 
-              const _module = await import(props.path);
-              const transpiler = new Transpiler({
-                loader: "tsx",
-                trimUnusedImports: true,
-                target: "browser",
-              });
-              const { imports, exports } = transpiler.scan(content);
-              const bypassImports = ["bun", "fs", "crypto"];
-              for await (const i of imports) {
-                if (bypassImports.includes(i.path)) continue;
-                const _modulePath = normalize(
-                  `${props.path.split("/").slice(0, -1).join("/")}/${i.path}`
-                );
-                const _module = transpiler.scan(
-                  await Bun.file(import.meta.resolveSync(_modulePath)).text()
-                );
-                const _default = import.meta.require(_modulePath);
-                const defaultName =
-                  typeof _default?.default?.name === "undefined"
-                    ? ""
-                    : _default.default.name;
-                _content += `import ${defaultName} {${_module.exports
-                  .filter((e) => e !== "default")
-                  .join(", ")}} from "${i.path}.tsx?importer";\n`;
+              if (!functionStr.startsWith(noParamsFunctionStr)) {
+                const newContent = `export${
+                  _module[i].name === _module?.default?.name ? " default " : " "
+                }${_module[i].toString()}`;
+                _content += newContent;
+                continue;
               }
-              for await (const i of exports) {
-                const exportName = i === "default" ? _module[i].name : i;
+              const element = (await _module[i]()) as JSX.Element;
+              if (!isValidElement(element)) continue;
+              const jsxString = reactElementToJSXString(element);
+              _content += `export ${
+                i === "default" ? "default " : ""
+              }function ${
+                i === "default" ? _module[i].name : i
+              }(){ return ${jsxString};}\n`;
 
-                const functionStr = (_module[i].toString() as string).trim();
-                const noParamsFunctionStr = `function ${exportName}()`;
-                const serverActionString = self.ServerActionPluginExt(
-                  _module[i],
-                  props.path,
-                  _module[i].name === _module?.default?.name
-                );
-                if (serverActionString) {
-                  _content += serverActionString + "\n";
-                  continue;
-                }
-
-                if (!functionStr.startsWith(noParamsFunctionStr)) {
-                  const newContent = `export${
-                    _module[i].name === _module?.default?.name
-                      ? " default "
-                      : " "
-                  }${_module[i].toString()}`;
-                  _content += newContent;
-                  continue;
-                }
-                const element = (await _module[i]()) as JSX.Element;
-                if (!isValidElement(element)) continue;
-                const jsxString = reactElementToJSXString(element);
-                _content += `export ${
-                  i === "default" ? "default " : ""
-                }function ${
-                  i === "default" ? _module[i].name : i
-                }(){ return ${jsxString};}\n`;
-
-                compilerType = "jsx";
-                break;
-              }
+              compilerType = "jsx";
               break;
             }
-            return {
-              contents: _content,
-              loader: compilerType,
-            };
           }
         );
         build.onResolve(
