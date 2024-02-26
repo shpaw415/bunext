@@ -204,7 +204,7 @@ export class StaticRouters {
     if (!module) return null;
     const call = module.actions.find((f) => f.name === reqData.call);
     if (!call) return null;
-    const result = JSON.stringify(call(...props));
+    const result = JSON.stringify(await call(...props));
     return new Response(result);
   }
   private extractServerActionHeader(request: Request) {
