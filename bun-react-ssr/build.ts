@@ -375,12 +375,13 @@ export class Builder {
               process.exit(1);
             }
             const fileContent = await Bun.file(_path).text();
+            /*
             const transpiled = new Transpiler({
               loader: "tsx",
             }).transformSync(fileContent);
-
+            */
             return {
-              contents: transpiled,
+              contents: fileContent,
               loader: "jsx",
             };
           }
