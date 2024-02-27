@@ -1,12 +1,12 @@
 import { Glob, Transpiler, fileURLToPath, pathToFileURL } from "bun";
 import { unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
-import type { BunPlugin } from "bun";
+import type { BunPlugin, Import, OnLoadArgs } from "bun";
 import { normalize } from "path";
 import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
-import { URLpaths } from "./types";
-import { isUseClient } from ".";
+import { URLpaths } from "../bun-react-ssr/types";
+import { isUseClient } from "../bun-react-ssr";
 export * from "./deprecated_build";
 
 globalThis.pages ??= [];
@@ -80,6 +80,7 @@ export class Builder {
       outdir: join(baseDir, buildDir as string),
       minify,
       plugins: [...(plugins ?? [])],
+      //external: await this.getExternalsFromPackageJson(),
     });
     if (result.success) {
       for await (const path of this.glob(join(baseDir, buildDir as string))) {
@@ -89,12 +90,6 @@ export class Builder {
       }
     } else return result;
 
-    const builtFile = this.glob(
-      normalize(`${this.options.baseDir}/${this.options.buildDir}`)
-    );
-    for await (const i of builtFile) {
-      this.clearDuplicateExports(i);
-    }
     return result;
   }
   async buildPath(path: string) {
@@ -274,32 +269,16 @@ export class Builder {
             }
             const _module = await import(props.path);
 
-            const bypassImports = ["bun", "fs", "crypto"];
             for await (const i of imports) {
-              if (bypassImports.includes(i.path)) continue;
-              let _modulePath: string = "";
-              try {
-                _modulePath = import.meta.resolveSync(
-                  normalize(
-                    `${props.path.split("/").slice(0, -1).join("/")}/${i.path}`
-                  )
-                );
-              } catch {
-                _modulePath = import.meta.resolveSync(i.path);
-              }
-              const _module = transpiler.scan(
-                await Bun.file(_modulePath).text()
-              );
-              const _default = import.meta.require(_modulePath);
-
-              const defaultName =
-                typeof _default?.default?.name === "undefined"
-                  ? ""
-                  : _default.default.name;
-              _content += `import ${defaultName} {${_module.exports
-                .filter((e) => e !== "default")
-                .join(", ")}} from "${i.path}.tsx?importer";\n`;
+              console.log(i);
+              _content += await self.importerV1({
+                imported: i,
+                props: props,
+                transpiler: transpiler,
+              });
+              //await self.importerV2(i, content);
             }
+
             for await (const i of exports) {
               const exportName = i === "default" ? _module[i].name : i;
 
@@ -342,7 +321,6 @@ export class Builder {
             filter: /\.ts[x]\?importer$/,
           },
           async (args) => {
-            //console.log(args.path);
             const url = pathToFileURL(args.importer);
             const path = fileURLToPath(new URL(args.path, url));
             let outsideOfProject = false;
@@ -354,7 +332,6 @@ export class Builder {
               ).slice(1);
             } else _path = path;
 
-            //console.log(import.meta.resolveSync(_path));
             return {
               namespace: "importer",
               path: _path,
@@ -374,12 +351,18 @@ export class Builder {
               console.log(e);
               process.exit(1);
             }
-            const fileContent = await Bun.file(_path).text();
-            /*
-            const transpiled = new Transpiler({
-              loader: "tsx",
-            }).transformSync(fileContent);
-            */
+            let fileContent = await Bun.file(_path).text();
+            console.log(_path);
+            if (
+              !_path.includes(
+                normalize(
+                  [self.options.baseDir, self.options.pageDir].join("/")
+                )
+              )
+            ) {
+              build.config.entrypoints.push(_path);
+            }
+
             return {
               contents: fileContent,
               loader: loader,
@@ -389,14 +372,51 @@ export class Builder {
       },
     } as BunPlugin;
   }
-  private CreateBuild(
+  private async importerV1({
+    imported,
+    props,
+    transpiler,
+  }: {
+    imported: Import;
+    props: OnLoadArgs;
+    transpiler: Transpiler;
+  }) {
+    const i = imported;
+    const bypassImports = ["bun", "fs", "crypto"];
+
+    if (bypassImports.includes(i.path)) return;
+    let _modulePath: string = "";
+    try {
+      _modulePath = import.meta.resolveSync(
+        normalize(`${props.path.split("/").slice(0, -1).join("/")}/${i.path}`)
+      );
+    } catch {
+      _modulePath = import.meta.resolveSync(i.path);
+    }
+    const _module = transpiler.scan(await Bun.file(_modulePath).text());
+    const _default = import.meta.require(_modulePath);
+
+    const defaultName =
+      typeof _default?.default?.name === "undefined"
+        ? ""
+        : _default.default.name;
+    return `import { ${
+      defaultName === "" ? "" : `default as ${defaultName},`
+    } ${_module.exports.filter((e) => e !== "default").join(", ")}} from "${
+      i.path
+    }.tsx?importer";\n`;
+  }
+  private async importerV2(imported: Import) {
+    if (imported.kind !== "import-statement") return "";
+  }
+  private async CreateBuild(
     options: Partial<_Mainoptions> &
       _requiredBuildoptions &
       Partial<_otherOptions>
   ) {
-    const { baseDir, plugins, pageDir, define } = this.options;
+    const { plugins, pageDir, define } = this.options;
     //const absPageDir = join(baseDir, pageDir as string);
-    return Bun.build({
+    const build = await Bun.build({
       ...options,
       publicPath: "./",
       plugins: [
@@ -414,6 +434,26 @@ export class Builder {
       },
       splitting: true,
     });
+
+    const builtFile = this.glob(
+      normalize(`${this.options.baseDir}/${this.options.buildDir}`)
+    );
+    for await (const i of builtFile) {
+      this.clearDuplicateExports(i);
+    }
+    return build;
+  }
+  private async getExternalsFromPackageJson() {
+    const packageJson = JSON.parse(await Bun.file("./package.json").text());
+
+    const sections = ["dependencies", "devDependencies", "peerDependencies"],
+      externals = new Set();
+
+    for (const section of sections)
+      if (packageJson[section])
+        Object.keys(packageJson[section]).forEach((_) => externals.add(_));
+
+    return Array.from(externals) as string[];
   }
   private glob(
     path: string,

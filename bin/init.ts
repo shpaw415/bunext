@@ -10,7 +10,7 @@ await (async () => {
     lstatSync(paths.bunextDirName).isDirectory();
   } catch {
     try {
-      await install();
+      await install(false);
     } catch {}
   }
 })();
@@ -21,23 +21,25 @@ interface packageJson {
   devDependencies: { [key: string]: string };
 }
 
-async function install() {
-  cpSync(
-    `${paths.bunextModulePath}/componants/exemple`,
-    `${paths.basePagePath}`,
-    {
-      recursive: true,
-      force: true,
-    }
-  );
+async function install(total: boolean) {
   cpSync(`${paths.bunextModulePath}/.bunext`, `.bunext`, {
     recursive: true,
     force: true,
   });
-  cpSync(`${paths.bunextModulePath}/componants/static`, "static", {
-    recursive: true,
-    force: true,
-  });
+  if (total)
+    cpSync(
+      `${paths.bunextModulePath}/componants/exemple`,
+      `${paths.basePagePath}`,
+      {
+        recursive: true,
+        force: true,
+      }
+    );
+  if (total)
+    cpSync(`${paths.bunextModulePath}/componants/static`, "static", {
+      recursive: true,
+      force: true,
+    });
 
   const packageJson = (await Bun.file("package.json").json()) as packageJson;
   packageJson.scripts = {
