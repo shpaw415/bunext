@@ -377,7 +377,6 @@ export class Builder {
             const fileContent = await Bun.file(_path).text();
             const transpiled = new Transpiler({
               loader: "tsx",
-              autoImportJSX: true,
             }).transformSync(fileContent);
 
             return {
