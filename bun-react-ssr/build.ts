@@ -7,7 +7,6 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "./types";
 import { isUseClient } from ".";
-import { relative } from "path";
 export * from "./deprecated_build";
 
 globalThis.pages ??= [];
@@ -378,6 +377,7 @@ export class Builder {
             const fileContent = await Bun.file(_path).text();
             const transpiled = new Transpiler({
               loader: "tsx",
+              autoImportJSX: true,
             }).transformSync(fileContent);
 
             return {
@@ -395,7 +395,7 @@ export class Builder {
       Partial<_otherOptions>
   ) {
     const { baseDir, plugins, pageDir, define } = this.options;
-    const absPageDir = join(baseDir, pageDir as string);
+    //const absPageDir = join(baseDir, pageDir as string);
     return Bun.build({
       ...options,
       publicPath: "./",
