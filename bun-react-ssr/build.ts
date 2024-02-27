@@ -243,6 +243,7 @@ export class Builder {
             }
 
             ///////////////////////////////////////////////////////////////////
+            //console.log(props.path);
             const content = await Bun.file(props.path).text();
             let _content = "";
             let compilerType: "tsx" | "jsx" | "ts" | "js" = "tsx";
@@ -349,11 +350,22 @@ export class Builder {
             filter: /\.ts[x]\?importer$/,
           },
           async (args) => {
+            console.log(args.path);
             const url = pathToFileURL(args.importer);
-            console.log(args, url);
+            const path = fileURLToPath(new URL(args.path, url));
+            let outsideOfProject = false;
+            let _path = "";
+            if (!(await Bun.file(path).exists())) {
+              outsideOfProject = true;
+              _path = (
+                path.split(self.options.pageDir as string).at(1) as string
+              ).slice(1);
+            } else _path = path;
+
+            console.log(import.meta.resolveSync(_path));
             return {
               namespace: "importer",
-              path: fileURLToPath(new URL(args.path, url)),
+              path: _path,
             };
           }
         );
@@ -363,8 +375,17 @@ export class Builder {
             filter: /\.ts[x]$/,
           },
           async ({ path, loader }) => {
+            let _path = "";
+            try {
+              _path = await import.meta.resolve(path);
+            } catch (e) {
+              console.log("!!!ERROR!!!");
+              console.log(e);
+              process.exit(1);
+            }
+            const fileContent = await Bun.file(_path).text();
             return {
-              contents: await Bun.file(path).text(),
+              contents: fileContent,
               loader,
             };
           }
