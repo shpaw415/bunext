@@ -366,7 +366,7 @@ export class Builder {
             namespace: "importer",
             filter: /\.ts[x]$/,
           },
-          async ({ path }) => {
+          async ({ path, loader }) => {
             let _path = "";
             try {
               _path = import.meta.resolveSync(path);
@@ -382,7 +382,7 @@ export class Builder {
             */
             return {
               contents: fileContent,
-              loader: "jsx",
+              loader: loader,
             };
           }
         );
