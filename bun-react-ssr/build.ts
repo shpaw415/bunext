@@ -243,7 +243,6 @@ export class Builder {
             }
 
             ///////////////////////////////////////////////////////////////////
-            //console.log(props.path);
             const content = await Bun.file(props.path).text();
             let _content = "";
             let compilerType: "tsx" | "jsx" | "ts" | "js" = "tsx";
@@ -260,12 +259,6 @@ export class Builder {
               target: "browser",
             });
             const { imports, exports } = transpiler.scan(content);
-
-            /*console.log({
-              isClient: isUseClient(content),
-              path: props.path,
-              exports: exports,
-            });*/
 
             if (
               isUseClient(content) ||
@@ -350,7 +343,7 @@ export class Builder {
             filter: /\.ts[x]\?importer$/,
           },
           async (args) => {
-            console.log(args.path);
+            //console.log(args.path);
             const url = pathToFileURL(args.importer);
             const path = fileURLToPath(new URL(args.path, url));
             let outsideOfProject = false;
@@ -362,7 +355,7 @@ export class Builder {
               ).slice(1);
             } else _path = path;
 
-            console.log(import.meta.resolveSync(_path));
+            //console.log(import.meta.resolveSync(_path));
             return {
               namespace: "importer",
               path: _path,
@@ -374,19 +367,22 @@ export class Builder {
             namespace: "importer",
             filter: /\.ts[x]$/,
           },
-          async ({ path, loader }) => {
+          async ({ path }) => {
             let _path = "";
             try {
-              _path = await import.meta.resolve(path);
+              _path = import.meta.resolveSync(path);
             } catch (e) {
-              console.log("!!!ERROR!!!");
               console.log(e);
               process.exit(1);
             }
             const fileContent = await Bun.file(_path).text();
+            const transpiled = new Transpiler({
+              loader: "tsx",
+            }).transformSync(fileContent);
+
             return {
-              contents: fileContent,
-              loader,
+              contents: transpiled,
+              loader: "jsx",
             };
           }
         );
