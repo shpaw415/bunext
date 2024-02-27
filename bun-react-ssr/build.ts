@@ -7,6 +7,7 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "./types";
 import { isUseClient } from ".";
+import { relative } from "path";
 export * from "./deprecated_build";
 
 globalThis.pages ??= [];
@@ -240,6 +241,7 @@ export class Builder {
                 loader: "jsx",
               };
             }
+
             ///////////////////////////////////////////////////////////////////
             const content = await Bun.file(props.path).text();
             let _content = "";
@@ -250,6 +252,7 @@ export class Builder {
                 loader: compilerType,
               };
             };
+
             const transpiler = new Transpiler({
               loader: "tsx",
               trimUnusedImports: true,
@@ -276,21 +279,26 @@ export class Builder {
               _content = content;
               return makeReturn();
             }
-
             const _module = await import(props.path);
-
-            !pageBasePath && console.log(_module);
 
             const bypassImports = ["bun", "fs", "crypto"];
             for await (const i of imports) {
               if (bypassImports.includes(i.path)) continue;
-              const _modulePath = normalize(
-                `${props.path.split("/").slice(0, -1).join("/")}/${i.path}`
-              );
+              let _modulePath: string = "";
+              try {
+                _modulePath = import.meta.resolveSync(
+                  normalize(
+                    `${props.path.split("/").slice(0, -1).join("/")}/${i.path}`
+                  )
+                );
+              } catch {
+                _modulePath = import.meta.resolveSync(i.path);
+              }
               const _module = transpiler.scan(
-                await Bun.file(import.meta.resolveSync(_modulePath)).text()
+                await Bun.file(_modulePath).text()
               );
               const _default = import.meta.require(_modulePath);
+
               const defaultName =
                 typeof _default?.default?.name === "undefined"
                   ? ""
@@ -342,6 +350,7 @@ export class Builder {
           },
           async (args) => {
             const url = pathToFileURL(args.importer);
+            console.log(args, url);
             return {
               namespace: "importer",
               path: fileURLToPath(new URL(args.path, url)),
