@@ -19,7 +19,7 @@ export function ClientsetHotServer() {
 }
 
 export function sendSignal() {
-  console.log("socket", globalThis.socketList.length);
+  console.log("socket connected: ", globalThis.socketList.length);
   for (const ws of globalThis.socketList) {
     ws.send("reload");
   }

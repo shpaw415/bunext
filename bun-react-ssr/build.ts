@@ -7,6 +7,7 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "../bun-react-ssr/types";
 import { isUseClient } from "../bun-react-ssr";
+import { relative } from "path";
 export * from "./deprecated_build";
 
 globalThis.pages ??= [];
@@ -199,10 +200,10 @@ export class Builder {
       .replaceAll("<!ModulePath!>", ModulePath)
       .replaceAll("<!URLPATH!>", URLpaths.serverAction);
   }
-  private UseServerPlugin(pageDir: string) {
+  private NextJsPlugin() {
     const self = this;
     return {
-      name: "use-server-revalidate-serverAction",
+      name: "NextJsPlugin",
       target: "browser",
       setup(build) {
         build.onLoad(
@@ -271,9 +272,9 @@ export class Builder {
               self.bypassoptions.useServer.pageName.includes(
                 props.path.split("/").at(-1) || ""
               )
-            ) {
+            )
               return makeReturn(content);
-            }
+
             const _isUseClient = isUseClient(content);
             const _isInPageDir = props.path.includes(
               self.options.pageDir as string
@@ -296,13 +297,11 @@ export class Builder {
               return makeClientFeature();
             } else if (!_isInPageDir && !isUseClient) {
               //console.log("onload: external (server)", props.path);
+              return makeReturn(content);
             } else if (!_isInPageDir && _isUseClient) {
               //console.log("onload: external (client)", props.path);
+              return makeReturn(content);
             }
-
-            return {
-              ...makeReturn(content),
-            };
           }
         );
         build.onResolve(
@@ -331,14 +330,12 @@ export class Builder {
             filter: /\.ts[x]$/,
           },
           async ({ path, loader }) => {
-            console.log("onload importer:", path);
             let file = Bun.file(path);
             if (!(await file.exists())) {
               const realPath = import.meta.resolveSync(
                 path.split(self.options.pageDir as string)[1].slice(1)
               );
 
-              console.log(realPath);
               file = Bun.file(realPath);
             }
             const fileContent = await file.text();
@@ -415,6 +412,7 @@ export class Builder {
 
     const bypassImports = ["bun", "fs", "crypto"];
     let _content = "";
+    if (namespace) namespace = "?" + namespace;
     for await (const i of imported) {
       if (bypassImports.includes(i.path)) continue;
       let _modulePath: string = "";
@@ -432,17 +430,26 @@ export class Builder {
         typeof _default?.default?.name === "undefined"
           ? ""
           : _default.default.name;
-
-      if (namespace) namespace = "?" + namespace;
-      if (!(await Bun.file(i.path).exists())) {
-        namespace = "";
+      let bypassNameSpace: undefined | string;
+      try {
+        const path = import.meta.resolveSync(
+          normalize(
+            [props.path.split("/").slice(0, -1).join("/"), i.path].join("/")
+          )
+        );
+      } catch {
+        bypassNameSpace = "";
       }
-
-      _content += `import { ${
+      const newContent = `import { ${
         defaultName === "" ? "" : `default as ${defaultName},`
       } ${_module.exports.filter((e) => e !== "default").join(", ")} } from "${
         i.path
-      }.tsx${namespace !== undefined ? namespace : "?importer"}";\n`;
+      }.tsx${
+        typeof bypassNameSpace !== "undefined"
+          ? bypassNameSpace
+          : namespace ?? "?importer"
+      }";\n`;
+      _content += newContent;
     }
     return _content;
   }
@@ -452,7 +459,6 @@ export class Builder {
       Partial<_otherOptions>
   ) {
     const { plugins, pageDir, define } = this.options;
-    //const absPageDir = join(baseDir, pageDir as string);
     const bypassExternal = ["react", "react-dom"];
     const build = await Bun.build({
       ...options,
@@ -460,8 +466,7 @@ export class Builder {
       plugins: [
         ...(plugins ?? []),
         ...(options.plugins ?? []),
-        this.UseServerPlugin(pageDir as string),
-        //this.BunReactSsrPlugin(absPageDir),
+        this.NextJsPlugin(),
       ],
       target: "browser",
       define: {
@@ -479,21 +484,8 @@ export class Builder {
     );
     for await (const i of builtFile) {
       await this.clearDuplicateExports(i);
-      await this.createExternalImports(i);
     }
     return build;
-  }
-  private async createExternalImports(filePath: string) {
-    const trasnpiler = new Transpiler({
-      loader: "js",
-    });
-    const fileContent = await Bun.file(filePath).text();
-    const { imports } = trasnpiler.scan(fileContent);
-
-    /*console.log({
-      path: filePath,
-      imports,
-    });*/
   }
   private async getExternalsFromPackageJson() {
     const packageJson = JSON.parse(await Bun.file("./package.json").text());
