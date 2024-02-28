@@ -111,11 +111,12 @@ export class Builder {
           .map((v) => v.trim()),
       });
     }
-    if (_export.length == 1) return;
+    if (_export.length <= 1) return;
     const filteredExports = [...new Set(..._export.map((e) => e.exportValues))];
-    _export.map((e) => {
+
+    for await (const e of _export) {
       fileContent = fileContent.replaceAll(e.exportStr, "");
-    });
+    }
     const transpiler = new Transpiler({
       loader: "jsx",
     });
