@@ -7,7 +7,6 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "../bun-react-ssr/types";
 import { isUseClient } from "../bun-react-ssr";
-import { relative } from "path";
 export * from "./deprecated_build";
 
 globalThis.pages ??= [];
@@ -99,7 +98,8 @@ export class Builder {
     await this.build();
   }
   private async clearDuplicateExports(filePath: string) {
-    let fileContent = await Bun.file(filePath).text();
+    const file = Bun.file(filePath);
+    let fileContent = await file.text();
     let exports = fileContent.matchAll(/export\s*\{([\s\S]*?)\}\s*;/g);
     let _export: { exportStr: string; exportValues: string[] }[] = [];
     for await (const i of exports) {
@@ -121,8 +121,9 @@ export class Builder {
     });
     fileContent += `export {${filteredExports.join(", ")}};`;
     await transpiler.transform(fileContent);
-    await Bun.write(filePath, fileContent);
+    await Bun.write(file, fileContent);
   }
+  /** Deprecated */
   private BunReactSsrPlugin(absPageDir: string) {
     const self = this;
     return {
@@ -339,11 +340,6 @@ export class Builder {
               file = Bun.file(realPath);
             }
             const fileContent = await file.text();
-            const transpiler = new Transpiler({
-              loader: path.endsWith("tsx") ? "tsx" : "ts",
-              autoImportJSX: path.endsWith("tsx") ? true : false,
-            });
-            //const transpiled = transpiler.transformSync(fileContent);
             return {
               contents: fileContent,
               loader: path.endsWith("tsx") ? "tsx" : "ts",
@@ -430,7 +426,9 @@ export class Builder {
         typeof _default?.default?.name === "undefined"
           ? ""
           : _default.default.name;
+
       let bypassNameSpace: undefined | string;
+      let _path = i.path;
       try {
         const path = import.meta.resolveSync(
           normalize(
@@ -442,9 +440,9 @@ export class Builder {
       }
       const newContent = `import { ${
         defaultName === "" ? "" : `default as ${defaultName},`
-      } ${_module.exports.filter((e) => e !== "default").join(", ")} } from "${
-        i.path
-      }.tsx${
+      } ${_module.exports
+        .filter((e) => e !== "default")
+        .join(", ")} } from "${_path}.tsx${
         typeof bypassNameSpace !== "undefined"
           ? bypassNameSpace
           : namespace ?? "?importer"
