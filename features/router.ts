@@ -1,3 +1,4 @@
+export * from "../bun-react-ssr/router";
 import { builder } from "./build";
 declare global {
   var pages: Array<{

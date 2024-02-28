@@ -11,10 +11,11 @@
     - Hot reload
     - Revalidate
     - Server action
+    - Links
 
 ## What is planed
 
-    - Links
+    - Links (some tweek for performance and biavours)
     - Error fallback
     - notFound fallback
     - Hot reload (performance tweek is planed)
@@ -24,7 +25,7 @@
 
 ```Bash
 #!/bin/env bash
-bun i
+bun i @bunpmjs/bunext || bunpm install bunext
 bun bunext init
 bun run dev
 ```
