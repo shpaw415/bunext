@@ -63,7 +63,10 @@ export class Builder {
           ...(options.display?.nextjs ? [options.display.nextjs.layout] : []),
           ...(options.bypass?.useServer.pageName ?? []),
         ],
-        functionName: ["getServerSideProps"],
+        functionName: [
+          "getServerSideProps",
+          ...(options.bypass?.useServer.functionName ?? []),
+        ],
       },
       ...options.bypass,
     };
