@@ -1,9 +1,4 @@
-import {
-  FileSystemRouter,
-  type MatchedRoute,
-  Glob,
-  readableStreamToText,
-} from "bun";
+import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
 import { NJSON } from "next-json";
 import { statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -132,6 +127,9 @@ export class StaticRouters {
               this.options?.displayMode?.nextjs?.layout.split(".").at(0)
             )}`
           : "",
+        this.options.displayMode?.nextjs
+          ? `__LAYOUT_ROUTE__=${JSON.stringify(await this.getlayoutPaths())}`
+          : "",
       ]
         .filter(Boolean)
         .join(";"),
@@ -192,6 +190,13 @@ export class StaticRouters {
     });
   }
 
+  private async getlayoutPaths() {
+    const files = this.getFilesFromPageDir();
+    return files
+      .filter((f) => f.split("/").at(-1)?.includes("layout."))
+      .map((l) => `//${l}`.split("/").slice(0, -1).join("/"));
+  }
+
   private async serverActionGetter(request: Request): Promise<Response | null> {
     const { pathname } = new URL(request.url);
     if (pathname !== "/ServerActionGetter") return null;
@@ -231,13 +236,8 @@ export class StaticRouters {
   async stackLayouts(route: MatchedRoute, pageElement: JSX.Element) {
     const layouts = route.pathname.split("/").slice(1);
     type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
-    type _layoutPromise = ({
-      children,
-    }: {
-      children: JSX.Element;
-    }) => Promise<JSX.Element>;
 
-    let layoutsJsxList: Array<_layout | _layoutPromise> = [];
+    let layoutsJsxList: Array<_layout> = [];
     let index = 0;
     for await (const i of layouts) {
       const path = layouts.slice(0, index).join("/");
@@ -257,20 +257,22 @@ export class StaticRouters {
     layoutsJsxList = layoutsJsxList.reverse();
     let currentJsx: JSX.Element = <></>;
     for await (const Layout of layoutsJsxList) {
-      currentJsx = await Layout({ children: currentJsx });
+      currentJsx = Layout({ children: currentJsx });
     }
     return currentJsx;
   }
-
-  async InitServerActions() {
-    globalThis.serverActions = [];
+  private getFilesFromPageDir() {
     const glob = new Glob("**/*.{ts,tsx,js,jsx}");
-    const files = Array.from(
+    return Array.from(
       glob.scanSync({
         cwd: this.pageDir,
         onlyFiles: true,
       })
     );
+  }
+  async InitServerActions() {
+    globalThis.serverActions = [];
+    const files = this.getFilesFromPageDir();
 
     for await (const f of files) {
       const filePath = normalize(`${this.pageDir}/${f}`);

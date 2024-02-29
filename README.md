@@ -15,7 +15,6 @@
 
 ## What is planed
 
-    - Links (some tweek for performance and biavours)
     - Error fallback
     - notFound fallback
     - Hot reload (performance tweek is planed)

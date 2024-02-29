@@ -124,6 +124,12 @@ export const RouterHost = ({
         import(match(target.split("?")[0])!.value),
         fetchServerSideProps(target),
       ]);
+      let JsxToDisplay = <module.default {...props?.props} />;
+      switch (globalX.__DISPLAY_MODE__) {
+        case "nextjs":
+          JsxToDisplay = await NextJsLayoutStacker(JsxToDisplay, target);
+          break;
+      }
       if (currentVersion === versionRef.current) {
         if (props?.redirect) {
           navigate(props.redirect);
@@ -131,11 +137,7 @@ export const RouterHost = ({
           startTransition(() => {
             onRouteUpdated?.(target);
             setVersion(currentVersion);
-            let JsxToDisplay = <module.default {...props?.props} />;
-            switch (globalX.__DISPLAY_MODE__) {
-              case "nextjs":
-                break;
-            }
+
             setCurrent(
               <Shell route={target} {...props}>
                 {JsxToDisplay}
@@ -167,6 +169,28 @@ export const RouterHost = ({
     </ReloadContext.Provider>
   );
 };
+
+async function NextJsLayoutStacker(page: JSX.Element, path: string) {
+  let currentPath = "/";
+  type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
+  let layoutStack: Array<_layout> = [() => page];
+  for await (const p of path.split("/")) {
+    currentPath += p.length > 0 ? p : "";
+    console.log("pathToLayout:", `${currentPath}`);
+    if (globalX.__LAYOUT_ROUTE__.includes(currentPath)) {
+      layoutStack.push(
+        (await import(`${currentPath}/${globalX.__LAYOUT_NAME__}.js`)).default
+      );
+    }
+    if (p.length > 0) currentPath += "/";
+  }
+  layoutStack = layoutStack.reverse();
+  let currentJsx = <></>;
+  for (const Element of layoutStack) {
+    currentJsx = <Element children={currentJsx} />;
+  }
+  return currentJsx;
+}
 
 const subscribeToLocationUpdates = (callback: () => void) => {
   const abort = new AbortController();

@@ -22,4 +22,5 @@ export type _GlobalData = {
   __SERVERSIDE_PROPS__?: any;
   __DISPLAY_MODE__: keyof _DisplayMode;
   __LAYOUT_NAME__: string;
+  __LAYOUT_ROUTE__: string[];
 };
