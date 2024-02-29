@@ -14,7 +14,7 @@ switch (cmd) {
     break;
   case "dev":
     //await init();
-    build();
+    await build();
     dev();
     break;
   default:
