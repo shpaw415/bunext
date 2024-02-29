@@ -169,25 +169,30 @@ export class StaticRouters {
         {jsxToServe}
       </Shell>
     );
-    const stream = await renderToReadableStream(FinalJSX, renderOptionData);
-    const _stream = stream.tee();
+    try {
+      const stream = await renderToReadableStream(FinalJSX, renderOptionData);
+      const _stream = stream.tee();
 
-    switch (this.options.ssrMode) {
-      case "nextjs":
-        if (globalThis.pages.find((p) => p.path === serverSide.pathname)) break;
-        globalThis.pages.push({
-          page: Bun.readableStreamToBlob(_stream[1]),
-          path: serverSide.pathname,
-        });
-        break;
+      switch (this.options.ssrMode) {
+        case "nextjs":
+          if (globalThis.pages.find((p) => p.path === serverSide.pathname))
+            break;
+          globalThis.pages.push({
+            page: Bun.readableStreamToBlob(_stream[1]),
+            path: serverSide.pathname,
+          });
+          break;
+      }
+
+      return new Response(_stream[0], {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch {
+      console.log("error while serving JSX");
     }
-
-    return new Response(_stream[0], {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    });
   }
 
   private async getlayoutPaths() {

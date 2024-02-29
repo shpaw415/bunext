@@ -1,3 +1,4 @@
+"use client";
 export function getRouteMatcher<T>(routes: Record<string, T>) {
   const processed = Object.entries(routes).map(([path, value]) => ({
     path,

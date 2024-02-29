@@ -2,7 +2,7 @@
 
 import { lstatSync, cpSync } from "fs";
 import { paths } from "../globals";
-import { $ } from "bun";
+import { $, type BunFile } from "bun";
 import { generateUuid } from "../features/utils";
 await (async () => {
   try {
@@ -71,5 +71,39 @@ async function install(total: boolean) {
       `${envFileContent}\nWEB_TOKEN_SECRET="${generateUuid()}"`
     ));
 
+  Bun.write("tsconfig.json", JSON.stringify(tsConfig()));
+
   await $`bun i`;
+}
+
+function tsConfig() {
+  return {
+    compilerOptions: {
+      lib: ["ESNext", "DOM"],
+      target: "ESNext",
+      module: "ESNext",
+      moduleDetection: "force",
+      jsx: "react-jsxdev",
+      allowJs: true,
+
+      /* Bundler mode */
+      moduleResolution: "bundler",
+      allowImportingTsExtensions: true,
+      verbatimModuleSyntax: true,
+      noEmit: true,
+      incremental: true,
+      isolatedModules: true,
+      resolveJsonModule: true,
+
+      /* Linting */
+      strict: true,
+      skipLibCheck: true,
+      noFallthroughCasesInSwitch: true,
+
+      paths: {
+        "@/*": ["./src/*"],
+      },
+    },
+    exclude: ["node_modules"],
+  };
 }
