@@ -12,15 +12,11 @@ import React, {
 } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher } from "./utils/get-route-matcher";
+import type { _GlobalData } from "../types";
 export * from "./components/Link";
 export * from "./hooks/useLink";
 
-const globalX = globalThis as unknown as {
-  __PAGES_DIR__: string;
-  __INITIAL_ROUTE__: string;
-  __ROUTES__: Record<string, string>;
-  __SERVERSIDE_PROPS__?: any;
-};
+const globalX = globalThis as unknown as _GlobalData;
 
 const match = globalX.__ROUTES__
   ? getRouteMatcher(globalX.__ROUTES__)
@@ -135,9 +131,14 @@ export const RouterHost = ({
           startTransition(() => {
             onRouteUpdated?.(target);
             setVersion(currentVersion);
+            let JsxToDisplay = <module.default {...props?.props} />;
+            switch (globalX.__DISPLAY_MODE__) {
+              case "nextjs":
+                break;
+            }
             setCurrent(
               <Shell route={target} {...props}>
-                <module.default {...props?.props} />
+                {JsxToDisplay}
               </Shell>
             );
           });
