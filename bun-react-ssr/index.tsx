@@ -192,6 +192,9 @@ export class StaticRouters {
       });
     } catch {
       console.log("error while serving JSX");
+      return new Response(
+        await renderToReadableStream(<h1>Something whent wrong</h1>)
+      );
     }
   }
 
