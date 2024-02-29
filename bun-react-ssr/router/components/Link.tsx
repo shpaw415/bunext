@@ -9,6 +9,8 @@ export function Link<
   href,
   ...props
 }: { as?: T; href: string } & React.ComponentPropsWithoutRef<T>) {
+  // @ts-ignore
+  if (typeof window === "undefined") return <Component {...props} />;
   const handleClick = useLink(href);
   // @ts-ignore
   return <Component {...props} onClick={handleClick} />;

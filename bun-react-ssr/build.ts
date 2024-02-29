@@ -295,6 +295,8 @@ export class Builder {
             const makeClientFeature = () => {
               return makeReturn(content);
             };
+
+            console.log(_isInPageDir, _isUseClient, props.path);
             if (_isInPageDir && !_isUseClient) {
               //console.log("onload: in pages (server)", props.path);
               return await makeFullServerFeature();

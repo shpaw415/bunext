@@ -257,7 +257,7 @@ export class StaticRouters {
     layoutsJsxList = layoutsJsxList.reverse();
     let currentJsx: JSX.Element = <></>;
     for await (const Layout of layoutsJsxList) {
-      currentJsx = Layout({ children: currentJsx });
+      currentJsx = <Layout children={currentJsx} />;
     }
     return currentJsx;
   }
