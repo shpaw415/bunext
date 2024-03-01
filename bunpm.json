@@ -11,6 +11,7 @@
     "componants",
     "bun-react-ssr",
     "bin",
+    "internal",
     ".bunext"
   ]
 }
