@@ -170,8 +170,30 @@ export class StaticRouters {
         {jsxToServe}
       </Shell>
     );
+    return this.makeStream({
+      jsx: FinalJSX,
+      renderOptions: renderOptionData,
+      serverSide,
+    });
+  }
+  private async makeStream({
+    jsx,
+    renderOptions,
+    serverSide,
+    retry,
+  }: {
+    jsx: JSX.Element;
+    renderOptions: any;
+    serverSide: MatchedRoute;
+    retry?: number;
+  }): Promise<Response> {
+    const _retry = retry ?? 0;
+    if (_retry > 5)
+      return new Response(
+        await renderToReadableStream(<h1>Oups something whent wrong</h1>)
+      );
     try {
-      const stream = await renderToReadableStream(FinalJSX, renderOptionData);
+      const stream = await renderToReadableStream(jsx, renderOptions);
       const _stream = stream.tee();
 
       switch (this.options.ssrMode) {
@@ -192,13 +214,14 @@ export class StaticRouters {
         },
       });
     } catch {
-      console.log("error while serving JSX");
-      return new Response(
-        await renderToReadableStream(<h1>Something whent wrong</h1>)
-      );
+      return (await this.makeStream({
+        jsx,
+        renderOptions,
+        serverSide,
+        retry: _retry + 1,
+      })) as Response;
     }
   }
-
   private async getlayoutPaths() {
     const files = this.getFilesFromPageDir();
     return files
