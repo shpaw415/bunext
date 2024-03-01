@@ -164,6 +164,7 @@ export class StaticRouters {
         jsxToServe = await this.stackLayouts(serverSide, jsxToServe);
         break;
     }
+
     const FinalJSX = (
       <Shell route={serverSide.pathname + search} {...result}>
         {jsxToServe}
