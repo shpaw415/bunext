@@ -214,6 +214,7 @@ export class StaticRouters {
         },
       });
     } catch {
+      console.log("retry ----------------------");
       return (await this.makeStream({
         jsx,
         renderOptions,
