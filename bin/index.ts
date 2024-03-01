@@ -22,7 +22,7 @@ switch (cmd) {
 }
 
 async function build() {
-  await $`bun ${paths.bunextModulePath}/features/build.ts`;
+  await $`bun ${paths.bunextModulePath}/internal/build.ts`;
 }
 function dev() {
   Bun.spawn({
