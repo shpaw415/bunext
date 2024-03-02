@@ -6,6 +6,7 @@ import { renderToReadableStream } from "react-dom/server";
 import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
+import { doBuild } from "../internal/build";
 declare global {
   var pages: Array<{
     page: Promise<Blob>;
@@ -186,12 +187,9 @@ export class StaticRouters {
     renderOptions: any;
     serverSide: MatchedRoute;
     retry?: number;
-  }): Promise<Response> {
+  }): Promise<Response | null> {
     const _retry = retry ?? 0;
-    if (_retry > 5)
-      return new Response(
-        await renderToReadableStream(<h1>Oups something whent wrong</h1>)
-      );
+    if (_retry > 5) return null;
     try {
       const stream = await renderToReadableStream(jsx, renderOptions);
       const _stream = stream.tee();
@@ -213,8 +211,16 @@ export class StaticRouters {
           "Cache-Control": "no-store",
         },
       });
-    } catch {
-      console.log("retry ----------------------");
+    } catch (e) {
+      if (retry === 5) {
+        const err = e as Error;
+        console.log(err.stack);
+        switch (err.name) {
+          case "TypeError":
+            console.log('"use client"; is missing');
+            break;
+        }
+      }
       return (await this.makeStream({
         jsx,
         renderOptions,
@@ -257,10 +263,11 @@ export class StaticRouters {
     return JSON.parse(decodeURI(await request.json()));
   }
 
-  updateRoute(path: string) {
+  async updateRoute(path: string) {
     const index = globalThis.pages.findIndex((p) => p.path === path);
     if (index == -1) return;
     globalThis.pages.splice(index, 1);
+    await doBuild();
   }
 
   /**

@@ -1,48 +1,50 @@
-import { builder, doBuild } from "@bunpmjs/bunext/internal/build";
+import { builder } from "@bunpmjs/bunext/internal/build";
 import { router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
-import { ClientsetHotServer, sendSignal } from "@bunpmjs/bunext/dev/dev";
+import { ClientsetHotServer } from "@bunpmjs/bunext/dev/dev";
 import { webToken } from "@bunpmjs/bunext";
 import "@bunpmjs/bunext/server_global";
 import { renderToReadableStream } from "react-dom/server";
 import { ErrorFallback } from "./fallback";
+import { doWatchBuild } from "./build-watch";
 
 await init();
 
-try {
-  const server = Bun.serve({
-    port: 3000,
-    async fetch(request) {
-      const controller = new middleWare({ req: request });
-      const response =
-        (await serve(request, controller)) ||
-        (await serveStatic(request)) ||
-        serveScript(request);
-      if (response) return controller.setSessionToken(response as Response);
+function RunServer() {
+  try {
+    const server = Bun.serve({
+      port: 3000,
+      async fetch(request) {
+        const controller = new middleWare({ req: request });
+        const response =
+          (await serve(request, controller)) ||
+          (await serveStatic(request)) ||
+          serveScript(request);
+        if (response) return controller.setSessionToken(response as Response);
 
-      globalThis.dryRun = false;
-      return new Response("Not found", {
-        status: 404,
-      });
-    },
-  });
-  console.log("Serve on port:", server.port);
-} catch (e) {
-  console.log(e);
-  process.exit(0);
+        globalThis.dryRun = false;
+        return new Response("Not found", {
+          status: 404,
+        });
+      },
+    });
+    console.log("Serve on port:", server.port);
+  } catch (e) {
+    console.log(e);
+    process.exit(0);
+  }
 }
-globalThis.dryRun = false;
-
 async function init() {
   if (globalThis.mode === "dev" && globalThis.dryRun) {
+    RunServer();
     serveHotServer();
     ClientsetHotServer();
+    doWatchBuild();
   }
-  if (globalThis.dryRun) await doBuild();
-  sendSignal();
+  globalThis.dryRun = false;
 }
 
 async function serve(request: Request, controller: middleWare) {
@@ -50,7 +52,7 @@ async function serve(request: Request, controller: middleWare) {
     const route = router.server.match(request);
     if (route && globalThis.mode === "dev") {
       await builder.buildPath(route.pathname);
-      router.updateRoute(route.pathname);
+      await router.updateRoute(route.pathname);
     }
     const response = await router.serve(request, {
       Shell: Shell,

@@ -25,10 +25,11 @@ async function build() {
   await $`bun ${paths.bunextModulePath}/internal/build.ts`;
 }
 function dev() {
-  Bun.spawn({
+  const process = Bun.spawnSync({
     cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`, "dev"],
     stdout: "inherit",
   });
+  console.log(process.stderr.toString("ascii"));
 }
 function init() {
   return import("./init");

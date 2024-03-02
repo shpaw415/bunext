@@ -2,7 +2,7 @@ import { Glob, Transpiler, fileURLToPath, pathToFileURL } from "bun";
 import { unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { BunFile, BunPlugin, Import, OnLoadArgs, OnLoadResult } from "bun";
-import { normalize } from "path";
+import { normalize, relative } from "path";
 import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "../bun-react-ssr/types";
@@ -50,6 +50,10 @@ type _otherOptions = {
 export class Builder {
   private options: _Mainoptions;
   private bypassoptions: _bypassOptions;
+  private useSyntax = {
+    useInjection: '"use injection";',
+    injected: '"bunext injected!";',
+  } as const;
   constructor(options: _Builderoptions) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
@@ -221,6 +225,12 @@ export class Builder {
             const pageBasePath = props.path
               .split(self.options.pageDir as string)
               .at(1);
+            const transpiler = new Transpiler({
+              loader: "tsx",
+              trimUnusedImports: true,
+              target: "browser",
+            });
+            const content = await Bun.file(props.path).text();
 
             const relativePath = normalize(
               "/" + (pageBasePath?.split("/").slice(0, -1).join("/") || "")
@@ -230,21 +240,25 @@ export class Builder {
               globalThis.pages.find((e) => e.path === relativePath) &&
               pageBasePath
             ) {
-              const { baseDir, buildDir, pageDir } = self.options;
-
+              const { imports, exports } = transpiler.scan(content);
+              const _content = [
+                await self.importerV1({
+                  imported: imports,
+                  namespace: "noRevalidate",
+                  props,
+                }),
+                await self.ServerExporter({
+                  exports: exports,
+                  props,
+                  _module: await import(props.path),
+                }),
+              ].join("\n");
               return {
-                contents: await Bun.file(
-                  normalize(
-                    [baseDir, buildDir, pageDir, relativePath].join("/") +
-                      `${props.path.split("/").at(-1)?.split(".")[0]}.js`
-                  )
-                ).text(),
-                loader: "js",
+                contents: _content,
               };
             }
 
             ///////////////////////////////////////////////////////////////////
-            const content = await Bun.file(props.path).text();
             let _return = {} as OnLoadResult;
             let compilerType = props.loader;
             const makeReturn = (content: string) => {
@@ -255,11 +269,6 @@ export class Builder {
               return _return;
             };
 
-            const transpiler = new Transpiler({
-              loader: "tsx",
-              trimUnusedImports: true,
-              target: "browser",
-            });
             const { imports, exports } = transpiler.scan(content);
             const makeImport = async (namespace?: string) =>
               await self.importerV1({
@@ -297,20 +306,78 @@ export class Builder {
               return makeReturn(content);
             };
 
-            //console.log({ _isInPageDir, _isUseClient, path: props.path });
             if (_isInPageDir && !_isUseClient) {
-              //console.log("onload: in pages (server)", props.path);
               return await makeFullServerFeature();
             } else if (_isInPageDir && _isUseClient) {
-              //console.log("onload: in pages (client)", props.path);
               return makeReturn(content);
             } else if (!_isInPageDir && !isUseClient) {
-              //console.log("onload: external (server)", props.path);
               return makeReturn(content);
             } else if (!_isInPageDir && _isUseClient) {
-              //console.log("onload: external (client)", props.path);
               return makeClientFeature();
             }
+          }
+        );
+        build.onResolve(
+          {
+            filter: /\.ts[x]\?noRevalidate$/,
+          },
+          async (args) => {
+            const url = pathToFileURL(args.importer);
+            const path = fileURLToPath(new URL(args.path, url));
+            return {
+              path: path,
+              namespace: "noRevalidate",
+            };
+          }
+        );
+        build.onLoad(
+          {
+            filter: /\.ts[x]$/,
+            namespace: "noRevalidate",
+          },
+          async ({ loader, path }) => {
+            //console.log("noRevlaidate", path);
+            const transpiler = new Transpiler({
+              loader: loader as "tsx" | "ts",
+              deadCodeElimination: true,
+              target: "browser",
+              trimUnusedImports: true,
+            });
+            const fileContent = await Bun.file(path).text();
+
+            const { imports, exports } = transpiler.scan(fileContent);
+            const buildedPath = normalize(
+              path
+                .replace(
+                  process.cwd(),
+                  `${self.options.baseDir}/${self.options.buildDir as string}`
+                )
+                .replace(".tsx", ".js")
+                .replace(".ts", ".js")
+            );
+            const buildFile = Bun.file(buildedPath);
+            const contentWithoutImports = (await buildFile.text())
+              .split("\n")
+              .filter(
+                (line) =>
+                  !line.trim().startsWith("import") &&
+                  !line.trim().startsWith("var jsx_dev_runtime = ")
+              )
+              .join("\n");
+            const isUseInjection = self.isUseInjection(contentWithoutImports);
+            const transpiled = transpiler.transformSync(contentWithoutImports);
+            await Bun.write(buildFile, transpiled);
+
+            const _module = await import(buildedPath);
+            const newData = `${(
+              await self.extractImports(fileContent, "tsx")
+            ).join("\n")}\n${
+              isUseInjection ? '"use injection";' : ""
+            }\n${transpiled}`;
+            return {
+              contents: newData,
+              loader: "js",
+            };
           }
         );
         build.onResolve(
@@ -374,6 +441,53 @@ export class Builder {
       },
     } as BunPlugin;
   }
+  private async extractImports(moduleText: string, loader: "tsx" | "ts") {
+    const transpiler = new Transpiler({ loader });
+    moduleText = transpiler.transformSync(moduleText);
+    const currly = /import\s*\{\s*[\s\S]*?\s*\}\s*from\s*["'].*?["'];?/g;
+    const wildas = /import\s*\*\s*as\s*\w+\s*from\s*["'].*?["'];?/g;
+    const matches = [
+      ...moduleText.matchAll(currly),
+      ...moduleText.matchAll(wildas),
+    ];
+
+    return matches.map((m) => m[0]);
+  }
+  private async importEveryThingToString(modulePath: string) {
+    let _moduleAbolutePath: string = "";
+    let returnedString = "";
+    try {
+      _moduleAbolutePath = import.meta.resolveSync(modulePath);
+    } catch (error) {
+      throw error;
+    }
+    const { imports } = new Transpiler({
+      loader: modulePath.split(".")[1] as "tsx",
+    }).scan(await Bun.file(_moduleAbolutePath).text());
+
+    const _modulePath = modulePath.split("/").slice(0, -1).join("/");
+    for await (const imported of imports.map((i) => i.path)) {
+      const relativePathToFile = relative(
+        _modulePath,
+        normalize([_modulePath, imported].join("/"))
+      );
+      try {
+        const _importedModule = await import(
+          import.meta.resolveSync(`${_modulePath}/${relativePathToFile}`)
+        );
+        returnedString += `import {${Object.keys(_importedModule)
+          .join(", ")
+          .replace(
+            "default",
+            `default as ${_importedModule?.default?.name}`
+          )}} from "${imported}";\n`;
+      } catch (e) {
+        //console.log(e);
+        process.exit(0);
+      }
+    }
+    return returnedString;
+  }
   private async ServerExporter({
     exports,
     _module,
@@ -396,7 +510,6 @@ export class Builder {
       const reactInjection = `var jsx_dev_runtime = __toESM(require_jsx_dev_runtime(), 1);\n`;
 
       const functionStr = (_module[i].toString() as string).trim();
-      //console.log(functionStr);
       const noParamsFunctionStr = `function ${exportName}()`;
       const serverActionString = this.ServerActionPluginExt(
         _module[i],
@@ -427,7 +540,6 @@ export class Builder {
     }
     return _content;
   }
-  private async makeClientExport() {}
   private async importerV1({
     imported,
     props,
@@ -530,6 +642,7 @@ export class Builder {
       const file = Bun.file(i);
       await this.makeUseInjection({
         file: file,
+        filePath: i,
         runtimePath: runtimePath,
         toESMPath: esmPath,
       });
@@ -568,23 +681,38 @@ export class Builder {
     file,
     runtimePath,
     toESMPath,
+    filePath,
   }: {
     file: BunFile;
     runtimePath: string;
     toESMPath: string;
+    filePath: string;
   }) {
     const content = await file.text();
 
     if (!content.split("\n").find((l) => l.startsWith('"use injection";')))
       return;
-    const newContent = `import { require_jsx_dev_runtime } from "${normalize(
-      ["/", runtimePath.split(this.options.buildDir as string)[1]].join("/")
-    )}";\nimport { __toESM } from "${normalize(
-      ["/", toESMPath.split(this.options.buildDir as string)[1]].join("/")
-    )}"
+    const realiveToRuntime = relative(
+      filePath.split(this.options.baseDir)[1].slice(1),
+      runtimePath.slice(1)
+    );
+    const relativeToESM = relative(
+      filePath.split(this.options.baseDir)[1].slice(1),
+      toESMPath.slice(1)
+    );
+
+    const newContent =
+      `import { require_jsx_dev_runtime } from "${realiveToRuntime}";\nimport { __toESM } from "${relativeToESM}"
      ${content}`.replaceAll('"use injection";', '"bunext injected!";');
 
     await Bun.write(file, newContent);
+  }
+  private isUseInjection(buildFileContent: string) {
+    return buildFileContent
+      .split("\n")
+      .find((line) => line.trim().startsWith('"bunext injected!";'))
+      ? true
+      : false;
   }
   private glob(
     path: string,
