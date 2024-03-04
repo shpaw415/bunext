@@ -1,5 +1,5 @@
 import { builder } from "@bunpmjs/bunext/internal/build";
-import { router } from "@bunpmjs/bunext/internal/routes";
+import { router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
