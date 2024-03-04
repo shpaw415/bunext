@@ -143,7 +143,7 @@ export class middleWare {
   public _session: webToken<any>;
   public _sessionData?: { [key: string]: any };
   public _deleteSesion = false;
-  private request: Request;
+  public request: Request;
 
   constructor({ req }: { req: Request }) {
     this.request = req;
