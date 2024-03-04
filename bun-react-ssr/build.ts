@@ -685,18 +685,6 @@ export class Builder {
 
     return paths;
   }
-  private async getExternalsFromPackageJson() {
-    const packageJson = JSON.parse(await Bun.file("./package.json").text());
-
-    const sections = ["dependencies", "devDependencies", "peerDependencies"],
-      externals = new Set();
-
-    for (const section of sections)
-      if (packageJson[section])
-        Object.keys(packageJson[section]).forEach((_) => externals.add(_));
-
-    return Array.from(externals) as string[];
-  }
   private async makeUseInjection({
     file,
     runtimePath,

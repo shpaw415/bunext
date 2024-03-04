@@ -1,4 +1,13 @@
+import { setHead } from "@bunpmjs/bunext/componants/head";
 import { Button } from "./button";
+
+setHead({
+  data: {
+    title: "My Bunext powered WebSite",
+    author: "shpaw415",
+    publisher: "bunpmjs",
+  },
+});
 
 export default function page() {
   return (
