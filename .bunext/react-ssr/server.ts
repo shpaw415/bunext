@@ -62,7 +62,10 @@ async function serve(request: Request, controller: middleWare) {
 
     const response = await router.serve(request, {
       Shell: Shell as any,
-      bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
+      bootstrapModules: [
+        "/node_modules/@bunpmjs/bunext/internal/hydrate.js",
+        "/bunext-scripts",
+      ],
       preloadScript: {
         __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
       },
