@@ -1,6 +1,6 @@
 import { builder } from "@bunpmjs/bunext/internal/build";
 import { router } from "./routes";
-import { Shell } from "@bunpmjs/bunext/internal/shell";
+import { Shell } from "./shell";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
@@ -62,10 +62,7 @@ async function serve(request: Request, controller: middleWare) {
 
     const response = await router.serve(request, {
       Shell: Shell as any,
-      bootstrapModules: [
-        "/node_modules/@bunpmjs/bunext/internal/hydrate.js",
-        "/bunext-scripts",
-      ],
+      bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
       preloadScript: {
         __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
       },

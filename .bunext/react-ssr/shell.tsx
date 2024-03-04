@@ -1,6 +1,7 @@
-import "../.bunext/react-ssr/global";
-import { Head } from "../componants/head";
-import { Dev } from "../dev/dev";
+import "./global";
+import { Head } from "@bunpmjs/bunext/componants/head";
+import { Dev } from "@bunpmjs/bunext/dev/dev";
+import React from "react";
 export const Shell = ({
   children,
   route,
