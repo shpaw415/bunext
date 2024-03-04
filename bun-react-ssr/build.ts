@@ -302,18 +302,22 @@ export class Builder {
                   "\n"
                 )
               );
-            const makeClientFeature = () => {
+            const makeClientFeature = (content: string) => {
+              const security = self.checkSecurityFeatures(
+                content,
+                props.loader as "tsx"
+              );
+              if (!security.passed) throw new Error(security.cause);
               return makeReturn(content);
             };
-
             if (_isInPageDir && !_isUseClient) {
               return await makeFullServerFeature();
             } else if (_isInPageDir && _isUseClient) {
-              return makeReturn(content);
+              return makeClientFeature(content);
             } else if (!_isInPageDir && !isUseClient) {
               return makeReturn(content);
             } else if (!_isInPageDir && _isUseClient) {
-              return makeClientFeature();
+              return makeClientFeature(content);
             }
           }
         );
@@ -439,6 +443,24 @@ export class Builder {
         );
       },
     } as BunPlugin;
+  }
+  private checkSecurityFeatures(
+    content: string,
+    loader: "ts" | "tsx"
+  ): { passed: true } | { passed: false; cause: string } {
+    const { exports } = new Transpiler({
+      loader,
+    }).scan(content);
+    if (exports.includes("getServerSideProps"))
+      return {
+        passed: false,
+        cause:
+          "getServerSideProps cannot be in a use client context for security reason",
+      };
+
+    return {
+      passed: true,
+    };
   }
   private async extractImports(moduleText: string, loader: "tsx" | "ts") {
     const transpiler = new Transpiler({ loader });

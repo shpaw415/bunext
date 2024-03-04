@@ -120,7 +120,6 @@ export const RouterHost = ({
     async (target = location.pathname + location.search) => {
       if (typeof target !== "string") throw new Error("invalid target", target);
       const currentVersion = ++versionRef.current;
-      console.log(match(target.split("?")[0]), target);
       const [module, props] = await Promise.all([
         import(
           `${match(target.split("?")[0])!.value}${
