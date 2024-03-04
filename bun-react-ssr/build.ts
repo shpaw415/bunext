@@ -336,7 +336,6 @@ export class Builder {
             namespace: "noRevalidate",
           },
           async ({ loader, path }) => {
-            //console.log("noRevlaidate", path);
             const transpiler = new Transpiler({
               loader: loader as "tsx" | "ts",
               deadCodeElimination: true,
@@ -482,7 +481,6 @@ export class Builder {
             `default as ${_importedModule?.default?.name}`
           )}} from "${imported}";\n`;
       } catch (e) {
-        //console.log(e);
         process.exit(0);
       }
     }

@@ -71,7 +71,7 @@ export class StaticRouters {
       },
     }: {
       Shell: React.ComponentType<{ children: React.ReactElement }>;
-      preloadScript?: string;
+      preloadScript?: Record<string, string>;
       bootstrapModules?: string[];
       context?: T;
       onError?(error: unknown, errorInfo: React.ErrorInfo): string | void;
@@ -112,28 +112,34 @@ export class StaticRouters {
       });
     }
 
+    const isNextJs = Boolean(this.options.displayMode?.nextjs);
+
+    const preloadScriptObj = {
+      __PAGES_DIR__: JSON.stringify(this.pageDir),
+      __INITIAL_ROUTE__: JSON.stringify(serverSide.pathname + search),
+      __ROUTES__: this.#routes_dump,
+      __SERVERSIDE_PROPS__: stringified,
+      __DISPLAY_MODE__: JSON.stringify(
+        Object.keys(this.options.displayMode)[0]
+      ),
+      __LAYOUT_NAME__: isNextJs
+        ? JSON.stringify(
+            this.options?.displayMode?.nextjs?.layout.split(".").at(0)
+          )
+        : "",
+      __LAYOUT_ROUTE__: isNextJs
+        ? JSON.stringify(await this.getlayoutPaths())
+        : "",
+      ...preloadScript,
+    } as const;
+
+    const preloadSriptsStrList = Object.keys(preloadScriptObj)
+      .map((i) => `${i}=${(preloadScriptObj as any)[i]}`)
+      .filter(Boolean);
+
     const renderOptionData = {
       signal: request.signal,
-      bootstrapScriptContent: [
-        preloadScript,
-        `__PAGES_DIR__=${JSON.stringify(this.pageDir)}`,
-        `__INITIAL_ROUTE__=${JSON.stringify(serverSide.pathname + search)}`,
-        `__ROUTES__=${this.#routes_dump}`,
-        `__SERVERSIDE_PROPS__=${stringified}`,
-        `__DISPLAY_MODE__=${JSON.stringify(
-          Object.keys(this.options.displayMode)[0]
-        )}`,
-        this.options.displayMode?.nextjs
-          ? `__LAYOUT_NAME__=${JSON.stringify(
-              this.options?.displayMode?.nextjs?.layout.split(".").at(0)
-            )}`
-          : "",
-        this.options.displayMode?.nextjs
-          ? `__LAYOUT_ROUTE__=${JSON.stringify(await this.getlayoutPaths())}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join(";"),
+      bootstrapScriptContent: preloadSriptsStrList.join(";"),
       bootstrapModules,
       onError,
     };

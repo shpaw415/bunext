@@ -10,7 +10,6 @@ import "@bunpmjs/bunext/server_global";
 import { renderToReadableStream } from "react-dom/server";
 import { ErrorFallback } from "./fallback";
 import { doWatchBuild } from "./build-watch";
-
 await init();
 
 function RunServer() {
@@ -39,12 +38,18 @@ function RunServer() {
 }
 async function init() {
   if (globalThis.mode === "dev" && globalThis.dryRun) {
+    setGlobalThis();
     RunServer();
     serveHotServer();
     ClientsetHotServer();
     doWatchBuild();
   }
+
   globalThis.dryRun = false;
+}
+
+function setGlobalThis() {
+  globalThis.__HEAD_DATA__ = JSON.parse(process.env.__HEAD_DATA__ as string);
 }
 
 async function serve(request: Request, controller: middleWare) {
@@ -54,9 +59,13 @@ async function serve(request: Request, controller: middleWare) {
       await builder.buildPath(route.pathname);
       await router.updateRoute(route.pathname);
     }
+
     const response = await router.serve(request, {
-      Shell: Shell,
+      Shell: Shell as any,
       bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
+      preloadScript: {
+        __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
+      },
     });
     return response;
   } catch (e) {
