@@ -18,7 +18,7 @@
     - Error fallback
     - notFound fallback
     - Hot reload (performance tweek is planed)
-    - React (some tweek needed to full compatibility)
+    - React (some tweek needed for full compatibility)
 
 ### To install and run
 

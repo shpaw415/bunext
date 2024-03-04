@@ -1,6 +1,6 @@
-import { watchBuild } from "@bunpmjs/bunext/bun-react-ssr/watch";
-import { paths } from "@bunpmjs/bunext/globals";
-import { sendSignal } from "@bunpmjs/bunext/dev/dev";
+import { watchBuild } from "../bun-react-ssr/watch";
+import { paths } from "../globals";
+import { sendSignal } from "../dev/dev";
 export const doWatchBuild = () =>
   watchBuild(async () => {
     doBuild();

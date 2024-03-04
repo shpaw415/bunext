@@ -1,5 +1,5 @@
 import { builder } from "@bunpmjs/bunext/internal/build";
-import { router } from "./routes";
+import { router } from "@bunpmjs/bunext/internal/routes";
 import { Shell } from "./shell";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
@@ -8,8 +8,8 @@ import { ClientsetHotServer } from "@bunpmjs/bunext/dev/dev";
 import { webToken } from "@bunpmjs/bunext";
 import "@bunpmjs/bunext/server_global";
 import { renderToReadableStream } from "react-dom/server";
-import { ErrorFallback } from "./fallback";
-import { doWatchBuild } from "./build-watch";
+import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
+import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 await init();
 
 function RunServer() {
@@ -125,6 +125,7 @@ async function serveStatic(request: Request) {
 }
 
 function serveScript(request: Request) {
+  globalThis.scriptsList ??= [];
   const path = new URL(request.url).pathname;
   if (names.loadScriptPath != path) return null;
   const _scriptsStr = globalThis.scriptsList.map((sc) => {
