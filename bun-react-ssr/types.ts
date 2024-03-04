@@ -23,4 +23,5 @@ export type _GlobalData = {
   __DISPLAY_MODE__: keyof _DisplayMode;
   __LAYOUT_NAME__: string;
   __LAYOUT_ROUTE__: string[];
+  __DEV_MODE__: boolean;
 };

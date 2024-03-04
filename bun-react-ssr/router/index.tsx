@@ -120,8 +120,13 @@ export const RouterHost = ({
     async (target = location.pathname + location.search) => {
       if (typeof target !== "string") throw new Error("invalid target", target);
       const currentVersion = ++versionRef.current;
+      console.log(match(target.split("?")[0]), target);
       const [module, props] = await Promise.all([
-        import(match(target.split("?")[0])!.value),
+        import(
+          `${match(target.split("?")[0])!.value}${
+            globalX.__DEV_MODE__ ? `?${currentVersion}` : ""
+          }`
+        ),
         fetchServerSideProps(target),
       ]);
       let JsxToDisplay = <module.default {...props?.props} />;
@@ -173,23 +178,58 @@ export const RouterHost = ({
 async function NextJsLayoutStacker(page: JSX.Element, path: string) {
   let currentPath = "/";
   type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
-  let layoutStack: Array<_layout> = [() => page];
-  for await (const p of path.split("/")) {
+  let layoutStack: Array<_layout> = [];
+  for await (const p of path.split("/").slice(1)) {
     currentPath += p.length > 0 ? p : "";
-    console.log("pathToLayout:", `${currentPath}`);
     if (globalX.__LAYOUT_ROUTE__.includes(currentPath)) {
       layoutStack.push(
-        (await import(`${currentPath}/${globalX.__LAYOUT_NAME__}.js`)).default
+        (
+          await import(
+            normalize(
+              `${globalX.__PAGES_DIR__}${currentPath}/${globalX.__LAYOUT_NAME__}.js`
+            )
+          )
+        ).default
       );
     }
     if (p.length > 0) currentPath += "/";
   }
+  layoutStack.push(() => page);
   layoutStack = layoutStack.reverse();
   let currentJsx = <></>;
   for (const Element of layoutStack) {
     currentJsx = <Element children={currentJsx} />;
   }
   return currentJsx;
+}
+
+function normalize(path: string) {
+  // remove multiple slashes
+  path = path.replace(/\/+/g, "/");
+  // remove leading slash, will be added further
+  if (path.startsWith("/")) path = path.substring(1);
+  // remove trailing slash
+  if (path.endsWith("/")) path = path.slice(0, -1);
+  let segments = path.split("/");
+  let normalizedPath = "/";
+  for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+    if (segments[segmentIndex] === "." || segments[segmentIndex] === "") {
+      // skip single dots and empty segments
+      continue;
+    }
+    if (segments[segmentIndex] === "..") {
+      // go up one level if possible
+      normalizedPath = normalizedPath.substring(
+        0,
+        normalizedPath.lastIndexOf("/") + 1
+      );
+      continue;
+    }
+    // append path segment
+    if (!normalizedPath.endsWith("/")) normalizedPath = normalizedPath + "/";
+    normalizedPath = normalizedPath + segments[segmentIndex];
+  }
+  return normalizedPath;
 }
 
 const subscribeToLocationUpdates = (callback: () => void) => {

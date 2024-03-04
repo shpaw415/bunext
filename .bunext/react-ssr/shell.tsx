@@ -1,12 +1,19 @@
 import React from "react";
 import "./global";
 import { Head } from "@bunpmjs/bunext/componants/head";
-
-export const Shell = (props: { children: JSX.Element; route: string }) => {
+import { Dev } from "@bunpmjs/bunext/dev/dev";
+export const Shell = ({
+  children,
+  route,
+}: {
+  children: JSX.Element;
+  route: string;
+}) => {
   return (
     <html>
-      <Head currentPath={props.route} />
-      <body>{props.children}</body>
+      <Head currentPath={route} />
+      <body>{children}</body>
+      <Dev />
     </html>
   );
 };

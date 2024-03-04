@@ -19,7 +19,7 @@ export async function doBuild() {
   if (!result.success) {
     console.log(
       ...result.logs,
-      "\nError while building the app...\n Look for a 'use client' missing probably where there is a hook in an exported function"
+      "\n\nError while building the app...\n Look for a 'use client' missing probably where there is a hook in an exported function"
     );
   }
 }

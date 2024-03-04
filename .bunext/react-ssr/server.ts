@@ -33,18 +33,18 @@ function RunServer() {
     console.log("Serve on port:", server.port);
   } catch (e) {
     console.log(e);
-    process.exit(0);
   }
 }
 async function init() {
   if (globalThis.mode === "dev" && globalThis.dryRun) {
-    setGlobalThis();
-    RunServer();
     serveHotServer();
     ClientsetHotServer();
+  }
+  if (globalThis.dryRun) {
+    setGlobalThis();
+    RunServer();
     doWatchBuild();
   }
-
   globalThis.dryRun = false;
 }
 
@@ -80,20 +80,26 @@ async function serve(request: Request, controller: middleWare) {
 }
 
 function serveHotServer() {
+  const clearSocket = () => {
+    globalThis.socketList = globalThis.socketList.filter(
+      (s) => s.readyState == 0 || s.readyState == 1
+    );
+  };
+
   Bun.serve({
     websocket: {
-      message: (ws, message) => {
-        console.log("Client sent message", message);
-      },
+      message: (ws, message) => {},
       open(ws) {
         ws.send("welcome");
         socketList.push(ws);
+        clearSocket();
       },
       close(ws) {
         globalThis.socketList.splice(
           socketList.findIndex((s) => s == ws),
           1
         );
+        clearSocket();
       },
     },
     fetch(req, server) {
@@ -105,6 +111,10 @@ function serveHotServer() {
     },
     port: 3001,
   });
+
+  setInterval(() => {
+    clearSocket();
+  }, 10000);
 }
 
 async function serveStatic(request: Request) {

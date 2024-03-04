@@ -1,32 +1,31 @@
 #!/bin/env bun
 
+import { $ } from "bun";
 import { __setHead__ } from "../componants/internal_head";
 import { paths } from "../globals";
 type _cmd = "init" | "build" | "dev";
 const cmd = process.argv[2] as _cmd;
 
-switch (cmd) {
-  case "init":
-    await init();
-    break;
-  case "build":
-    await build();
-    break;
-  case "dev":
-    //await init();
-    await __setHead__();
-    await build();
-    dev();
-    break;
-  default:
-    console.log(`Bunext: '${cmd}' is not a function`);
-}
+if (import.meta.main)
+  switch (cmd) {
+    case "init":
+      await init();
+      break;
+    case "build":
+      await Build();
+      break;
+    case "dev":
+      //await init();
+      await __setHead__();
+      await Build();
+      dev();
+      break;
+    default:
+      console.log(`Bunext: '${cmd}' is not a function`);
+  }
 
-async function build() {
-  Bun.spawnSync({
-    cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
-    stdout: "inherit",
-  });
+export function Build() {
+  return $`bun ${paths.bunextModulePath}/internal/build.ts`;
 }
 
 function dev() {
@@ -38,7 +37,6 @@ function dev() {
     },
     stdout: "inherit",
   });
-  console.log(proc.stderr.toString("ascii"));
 }
 function init() {
   return import("./init");

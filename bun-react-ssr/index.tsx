@@ -6,7 +6,7 @@ import { renderToReadableStream } from "react-dom/server";
 import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
-import { doBuild } from "../internal/build";
+import { Build } from "../bin/index";
 declare global {
   var pages: Array<{
     page: Promise<Blob>;
@@ -130,6 +130,7 @@ export class StaticRouters {
       __LAYOUT_ROUTE__: isNextJs
         ? JSON.stringify(await this.getlayoutPaths())
         : "",
+      __DEV_MODE__: Boolean(process.env.NODE_ENV === "development"),
       ...preloadScript,
     } as const;
 
@@ -273,7 +274,7 @@ export class StaticRouters {
     const index = globalThis.pages.findIndex((p) => p.path === path);
     if (index == -1) return;
     globalThis.pages.splice(index, 1);
-    await doBuild();
+    await Build();
   }
 
   /**

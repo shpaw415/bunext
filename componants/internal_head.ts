@@ -2,6 +2,12 @@ import { paths } from "../globals";
 import { normalize } from "path";
 import { Glob } from "bun";
 
+declare global {
+  var headInit: boolean;
+}
+
+globalThis.headInit ??= true;
+
 export async function __setHead__() {
   const files = glob(paths.basePagePath);
   for await (const filePath of files) {
