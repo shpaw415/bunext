@@ -1,6 +1,6 @@
 import { builder } from "@bunpmjs/bunext/internal/build";
 import { router } from "./routes";
-import { Shell } from "./shell";
+import { Shell } from "@bunpmjs/bunext/internal/shell";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
