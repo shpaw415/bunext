@@ -10,7 +10,7 @@ await (async () => {
     lstatSync(paths.bunextDirName).isDirectory();
   } catch {
     try {
-      await install(false);
+      await install(true);
     } catch {}
   }
 })();
