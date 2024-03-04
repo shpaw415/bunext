@@ -5,7 +5,7 @@ export const builder = new Builder({
     baseDir: process.cwd(),
     buildDir: ".bunext/build",
     pageDir: "src/pages",
-    hydrate: ".bunext/react-ssr/hydrate.ts",
+    hydrate: "node_modules/@bunpmjs/bunext/internal/hydrate.ts",
   },
   display: {
     nextjs: {
