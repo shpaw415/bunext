@@ -17,9 +17,10 @@
 
     - Error fallback
     - notFound fallback
-    - Hot reload (performance tweek is planed)
+    - Hot reload (features state memory)
     - React (some tweek needed for full compatibility)
     - Documentation
+    - Revalidate ( beta version )
     - Session Management
 
 ### To install and run
