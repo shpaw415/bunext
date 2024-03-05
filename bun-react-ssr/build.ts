@@ -217,7 +217,7 @@ export class Builder {
       setup(build) {
         build.onLoad(
           {
-            filter: /\.tsx$/,
+            filter: /\.ts[x]$/,
             namespace: "file",
           },
           async (props) => {
@@ -309,6 +309,7 @@ export class Builder {
               if (!security.passed) throw new Error(security.cause);
               return makeReturn(content);
             };
+
             if (_isInPageDir && !_isUseClient) {
               return await makeFullServerFeature();
             } else if (_isInPageDir && _isUseClient) {
@@ -370,10 +371,10 @@ export class Builder {
             const transpiled = transpiler.transformSync(contentWithoutImports);
             await Bun.write(buildFile, transpiled);
 
-            const _module = await import(buildedPath);
-            const newData = `${(
-              await self.extractImports(fileContent, "tsx")
-            ).join("\n")}\n${
+            //const _module = await import(buildedPath);
+            const newData = `${self
+              .extractImports(fileContent, "tsx")
+              .join("\n")}\n${
               isUseInjection ? '"use injection";' : ""
             }\n${transpiled}`;
             return {
@@ -393,7 +394,6 @@ export class Builder {
                 path.split(".").at(0) as string
               );
             } catch {}
-
             return {
               path: realPath ?? path,
             };
@@ -424,16 +424,49 @@ export class Builder {
             namespace: "importer",
             filter: /\.ts[x]$/,
           },
-          async ({ path, loader }) => {
+          async ({ path, loader, namespace }) => {
             let file = Bun.file(path);
+            let realPath = path;
             if (!(await file.exists())) {
-              const realPath = import.meta.resolveSync(
+              realPath = import.meta.resolveSync(
                 path.split(self.options.pageDir as string)[1].slice(1)
               );
 
               file = Bun.file(realPath);
             }
-            const fileContent = await file.text();
+            let fileContent = await file.text();
+            if (!isUseClient(fileContent)) {
+              const makeImport = async (
+                imports: Import[],
+                _namespace?: string
+              ) =>
+                await self.importerV1({
+                  imported: imports,
+                  props: {
+                    loader,
+                    path,
+                    namespace,
+                  },
+                  namespace: _namespace,
+                });
+              const makeServerExport = async (exportes: any) =>
+                await self.ServerExporter({
+                  exports: exportes,
+                  _module: await import(realPath),
+                  props: {
+                    loader,
+                    path,
+                    namespace,
+                  },
+                });
+              const { exports, imports } = new Transpiler({
+                loader: "tsx",
+              }).scan(fileContent);
+              fileContent = [
+                await makeImport(imports, namespace),
+                await makeServerExport(exports),
+              ].join("\n");
+            }
             return {
               contents: fileContent,
               loader: path.endsWith("tsx") ? "tsx" : "ts",
@@ -461,17 +494,15 @@ export class Builder {
       passed: true,
     };
   }
-  private async extractImports(moduleText: string, loader: "tsx" | "ts") {
+  private extractImports(moduleText: string, loader: "tsx" | "ts") {
+    return this._extracImports(moduleText, loader).map((m) => m[0]);
+  }
+  private _extracImports(moduleText: string, loader: "tsx" | "ts") {
     const transpiler = new Transpiler({ loader });
     moduleText = transpiler.transformSync(moduleText);
     const currly = /import\s*\{\s*[\s\S]*?\s*\}\s*from\s*["'].*?["'];?/g;
     const wildas = /import\s*\*\s*as\s*\w+\s*from\s*["'].*?["'];?/g;
-    const matches = [
-      ...moduleText.matchAll(currly),
-      ...moduleText.matchAll(wildas),
-    ];
-
-    return matches.map((m) => m[0]);
+    return [...moduleText.matchAll(currly), ...moduleText.matchAll(wildas)];
   }
   private async importEveryThingToString(modulePath: string) {
     let _moduleAbolutePath: string = "";
@@ -574,7 +605,7 @@ export class Builder {
       target: "browser",
     });
 
-    const bypassImports = ["bun", "fs", "crypto"];
+    const bypassImports = ["bun", "fs", "crypto", "node:crypto"];
     let _content = "";
     if (namespace) namespace = "?" + namespace;
     for await (const i of imported) {
@@ -666,7 +697,25 @@ export class Builder {
         toESMPath: esmPath,
       });
       await this.clearDuplicateExports(file);
+      await this.normalizeInjection(file);
     }
+  }
+  private async normalizeInjection(file: BunFile) {
+    let fileContent = await file.text();
+    const imports = this._extracImports(fileContent, "tsx");
+    for (const i of imports) {
+      if (i[0].includes("__toESM as __toESM")) {
+        fileContent = fileContent.replaceAll("__toESM(", "__toESM2(");
+      } else if (
+        i[0].includes("require_jsx_dev_runtime as require_jsx_dev_runtime")
+      ) {
+        fileContent = fileContent.replaceAll(
+          "require_jsx_dev_runtime(",
+          "require_jsx_dev_runtime2("
+        );
+      }
+    }
+    await Bun.write(file, fileContent);
   }
   private async findUseInjectionModulePath(files: Array<string>) {
     const paths = {

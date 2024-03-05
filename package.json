@@ -14,10 +14,10 @@
     "react": "*",
     "react-dom": "*",
     "@bunpmjs/bunext": "link:bunext",
-    "react-element-to-jsx-string": "15.0.0"
+    "react-element-to-jsx-string": "15.0.0",
+    "@bunpmjs/json-webtoken": "latest"
   },
   "dependencies": {
-    "@bunpmjs/json-webtoken": "latest",
     "json-beautify": "1.1.1",
     "next-json": "^0.2.3"
   },

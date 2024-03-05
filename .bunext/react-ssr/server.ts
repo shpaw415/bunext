@@ -18,12 +18,17 @@ function RunServer() {
       port: 3000,
       async fetch(request) {
         // header probable memory leak
-        request.headers.toJSON();
+        const _MiddleWaremodule = await import(
+          "@bunpmjs/bunext/internal/middleware"
+        );
+        request.headers.toJSON(); // <---- inhibit the problem for some reason
+        _MiddleWaremodule.setMiddleWare(request); // <---- the error occure when the request is passed to this function
         const response =
           (await serve(request)) ||
           (await serveStatic(request)) ||
           serveScript(request);
-        if (response) return response;
+
+        if (response) return _MiddleWaremodule.Session.setToken(response);
 
         globalThis.dryRun = false;
         return new Response("Not found", {

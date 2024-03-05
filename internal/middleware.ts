@@ -1,15 +1,15 @@
 import { webToken } from "@bunpmjs/json-webtoken";
+import { __SET_CURRENT__, __USER_ACTION__ } from "../features/session";
+export let Session: middleWare;
 
-let test = 0;
+export function setMiddleWare(req: Request) {
+  Session = new middleWare({
+    req,
+  });
+}
 
-console.log(test);
-
-test++;
-
-export class middleWare {
+class middleWare {
   public _session: webToken<any>;
-  public _sessionData?: { [key: string]: any };
-  public _deleteSesion = false;
   public request: Request;
 
   constructor({ req }: { req: Request }) {
@@ -17,20 +17,23 @@ export class middleWare {
     this._session = new webToken<unknown>(req, {
       cookieName: "bunext_session_token",
     });
+    __SET_CURRENT__(this.getData());
   }
 
-  setSessionData(data: { [key: string]: any }) {
-    this._sessionData = data;
+  setData(data: { [key: string]: any }) {
+    __USER_ACTION__.__CURRENT_DATA__ = data;
   }
 
-  setSessionToken(response: Response) {
-    if (this._sessionData) {
+  setToken(response: Response) {
+    if (__USER_ACTION__.__SESSION_DATA__) {
+      this._session.setData(__USER_ACTION__.__SESSION_DATA__);
       return this._session.setCookie(response, {
         expire: 3600,
         httpOnly: true,
         secure: false,
       });
-    } else if (this._deleteSesion) {
+    } else if (__USER_ACTION__.__DELETE__) {
+      this._session.setData({});
       return this._session.setCookie(response, {
         expire: -10000,
         httpOnly: true,
@@ -40,7 +43,7 @@ export class middleWare {
     return response;
   }
 
-  getSessionData<_Data>() {
+  getData<_Data>() {
     return this._session.session() as _Data | undefined;
   }
 }
