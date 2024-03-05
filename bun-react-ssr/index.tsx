@@ -2,13 +2,13 @@ import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
 import { NJSON } from "next-json";
 import { statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { renderToReadableStream } from "react-dom/server";
+import { renderToReadableStream, renderToString } from "react-dom/server";
 import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
 declare global {
   var pages: Array<{
-    page: Promise<Blob>;
+    page: string;
     path: string;
   }>;
   var serverActions: Array<{
@@ -149,7 +149,7 @@ export class StaticRouters {
         (p) => p.path === serverSide.pathname
       )?.page;
       if (page) {
-        return new Response((await page).stream(), {
+        return new Response(page, {
           headers: {
             "Content-Type": "text/html; charset=utf-8",
             "Cache-Control": "no-store",
@@ -187,53 +187,29 @@ export class StaticRouters {
     jsx,
     renderOptions,
     serverSide,
-    retry,
   }: {
     jsx: JSX.Element;
     renderOptions: any;
     serverSide: MatchedRoute;
-    retry?: number;
   }): Promise<Response | null> {
-    const _retry = retry ?? 0;
-    if (_retry > 5) return null;
-    try {
-      const stream = await renderToReadableStream(jsx, renderOptions);
-      const _stream = stream.tee();
+    const string = renderToString(jsx, renderOptions);
 
-      switch (this.options.ssrMode) {
-        case "nextjs":
-          if (globalThis.pages.find((p) => p.path === serverSide.pathname))
-            break;
-          globalThis.pages.push({
-            page: Bun.readableStreamToBlob(_stream[1]),
-            path: serverSide.pathname,
-          });
-          break;
-      }
-
-      return new Response(_stream[0], {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-store",
-        },
-      });
-    } catch (e) {
-      if (retry === 5) {
-        const err = e as Error;
-        console.log(err.stack);
-        switch (err.name) {
-          case "TypeError":
-            console.log('"use client"; is missing');
-            break;
-        }
-      }
-      return (await this.makeStream({
-        jsx,
-        renderOptions,
-        serverSide,
-        retry: _retry + 1,
-      })) as Response;
+    switch (this.options.ssrMode) {
+      case "nextjs":
+        if (globalThis.pages.find((p) => p.path === serverSide.pathname)) break;
+        globalThis.pages.push({
+          page: string,
+          path: serverSide.pathname,
+        });
+        break;
     }
+
+    return new Response(string, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
   }
   private async getlayoutPaths() {
     const files = this.getFilesFromPageDir();

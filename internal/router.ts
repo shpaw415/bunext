@@ -3,7 +3,7 @@ import { builder } from "./build";
 declare global {
   var pages: Array<{
     path: string;
-    page: Promise<Blob>;
+    page: string;
   }>;
 
   var revalidate: {
