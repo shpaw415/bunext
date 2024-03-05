@@ -8,7 +8,7 @@ import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
 declare global {
   var pages: Array<{
-    page: string;
+    page: Blob;
     path: string;
   }>;
   var serverActions: Array<{
@@ -149,7 +149,7 @@ export class StaticRouters {
         (p) => p.path === serverSide.pathname
       )?.page;
       if (page) {
-        return new Response(page, {
+        return new Response(page.stream(), {
           headers: {
             "Content-Type": "text/html; charset=utf-8",
             "Cache-Control": "no-store",
@@ -192,19 +192,19 @@ export class StaticRouters {
     renderOptions: any;
     serverSide: MatchedRoute;
   }): Promise<Response | null> {
-    const string = renderToString(jsx, renderOptions);
-
+    const stream = await renderToReadableStream(jsx, renderOptions);
+    const [mainStream, secondStream] = stream.tee();
     switch (this.options.ssrMode) {
       case "nextjs":
         if (globalThis.pages.find((p) => p.path === serverSide.pathname)) break;
         globalThis.pages.push({
-          page: string,
+          page: await Bun.readableStreamToBlob(secondStream),
           path: serverSide.pathname,
         });
         break;
     }
 
-    return new Response(string, {
+    return new Response(mainStream, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",

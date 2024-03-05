@@ -7,7 +7,7 @@ const cmd = (process.argv[2] as _cmd) ?? "bypass";
 
 declare global {
   var pages: {
-    page: string;
+    page: Blob;
     path: string;
   }[];
 }

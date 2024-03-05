@@ -1,5 +1,12 @@
 import { Builder } from "../bun-react-ssr/build";
 
+declare global {
+  var pages: {
+    page: Blob;
+    path: string;
+  }[];
+}
+
 globalThis.pages ??= JSON.parse(process.env.__PAGE__ ?? "[]");
 
 export const builder = new Builder({
