@@ -2,7 +2,7 @@ import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
 import { NJSON } from "next-json";
 import { statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { renderToReadableStream, renderToString } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server";
 import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
@@ -102,6 +102,7 @@ export class StaticRouters {
       context,
     });
     const stringified = NJSON.stringify(result, { omitStack: true });
+    //console.log({ header: request.headers, path: pathname });
     if (request.headers.get("Accept") === "application/vnd.server-side-props") {
       return new Response(stringified, {
         headers: {
@@ -183,6 +184,7 @@ export class StaticRouters {
       serverSide,
     });
   }
+  private getServerSideProps(matched: MatchedRoute) {}
   private async makeStream({
     jsx,
     renderOptions,

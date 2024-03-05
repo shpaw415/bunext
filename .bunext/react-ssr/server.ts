@@ -17,6 +17,8 @@ function RunServer() {
     const server = Bun.serve({
       port: 3000,
       async fetch(request) {
+        // header probable memory leak
+        request.headers.toJSON();
         const response =
           (await serve(request)) ||
           (await serveStatic(request)) ||
