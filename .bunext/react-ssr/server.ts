@@ -56,6 +56,7 @@ async function serve(request: Request) {
     const route = router.server.match(request);
     if (route && globalThis.mode === "dev") {
       const builded = await builder.buildPath(route.pathname);
+      console.log(builded);
       if (builded && !builded.success) process.exit(101);
     }
 
