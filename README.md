@@ -5,6 +5,7 @@
 ## What is ready
 
     - SSR and CSR
+    - layout stacking
     - React
     - Static assets
     - Server componants ("use server" & "use client")
@@ -12,6 +13,7 @@
     - Revalidate
     - Server action
     - Links
+    - Session Management
 
 ## What is planed
 
@@ -21,7 +23,8 @@
     - React (some tweek needed for full compatibility)
     - Documentation
     - Revalidate ( beta version )
-    - Session Management
+    - Session Management ( beta version )
+    - Server componants ( Cleanup and refactoring for performance and reliability )
 
 ### To install and run
 
