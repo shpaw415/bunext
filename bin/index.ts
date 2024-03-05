@@ -5,6 +5,15 @@ import { paths } from "../globals";
 type _cmd = "init" | "build" | "dev";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 
+declare global {
+  var pages: {
+    page: string;
+    path: string;
+  }[];
+}
+
+globalThis.pages ??= [];
+
 if (import.meta.main)
   switch (cmd) {
     case "init":
@@ -31,9 +40,9 @@ export function Build() {
     env: {
       ...process.env,
       __PAGE__: JSON.stringify(
-        globalThis?.pages.map((e) => {
+        globalThis.pages.map((e) => {
           return { page: "", path: e.path };
-        }) ?? "[]"
+        })
       ),
     },
   }).exitCode;
