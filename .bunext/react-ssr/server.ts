@@ -22,7 +22,7 @@ function RunServer() {
           (await serve(request)) ||
           (await serveStatic(request)) ||
           serveScript(request);
-        if (response) return controller.setSessionToken(response as Response);
+        if (response) return response;
 
         globalThis.dryRun = false;
         return new Response("Not found", {
