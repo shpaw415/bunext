@@ -24,7 +24,7 @@ function RunServer() {
         request.headers.toJSON(); // <---- inhibit the problem for some reason
         _MiddleWaremodule.setMiddleWare(request); // <---- the error occure when the request is passed to this function
         const response =
-          (await serve(request)) ||
+          (await serve(request)) || // <----- or this function
           (await serveStatic(request)) ||
           serveScript(request);
 
