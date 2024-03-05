@@ -3,13 +3,13 @@ import { paths } from "../globals";
 import { sendSignal } from "../dev/dev";
 export const doWatchBuild = () =>
   watchBuild(async () => {
-    doBuild();
+    if (doBuild() === 101) process.exit(101);
     sendSignal();
   }, [paths.basePagePath]);
 
 function doBuild() {
-  Bun.spawnSync({
+  return Bun.spawnSync({
     cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
     stdout: "ignore",
-  });
+  }).exitCode;
 }

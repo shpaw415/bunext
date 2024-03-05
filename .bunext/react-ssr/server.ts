@@ -17,7 +17,6 @@ function RunServer() {
     const server = Bun.serve({
       port: 3000,
       async fetch(request) {
-        const controller = await require("@bunpmjs/bunext/internal/middleware");
         const response =
           (await serve(request)) ||
           (await serveStatic(request)) ||
@@ -56,8 +55,8 @@ async function serve(request: Request) {
   try {
     const route = router.server.match(request);
     if (route && globalThis.mode === "dev") {
-      await builder.buildPath(route.pathname);
-      await router.updateRoute(route.pathname);
+      const builded = await builder.buildPath(route.pathname);
+      if (builded && !builded.success) process.exit(101);
     }
 
     const response = await router.serve(request, {

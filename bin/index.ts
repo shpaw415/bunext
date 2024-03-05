@@ -12,12 +12,12 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      await Build();
+      Build();
       break;
     case "dev":
       //await init();
       await __setHead__();
-      await Build();
+      Build();
       dev();
       break;
     default:
@@ -25,7 +25,9 @@ if (import.meta.main)
   }
 
 export function Build() {
-  return $`bun ${paths.bunextModulePath}/internal/build.ts`;
+  return Bun.spawnSync({
+    cmd: [`bun`, `${paths.bunextModulePath}/internal/build.ts`],
+  }).exitCode;
 }
 
 function dev() {
@@ -37,6 +39,7 @@ function dev() {
     },
     stdout: "inherit",
   });
+  if (proc.exitCode === 101) dev();
 }
 function init() {
   return import("./init");

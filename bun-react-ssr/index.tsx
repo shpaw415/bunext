@@ -6,7 +6,6 @@ import { renderToReadableStream } from "react-dom/server";
 import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
-import { Build } from "../bin/index";
 declare global {
   var pages: Array<{
     page: Promise<Blob>;
@@ -274,7 +273,6 @@ export class StaticRouters {
     const index = globalThis.pages.findIndex((p) => p.path === path);
     if (index == -1) return;
     globalThis.pages.splice(index, 1);
-    await Build();
   }
 
   /**

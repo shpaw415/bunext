@@ -18,9 +18,10 @@ export async function doBuild() {
   const result = await builder.build();
   if (!result.success) {
     console.log(
-      ...result.logs,
-      "\n\nError while building the app...\n Look for a 'use client' missing probably where there is a hook in an exported function"
+      ...result.logs
+      //"\n\nError while building the app...\n Look for a 'use client' missing probably where there is a hook in an exported function"
     );
+    process.exit(101);
   }
 }
 
