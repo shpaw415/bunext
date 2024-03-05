@@ -1,10 +1,9 @@
 #!/bin/env bun
 
-import { $ } from "bun";
 import { __setHead__ } from "../componants/internal_head";
 import { paths } from "../globals";
 type _cmd = "init" | "build" | "dev";
-const cmd = process.argv[2] as _cmd;
+const cmd = (process.argv[2] as _cmd) ?? "bypass";
 
 if (import.meta.main)
   switch (cmd) {
@@ -22,11 +21,21 @@ if (import.meta.main)
       break;
     default:
       console.log(`Bunext: '${cmd}' is not a function`);
+      break;
   }
 
 export function Build() {
   return Bun.spawnSync({
     cmd: [`bun`, `${paths.bunextModulePath}/internal/build.ts`],
+    stdout: "inherit",
+    env: {
+      ...process.env,
+      __PAGE__: JSON.stringify(
+        globalThis?.pages.map((e) => {
+          return { page: "", path: e.path };
+        }) ?? "[]"
+      ),
+    },
   }).exitCode;
 }
 

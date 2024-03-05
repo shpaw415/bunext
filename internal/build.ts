@@ -1,5 +1,7 @@
 import { Builder } from "../bun-react-ssr/build";
 
+globalThis.pages ??= JSON.parse(process.env.__PAGE__ ?? "[]");
+
 export const builder = new Builder({
   main: {
     baseDir: process.cwd(),

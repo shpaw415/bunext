@@ -5,11 +5,11 @@ import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import { ClientsetHotServer } from "@bunpmjs/bunext/dev/dev";
-import { webToken } from "@bunpmjs/bunext";
 import "@bunpmjs/bunext/server_global";
 import { renderToReadableStream } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
+import { Build } from "@bunpmjs/bunext/bin";
 await init();
 
 function RunServer() {
@@ -55,8 +55,8 @@ async function serve(request: Request) {
   try {
     const route = router.server.match(request);
     if (route && globalThis.mode === "dev") {
-      const builded = await builder.buildPath(route.pathname);
-      if (builded && !builded.success) process.exit(101);
+      builder.resetPath(route.pathname);
+      Build();
     }
 
     const response = await router.serve(request, {

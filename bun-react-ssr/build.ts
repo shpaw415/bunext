@@ -100,11 +100,10 @@ export class Builder {
 
     return result;
   }
-  async buildPath(path: string) {
+  resetPath(path: string) {
     const index = globalThis.pages.findIndex((p) => p.path === path);
     if (index == -1) return;
     globalThis.pages.splice(index, 1);
-    return this.build();
   }
   private async clearDuplicateExports(file: BunFile) {
     let fileContent = await file.text();
