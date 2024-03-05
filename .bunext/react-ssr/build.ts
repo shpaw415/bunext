@@ -1,4 +1,4 @@
-import { Builder } from "../bun-react-ssr/build";
+import { Builder } from "@bunpmjs/bunext/bun-react-ssr/build";
 
 export const builder = new Builder({
   main: {

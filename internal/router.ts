@@ -1,4 +1,4 @@
-import { builder } from "./build";
+import { builder } from "../.bunext/react-ssr/build";
 
 declare global {
   var pages: Array<{

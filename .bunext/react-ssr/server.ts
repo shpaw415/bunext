@@ -17,9 +17,9 @@ function RunServer() {
     const server = Bun.serve({
       port: 3000,
       async fetch(request) {
-        const controller = new middleWare({ req: request });
+        const controller = await require("@bunpmjs/bunext/internal/middleware");
         const response =
-          (await serve(request, controller)) ||
+          (await serve(request)) ||
           (await serveStatic(request)) ||
           serveScript(request);
         if (response) return controller.setSessionToken(response as Response);
@@ -52,7 +52,7 @@ function setGlobalThis() {
   globalThis.__HEAD_DATA__ = JSON.parse(process.env.__HEAD_DATA__ as string);
 }
 
-async function serve(request: Request, controller: middleWare) {
+async function serve(request: Request) {
   try {
     const route = router.server.match(request);
     if (route && globalThis.mode === "dev") {
@@ -137,43 +137,4 @@ function serveScript(request: Request) {
       "Content-Type": "text/javascript;charset=utf-8",
     },
   });
-}
-
-export class middleWare {
-  public _session: webToken<any>;
-  public _sessionData?: { [key: string]: any };
-  public _deleteSesion = false;
-  public request: Request;
-
-  constructor({ req }: { req: Request }) {
-    this.request = req;
-    this._session = new webToken<unknown>(req, {
-      cookieName: "bunext_session_token",
-    });
-  }
-
-  setSessionData(data: { [key: string]: any }) {
-    this._sessionData = data;
-  }
-
-  setSessionToken(response: Response) {
-    if (this._sessionData) {
-      return this._session.setCookie(response, {
-        expire: 3600,
-        httpOnly: true,
-        secure: false,
-      });
-    } else if (this._deleteSesion) {
-      return this._session.setCookie(response, {
-        expire: -10000,
-        httpOnly: true,
-        secure: false,
-      });
-    }
-    return response;
-  }
-
-  getSessionData<_Data>() {
-    return this._session.session() as _Data | undefined;
-  }
 }

@@ -131,7 +131,11 @@ export const RouterHost = ({
       let JsxToDisplay = <module.default {...props?.props} />;
       switch (globalX.__DISPLAY_MODE__) {
         case "nextjs":
-          JsxToDisplay = await NextJsLayoutStacker(JsxToDisplay, target);
+          JsxToDisplay = await NextJsLayoutStacker(
+            JsxToDisplay,
+            target,
+            currentVersion
+          );
           break;
       }
       if (currentVersion === versionRef.current) {
@@ -174,7 +178,11 @@ export const RouterHost = ({
   );
 };
 
-async function NextJsLayoutStacker(page: JSX.Element, path: string) {
+async function NextJsLayoutStacker(
+  page: JSX.Element,
+  path: string,
+  currentVersion: number
+) {
   let currentPath = "/";
   type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
   let layoutStack: Array<_layout> = [];
@@ -185,7 +193,7 @@ async function NextJsLayoutStacker(page: JSX.Element, path: string) {
         (
           await import(
             normalize(
-              `${globalX.__PAGES_DIR__}${currentPath}/${globalX.__LAYOUT_NAME__}.js`
+              `${globalX.__PAGES_DIR__}${currentPath}/${globalX.__LAYOUT_NAME__}.js?${currentVersion}`
             )
           )
         ).default
