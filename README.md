@@ -19,6 +19,8 @@
     - notFound fallback
     - Hot reload (performance tweek is planed)
     - React (some tweek needed for full compatibility)
+    - Documentation
+    - Session Management
 
 ### To install and run
 

@@ -2,7 +2,7 @@
 
 import { lstatSync, cpSync } from "fs";
 import { paths } from "../globals";
-import { $, type BunFile } from "bun";
+import { $ } from "bun";
 import { generateUuid } from "../features/utils";
 await (async () => {
   try {
@@ -26,7 +26,7 @@ async function install(total: boolean) {
     recursive: true,
     force: true,
   });
-  if (total)
+  if (total || !(await Bun.file(`${paths.basePagePath}/index.tsx`).exists()))
     cpSync(
       `${paths.bunextModulePath}/componants/exemple`,
       `${paths.basePagePath}`,
@@ -35,7 +35,7 @@ async function install(total: boolean) {
         force: true,
       }
     );
-  if (total)
+  if (total || !(await Bun.file(`static/favicon.ico`).exists()))
     cpSync(`${paths.bunextModulePath}/componants/static`, "static", {
       recursive: true,
       force: true,
