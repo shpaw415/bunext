@@ -12,6 +12,7 @@
     "bun-react-ssr",
     "bin",
     "internal",
+    "database",
     ".bunext"
   ]
 }

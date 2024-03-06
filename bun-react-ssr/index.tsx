@@ -102,7 +102,6 @@ export class StaticRouters {
       context,
     });
     const stringified = NJSON.stringify(result, { omitStack: true });
-    //console.log({ header: request.headers, path: pathname });
     if (request.headers.get("Accept") === "application/vnd.server-side-props") {
       return new Response(stringified, {
         headers: {

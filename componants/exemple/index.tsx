@@ -1,5 +1,6 @@
 import { setHead } from "@bunpmjs/bunext/componants/head";
-import { Button } from "./button";
+import { Register } from "./register";
+import { Session } from "@bunpmjs/bunext/features/session";
 
 setHead({
   data: {
@@ -14,12 +15,22 @@ export default function page() {
     <>
       <h1>Hello World!</h1>
       <p>this is my Website</p>
-      <Button content="Click on me!" />
+      <Register content="Register Now!" />
     </>
   );
 }
 
-export async function ServerAction({ data }: { data: string }) {
+export async function ServerCreateUser({
+  username,
+  password,
+}: {
+  username: string;
+  password: string;
+}) {
   Bun.sleepSync(1000); // some backend work
-  return "Data: " + data;
+  Session.setData({
+    username: username,
+    password: password,
+  });
+  return `Data: ${username} with password: ${password} now registered`;
 }

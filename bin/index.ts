@@ -2,9 +2,10 @@
 
 import { __setHead__ } from "../componants/internal_head";
 import { paths } from "../globals";
-type _cmd = "init" | "build" | "dev";
+import { ConvertShemaToType } from "../database/schema";
+type _cmd = "init" | "build" | "dev" | "database_schema";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
-
+const args = process.argv[3] as undefined | string;
 declare global {
   var pages: {
     page: Blob;
@@ -23,10 +24,12 @@ if (import.meta.main)
       Build();
       break;
     case "dev":
-      //await init();
       await __setHead__();
       Build();
       dev();
+      break;
+    case "database_schema":
+      ConvertShemaToType("../componants/config/database.ts");
       break;
     default:
       console.log(`Bunext: '${cmd}' is not a function`);
