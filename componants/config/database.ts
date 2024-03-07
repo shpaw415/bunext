@@ -25,13 +25,32 @@ const MyDatabaseShema: DBSchema = [
         type: "json",
         nullable: true,
         DataType: {
-          age: "number",
-          address: "string",
-          name: {
-            name: "string",
-            lastName: "string",
+          allo: {
+            something: {
+              inner: "string",
+            },
+            else: ["undefined", "number", "string"],
           },
         },
+      },
+    ],
+  },
+  {
+    name: "purchase",
+    columns: [
+      {
+        name: "id",
+        primary: true,
+        type: "number",
+        autoIncrement: true,
+      },
+      {
+        name: "price",
+        type: "float",
+      },
+      {
+        name: "quantity",
+        type: "number",
       },
     ],
   },

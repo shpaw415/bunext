@@ -40,6 +40,12 @@ async function install(total: boolean) {
       recursive: true,
       force: true,
     });
+  if (total || !(await Bun.file(`config/database.ts`).exists())) {
+    cpSync(`${paths.bunextModulePath}/componants/config`, "config", {
+      recursive: true,
+      force: true,
+    });
+  }
 
   const packageJson = (await Bun.file("package.json").json()) as packageJson;
   packageJson.scripts = {
@@ -47,6 +53,7 @@ async function install(total: boolean) {
     bunext: "bunext",
     build: "bunext build",
     dev: "bunext dev",
+    databaseCreate: "bunext database_schema",
   };
   packageJson.dependencies = {
     ...packageJson.dependencies,
@@ -62,17 +69,18 @@ async function install(total: boolean) {
   const beatifiedJson = beautify(packageJson, null, 2, 50);
   await Bun.write("package.json", beatifiedJson);
 
-  const envFile = Bun.file(".env");
-  let envFileContent = (await envFile.exists()) ? await envFile.text() : "";
+  if (total || !(await Bun.file(`.env`).exists())) {
+    const envFile = Bun.file(".env");
+    let envFileContent = (await envFile.exists()) ? await envFile.text() : "";
 
-  envFileContent.includes("WEB_TOKEN_SECRET=") === false &&
-    (await Bun.write(
-      ".env",
-      `${envFileContent}\nWEB_TOKEN_SECRET="${generateUuid()}"`
-    ));
+    envFileContent.includes("WEB_TOKEN_SECRET=") === false &&
+      (await Bun.write(
+        ".env",
+        `${envFileContent}\nWEB_TOKEN_SECRET="${generateUuid()}"`
+      ));
 
-  Bun.write("tsconfig.json", beautify(tsConfig(), null, 2, 50));
-
+    Bun.write("tsconfig.json", beautify(tsConfig(), null, 2, 50));
+  }
   await $`bun i`;
 }
 

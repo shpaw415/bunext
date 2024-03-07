@@ -1,28 +1,13 @@
 import { Database as _BunDB } from "bun:sqlite";
 import type { TableSchema } from "./schema";
-
-type _Users = {
-  id?: number;
-  username: string;
-  password: string;
-  data?: {
-    age: number;
-    address: string;
-    name: {
-      name: string;
-      lastName: string;
-    };
-  };
-};
+("<Bunext_TypeImposts>");
+("<Bunext_TypeImports>");
 
 const BunDB = new _BunDB("bunext.sqlite", {
   create: true,
 });
 
 export class _Database {
-  Users = new Table<_Users>({
-    name: "Users",
-  });
   create(data: _Create) {
     let hasPrimary = false;
     let queryString = `CREATE TABLE IF NOT EXISTS ${data.name} `;
@@ -223,16 +208,8 @@ class Table<T> {
   }
 }
 
-const db = new _Database();
-
-const data = db.Users.select({
-  where: {
-    username: "shpaw415",
-  },
-  select: {
-    username: true,
-  },
-  limit: 0,
-});
-
-console.log(data[0]);
+("<Bunext_DBExport>");
+export const database = {
+  Users: new Table<string>({ name: "Users" }),
+} as const;
+("<Bunext_DBExport>");

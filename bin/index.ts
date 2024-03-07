@@ -29,7 +29,7 @@ if (import.meta.main)
       dev();
       break;
     case "database_schema":
-      ConvertShemaToType("../componants/config/database.ts");
+      await databaseSchemaMaker();
       break;
     default:
       console.log(`Bunext: '${cmd}' is not a function`);
@@ -49,6 +49,34 @@ export function Build() {
       ),
     },
   }).exitCode;
+}
+
+async function databaseSchemaMaker() {
+  const Importseparator = '("<Bunext_TypeImposts>");';
+  const ExportSeparator = '("<Bunext_DBExport>");';
+  const types = await ConvertShemaToType(`${process.cwd()}/config/database.ts`);
+  await Bun.write(
+    `${paths.bunextModulePath}/database/database_types.ts`,
+    types.types.map((type) => `export ${type}`).join("\n")
+  );
+  const dbFile = Bun.file(`${paths.bunextModulePath}/database/index.ts`);
+  let dbFileContent: string | string[] = await dbFile.text();
+
+  dbFileContent = dbFileContent.split(Importseparator);
+
+  dbFileContent[1] = `import type { ${types.tables
+    .map((t) => `_${t}`)
+    .join(", ")} } from "./database_types.ts"`;
+
+  console.log(dbFileContent[1]);
+  dbFileContent = dbFileContent.join(Importseparator);
+  dbFileContent = dbFileContent.split(ExportSeparator);
+  dbFileContent[1] = `export const database = {\n ${types.tables
+    .map((t) => `${t}: new Table<_${t}>({ name: "${t}" })`)
+    .join(",\n")} \n} as const;`;
+
+  console.log(dbFileContent[1]);
+  dbFileContent = dbFileContent.join(ExportSeparator);
 }
 
 function dev() {
