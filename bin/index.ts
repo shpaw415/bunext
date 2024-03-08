@@ -3,10 +3,12 @@
 import { __setHead__ } from "../componants/internal_head";
 import { paths } from "../globals";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
-import { _Database } from "../database/class";
 type _cmd = "init" | "build" | "dev" | "database_create" | "database_merge";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
+
+const DBShemaPath = (process.env.DATABASE_NAME || "database") + ".ts";
+
 declare global {
   var pages: {
     page: Blob;
@@ -53,10 +55,24 @@ export function Build() {
   }).exitCode;
 }
 
+function CheckDbExists() {
+  return Bun.file(
+    `config/${process.env.DATABASE_PATH || "database.ts"}`
+  ).exists();
+}
+
 async function databaseSchemaMaker() {
+  if (await CheckDbExists()) {
+    console.log(
+      `config/${DBShemaPath} already exists the new Database Schema may not fit\n`,
+      "Database Merging will be in a next release"
+    );
+  }
   const Importseparator = '("<Bunext_TypeImposts>");';
   const ExportSeparator = '("<Bunext_DBExport>");';
-  const types = await ConvertShemaToType(`${process.cwd()}/config/database.ts`);
+  const types = await ConvertShemaToType(
+    `${process.cwd()}/config/${DBShemaPath}`
+  );
   await Bun.write(
     `${paths.bunextModulePath}/database/database_types.ts`,
     types.types.map((type) => `export ${type}`).join("\n")
@@ -79,9 +95,9 @@ async function databaseSchemaMaker() {
   await Bun.write(dbFile, dbFileContent);
 }
 async function databaseCreator() {
-  const schema = (await import(`${process.cwd()}/config/database.ts`))
+  const schema = (await import(`${process.cwd()}/config/${DBShemaPath}`))
     .default as DBSchema;
-  const db = new _Database();
+  const db = new (await import("../database/class"))._Database();
   schema.map((table) => {
     db.create(table);
   });
