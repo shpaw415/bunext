@@ -72,7 +72,7 @@ async function databaseSchemaMaker() {
 
   dbFileContent = dbFileContent.split(ExportSeparator);
 
-  dbFileContent[1] = `\nexport const database = {\n ${types.tables
+  dbFileContent[1] = `\nreturn {\n ${types.tables
     .map((t) => `${t}: new Table<_${t}>({ name: "${t}" })`)
     .join(",\n ")} \n} as const;\n`;
   dbFileContent = dbFileContent.join(ExportSeparator);

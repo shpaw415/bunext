@@ -14,7 +14,7 @@
     - Server action
     - Links
     - Session Management
-    - SQlite management
+    - SQlite Management
 
 ## What is planed
 

@@ -25,11 +25,17 @@ const MyDatabaseShema: DBSchema = [
         type: "json",
         nullable: true,
         DataType: {
-          name: {
-            firstName: "string",
-            lastName: "string",
-            birtDate: "Date",
-          },
+          friends: [
+            {
+              username: "string",
+            },
+          ],
+          purchases: [
+            "undefined",
+            {
+              id: "string",
+            },
+          ],
         },
       },
     ],

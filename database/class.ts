@@ -1,5 +1,5 @@
 import { Database as _BunDB } from "bun:sqlite";
-import type { _DataType, ColumnsSchema, DBSchema, TableSchema } from "./schema";
+import type { _DataType, DBSchema, TableSchema } from "./schema";
 
 declare global {
   var dbShema: DBSchema;
