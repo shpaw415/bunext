@@ -99,22 +99,6 @@ export class Table<T> {
       return JSON.stringify(param);
     });
   }
-  private restoreJsonParam(
-    param: Object | Array<any>,
-    ColumnsSchema: ColumnsSchema
-  ) {
-    if (ColumnsSchema.type !== "json") return;
-    if (Array.isArray(param) && Array.isArray(ColumnsSchema.DataType)) {
-      ColumnsSchema.DataType.map((data) => {
-        if (typeof data == "string") {
-          switch (data) {
-            case "Date":
-              return new Date();
-          }
-        }
-      });
-    }
-  }
   private restoreParams(params: any) {
     return Object.assign(
       {},
@@ -126,7 +110,7 @@ export class Table<T> {
         if (column?.type === "json") {
           column.DataType;
           return {
-            [key]: this.restoreJsonParam(JSON.parse(params[key]), column),
+            [key]: JSON.parse(params[key]),
           };
         } else return { [key]: params[key] };
       })
