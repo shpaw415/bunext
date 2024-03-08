@@ -7,7 +7,8 @@ type _cmd = "init" | "build" | "dev" | "database_create" | "database_merge";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
 
-const DBShemaPath = (process.env.DATABASE_NAME || "database") + ".ts";
+const DBShemaPath = "database.ts";
+const DBPath = (process.env.DATABASE_NAME || "database") + ".sqlite";
 
 declare global {
   var pages: {
@@ -56,9 +57,7 @@ export function Build() {
 }
 
 function CheckDbExists() {
-  return Bun.file(
-    `config/${process.env.DATABASE_PATH || "database.ts"}`
-  ).exists();
+  return Bun.file(`config/${DBPath}`).exists();
 }
 
 async function databaseSchemaMaker() {
