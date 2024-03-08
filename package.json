@@ -1,6 +1,6 @@
 {
   "name": "bunext",
-  "version": "0.2.31",
+  "version": "0.2.33",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
