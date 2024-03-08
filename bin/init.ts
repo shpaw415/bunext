@@ -53,7 +53,7 @@ async function install(total: boolean) {
     bunext: "bunext",
     build: "bunext build",
     dev: "bunext dev",
-    databaseCreate: "bunext database_schema",
+    databaseCreate: "bunext database_create",
   };
   packageJson.dependencies = {
     ...packageJson.dependencies,

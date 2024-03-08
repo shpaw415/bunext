@@ -25,11 +25,10 @@ const MyDatabaseShema: DBSchema = [
         type: "json",
         nullable: true,
         DataType: {
-          allo: {
-            something: {
-              inner: "string",
-            },
-            else: ["undefined", "number", "string"],
+          name: {
+            firstName: "string",
+            lastName: "string",
+            birtDate: "Date",
           },
         },
       },

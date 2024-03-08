@@ -29,19 +29,13 @@ export type ColumnsSchema =
       default?: number;
     } & common);
 
-type _TypeJson =
-  | "number"
-  | "string"
-  | "Date"
-  | "undefined"
-  | "float"
-  | "number";
+type _TypeJson = "number" | "string" | "undefined" | "float" | "number";
 
 type _DataTypeObject = {
   [key: string]: _TypeJson | _TypeJson[] | _DataType;
 };
 
-type _DataType =
+export type _DataType =
   | _DataTypeObject
   | (_DataTypeObject & Array<_TypeJson>)
   | (_DataTypeObject & _TypeJson)
@@ -65,21 +59,10 @@ export async function ConvertShemaToType(filePath: string) {
         if (column.type === "number") {
           autoIncrement = column.autoIncrement ? true : false;
         }
-        if (
-          (column.nullable && column.primary) ||
-          (column.nullable && autoIncrement)
-        ) {
-          throw new Error(
-            `${table.name}.${column.name} cannot be nullable if it's a primary key or autoIncrement flag is set`,
-            {
-              cause: "NOT_NULL",
-            }
-          );
-        }
         switch (column.type) {
           case "string":
-          case "Date":
           case "number":
+          case "Date":
             dataType = column.type;
             break;
           case "float":
@@ -90,7 +73,7 @@ export async function ConvertShemaToType(filePath: string) {
             break;
         }
         return `${column.name}${
-          column.nullable && !autoIncrement && !column.primary ? "?" : ""
+          column.nullable || autoIncrement ? "?" : ""
         }: ${dataType};`;
       })
       .join("\n")}\n};`;
@@ -104,7 +87,6 @@ export async function ConvertShemaToType(filePath: string) {
 
 function sqliteTypeToTypeScript(type: _TypeJson): _TypeJson | undefined {
   switch (type) {
-    case "Date":
     case "number":
     case "string":
       return type;
@@ -118,7 +100,7 @@ function sqliteTypeToTypeScript(type: _TypeJson): _TypeJson | undefined {
 function dataTypeToType(dataType: _DataType) {
   let returnString = "";
   if (Array.isArray(dataType)) {
-    returnString += dataTypeArrayToType(dataType);
+    returnString += dataTypeArrayToType(dataType).text;
   } else {
     returnString += dataTypeObjectToType(dataType).text;
   }

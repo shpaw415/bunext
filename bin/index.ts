@@ -2,8 +2,9 @@
 
 import { __setHead__ } from "../componants/internal_head";
 import { paths } from "../globals";
-import { ConvertShemaToType } from "../database/schema";
-type _cmd = "init" | "build" | "dev" | "database_schema";
+import { ConvertShemaToType, type DBSchema } from "../database/schema";
+import { _Database } from "../database/class";
+type _cmd = "init" | "build" | "dev" | "database_create" | "database_merge";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
 declare global {
@@ -28,8 +29,9 @@ if (import.meta.main)
       Build();
       dev();
       break;
-    case "database_schema":
+    case "database_create":
       await databaseSchemaMaker();
+      await databaseCreator();
       break;
     default:
       console.log(`Bunext: '${cmd}' is not a function`);
@@ -63,20 +65,26 @@ async function databaseSchemaMaker() {
   let dbFileContent: string | string[] = await dbFile.text();
 
   dbFileContent = dbFileContent.split(Importseparator);
-
-  dbFileContent[1] = `import type { ${types.tables
+  dbFileContent[1] = `\nimport type { ${types.tables
     .map((t) => `_${t}`)
-    .join(", ")} } from "./database_types.ts"`;
-
-  console.log(dbFileContent[1]);
+    .join(", ")} } from "./database_types.ts";\n`;
   dbFileContent = dbFileContent.join(Importseparator);
-  dbFileContent = dbFileContent.split(ExportSeparator);
-  dbFileContent[1] = `export const database = {\n ${types.tables
-    .map((t) => `${t}: new Table<_${t}>({ name: "${t}" })`)
-    .join(",\n")} \n} as const;`;
 
-  console.log(dbFileContent[1]);
+  dbFileContent = dbFileContent.split(ExportSeparator);
+
+  dbFileContent[1] = `\nexport const database = {\n ${types.tables
+    .map((t) => `${t}: new Table<_${t}>({ name: "${t}" })`)
+    .join(",\n ")} \n} as const;\n`;
   dbFileContent = dbFileContent.join(ExportSeparator);
+  await Bun.write(dbFile, dbFileContent);
+}
+async function databaseCreator() {
+  const schema = (await import(`${process.cwd()}/config/database.ts`))
+    .default as DBSchema;
+  const db = new _Database();
+  schema.map((table) => {
+    db.create(table);
+  });
 }
 
 function dev() {

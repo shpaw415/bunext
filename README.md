@@ -14,17 +14,17 @@
     - Server action
     - Links
     - Session Management
+    - SQlite management
 
 ## What is planed
 
-    - Error fallback
-    - notFound fallback
     - Hot reload (features state memory)
     - React (some tweek needed for full compatibility)
     - Documentation
     - Revalidate ( beta version )
     - Session Management ( beta version )
     - Server componants ( Cleanup and refactoring for performance and reliability )
+    - SQlite performance & features
 
 ### To install and run
 
