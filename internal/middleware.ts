@@ -1,5 +1,10 @@
 import { webToken } from "@bunpmjs/json-webtoken";
-import { __SET_CURRENT__, __USER_ACTION__ } from "../features/session";
+import {
+  __SET_CURRENT__,
+  Session as _Session,
+  __USER_ACTION__,
+} from "../features/session";
+
 export let Session: middleWare;
 
 export function setMiddleWare(req: Request) {
@@ -17,7 +22,11 @@ class middleWare {
     this._session = new webToken<unknown>(req, {
       cookieName: "bunext_session_token",
     });
-    __SET_CURRENT__(this.getData());
+    try {
+      __SET_CURRENT__(this.getData());
+    } catch {
+      _Session.delete();
+    }
   }
 
   setData(data: { [key: string]: any }) {

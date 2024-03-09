@@ -10,6 +10,7 @@ import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { Build } from "@bunpmjs/bunext/bin";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
+import { __USER_ACTION__ } from "../../features/session";
 await init();
 
 function RunServer() {
