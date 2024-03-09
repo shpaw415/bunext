@@ -75,7 +75,7 @@ async function serve(request: Request) {
     });
     return response;
   } catch (e) {
-    console.log((e as Error).cause);
+    console.log((e as Error).name);
     const res = async () =>
       new Response(
         await renderToReadableStream(ErrorFallback(), {
