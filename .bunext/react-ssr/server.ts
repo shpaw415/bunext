@@ -4,13 +4,18 @@ import { Shell } from "./shell";
 import "./global";
 import { names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
-import { ClientsetHotServer } from "@bunpmjs/bunext/dev/dev";
 import "@bunpmjs/bunext/server_global";
 import { renderToReadableStream } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { Build } from "@bunpmjs/bunext/bin";
+import { _serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
+import { Subprocess } from "bun";
 await init();
+
+declare global {
+  var HotServer: Subprocess<"ignore", "pipe", "inherit">;
+}
 
 function RunServer() {
   try {
@@ -43,8 +48,7 @@ function RunServer() {
 }
 async function init() {
   if (globalThis.mode === "dev" && globalThis.dryRun) {
-    serveHotServer();
-    ClientsetHotServer();
+    _serveHotServer();
   }
   if (globalThis.dryRun) {
     setGlobalThis();
@@ -82,46 +86,9 @@ async function serve(request: Request) {
           bootstrapModules: ["/bunext-scripts"],
         })
       );
+    if ((e as Error).name == "TypeError") process.exit(101);
     return res();
   }
-}
-
-function serveHotServer() {
-  const clearSocket = () => {
-    globalThis.socketList = globalThis.socketList.filter(
-      (s) => s.readyState == 0 || s.readyState == 1
-    );
-  };
-
-  Bun.serve({
-    websocket: {
-      message: (ws, message) => {},
-      open(ws) {
-        ws.send("welcome");
-        socketList.push(ws);
-        clearSocket();
-      },
-      close(ws) {
-        globalThis.socketList.splice(
-          socketList.findIndex((s) => s == ws),
-          1
-        );
-        clearSocket();
-      },
-    },
-    fetch(req, server) {
-      const upgraded = server.upgrade(req);
-      if (!upgraded) {
-        return new Response("Error", { status: 400 });
-      }
-      return new Response("OK");
-    },
-    port: 3001,
-  });
-
-  setInterval(() => {
-    clearSocket();
-  }, 10000);
 }
 
 async function serveStatic(request: Request) {

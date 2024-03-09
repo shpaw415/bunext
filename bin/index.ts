@@ -111,6 +111,7 @@ function dev() {
     },
     stdout: "inherit",
   });
+  console.log("bin ExitCode:", proc.exitCode);
   if (proc.exitCode === 101) dev();
 }
 function init() {
