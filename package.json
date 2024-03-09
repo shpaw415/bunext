@@ -15,7 +15,7 @@
     "react-dom": "*",
     "@bunpmjs/bunext": "link:bunext",
     "react-element-to-jsx-string": "15.0.0",
-    "@bunpmjs/json-webtoken": "latest"
+    "@bunpmjs/json-webtoken": "0.0.22"
   },
   "dependencies": {
     "json-beautify": "1.1.1",
