@@ -1,22 +1,11 @@
 import type { ServerWebSocket, Subprocess } from "bun";
-import { paths } from "../globals";
 
 declare global {
   var socketList: ServerWebSocket<unknown>[];
-  var HotServer: Subprocess<"ignore", "pipe", "inherit">;
+  var HotServer: Subprocess<"ignore", "inherit", "inherit">;
 }
 
 globalThis.socketList ??= [];
-
-if (import.meta.main) {
-  process.on("message", (message) => {
-    console.log("the message:", message);
-    if (message == "signal") {
-      _sendSignal();
-    }
-  });
-  serveHotServer();
-}
 
 export function serveHotServer() {
   const clearSocket = () => {
@@ -56,20 +45,8 @@ export function serveHotServer() {
   }, 10000);
 }
 
-function _sendSignal() {
-  console.log("socket connected: ", globalThis.socketList.length);
+export function sendSignal() {
   for (const ws of globalThis.socketList) {
     ws.send("reload");
   }
-}
-
-export function sendSignal() {
-  globalThis.HotServer.send("signal");
-}
-
-export function _serveHotServer() {
-  const proc = Bun.spawn({
-    cmd: ["bun", `${paths.bunextModulePath}/bin/hotServer.ts`],
-  });
-  globalThis.HotServer = proc;
 }

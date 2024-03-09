@@ -3,6 +3,8 @@
 import { __setHead__ } from "../componants/internal_head";
 import { paths } from "../globals";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
+import { sendSignal, serveHotServer } from "../dev/hotServer";
+import type { Subprocess } from "bun";
 type _cmd = "init" | "build" | "dev" | "database_create" | "database_merge";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
@@ -15,8 +17,9 @@ declare global {
     page: Blob;
     path: string;
   }[];
+  var processes: Subprocess[];
 }
-
+globalThis.processes ??= [];
 globalThis.pages ??= [];
 
 if (import.meta.main)
@@ -103,16 +106,22 @@ async function databaseCreator() {
 }
 
 function dev() {
-  const proc = Bun.spawnSync({
+  const proc = Bun.spawn({
     cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`, "dev"],
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),
     },
+    ipc(message, subprocess) {
+      if (message == "signal") sendSignal();
+    },
     stdout: "inherit",
+    onExit(subprocess, exitCode, signalCode, error) {
+      console.log("exit!!");
+      if (exitCode === 101) dev();
+    },
   });
-  console.log("bin ExitCode:", proc.exitCode);
-  if (proc.exitCode === 101) dev();
+  globalThis.processes.push(proc);
 }
 function init() {
   return import("./init");

@@ -1,22 +1,16 @@
 import { watchBuild } from "../bun-react-ssr/watch";
-import { paths } from "../globals";
 import { sendSignal } from "../dev/hotServer";
+import { paths } from "../globals";
 export const doWatchBuild = () =>
   watchBuild(async () => {
-    console.log(await doBuild());
+    console.log("new build succeed: ", doBuild());
     sendSignal();
   }, [paths.basePagePath]);
 
-async function doBuild() {
-  return new Promise<number>((resolve) => {
-    const proc = Bun.spawn({
-      cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
-    });
-    const interval = setInterval(async () => {
-      if (await proc.exited) {
-        clearInterval(interval);
-        resolve(await proc.exited);
-      }
-    }, 100);
+function doBuild() {
+  const proc = Bun.spawnSync({
+    cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
+    stdout: "inherit",
   });
+  return proc.success;
 }

@@ -9,13 +9,8 @@ import { renderToReadableStream } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { Build } from "@bunpmjs/bunext/bin";
-import { _serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
-import { Subprocess } from "bun";
+import { serveHotServer } from "../../dev/hotServer";
 await init();
-
-declare global {
-  var HotServer: Subprocess<"ignore", "pipe", "inherit">;
-}
 
 function RunServer() {
   try {
@@ -44,11 +39,12 @@ function RunServer() {
     console.log("Serve on port:", server.port);
   } catch (e) {
     console.log(e);
+    process.exit(0);
   }
 }
 async function init() {
   if (globalThis.mode === "dev" && globalThis.dryRun) {
-    _serveHotServer();
+    serveHotServer();
   }
   if (globalThis.dryRun) {
     setGlobalThis();
