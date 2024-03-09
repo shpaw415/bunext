@@ -1,8 +1,10 @@
 ("<Bunext_TypeImposts>");
 ("<Bunext_TypeImposts>");
 
-export async function Database() {
-  if (typeof window !== "undefined") return {};
+export const Database =
+  typeof window === "undefined" ? undefined : await _Database();
+
+async function _Database() {
   const Table = (await import("./class")).Table;
   ("<Bunext_DBExport>");
   ("<Bunext_DBExport>");
