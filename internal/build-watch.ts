@@ -5,7 +5,7 @@ export const doWatchBuild = () =>
   watchBuild(async () => {
     console.log("new build succeed: ", doBuild());
     sendSignal();
-  }, [paths.basePagePath]);
+  }, [paths.basePagePath, "static"]);
 
 function doBuild() {
   const proc = Bun.spawnSync({

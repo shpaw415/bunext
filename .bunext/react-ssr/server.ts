@@ -9,7 +9,7 @@ import { renderToReadableStream } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { Build } from "@bunpmjs/bunext/bin";
-import { serveHotServer } from "../../dev/hotServer";
+import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 await init();
 
 function RunServer() {
