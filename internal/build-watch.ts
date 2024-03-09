@@ -4,14 +4,19 @@ import { sendSignal } from "../dev/dev";
 export const doWatchBuild = () =>
   watchBuild(async () => {
     console.log(await doBuild());
-    //if (doBuild() === 101) process.exit(101);
     sendSignal();
   }, [paths.basePagePath]);
 
 async function doBuild() {
-  const proc = Bun.spawn({
-    cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
+  return new Promise<number>((resolve) => {
+    const proc = Bun.spawn({
+      cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
+    });
+    const interval = setInterval(async () => {
+      if (await proc.exited) {
+        clearInterval(interval);
+        resolve(await proc.exited);
+      }
+    }, 100);
   });
-  await proc.exited;
-  return proc.exitCode;
 }
