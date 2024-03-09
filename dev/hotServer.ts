@@ -10,6 +10,7 @@ globalThis.socketList ??= [];
 
 if (import.meta.main) {
   process.on("message", (message) => {
+    console.log("the message:", message);
     if (message == "signal") {
       _sendSignal();
     }
