@@ -24,13 +24,16 @@ function RunServer() {
         );
         request.headers.toJSON(); // <---- inhibit the problem for some reason
         _MiddleWaremodule.setMiddleWare(request); // <---- the error occure when the request is passed to this function
-        const response =
-          (await serve(request)) || // <----- or this function
-          (await serveStatic(request)) ||
-          serveScript(request);
-
-        if (response) return _MiddleWaremodule.Session.setToken(response);
-
+        try {
+          const response =
+            (await serve(request)) || // <----- or this function
+            (await serveStatic(request)) ||
+            serveScript(request);
+          if (response) return _MiddleWaremodule.Session.setToken(response);
+        } catch {
+          console.log("Runtime error... Reloading!");
+          process.exit(101);
+        }
         globalThis.dryRun = false;
         return new Response("Not found", {
           status: 404,
