@@ -33,7 +33,7 @@ if (import.meta.main)
     case "dev":
       await __setHead__();
       Build();
-      dev();
+      dev(false);
       break;
     case "database_create":
       await databaseSchemaMaker();
@@ -105,9 +105,17 @@ async function databaseCreator() {
   });
 }
 
-function dev() {
+let retry = 0;
+
+function dev(errorDisplay: boolean) {
   const proc = Bun.spawn({
-    cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`, "dev"],
+    cmd: [
+      "bun",
+      "--hot",
+      `${paths.bunextDirName}/react-ssr/server.ts`,
+      "dev",
+      ...(errorDisplay ? ["errorDisplay"] : []),
+    ],
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),
@@ -117,8 +125,12 @@ function dev() {
     },
     stdout: "inherit",
     onExit(subprocess, exitCode, signalCode, error) {
-      console.log("exit!!");
-      if (exitCode === 101) dev();
+      if (exitCode === 101 && retry < 1) {
+        dev(retry == 1);
+        retry++;
+      } else {
+        console.log("Bunext Dev Exited.");
+      }
     },
   });
   globalThis.processes.push(proc);

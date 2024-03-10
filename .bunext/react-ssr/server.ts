@@ -10,7 +10,9 @@ import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { Build } from "@bunpmjs/bunext/bin";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
-import { __USER_ACTION__ } from "../../features/session";
+
+const arg = process.argv[3] as undefined | "errorDisplay";
+
 await init();
 
 function RunServer() {
@@ -30,9 +32,12 @@ function RunServer() {
             (await serveStatic(request)) ||
             serveScript(request);
           if (response) return _MiddleWaremodule.Session.setToken(response);
-        } catch {
-          console.log("Runtime error... Reloading!");
-          process.exit(101);
+        } catch (e) {
+          if ((e as Error).name == "TypeError" && arg != "errorDisplay") {
+            console.log("Runtime error... Reloading!");
+            process.exit(101);
+          }
+          console.log(e);
         }
         globalThis.dryRun = false;
         return new Response("Not found", {
