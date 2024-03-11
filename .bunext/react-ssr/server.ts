@@ -100,11 +100,16 @@ async function serve(request: Request) {
       Build();
     }
 
+    const session = await import("@bunpmjs/bunext/features/session");
+
     const response = await router.serve(request, {
       Shell: Shell as any,
       bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
       preloadScript: {
         __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
+        __PUBLIC_SESSION_DATA__: JSON.stringify(
+          session.__GET_PUBLIC_SESSION_DATA__() ?? {}
+        ),
       },
     });
     return response;
