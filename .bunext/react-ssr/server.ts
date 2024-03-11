@@ -11,7 +11,20 @@ import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { Build } from "@bunpmjs/bunext/bin";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 
-const arg = process.argv[3] as undefined | "errorDisplay";
+interface devConsole {
+  servePort: number;
+  hostName: string;
+  error?: string;
+}
+
+declare global {
+  var devConsole: devConsole;
+}
+
+globalThis.devConsole ??= {
+  servePort: 3000,
+  hostName: "localhost",
+};
 
 await init();
 
@@ -33,7 +46,7 @@ function RunServer() {
             serveScript(request);
           if (response) return _MiddleWaremodule.Session.setToken(response);
         } catch (e) {
-          if ((e as Error).name == "TypeError" && arg != "errorDisplay") {
+          if ((e as Error).name == "TypeError") {
             console.log("Runtime error... Reloading!");
             process.exit(101);
           }
@@ -45,7 +58,7 @@ function RunServer() {
         });
       },
     });
-    console.log("Serve on port:", server.port);
+    globalThis.devConsole.servePort = server.port;
   } catch (e) {
     console.log(e);
     process.exit(0);
@@ -60,7 +73,18 @@ async function init() {
     RunServer();
     doWatchBuild();
   }
+  logDevConsole();
   globalThis.dryRun = false;
+}
+
+function logDevConsole() {
+  const dev = globalThis.devConsole;
+  const toLog = [
+    `Serving: http://${dev.hostName}:${dev.servePort}`,
+    `current Error: ${dev.error || "none"}`,
+  ];
+
+  toLog.forEach((c) => console.log(c));
 }
 
 function setGlobalThis() {

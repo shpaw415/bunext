@@ -709,14 +709,14 @@ export class Builder {
     );
     for await (const i of buildFileArray) {
       const file = Bun.file(i);
-      await this.makeUseInjection({
+      /* await this.makeUseInjection({
         file: file,
         filePath: i,
         runtimePath: runtimePath,
         toESMPath: esmPath,
-      });
+      });*/
       await this.clearDuplicateExports(file);
-      await this.normalizeInjection(file);
+      /*await this.normalizeInjection(file);*/
     }
   }
   private async normalizeInjection(file: BunFile) {
