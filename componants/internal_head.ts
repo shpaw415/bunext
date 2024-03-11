@@ -17,6 +17,7 @@ export async function __setHead__() {
       "/" +
         filePath.split(paths.basePagePath)[1].split("/").slice(0, -1).join("/")
     );
+
     globalThis.currentPath = _filePath;
     try {
       await import(filePath);

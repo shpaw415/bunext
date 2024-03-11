@@ -297,14 +297,12 @@ export class Builder {
             );
 
             const makeFullServerFeature = async (namespace?: string) => {
-              compilerType = "tsx";
-              return makeReturn(
-                [
-                  await self.ContentWOExports(content),
-                  await makeServerExport(),
-                  await makeImport(namespace),
-                ].join("\n")
-              );
+              const parsedContent = [
+                await makeImport(namespace),
+                //await self.ContentWOExports(content),
+                await makeServerExport(),
+              ];
+              return makeReturn(parsedContent.join("\n"));
             };
             const makeClientFeature = (content: string) => {
               const security = self.checkSecurityFeatures(
@@ -704,18 +702,18 @@ export class Builder {
     for await (const i of builtFile) {
       buildFileArray.push(i);
     }
-    const { runtimePath, esmPath } = await this.findUseInjectionModulePath(
+    /*const { runtimePath, esmPath } = await this.findUseInjectionModulePath(
       buildFileArray
-    );
+    );*/
     for await (const i of buildFileArray) {
       const file = Bun.file(i);
+      await this.clearDuplicateExports(file);
       /* await this.makeUseInjection({
         file: file,
         filePath: i,
         runtimePath: runtimePath,
         toESMPath: esmPath,
       });*/
-      await this.clearDuplicateExports(file);
       /*await this.normalizeInjection(file);*/
     }
   }

@@ -28,12 +28,13 @@ if (import.meta.main)
       await init();
       break;
     case "build":
+      await __setHead__();
       Build();
       break;
     case "dev":
       await __setHead__();
       Build();
-      dev(false);
+      dev();
       break;
     case "database_create":
       await databaseSchemaMaker();
@@ -107,15 +108,9 @@ async function databaseCreator() {
 
 let retry = 0;
 
-function dev(errorDisplay: boolean) {
+function dev() {
   const proc = Bun.spawn({
-    cmd: [
-      "bun",
-      "--hot",
-      `${paths.bunextDirName}/react-ssr/server.ts`,
-      "dev",
-      ...(errorDisplay ? ["errorDisplay"] : []),
-    ],
+    cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`, "dev"],
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),
@@ -126,7 +121,7 @@ function dev(errorDisplay: boolean) {
     stdout: "inherit",
     onExit(subprocess, exitCode, signalCode, error) {
       if (exitCode === 101 && retry < 1) {
-        dev(retry == 1);
+        dev();
         retry++;
       } else {
         console.log("Bunext Dev Exited.");
