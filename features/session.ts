@@ -20,6 +20,7 @@ export function __GET_PUBLIC_SESSION_DATA__() {
 }
 
 class _Session {
+  private cookieName = "bunext_session_token";
   private publicSessionData = globalThis.__PUBLIC_SESSION_DATA__;
   /**
    *
@@ -27,8 +28,7 @@ class _Session {
    * @param Public the data can be accessed in the client context
    */
   setData(data: Record<string, any>, Public?: true) {
-    if (typeof window != "undefined")
-      throw new Error("Session.setData cannot be called in a client context");
+    this.PublicThrow("Session.setData cannot be called in a client context");
     __USER_ACTION__.__SESSION_DATA__ = data;
     if (Public) __USER_ACTION__.__PUBLIC_SESSION_DATA__ = data;
   }
@@ -37,7 +37,19 @@ class _Session {
     return __USER_ACTION__.__CURRENT_DATA__;
   }
   delete() {
-    __USER_ACTION__.__DELETE__ = true;
+    if (this.isClient()) this.deleteClientSession();
+    else __USER_ACTION__.__DELETE__ = true;
+  }
+  private PublicThrow(error: string) {
+    if (typeof window != "undefined") throw new Error(error);
+  }
+  private isClient() {
+    return typeof window != "undefined";
+  }
+  private deleteClientSession() {
+    document.cookie =
+      this.cookieName + "=; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    globalThis.__PUBLIC_SESSION_DATA__ = undefined;
   }
 }
 
