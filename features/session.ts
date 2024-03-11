@@ -1,11 +1,11 @@
-export interface _SessionData {
-  public: Record<string, any>;
-  private: Record<string, any>;
+export interface _SessionData<_SessionData> {
+  public: Record<string, _SessionData>;
+  private: Record<string, _SessionData>;
 }
 
 export const __USER_ACTION__ = {
   __DELETE__: false,
-  __SESSION_DATA__: undefined as undefined | _SessionData,
+  __SESSION_DATA__: undefined as undefined | _SessionData<any>,
 };
 
 /**
@@ -15,7 +15,7 @@ declare global {
   var __PUBLIC_SESSION_DATA__: Record<string, any> | undefined;
 }
 
-export function __SET_CURRENT__(data: _SessionData) {
+export function __SET_CURRENT__(data: _SessionData<any>) {
   __USER_ACTION__.__SESSION_DATA__ = data;
 }
 export function __GET_PUBLIC_SESSION_DATA__() {

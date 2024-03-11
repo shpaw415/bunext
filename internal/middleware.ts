@@ -57,6 +57,6 @@ class middleWare {
   }
 
   getData<_Data>() {
-    return this._session.session() as _SessionData | undefined;
+    return this._session.session() as _SessionData<_Data> | undefined;
   }
 }
