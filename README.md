@@ -13,7 +13,7 @@
     - Revalidate
     - Server action
     - Links
-    - Session Management
+    - Session Management ( public & private )
     - SQlite Management
 
 ## What is planed
@@ -36,3 +36,28 @@ bun run dev
 ```
 
 ## Documentation To Come
+
+## Session
+
+### Set Session
+
+```TypeScript
+
+```
+
+### Get Session
+
+```TypeScript
+    "use server";
+    export default function Page() {
+
+    }
+    // other file
+    "use client"
+    import { Session } from "@bunpmjs/bunext/features/session";
+    export function Componant() {
+        const session = Session.getData();
+        return <span>{session.username}</span>
+    }
+
+```
