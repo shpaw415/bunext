@@ -254,6 +254,7 @@ export class Builder {
               ].join("\n");
               return {
                 contents: _content,
+                loader: props.loader,
               };
             }
 
@@ -295,12 +296,16 @@ export class Builder {
               self.options.pageDir as string
             );
 
-            const makeFullServerFeature = async (namespace?: string) =>
-              makeReturn(
-                [await makeServerExport(), await makeImport(namespace)].join(
-                  "\n"
-                )
+            const makeFullServerFeature = async (namespace?: string) => {
+              compilerType = "tsx";
+              return makeReturn(
+                [
+                  await self.ContentWOExports(content),
+                  await makeServerExport(),
+                  await makeImport(namespace),
+                ].join("\n")
               );
+            };
             const makeClientFeature = (content: string) => {
               const security = self.checkSecurityFeatures(
                 content,
@@ -463,6 +468,7 @@ export class Builder {
                 loader: "tsx",
               }).scan(fileContent);
               fileContent = [
+                await self.ContentWOExports(fileContent),
                 await makeImport(imports, namespace),
                 await makeServerExport(exports),
               ].join("\n");
@@ -475,6 +481,23 @@ export class Builder {
         );
       },
     } as BunPlugin;
+  }
+  private ContentWOExports(content: string) {
+    const transpiled = new Bun.Transpiler({
+      target: "browser",
+      loader: "tsx",
+      deadCodeElimination: true,
+      autoImportJSX: true,
+      exports: {
+        eliminate: [
+          ...new Bun.Transpiler({ loader: "tsx" }).scan(content).exports,
+        ],
+      },
+      trimUnusedImports: true,
+      jsxOptimizationInline: true,
+    }).transform(content);
+
+    return transpiled;
   }
   private checkSecurityFeatures(
     content: string,
@@ -548,10 +571,6 @@ export class Builder {
     props: OnLoadArgs;
   }) {
     let _content = "";
-    const transpiler = new Transpiler({
-      loader: "jsx",
-      target: "browser",
-    });
 
     for await (const i of exports) {
       if (this.bypassoptions.useServer.functionName.includes(i)) continue;
