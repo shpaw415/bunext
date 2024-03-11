@@ -34,7 +34,7 @@ class _Response {
       secure ? "Secure;" : "",
       httpOnly ? "HttpOnly" : "",
     ].filter((v) => v.length > 0);
-    __REQUEST_CONTEXT__.request?.headers.append(
+    __REQUEST_CONTEXT__.response?.headers.append(
       "Set-Cookie",
       cookieHeader.join(" ")
     );
