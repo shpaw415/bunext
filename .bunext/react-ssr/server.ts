@@ -78,6 +78,7 @@ async function init() {
 }
 
 function logDevConsole() {
+  console.clear();
   const dev = globalThis.devConsole;
   const toLog = [
     `Serving: http://${dev.hostName}:${dev.servePort}`,
