@@ -33,7 +33,8 @@ globalThis.head ??= {};
  * @param data to be set
  */
 export function setHead({ data, path }: { data: _Head; path?: string }) {
-  if (typeof globalThis.headInit === "undefined") return;
+  if (typeof globalThis.headInit == "undefined" || typeof window != "undefined")
+    return;
   if (path) globalThis.head[path] = data;
   globalThis.head[globalThis.currentPath] = data;
 }
