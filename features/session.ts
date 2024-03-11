@@ -5,6 +5,13 @@ export const __USER_ACTION__ = {
   __PUBLIC_SESSION_DATA__: undefined as Record<string, any> | undefined,
 };
 
+/**
+ * __PUBLIC_SESSION_DATA__ is set in middleware
+ */
+declare global {
+  var __PUBLIC_SESSION_DATA__: Record<string, any> | undefined;
+}
+
 export function __SET_CURRENT__(data: any) {
   __USER_ACTION__.__CURRENT_DATA__ = data;
 }
@@ -13,7 +20,7 @@ export function __GET_PUBLIC_SESSION_DATA__() {
 }
 
 class _Session {
-  private globalX: Record<string, any> = globalThis;
+  private publicSessionData = globalThis.__PUBLIC_SESSION_DATA__;
   /**
    *
    * @param data data to set in the token
@@ -26,8 +33,7 @@ class _Session {
     if (Public) __USER_ACTION__.__PUBLIC_SESSION_DATA__ = data;
   }
   getData(): undefined | Record<string, any> {
-    if (typeof window != "undefined")
-      return this.globalX.__PUBLIC_SESSION_DATA__;
+    if (typeof window != "undefined") return this.publicSessionData;
     return __USER_ACTION__.__CURRENT_DATA__;
   }
   delete() {
