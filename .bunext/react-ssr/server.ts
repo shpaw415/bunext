@@ -104,7 +104,7 @@ async function serve(request: Request) {
     const session = await import("@bunpmjs/bunext/features/session");
 
     const response = await router.serve(
-      __REQUEST_CONTEXT__.request as Request,
+      request,
       __REQUEST_CONTEXT__.response as Response,
       {
         Shell: Shell as any,
