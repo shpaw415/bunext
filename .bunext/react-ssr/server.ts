@@ -10,6 +10,7 @@ import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { Build } from "@bunpmjs/bunext/bin";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
+import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
 
 interface devConsole {
   servePort: number;
@@ -102,16 +103,20 @@ async function serve(request: Request) {
 
     const session = await import("@bunpmjs/bunext/features/session");
 
-    const response = await router.serve(request, {
-      Shell: Shell as any,
-      bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
-      preloadScript: {
-        __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
-        __PUBLIC_SESSION_DATA__: JSON.stringify(
-          session.__GET_PUBLIC_SESSION_DATA__() ?? {}
-        ),
-      },
-    });
+    const response = await router.serve(
+      __REQUEST_CONTEXT__.request as Request,
+      __REQUEST_CONTEXT__.response as Response,
+      {
+        Shell: Shell as any,
+        bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
+        preloadScript: {
+          __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
+          __PUBLIC_SESSION_DATA__: JSON.stringify(
+            session.__GET_PUBLIC_SESSION_DATA__() ?? {}
+          ),
+        },
+      }
+    );
     return response;
   } catch (e) {
     const res = async () =>

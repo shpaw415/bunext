@@ -59,6 +59,7 @@ export class StaticRouters {
 
   async serve<T = void>(
     request: Request,
+    response: Response,
     {
       Shell,
       preloadScript,
@@ -77,14 +78,17 @@ export class StaticRouters {
     }
   ): Promise<Response | null> {
     const { pathname, search } = new URL(request.url);
-    const serverAction = await this.serverActionGetter(request);
+    const serverAction = await this.serverActionGetter(request, response);
     if (serverAction) return serverAction;
 
     const staticResponse = await serveFromDir({
       directory: this.buildDir,
       path: pathname,
     });
-    if (staticResponse) return new Response(staticResponse);
+    if (staticResponse)
+      return new Response(staticResponse, {
+        headers: response.headers,
+      });
     const serverSide = this.server.match(request);
     if (!serverSide) return null;
     const clientSide = this.client.match(request);
@@ -105,6 +109,7 @@ export class StaticRouters {
     if (request.headers.get("Accept") === "application/vnd.server-side-props") {
       return new Response(stringified, {
         headers: {
+          ...response.headers,
           "Content-Type": "application/vnd.server-side-props",
           "Cache-Control": "no-store",
         },
@@ -151,6 +156,7 @@ export class StaticRouters {
       if (page) {
         return new Response(page.stream(), {
           headers: {
+            ...response.headers,
             "Content-Type": "text/html; charset=utf-8",
             "Cache-Control": "no-store",
           },
@@ -181,6 +187,7 @@ export class StaticRouters {
       jsx: FinalJSX,
       renderOptions: renderOptionData,
       serverSide,
+      response,
     });
   }
   private getServerSideProps(matched: MatchedRoute) {}
@@ -188,10 +195,12 @@ export class StaticRouters {
     jsx,
     renderOptions,
     serverSide,
+    response,
   }: {
     jsx: JSX.Element;
     renderOptions: any;
     serverSide: MatchedRoute;
+    response: Response;
   }): Promise<Response | null> {
     const stream = await renderToReadableStream(jsx, renderOptions);
     const [mainStream, secondStream] = stream.tee();
@@ -207,6 +216,7 @@ export class StaticRouters {
 
     return new Response(mainStream, {
       headers: {
+        ...response.headers,
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
       },
@@ -219,7 +229,10 @@ export class StaticRouters {
       .map((l) => `//${l}`.split("/").slice(0, -1).join("/"));
   }
 
-  private async serverActionGetter(request: Request): Promise<Response | null> {
+  private async serverActionGetter(
+    request: Request,
+    response: Response
+  ): Promise<Response | null> {
     const { pathname } = new URL(request.url);
     if (pathname !== "/ServerActionGetter") return null;
     const reqData = this.extractServerActionHeader(request);
@@ -234,7 +247,9 @@ export class StaticRouters {
     const res = await call(...props);
 
     const result = JSON.stringify(typeof res === "undefined" ? "" : res);
-    return new Response(result);
+    return new Response(result, {
+      headers: response.headers,
+    });
   }
   private extractServerActionHeader(request: Request) {
     const serverActionData = request.headers.get("serveractionid")?.split(":");

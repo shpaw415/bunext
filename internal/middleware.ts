@@ -5,6 +5,8 @@ import {
   __USER_ACTION__,
 } from "../features/session";
 
+import { __SET_REQUEST__ } from "../features/request";
+
 export let Session: middleWare;
 
 export function setMiddleWare(req: Request) {
@@ -27,6 +29,7 @@ class middleWare {
     } catch {
       _Session.delete();
     }
+    __SET_REQUEST__({ req });
   }
 
   setData(data: { [key: string]: any }) {
