@@ -1,8 +1,11 @@
+export interface _SessionData {
+  public: Record<string, any>;
+  private: Record<string, any>;
+}
+
 export const __USER_ACTION__ = {
   __DELETE__: false,
-  __CURRENT_DATA__: undefined as undefined | any,
-  __SESSION_DATA__: undefined as Record<string, any> | undefined,
-  __PUBLIC_SESSION_DATA__: undefined as Record<string, any> | undefined,
+  __SESSION_DATA__: undefined as undefined | _SessionData,
 };
 
 /**
@@ -12,11 +15,11 @@ declare global {
   var __PUBLIC_SESSION_DATA__: Record<string, any> | undefined;
 }
 
-export function __SET_CURRENT__(data: any) {
-  __USER_ACTION__.__CURRENT_DATA__ = data;
+export function __SET_CURRENT__(data: _SessionData) {
+  __USER_ACTION__.__SESSION_DATA__ = data;
 }
 export function __GET_PUBLIC_SESSION_DATA__() {
-  return __USER_ACTION__.__PUBLIC_SESSION_DATA__;
+  return __USER_ACTION__.__SESSION_DATA__?.public;
 }
 
 class _Session {
@@ -30,15 +33,21 @@ class _Session {
    */
   setData(data: Record<string, any>, Public?: true) {
     this.PublicThrow("Session.setData cannot be called in a client context");
-    __USER_ACTION__.__SESSION_DATA__ = {
-      ...__USER_ACTION__.__SESSION_DATA__,
+    if (typeof __USER_ACTION__.__SESSION_DATA__?.private == "undefined") return;
+    __USER_ACTION__.__SESSION_DATA__.private = {
+      ...__USER_ACTION__.__SESSION_DATA__?.private,
       ...data,
     };
-    if (Public)
-      __USER_ACTION__.__PUBLIC_SESSION_DATA__ = {
-        ...__USER_ACTION__.__PUBLIC_SESSION_DATA__,
-        ...data,
-      };
+
+    if (
+      typeof __USER_ACTION__.__SESSION_DATA__?.public == "undefined" ||
+      !Public
+    )
+      return;
+    __USER_ACTION__.__SESSION_DATA__.public = {
+      ...__USER_ACTION__.__SESSION_DATA__.public,
+      ...data,
+    };
   }
   /**
    * Server side only
@@ -46,8 +55,10 @@ class _Session {
    */
   reset() {
     this.PublicThrow("Session.reset cannot be called in a client context");
-    __USER_ACTION__.__SESSION_DATA__ = {};
-    __USER_ACTION__.__PUBLIC_SESSION_DATA__ = {};
+    __USER_ACTION__.__SESSION_DATA__ = {
+      public: {},
+      private: {},
+    };
     return this;
   }
   /**
@@ -62,7 +73,7 @@ class _Session {
    */
   getData(): undefined | Record<string, any> {
     if (typeof window != "undefined") return this.publicSessionData;
-    return __USER_ACTION__.__CURRENT_DATA__;
+    return __USER_ACTION__.__SESSION_DATA__?.private;
   }
   /**
    * Server & Client

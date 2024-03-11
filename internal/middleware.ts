@@ -3,6 +3,7 @@ import {
   __SET_CURRENT__,
   Session as _Session,
   __USER_ACTION__,
+  type _SessionData,
 } from "../features/session";
 
 import { __SET_REQUEST__ } from "../features/request";
@@ -25,15 +26,15 @@ class middleWare {
       cookieName: "bunext_session_token",
     });
     try {
-      __SET_CURRENT__(this.getData());
+      __SET_CURRENT__(this.getData() || { private: {}, public: {} });
     } catch {
       _Session.delete();
     }
     __SET_REQUEST__({ req });
   }
 
-  setData(data: { [key: string]: any }) {
-    __USER_ACTION__.__CURRENT_DATA__ = data;
+  setData(data: { private: Record<string, any>; public: Record<string, any> }) {
+    __USER_ACTION__.__SESSION_DATA__ = data;
   }
 
   setToken(response: Response) {
@@ -56,6 +57,6 @@ class middleWare {
   }
 
   getData<_Data>() {
-    return this._session.session() as _Data | undefined;
+    return this._session.session() as _SessionData | undefined;
   }
 }
