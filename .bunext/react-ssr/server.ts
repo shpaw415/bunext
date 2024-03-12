@@ -14,6 +14,8 @@ import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
 
 const arg = process.argv[3] as undefined | "showError";
 
+globalThis.devConsole.error = undefined;
+
 await init();
 
 function RunServer() {
