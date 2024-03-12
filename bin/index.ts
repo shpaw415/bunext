@@ -1,7 +1,7 @@
 #!/bin/env bun
 
 import { __setHead__ } from "../componants/internal_head";
-import { paths } from "../globals";
+import { exitCodes, paths } from "../globals";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { sendSignal, serveHotServer } from "../dev/hotServer";
 import type { Subprocess } from "bun";
@@ -34,7 +34,7 @@ if (import.meta.main)
     case "dev":
       await __setHead__();
       Build();
-      dev();
+      dev(false);
       break;
     case "database_create":
       await databaseSchemaMaker();
@@ -106,11 +106,15 @@ async function databaseCreator() {
   });
 }
 
-let retry = 0;
-
-function dev() {
+function dev(showBuildError: boolean) {
   const proc = Bun.spawn({
-    cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`, "dev"],
+    cmd: [
+      "bun",
+      "--hot",
+      `${paths.bunextDirName}/react-ssr/server.ts`,
+      "dev",
+      showBuildError ? "showError" : "",
+    ],
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),
@@ -120,9 +124,10 @@ function dev() {
     },
     stdout: "inherit",
     onExit(subprocess, exitCode, signalCode, error) {
-      if (exitCode === 101 && retry < 1) {
-        dev();
-        retry++;
+      if (exitCode == exitCodes.runtime) {
+        dev(false);
+      } else if (exitCode == exitCodes.build) {
+        dev(true);
       } else {
         console.log("Bunext Dev Exited.");
       }

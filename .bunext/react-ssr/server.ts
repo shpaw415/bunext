@@ -2,7 +2,7 @@ import { builder } from "@bunpmjs/bunext/internal/build";
 import { router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
-import { names, paths } from "@bunpmjs/bunext/globals";
+import { exitCodes, names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import "@bunpmjs/bunext/server_global";
 import { renderToReadableStream } from "react-dom/server";
@@ -12,20 +12,7 @@ import { Build } from "@bunpmjs/bunext/bin";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
 
-interface devConsole {
-  servePort: number;
-  hostName: string;
-  error?: string;
-}
-
-declare global {
-  var devConsole: devConsole;
-}
-
-globalThis.devConsole ??= {
-  servePort: 3000,
-  hostName: "localhost",
-};
+const arg = process.argv[3] as undefined | "showError";
 
 await init();
 
@@ -49,7 +36,7 @@ function RunServer() {
         } catch (e) {
           if ((e as Error).name == "TypeError") {
             console.log("Runtime error... Reloading!");
-            process.exit(101);
+            process.exit(exitCodes.runtime);
           }
           console.log(e);
         }
@@ -72,7 +59,7 @@ async function init() {
   if (globalThis.dryRun) {
     setGlobalThis();
     RunServer();
-    doWatchBuild();
+    doWatchBuild(arg == "showError" ? true : false);
   }
   logDevConsole();
   globalThis.dryRun = false;
@@ -125,7 +112,7 @@ async function serve(request: Request) {
           bootstrapModules: ["/bunext-scripts"],
         })
       );
-    if ((e as Error).name == "TypeError") process.exit(101);
+    if ((e as Error).name == "TypeError") process.exit(exitCodes.runtime);
     return res();
   }
 }

@@ -9,3 +9,8 @@ export const names = {
   bunextModuleName: "bunext",
   loadScriptPath: "/bunext-scripts",
 } as const;
+
+export const exitCodes = {
+  build: 102,
+  runtime: 101,
+} as const;

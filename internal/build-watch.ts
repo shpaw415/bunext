@@ -1,9 +1,13 @@
 import { watchBuild } from "../bun-react-ssr/watch";
 import { sendSignal } from "../dev/hotServer";
-import { paths } from "../globals";
-export const doWatchBuild = () =>
+import { exitCodes, paths } from "../globals";
+import "../dev/dev";
+export const doWatchBuild = (showError: boolean) =>
   watchBuild(async () => {
-    console.log("new build succeed: ", doBuild());
+    const res = doBuild();
+    console.log("new build succeed: ", res);
+    if (!res && !showError) process.exit(exitCodes.build);
+    else if (!res && showError) globalThis.devConsole.error = "Build Error";
     sendSignal();
   }, [paths.basePagePath, "static"]);
 
