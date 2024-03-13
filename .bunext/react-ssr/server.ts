@@ -1,5 +1,5 @@
 import { builder } from "@bunpmjs/bunext/internal/build";
-import { router } from "./routes";
+import { resetRouter, router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
 import { exitCodes, names, paths } from "@bunpmjs/bunext/globals";
@@ -63,6 +63,7 @@ async function init() {
     RunServer();
     doWatchBuild(arg == "showError" ? true : false);
   }
+  resetRouter();
   logDevConsole();
   globalThis.dryRun = false;
 }

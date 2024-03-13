@@ -223,10 +223,9 @@ export class StaticRouters {
     });
   }
   private async getlayoutPaths() {
-    const files = this.getFilesFromPageDir();
-    return files
+    return this.getFilesFromPageDir()
       .filter((f) => f.split("/").at(-1)?.includes("layout."))
-      .map((l) => `//${l}`.split("/").slice(0, -1).join("/"));
+      .map((l) => normalize(`//${l}`.split("/").slice(0, -1).join("/")));
   }
 
   private async serverActionGetter(
@@ -273,16 +272,17 @@ export class StaticRouters {
    * Next.js like module stacking
    */
   async stackLayouts(route: MatchedRoute, pageElement: JSX.Element) {
-    const layouts = route.pathname.split("/").slice(1);
+    const layouts = route.pathname == "/" ? [""] : route.pathname.split("/");
     type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
-
     let layoutsJsxList: Array<_layout> = [];
     let index = 0;
     for await (const i of layouts) {
-      const path = layouts.slice(0, index).join("/");
-      const pathToFile = `${this.baseDir}/${this.pageDir}/${path}${
-        this.options.displayMode.nextjs?.layout as string
-      }`;
+      const path = layouts.slice(0, index + 1).join("/");
+      const pathToFile = normalize(
+        `${this.baseDir}/${this.pageDir}/${path}/${
+          this.options.displayMode.nextjs?.layout as string
+        }`
+      );
       if (!(await Bun.file(pathToFile).exists())) continue;
       const defaultExport = (await import(pathToFile)).default;
       if (!defaultExport)

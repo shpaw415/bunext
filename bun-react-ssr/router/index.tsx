@@ -186,9 +186,10 @@ async function NextJsLayoutStacker(
   let currentPath = "/";
   type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
   let layoutStack: Array<_layout> = [];
-  for await (const p of path.split("/").slice(1)) {
+  const formatedPath = path == "/" ? [""] : path.split("/");
+  for await (const p of formatedPath) {
     currentPath += p.length > 0 ? p : "";
-    if (globalX.__LAYOUT_ROUTE__.includes(currentPath)) {
+    if (globalX.__LAYOUT_ROUTE__.includes(normalize(currentPath))) {
       layoutStack.push(
         (
           await import(
