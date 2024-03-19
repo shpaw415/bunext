@@ -14,7 +14,6 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "../bun-react-ssr/types";
 import { isUseClient } from "../bun-react-ssr";
-export * from "./deprecated_build";
 
 globalThis.pages ??= [];
 globalThis.serverActions ??= [];
@@ -126,56 +125,14 @@ export class Builder {
       });
     }
     if (_export.length <= 1) return fileContent;
-    //const filteredExports = [...new Set(..._export.map((e) => e.exportValues))];
+    const filteredExports = [...new Set(..._export.map((e) => e.exportValues))];
     for await (const e of _export) {
       fileContent = fileContent.replaceAll(e.exportStr, "");
     }
+    fileContent += `export {${filteredExports.join(", ")}};`;
     return fileContent;
   }
-  /** Deprecated */
-  private BunReactSsrPlugin(absPageDir: string) {
-    const self = this;
-    return {
-      name: "bun-react-ssr",
-      target: "browser",
-      setup(build) {
-        build.onLoad(
-          {
-            filter: new RegExp(
-              "^" + self.escapeRegExp(absPageDir) + "/.*" + "\\.ts[x]$"
-            ),
-          },
-          async ({ path, loader }) => {
-            const search = new URLSearchParams();
-            search.append("client", "1");
-            search.append("loader", loader);
-            return {
-              contents:
-                "export { default } from " +
-                JSON.stringify("./" + basename(path) + "?client"),
-              loader: "ts",
-            };
-          }
-        );
-        build.onResolve(
-          { filter: /\.ts[x]\?client$/ },
-          async ({ importer, path }) => {
-            const url = pathToFileURL(importer);
-            return {
-              path: fileURLToPath(new URL(path, url)),
-              namespace: "client",
-            };
-          }
-        );
-        build.onLoad(
-          { namespace: "client", filter: /\.ts[x]$/ },
-          async ({ path, loader }) => {
-            return { contents: await Bun.file(path).text(), loader };
-          }
-        );
-      },
-    } as BunPlugin;
-  }
+
   private ServerActionPluginExt(
     func: Function,
     ModulePath: string,
@@ -693,11 +650,11 @@ export class Builder {
     for await (const i of buildFileArray) {
       if (i.split("/").at(-1)?.startsWith("chunk-")) continue;
       const file = Bun.file(i);
-      let content = await file.text();
+      let content = await this.clearDuplicateExports(await file.text());
       for await (const fix of this.postProcessFixes) {
         if (!(await this.PackageJsonFindDependency(fix.packageName))) continue;
         content = await fix.modifier({
-          fileContent: await this.clearDuplicateExports(content),
+          fileContent: content,
           path: i,
         });
       }
