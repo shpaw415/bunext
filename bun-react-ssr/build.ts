@@ -1,20 +1,11 @@
-import { Glob, Transpiler, fileURLToPath, pathToFileURL } from "bun";
-import { unlink } from "node:fs/promises";
-import { basename, join } from "node:path";
-import type {
-  BunFile,
-  BunPlugin,
-  Import,
-  OnLoadArgs,
-  OnLoadResult,
-  ServeOptions,
-} from "bun";
-import { normalize, relative } from "path";
+import { Glob, fileURLToPath, pathToFileURL } from "bun";
+import { join, basename } from "node:path";
+import type { BunPlugin } from "bun";
+import { normalize } from "path";
 import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "../bun-react-ssr/types";
 import { isUseClient } from "../bun-react-ssr";
-
 globalThis.pages ??= [];
 globalThis.serverActions ??= [];
 
@@ -25,9 +16,6 @@ type _Builderoptions = {
     nextjs: {
       layout: string;
     };
-  };
-  postProcess?: {
-    PostProcessFixes?: PostProcessFix[];
   };
 };
 
@@ -56,10 +44,14 @@ type _requiredBuildoptions = {
 type _otherOptions = {
   external: string[];
 };
+
+type _CreateBuild = Partial<_Mainoptions> &
+  _requiredBuildoptions &
+  Partial<_otherOptions>;
+
 export class Builder {
   private options: _Mainoptions;
   private bypassoptions: _bypassOptions;
-  private postProcessFixes: PostProcessFix[];
   constructor(options: _Builderoptions) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
@@ -80,31 +72,32 @@ export class Builder {
       },
       ...options.bypass,
     };
-    this.postProcessFixes = options.postProcess?.PostProcessFixes || [];
   }
   async build() {
     const { baseDir, hydrate, pageDir, sourcemap, buildDir, minify, plugins } =
       this.options;
-    const entrypoints = [join(baseDir, hydrate)];
+    let entrypoints = [join(baseDir, hydrate)];
     const absPageDir = join(baseDir, pageDir as string);
     for await (const path of this.glob(absPageDir)) {
       entrypoints.push(path);
     }
+    entrypoints = entrypoints.filter((e) => {
+      const allowedEndsWith = [
+        "hydrate.ts",
+        "layout.tsx",
+        "index.tsx",
+        "[id].tsx",
+      ];
+      if (allowedEndsWith.includes(e.split("/").at(-1) as string)) return true;
+      return false;
+    });
     const result = await this.CreateBuild({
-      entrypoints,
+      entrypoints: entrypoints,
       sourcemap,
       outdir: join(baseDir, buildDir as string),
       minify,
       plugins: [...(plugins ?? [])],
     });
-    if (result.success) {
-      for await (const path of this.glob(join(baseDir, buildDir as string))) {
-        if (result.outputs.every((x) => x.path !== path)) {
-          await unlink(path);
-        }
-      }
-    } else return result;
-
     return result;
   }
   resetPath(path: string) {
@@ -132,40 +125,88 @@ export class Builder {
     fileContent += `export {${filteredExports.join(", ")}};`;
     return fileContent;
   }
+  private ServerActionToClient(func: Function, ModulePath: string): string {
+    const path = ModulePath.split(this.options.pageDir as string).at(
+      1
+    ) as string;
 
-  private ServerActionPluginExt(
-    func: Function,
-    ModulePath: string,
-    isDefault: boolean
-  ): string | null {
-    if (!func.name.startsWith("Server")) return null;
-    const path = ModulePath.split(this.options.pageDir as string).at(1);
-    if (!path) return null;
+    const ServerActionClient = (ModulePath: string, funcName: string) => {
+      return async function (...props: Array<any>) {
+        const response = await fetch("<!URLPATH!>", {
+          headers: {
+            serverActionID: "<!ModulePath!>:<!FuncName!>",
+          },
+          method: "POST",
+          body: JSON.stringify(encodeURI(JSON.stringify(props))),
+        });
+        if (!response.ok)
+          throw new Error(
+            "error when Calling server action <!ModulePath!>:<!FuncName!>"
+          );
+        return response.json();
+      }
+        .toString()
+        .replace("async function", "")
+        .replaceAll("<!FuncName!>", funcName)
+        .replaceAll("<!ModulePath!>", ModulePath)
+        .replaceAll("<!URLPATH!>", URLpaths.serverAction);
+    };
 
-    return `export ${isDefault ? "default " : ""}async function ${
+    return `async function ${func.name}${ServerActionClient(
+      normalize(path),
       func.name
-    }${this.ServerActionClient(normalize(path), func.name)}`;
+    )}`;
   }
-  private ServerActionClient(ModulePath: string, funcName: string) {
-    return async function (...props: Array<any>) {
-      const response = await fetch("<!URLPATH!>", {
-        headers: {
-          serverActionID: "<!ModulePath!>:<!FuncName!>",
-        },
-        method: "POST",
-        body: JSON.stringify(encodeURI(JSON.stringify(props))),
-      });
-      if (!response.ok)
-        throw new Error(
-          "error when Calling server action <!ModulePath!>:<!FuncName!>"
-        );
-      return response.json();
+  private ClientSideFeatures(fileContent: string, filePath: string) {
+    return fileContent;
+  }
+  private async ServerSideFeatures({
+    modulePath,
+    fileContent,
+    serverComponants,
+  }: {
+    modulePath: string;
+    fileContent: string;
+    serverComponants: {
+      [key: string]: {
+        tag: string; // "<!Bunext_Element_FunctionName!>"
+        reactElement: string;
+      };
+    };
+  }) {
+    const _module = (await import(modulePath)) as Record<string, Function>;
+    const ServerActionsExports = Object.keys(_module).filter(
+      (k) =>
+        k.startsWith("Server") ||
+        (k == "default" && _module[k].name.startsWith("Server"))
+    );
+    // ServerAction
+    for await (const serverAction of ServerActionsExports) {
+      const SAFunc = _module[serverAction] as Function;
+      const SAString = SAFunc.toString();
+      if (!SAString.startsWith("async")) continue;
+      fileContent = fileContent.replace(
+        `"<!BUNEXT_ServerAction_${serverAction}!>"`,
+        this.ServerActionToClient(SAFunc, modulePath)
+      );
     }
-      .toString()
-      .replace("async function", "")
-      .replaceAll("<!FuncName!>", funcName)
-      .replaceAll("<!ModulePath!>", ModulePath)
-      .replaceAll("<!URLPATH!>", URLpaths.serverAction);
+    const transpiler = new Bun.Transpiler({
+      loader: "jsx",
+    });
+    for (const _componant of Object.keys(serverComponants)) {
+      const componant = (serverComponants as any)[_componant] as {
+        tag: string;
+        reactElement: string;
+      };
+      const transpiled = transpiler
+        .transformSync(
+          `let ${_module[_componant].name} = () => { return (${componant.reactElement})}`
+        )
+        .replace(`let ${_module[_componant].name} = `, "");
+      fileContent = fileContent.replace(`"${componant.tag}"`, transpiled);
+    }
+
+    return fileContent;
   }
   private NextJsPlugin() {
     const self = this;
@@ -175,448 +216,146 @@ export class Builder {
       setup(build) {
         build.onLoad(
           {
-            filter: /\.ts[x]$/,
-            namespace: "file",
+            filter: new RegExp(
+              "^" +
+                self.escapeRegExp(
+                  normalize(
+                    [self.options.baseDir, self.options.pageDir].join("/")
+                  )
+                ) +
+                "/.*" +
+                "\\.ts[x]$"
+            ),
           },
-          async (props) => {
-            const pageBasePath = props.path
-              .split(self.options.pageDir as string)
-              .at(1);
-            const transpiler = new Transpiler({
+          async ({ path, loader }) => {
+            const search = new URLSearchParams();
+            search.append("client", "1");
+            search.append("loader", loader);
+            const { exports } = new Bun.Transpiler({
               loader: "tsx",
-              trimUnusedImports: true,
-              target: "browser",
-            });
-            const content = await Bun.file(props.path).text();
-
-            const relativePath = normalize(
-              "/" + (pageBasePath?.split("/").slice(0, -1).join("/") || "")
-            );
-
-            if (
-              globalThis.pages.find((e) => e.path === relativePath) &&
-              pageBasePath
-            ) {
-              const { imports, exports } = transpiler.scan(content);
-              const _content = [
-                await self.importerV1({
-                  imported: imports,
-                  namespace: "noRevalidate",
-                  props,
-                }),
-                await self.ServerExporter({
-                  exports: exports,
-                  props,
-                  _module: await import(props.path),
-                }),
-              ].join("\n");
-              return {
-                contents: _content,
-                loader: props.loader,
-              };
-            }
-
-            ///////////////////////////////////////////////////////////////////
-            let _return = {} as OnLoadResult;
-            let compilerType = props.loader;
-            const makeReturn = (content: string) => {
-              _return = {
-                contents: content,
-                loader: compilerType,
-              };
-              return _return;
+            }).scan(await Bun.file(path).text());
+            return {
+              contents:
+                `export { ${exports.join(", ")} } from ` +
+                JSON.stringify("./" + basename(path) + "?client"),
+              loader: "ts",
             };
-
-            const { imports, exports } = transpiler.scan(content);
-            const makeImport = async (namespace?: string) =>
-              await self.importerV1({
-                imported: imports,
-                props: props,
-                namespace,
-              });
-            const makeServerExport = async () =>
-              await self.ServerExporter({
-                exports: exports,
-                _module: await import(props.path),
-                props: props,
-              });
-
-            if (
-              props.path.includes(self.options.pageDir as string) &&
-              self.bypassoptions.useServer.pageName.includes(
-                props.path.split("/").at(-1) || ""
-              )
-            )
-              return makeReturn(content);
-
-            const _isUseClient = isUseClient(content);
-            const _isInPageDir = props.path.includes(
-              self.options.pageDir as string
-            );
-
-            const makeFullServerFeature = async (namespace?: string) => {
-              const parsedContent = [
-                await makeImport(namespace),
-                //await self.ContentWOExports(content),
-                await makeServerExport(),
-              ];
-              return makeReturn(parsedContent.join("\n"));
-            };
-            const makeClientFeature = (content: string) => {
-              const security = self.checkSecurityFeatures(
-                content,
-                props.loader as "tsx"
-              );
-              if (!security.passed) throw new Error(security.cause);
-              return makeReturn(content);
-            };
-
-            if (_isInPageDir && !_isUseClient) {
-              return await makeFullServerFeature();
-            } else if (_isInPageDir && _isUseClient) {
-              return makeClientFeature(content);
-            } else if (!_isInPageDir && !isUseClient) {
-              return makeReturn(content);
-            } else if (!_isInPageDir && _isUseClient) {
-              return makeClientFeature(content);
-            }
           }
         );
         build.onResolve(
-          {
-            filter: /\.ts[x]\?noRevalidate$/,
-          },
-          async (args) => {
-            const url = pathToFileURL(args.importer);
-            const path = fileURLToPath(new URL(args.path, url));
+          { filter: /\.ts[x]\?client$/ },
+          async ({ importer, path }) => {
+            const url = pathToFileURL(importer);
+            const filePath = fileURLToPath(new URL(path, url));
             return {
-              path: path,
-              namespace: "noRevalidate",
+              path: filePath,
+              namespace: "client",
             };
           }
         );
         build.onLoad(
-          {
-            filter: /\.ts[x]$/,
-            namespace: "noRevalidate",
-          },
-          async ({ loader, path }) => {
-            const transpiler = new Transpiler({
-              loader: loader as "tsx" | "ts",
+          { namespace: "client", filter: /\.ts[x]$/ },
+          async ({ path, loader }) => {
+            let fileContent = await Bun.file(path).text();
+            const isServer = !isUseClient(fileContent);
+
+            let transpiler = new Bun.Transpiler({ loader: "tsx" });
+
+            const serverComponants = isServer
+              ? await self.ServerComponantsToTag(path)
+              : {};
+            const serverCompotantsForTranspiler = Object.assign(
+              {},
+              ...Object.keys(serverComponants).map((componant) => ({
+                [componant]: serverComponants[componant].tag,
+              }))
+            );
+            transpiler = new Bun.Transpiler({
+              loader: "tsx",
               deadCodeElimination: true,
-              target: "browser",
               trimUnusedImports: true,
+              autoImportJSX: true,
+              exports: isServer
+                ? {
+                    replace: {
+                      ...self.ServerActionToTag(fileContent),
+                      ...serverCompotantsForTranspiler,
+                    },
+                  }
+                : {},
             });
-            const fileContent = await Bun.file(path).text();
+            fileContent = transpiler.transformSync(fileContent);
+            if (isServer)
+              fileContent = await self.ServerSideFeatures({
+                modulePath: path,
+                fileContent: fileContent,
+                serverComponants: serverComponants,
+              });
 
-            const buildedPath = normalize(
-              path
-                .replace(
-                  process.cwd(),
-                  `${self.options.baseDir}/${self.options.buildDir as string}`
-                )
-                .replace(".tsx", ".js")
-                .replace(".ts", ".js")
-            );
-            const buildFile = Bun.file(buildedPath);
-            const contentWithoutImports = (await buildFile.text())
-              .split("\n")
-              .filter(
-                (line) =>
-                  !line.trim().startsWith("import") &&
-                  !line.trim().startsWith("var jsx_dev_runtime = ")
-              )
-              .join("\n");
-            const isUseInjection = self.isUseInjection(contentWithoutImports);
-            const transpiled = transpiler.transformSync(contentWithoutImports);
-            await Bun.write(buildFile, transpiled);
-
-            //const _module = await import(buildedPath);
-            const newData = `${self
-              .extractImports(fileContent, "tsx")
-              .join("\n")}\n${
-              isUseInjection ? '"use injection";' : ""
-            }\n${transpiled}`;
-            return {
-              contents: newData,
-              loader: "js",
-            };
-          }
-        );
-        build.onResolve(
-          {
-            filter: /\.tsx$/,
-          },
-          async ({ path }) => {
-            let realPath: undefined | string;
-            try {
-              realPath = import.meta.resolveSync(
-                path.split(".").at(0) as string
-              );
-            } catch {}
-            return {
-              path: realPath ?? path,
-            };
-          }
-        );
-        build.onResolve(
-          {
-            filter: /\.ts[x]\?importer$/,
-          },
-          async (args) => {
-            const url = pathToFileURL(args.importer);
-            const path = fileURLToPath(new URL(args.path, url));
-            let _path: string | undefined = path;
-            let external = false;
-            if (!(await Bun.file(path).exists())) {
-              external = true;
-            } else if (path.includes(self.options.pageDir as string))
-              _path = path;
-            return {
-              path: _path ?? args.path,
-              external: external,
-              namespace: "importer",
-            };
-          }
-        );
-        build.onLoad(
-          {
-            namespace: "importer",
-            filter: /\.ts[x]$/,
-          },
-          async ({ path, loader, namespace }) => {
-            let file = Bun.file(path);
-            let realPath = path;
-            if (!(await file.exists())) {
-              realPath = import.meta.resolveSync(
-                path.split(self.options.pageDir as string)[1].slice(1)
-              );
-
-              file = Bun.file(realPath);
-            }
-            let fileContent = await file.text();
-            if (!isUseClient(fileContent)) {
-              const makeImport = async (
-                imports: Import[],
-                _namespace?: string
-              ) =>
-                await self.importerV1({
-                  imported: imports,
-                  props: {
-                    loader,
-                    path,
-                    namespace,
-                  },
-                  namespace: _namespace,
-                });
-              const makeServerExport = async (exportes: any) =>
-                await self.ServerExporter({
-                  exports: exportes,
-                  _module: await import(realPath),
-                  props: {
-                    loader,
-                    path,
-                    namespace,
-                  },
-                });
-              const { exports, imports } = new Transpiler({
-                loader: "tsx",
-              }).scan(fileContent);
-              fileContent = [
-                await self.ContentWOExports(fileContent),
-                await makeImport(imports, namespace),
-                await makeServerExport(exports),
-              ].join("\n");
-            }
             return {
               contents: fileContent,
-              loader: path.endsWith("tsx") ? "tsx" : "ts",
+              loader: "js",
             };
           }
         );
       },
     } as BunPlugin;
   }
-  private ContentWOExports(content: string) {
-    const transpiled = new Bun.Transpiler({
-      target: "browser",
-      loader: "tsx",
-      deadCodeElimination: true,
-      autoImportJSX: true,
-      exports: {
-        eliminate: [
-          ...new Bun.Transpiler({ loader: "tsx" }).scan(content).exports,
-        ],
-      },
-      trimUnusedImports: true,
-      jsxOptimizationInline: true,
-    }).transform(content);
-
-    return transpiled;
-  }
-  private checkSecurityFeatures(
-    content: string,
-    loader: "ts" | "tsx"
-  ): { passed: true } | { passed: false; cause: string } {
-    const { exports } = new Transpiler({
-      loader,
-    }).scan(content);
-    if (exports.includes("getServerSideProps"))
-      return {
-        passed: false,
-        cause:
-          "getServerSideProps cannot be in a use client context for security reason",
+  private async ServerComponantsToTag(modulePath: string) {
+    // ServerComponant
+    const _module = await import(modulePath);
+    const defaultName = _module.default?.name as undefined | string;
+    const regex = /\b\w+\s*\(\s*\)/;
+    let replaceServerElement: {
+      [key: string]: {
+        tag: string;
+        reactElement: string;
       };
-
-    return {
-      passed: true,
-    };
-  }
-  private extractImports(moduleText: string, loader: "tsx" | "ts") {
-    return this._extracImports(moduleText, loader).map((m) => m[0]);
-  }
-  private _extracImports(moduleText: string, loader: "tsx" | "ts") {
-    const transpiler = new Transpiler({ loader });
-    moduleText = transpiler.transformSync(moduleText);
-    const currly = /import\s*\{\s*[\s\S]*?\s*\}\s*from\s*["'].*?["'];?/g;
-    const wildas = /import\s*\*\s*as\s*\w+\s*from\s*["'].*?["'];?/g;
-    return [...moduleText.matchAll(currly), ...moduleText.matchAll(wildas)];
-  }
-  private async ServerExporter({
-    exports,
-    _module,
-    props,
-  }: {
-    exports: string[];
-    _module: { [key: string]: Function };
-    props: OnLoadArgs;
-  }) {
-    let _content = "";
-
-    for await (const i of exports) {
-      if (this.bypassoptions.useServer.functionName.includes(i)) continue;
-      const exportName = i === "default" ? _module[i].name : i;
-
-      const reactInjection = `var jsx_dev_runtime = __toESM(require_jsx_dev_runtime(), 1);\n`;
-
-      const functionStr = (_module[i].toString() as string).trim();
-      const noParamsFunctionStr = `function ${exportName}()`;
-      const serverActionString = this.ServerActionPluginExt(
-        _module[i],
-        props.path,
-        _module[i].name === _module?.default?.name
-      );
-      if (serverActionString) {
-        _content += serverActionString + "\n";
-        continue;
-      }
-
-      if (!functionStr.startsWith(noParamsFunctionStr)) {
-        const newContent = `"use injection";\n${reactInjection}\nexport${
-          _module[i].name === _module?.default?.name ? " default " : " "
-        }${_module[i]
-          .toString()
-          .replaceAll("jsxDEV", "jsx_dev_runtime.jsxDEV")}`;
-        _content += newContent;
-        continue;
-      }
-      const element = (await _module[i]()) as JSX.Element;
-      if (!isValidElement(element)) continue;
-      const jsxString = reactElementToJSXString(element, {
+    } = {};
+    for await (const exported of Object.keys(_module)) {
+      const Func = _module[exported] as Function;
+      if (!this.isFunction(Func)) continue;
+      const FuncString = Func.toString();
+      if (!FuncString.match(regex)) continue;
+      const value = await Func();
+      if (!isValidElement(value)) continue;
+      const elementToString = reactElementToJSXString(value, {
         showFunctions: true,
         showDefaultProps: true,
       });
-      _content += `export ${i === "default" ? "default " : ""}function ${
-        i === "default" ? _module[i].name : i
-      }(){ return ${jsxString};}\n`;
-      break;
+      const TagElement = `<!Bunext_Element_${Func.name}!>`;
+      if (defaultName == Func.name)
+        replaceServerElement.default = {
+          tag: TagElement,
+          reactElement: elementToString,
+        };
+      else
+        replaceServerElement[Func.name] = {
+          tag: TagElement,
+          reactElement: elementToString,
+        };
     }
-    return _content;
+    //console.log(replaceServerElement);
+    return replaceServerElement;
   }
-  private async importerV1({
-    imported,
-    props,
-    namespace,
-  }: {
-    imported: Import[];
-    props: OnLoadArgs;
-    namespace?: string;
-  }) {
-    const transpiler = new Transpiler({
-      loader: "tsx",
-      trimUnusedImports: true,
-      target: "browser",
-    });
-
-    const bypassImports = ["bun", "fs", "crypto", "node:crypto"];
-    let _content = "";
-    if (namespace) namespace = "?" + namespace;
-    for await (const i of imported) {
-      if (bypassImports.includes(i.path)) continue;
-      let _modulePath: string = "";
-      try {
-        _modulePath = import.meta.resolveSync(
-          normalize(`${props.path.split("/").slice(0, -1).join("/")}/${i.path}`)
-        );
-      } catch {
-        _modulePath = import.meta.resolveSync(i.path);
-      }
-      const _module = transpiler.scan(await Bun.file(_modulePath).text());
-      const _default = import.meta.require(_modulePath);
-
-      const defaultName =
-        typeof _default?.default?.name === "undefined"
-          ? ""
-          : _default.default.name;
-
-      let bypassNameSpace: undefined | string;
-      let _path = i.path;
-      try {
-        const path = import.meta.resolveSync(
-          normalize(
-            [props.path.split("/").slice(0, -1).join("/"), i.path].join("/")
-          )
-        );
-      } catch {
-        bypassNameSpace = "";
-      }
-      const newContent = `import { ${
-        defaultName === "" ? "" : `default as ${defaultName},`
-      } ${_module.exports
-        .filter((e) => e !== "default")
-        .join(", ")} } from "${_path}.tsx${
-        typeof bypassNameSpace !== "undefined"
-          ? bypassNameSpace
-          : namespace ?? "?importer"
-      }";\n`;
-      _content += newContent;
-    }
-    return _content;
+  /**
+   * used for transform serverAction to tag for Transpiler
+   */
+  private ServerActionToTag(fileContent: string) {
+    let transpiler = new Bun.Transpiler({ loader: "tsx" });
+    const { exports } = transpiler.scan(fileContent);
+    return exports
+      .filter((ex) => ex.startsWith("Server"))
+      .reduce(
+        (a, ex) => ({
+          ...a,
+          [ex]: `<!BUNEXT_ServerAction_${ex}!>`,
+        }),
+        {}
+      ) as { [key: string]: string };
   }
-  private async PackageJsonFindDependency(dependencyName: string) {
-    const packageFile = (await Bun.file(
-      `${process.cwd()}/package.json`
-    ).json()) as {
-      dependencies?: Record<string, string>;
-      peerDependencies?: Record<string, string>;
-    };
-    if (
-      packageFile.dependencies &&
-      Object.keys(packageFile.dependencies).includes(dependencyName)
-    )
-      return true;
-    if (
-      packageFile.peerDependencies &&
-      Object.keys(packageFile.peerDependencies).includes(dependencyName)
-    )
-      return true;
-    return false;
-  }
-  private async CreateBuild(
-    options: Partial<_Mainoptions> &
-      _requiredBuildoptions &
-      Partial<_otherOptions>
-  ) {
+
+  private async CreateBuild(options: _CreateBuild) {
     const { plugins, define } = this.options;
     const build = await Bun.build({
       ...options,
@@ -636,8 +375,11 @@ export class Builder {
       splitting: true,
     });
     if (!build.success) return build;
-    await this.makePostProcessing();
+    //await this.makePostProcessing();
     return build;
+  }
+  isFunction(functionToCheck: any) {
+    return typeof functionToCheck == "function";
   }
   private async makePostProcessing() {
     const builtFile = this.glob(
@@ -651,22 +393,8 @@ export class Builder {
       if (i.split("/").at(-1)?.startsWith("chunk-")) continue;
       const file = Bun.file(i);
       let content = await this.clearDuplicateExports(await file.text());
-      for await (const fix of this.postProcessFixes) {
-        if (!(await this.PackageJsonFindDependency(fix.packageName))) continue;
-        content = await fix.modifier({
-          fileContent: content,
-          path: i,
-        });
-      }
       await Bun.write(file, content);
     }
-  }
-  private isUseInjection(buildFileContent: string) {
-    return buildFileContent
-      .split("\n")
-      .find((line) => line.trim().startsWith('"bunext injected!";'))
-      ? true
-      : false;
   }
   private glob(
     path: string,
@@ -677,24 +405,5 @@ export class Builder {
   }
   private escapeRegExp(string: string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
-  }
-}
-
-/**
- * fix for library using special syntax
- * @param packageName package name found in package.json in dependencies
- */
-export class PostProcessFix {
-  public packageName: string;
-  public modifier: ({
-    fileContent,
-    path,
-  }: {
-    fileContent: string;
-    path: string;
-  }) => Promise<string>;
-  constructor(packageName: string, modifier: PostProcessFix["modifier"]) {
-    this.packageName = packageName;
-    this.modifier = modifier;
   }
 }

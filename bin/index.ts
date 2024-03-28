@@ -3,8 +3,9 @@
 import { __setHead__ } from "../componants/internal_head";
 import { exitCodes, paths } from "../globals";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
-import { sendSignal, serveHotServer } from "../dev/hotServer";
+import { sendSignal } from "../dev/hotServer";
 import type { Subprocess } from "bun";
+import { doBuild } from "../internal/build";
 type _cmd = "init" | "build" | "dev" | "database_create" | "database_merge";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
@@ -21,15 +22,15 @@ declare global {
 }
 globalThis.processes ??= [];
 globalThis.pages ??= [];
-
+globalThis.head ??= {};
 if (import.meta.main)
   switch (cmd) {
     case "init":
       await init();
       break;
     case "build":
-      await __setHead__();
-      Build();
+      await doBuild();
+      //Build();
       break;
     case "dev":
       await __setHead__();

@@ -4,7 +4,7 @@ import { Shell } from "./shell";
 import "./global";
 import { exitCodes, names, paths } from "@bunpmjs/bunext/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
-import "@bunpmjs/bunext/server_global";
+import "@bunpmjs/bunext/internal/server_global";
 import { renderToReadableStream } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";

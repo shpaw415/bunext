@@ -21,9 +21,6 @@ export const builder = new Builder({
       layout: "layout.tsx",
     },
   },
-  postProcess: {
-    PostProcessFixes: [(await import("./buildFixes/muiMaterial")).default],
-  },
 });
 
 export async function doBuild() {
