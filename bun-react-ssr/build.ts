@@ -6,7 +6,9 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "../bun-react-ssr/types";
 import { isUseClient } from "../bun-react-ssr";
+import { unlink } from "node:fs/promises";
 import "../internal/server_global";
+import type { JsxElement } from "typescript";
 
 //console.log({ ssrElement: globalThis.ssrElement });
 
@@ -53,6 +55,7 @@ type _CreateBuild = Partial<_Mainoptions> &
 export class Builder {
   private options: _Mainoptions;
   private bypassoptions: _bypassOptions;
+  static preBuildPaths: Array<string> = [];
   constructor(options: _Builderoptions) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
@@ -99,7 +102,78 @@ export class Builder {
       minify,
       plugins: [...(plugins ?? [])],
     });
+    const fileInBuildDir = await Array.fromAsync(
+      this.glob(this.options.buildDir as string)
+    );
+
+    for await (const file of fileInBuildDir) {
+      if (result.outputs.find((o) => o.path == file)) continue;
+      await unlink(file);
+    }
+
     return result;
+  }
+  // globalThis.ssrElement setting
+  static async preBuild(modulePath: string) {
+    const moduleContent = await Bun.file(modulePath).text();
+    const _module = await import(modulePath);
+    const isServer = !isUseClient(moduleContent);
+    if (!isServer) return;
+    const { exports, imports } = new Bun.Transpiler({ loader: "tsx" }).scan(
+      moduleContent
+    );
+    const EmptyParamsFunctionRegex = /\b\w+\s*\(\s*\)/;
+    for await (const ex of exports) {
+      const exported = _module[ex] as Function | unknown;
+      if (typeof exported != "function") continue;
+      const FuncString = exported.toString();
+      if (!FuncString.match(EmptyParamsFunctionRegex)) continue;
+      const element = exported() as JsxElement | any;
+      if (!isValidElement(element)) continue;
+      const findModule = (e: any) => e.path == modulePath;
+      let moduleSSR = globalThis.ssrElement.find(findModule);
+      if (!moduleSSR) {
+        globalThis.ssrElement.push({
+          path: import.meta.resolveSync(modulePath),
+          elements: [],
+        });
+        moduleSSR = globalThis.ssrElement.find(findModule);
+      }
+      if (!moduleSSR) throw new Error();
+      const SSRelement = moduleSSR.elements.find(
+        (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
+      );
+      const ElementToString = () =>
+        reactElementToJSXString(element, {
+          showFunctions: true,
+          showDefaultProps: true,
+        });
+      if (SSRelement) {
+        SSRelement.reactElement = ElementToString();
+      } else {
+        moduleSSR.elements.push({
+          tag: `<!Bunext_Element_${exported.name}!>`,
+          reactElement: ElementToString(),
+        });
+      }
+    }
+    for await (const imported of imports) {
+      let path;
+      try {
+        if (imported.path == ".") throw new Error();
+        path = import.meta.resolveSync(imported.path);
+      } catch {
+        path = import.meta.resolveSync(
+          normalize(
+            [...modulePath.split("/").slice(0, -1), imported.path].join("/")
+          )
+        );
+      }
+      if (!path.endsWith(".tsx")) continue;
+      if (this.preBuildPaths.includes(path)) continue;
+      else this.preBuildPaths.push(path);
+      await this.preBuild(path);
+    }
   }
   resetPath(path: string) {
     const index = globalThis.pages.findIndex((p) => p.path === path);
@@ -295,10 +369,6 @@ export class Builder {
     // ServerComponant
     const ssrModule = globalThis.ssrElement.find((e) => e.path == modulePath);
 
-    if (ssrModule) {
-      console.log("ServerComponants:", { ssrModule });
-    }
-
     const _module = await import(modulePath);
     const defaultName = _module.default?.name as undefined | string;
     const regex = /\b\w+\s*\(\s*\)/;
@@ -311,6 +381,15 @@ export class Builder {
     for await (const exported of Object.keys(_module)) {
       const Func = _module[exported] as Function;
       if (!this.isFunction(Func)) continue;
+      const ssrElement = ssrModule?.elements.find(
+        (e) => e.tag == `<!Bunext_Element_${Func.name}!>`
+      );
+      if (ssrElement) {
+        if (defaultName == Func.name) replaceServerElement.default = ssrElement;
+        else replaceServerElement[Func.name] = ssrElement;
+        continue;
+      }
+      /*
       const FuncString = Func.toString();
       if (!FuncString.match(regex)) continue;
       const value = await Func();
@@ -330,6 +409,7 @@ export class Builder {
           tag: TagElement,
           reactElement: elementToString,
         };
+        */
     }
     //console.log(replaceServerElement);
     return replaceServerElement;

@@ -1,4 +1,4 @@
-import { FileSystemRouter, type MatchedRoute, Glob, sleepSync } from "bun";
+import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
 import { NJSON } from "next-json";
 import { statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -9,16 +9,11 @@ import {
 import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
-import type { JsxElement } from "typescript";
-import { isValidElement } from "react";
-import reactElementToJSXString from "react-element-to-jsx-string";
 import "../internal/server_global";
 export class StaticRouters {
   readonly server: FileSystemRouter;
   readonly client: FileSystemRouter;
   readonly #routes_dump: string;
-
-  private preBuildPaths: Array<string> = [];
 
   constructor(
     public baseDir: string,
@@ -186,68 +181,7 @@ export class StaticRouters {
       response,
     });
   }
-  // globalThis.ssrElement setting
-  public async preBuild(modulePath: string) {
-    const moduleContent = await Bun.file(modulePath).text();
-    const _module = await import(modulePath);
-    const isServer = !isUseClient(moduleContent);
-    if (!isServer) return;
-    const { exports, imports } = new Bun.Transpiler({ loader: "tsx" }).scan(
-      moduleContent
-    );
-    const EmptyParamsFunctionRegex = /\b\w+\s*\(\s*\)/;
-    for await (const ex of exports) {
-      const exported = _module[ex] as Function | unknown;
-      if (typeof exported != "function") continue;
-      const FuncString = exported.toString();
-      if (!FuncString.match(EmptyParamsFunctionRegex)) continue;
-      const element = exported() as JsxElement | any;
-      if (!isValidElement(element)) continue;
-      const findModule = (e: any) => e.path == modulePath;
-      let moduleSSR = globalThis.ssrElement.find(findModule);
-      if (!moduleSSR) {
-        globalThis.ssrElement.push({
-          path: import.meta.resolveSync(modulePath),
-          elements: [],
-        });
-        moduleSSR = globalThis.ssrElement.find(findModule);
-      }
-      if (!moduleSSR) throw new Error();
-      const SSRelement = moduleSSR.elements.find(
-        (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
-      );
-      const ElementToString = () =>
-        reactElementToJSXString(element, {
-          showFunctions: true,
-          showDefaultProps: true,
-        });
-      if (SSRelement) {
-        SSRelement.reactElement = ElementToString();
-      } else {
-        moduleSSR.elements.push({
-          tag: `<!Bunext_Element_${exported.name}!>`,
-          reactElement: ElementToString(),
-        });
-      }
-    }
-    for await (const imported of imports) {
-      let path;
-      try {
-        if (imported.path == ".") throw new Error();
-        path = import.meta.resolveSync(imported.path);
-      } catch {
-        path = import.meta.resolveSync(
-          normalize(
-            [...modulePath.split("/").slice(0, -1), imported.path].join("/")
-          )
-        );
-      }
-      if (!path.endsWith(".tsx")) continue;
-      if (this.preBuildPaths.includes(path)) continue;
-      else this.preBuildPaths.push(path);
-      await this.preBuild(path);
-    }
-  }
+
   private async makeStream({
     jsx,
     renderOptions,
@@ -362,6 +296,15 @@ export class StaticRouters {
     return Array.from(
       glob.scanSync({
         cwd: this.pageDir,
+        onlyFiles: true,
+      })
+    );
+  }
+  static getFileFromPageDir(pageDir?: string) {
+    const glob = new Glob("**/*.{ts,tsx,js,jsx}");
+    return Array.from(
+      glob.scanSync({
+        cwd: pageDir,
         onlyFiles: true,
       })
     );

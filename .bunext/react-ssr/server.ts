@@ -59,7 +59,6 @@ async function init() {
   }
   if (globalThis.dryRun) {
     RunServer();
-    await doPreBuild();
     doWatchBuild(arg == "showError" ? true : false);
   }
   resetRouter();
@@ -81,8 +80,8 @@ function logDevConsole(noClear?: boolean) {
 async function serve(request: Request) {
   try {
     const route = router.server.match(request);
-    route ? await doPreBuild(route.filePath) : null;
     if (route && globalThis.mode === "dev") {
+      await doPreBuild(route.filePath);
       builder.resetPath(route.filePath);
       doBuild();
     }

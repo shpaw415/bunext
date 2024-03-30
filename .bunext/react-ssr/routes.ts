@@ -1,13 +1,17 @@
 import { StaticRouters } from "@bunpmjs/bunext/bun-react-ssr";
+import { Builder } from "@bunpmjs/bunext/bun-react-ssr/build";
 import { normalize } from "node:path";
+
+const pageDir = "src/pages" as const;
+const baseDir = process.cwd();
 
 export let router = undefined as unknown as StaticRouters;
 
 export async function doPreBuild(filePath?: string) {
-  if (filePath) return await router.preBuild(import.meta.resolveSync(filePath));
-  for await (const i of router.getFilesFromPageDir()) {
-    const path = normalize([router.baseDir, router.pageDir, i].join("/"));
-    await router.preBuild(path);
+  if (filePath)
+    return await Builder.preBuild(import.meta.resolveSync(filePath));
+  for await (const i of StaticRouters.getFileFromPageDir(pageDir)) {
+    await Builder.preBuild(normalize([baseDir, pageDir, i].join("/")));
   }
 }
 
