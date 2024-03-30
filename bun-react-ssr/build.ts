@@ -383,11 +383,9 @@ export class Builder {
       const ssrElement = ssrModule?.elements.find(
         (e) => e.tag == `<!Bunext_Element_${Func.name}!>`
       );
-      if (ssrElement) {
-        if (defaultName == Func.name) replaceServerElement.default = ssrElement;
-        else replaceServerElement[Func.name] = ssrElement;
-        continue;
-      }
+      if (!ssrElement) continue;
+      if (defaultName == Func.name) replaceServerElement.default = ssrElement;
+      else replaceServerElement[Func.name] = ssrElement;
     }
     return replaceServerElement;
   }
