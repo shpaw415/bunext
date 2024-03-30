@@ -1,5 +1,5 @@
 import { builder } from "@bunpmjs/bunext/internal/build";
-import { resetRouter, router } from "./routes";
+import { doPreBuild, resetRouter, router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
 import { exitCodes, names, paths } from "@bunpmjs/bunext/globals";
@@ -7,8 +7,7 @@ import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import "@bunpmjs/bunext/internal/server_global";
 import { renderToReadableStream } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
-import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
-import { Build } from "@bunpmjs/bunext/bin";
+import { doWatchBuild, doBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
 
@@ -59,8 +58,8 @@ async function init() {
     serveHotServer();
   }
   if (globalThis.dryRun) {
-    setGlobalThis();
     RunServer();
+    await doPreBuild();
     doWatchBuild(arg == "showError" ? true : false);
   }
   resetRouter();
@@ -68,8 +67,8 @@ async function init() {
   globalThis.dryRun = false;
 }
 
-function logDevConsole() {
-  console.clear();
+function logDevConsole(noClear?: boolean) {
+  noClear ?? console.clear();
   const dev = globalThis.devConsole;
   const toLog = [
     `Serving: http://${dev.hostName}:${dev.servePort}`,
@@ -79,16 +78,13 @@ function logDevConsole() {
   toLog.forEach((c) => console.log(c));
 }
 
-function setGlobalThis() {
-  globalThis.__HEAD_DATA__ = JSON.parse(process.env.__HEAD_DATA__ as string);
-}
-
 async function serve(request: Request) {
   try {
     const route = router.server.match(request);
+    route ? await doPreBuild(route.filePath) : null;
     if (route && globalThis.mode === "dev") {
-      builder.resetPath(route.pathname);
-      Build();
+      builder.resetPath(route.filePath);
+      doBuild();
     }
 
     const session = await import("@bunpmjs/bunext/features/session");

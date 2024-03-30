@@ -6,8 +6,9 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "../bun-react-ssr/types";
 import { isUseClient } from "../bun-react-ssr";
-globalThis.pages ??= [];
-globalThis.serverActions ??= [];
+import "../internal/server_global";
+
+//console.log({ ssrElement: globalThis.ssrElement });
 
 type _Builderoptions = {
   main: _Mainoptions;
@@ -105,26 +106,6 @@ export class Builder {
     if (index == -1) return;
     globalThis.pages.splice(index, 1);
   }
-  private async clearDuplicateExports(fileContent: string) {
-    let exports = fileContent.matchAll(/export\s*\{([\s\S]*?)\}\s*;/g);
-    let _export: { exportStr: string; exportValues: string[] }[] = [];
-    for await (const i of exports) {
-      _export.push({
-        exportStr: i[0],
-        exportValues: i[1]
-          .replaceAll("\n", "")
-          .split(",")
-          .map((v) => v.trim()),
-      });
-    }
-    if (_export.length <= 1) return fileContent;
-    const filteredExports = [...new Set(..._export.map((e) => e.exportValues))];
-    for await (const e of _export) {
-      fileContent = fileContent.replaceAll(e.exportStr, "");
-    }
-    fileContent += `export {${filteredExports.join(", ")}};`;
-    return fileContent;
-  }
   private ServerActionToClient(func: Function, ModulePath: string): string {
     const path = ModulePath.split(this.options.pageDir as string).at(
       1
@@ -190,20 +171,16 @@ export class Builder {
         this.ServerActionToClient(SAFunc, modulePath)
       );
     }
-    const transpiler = new Bun.Transpiler({
-      loader: "jsx",
-    });
+    // ServerComponants
     for (const _componant of Object.keys(serverComponants)) {
       const componant = (serverComponants as any)[_componant] as {
         tag: string;
         reactElement: string;
       };
-      const transpiled = transpiler
-        .transformSync(
-          `let ${_module[_componant].name} = () => { return (${componant.reactElement})}`
-        )
-        .replace(`let ${_module[_componant].name} = `, "");
-      fileContent = fileContent.replace(`"${componant.tag}"`, transpiled);
+      fileContent = fileContent.replace(
+        `"${componant.tag}"`,
+        `() => ${componant.reactElement}`
+      );
     }
 
     return fileContent;
@@ -257,6 +234,17 @@ export class Builder {
           { namespace: "client", filter: /\.ts[x]$/ },
           async ({ path, loader }) => {
             let fileContent = await Bun.file(path).text();
+            console.log(path);
+            if (
+              ["layout.tsx"]
+                .map((endswith) => path.endsWith(endswith))
+                .filter((t) => t == true).length > 0
+            ) {
+              return {
+                contents: fileContent,
+                loader: "tsx",
+              };
+            }
             const isServer = !isUseClient(fileContent);
 
             let transpiler = new Bun.Transpiler({ loader: "tsx" });
@@ -274,7 +262,6 @@ export class Builder {
               loader: "tsx",
               deadCodeElimination: true,
               trimUnusedImports: true,
-              autoImportJSX: true,
               exports: isServer
                 ? {
                     replace: {
@@ -291,7 +278,10 @@ export class Builder {
                 fileContent: fileContent,
                 serverComponants: serverComponants,
               });
-
+            fileContent = new Bun.Transpiler({
+              loader: "jsx",
+              autoImportJSX: true,
+            }).transformSync(fileContent);
             return {
               contents: fileContent,
               loader: "js",
@@ -303,6 +293,12 @@ export class Builder {
   }
   private async ServerComponantsToTag(modulePath: string) {
     // ServerComponant
+    const ssrModule = globalThis.ssrElement.find((e) => e.path == modulePath);
+
+    if (ssrModule) {
+      console.log("ServerComponants:", { ssrModule });
+    }
+
     const _module = await import(modulePath);
     const defaultName = _module.default?.name as undefined | string;
     const regex = /\b\w+\s*\(\s*\)/;
@@ -375,26 +371,10 @@ export class Builder {
       splitting: true,
     });
     if (!build.success) return build;
-    //await this.makePostProcessing();
     return build;
   }
   isFunction(functionToCheck: any) {
     return typeof functionToCheck == "function";
-  }
-  private async makePostProcessing() {
-    const builtFile = this.glob(
-      normalize(`${this.options.baseDir}/${this.options.buildDir}`)
-    );
-    let buildFileArray = [];
-    for await (const i of builtFile) {
-      buildFileArray.push(i);
-    }
-    for await (const i of buildFileArray) {
-      if (i.split("/").at(-1)?.startsWith("chunk-")) continue;
-      const file = Bun.file(i);
-      let content = await this.clearDuplicateExports(await file.text());
-      await Bun.write(file, content);
-    }
   }
   private glob(
     path: string,

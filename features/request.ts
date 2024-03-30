@@ -19,8 +19,18 @@ interface _Cookie {
 
 const isClient = typeof window != "undefined";
 
-class _Response {
+class Common {
+  getOriginalRequest() {
+    return __REQUEST_CONTEXT__.request;
+  }
+  getOriginalResponse() {
+    return __REQUEST_CONTEXT__.response;
+  }
+}
+
+class _Response extends Common {
   constructor() {
+    super();
     if (isClient)
       throw new Error("You cannot use Response in a Client context");
   }
@@ -41,10 +51,11 @@ class _Response {
   }
 }
 
-class _Request {
+class _Request extends Common {
   Request = __REQUEST_CONTEXT__.request as Request;
 
   constructor() {
+    super();
     if (isClient) throw new Error("You cannot use Request in a Client context");
   }
   getCookie(name: string) {

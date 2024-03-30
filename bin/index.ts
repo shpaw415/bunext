@@ -5,8 +5,14 @@ import { exitCodes, paths } from "../globals";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { sendSignal } from "../dev/hotServer";
 import type { Subprocess } from "bun";
-import { doBuild } from "../internal/build";
-type _cmd = "init" | "build" | "dev" | "database_create" | "database_merge";
+import { doBuild } from "../internal/build-watch";
+type _cmd =
+  | "init"
+  | "build"
+  | "dev"
+  | "database_create"
+  | "database_merge"
+  | "devTest";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
 
@@ -29,12 +35,14 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      await doBuild();
-      //Build();
+      doBuild();
+      break;
+    case "devTest":
+      await __setHead__();
+      dev(false, true);
       break;
     case "dev":
       await __setHead__();
-      Build();
       dev(false);
       break;
     case "database_create":
@@ -45,21 +53,6 @@ if (import.meta.main)
       console.log(`Bunext: '${cmd}' is not a function`);
       break;
   }
-
-export function Build() {
-  return Bun.spawnSync({
-    cmd: [`bun`, `${paths.bunextModulePath}/internal/build.ts`],
-    stdout: "inherit",
-    env: {
-      ...process.env,
-      __PAGE__: JSON.stringify(
-        globalThis.pages.map((e) => {
-          return { page: "", path: e.path };
-        })
-      ),
-    },
-  }).exitCode;
-}
 
 function CheckDbExists() {
   return Bun.file(`config/${DBPath}`).exists();
@@ -107,11 +100,11 @@ async function databaseCreator() {
   });
 }
 
-function dev(showBuildError: boolean) {
+function dev(showBuildError: boolean, hotServerDisable?: boolean) {
   const proc = Bun.spawn({
     cmd: [
       "bun",
-      "--hot",
+      hotServerDisable ? "" : "--hot",
       `${paths.bunextDirName}/react-ssr/server.ts`,
       "dev",
       showBuildError ? "showError" : "",
