@@ -10,8 +10,6 @@ import { unlink } from "node:fs/promises";
 import "../internal/server_global";
 import type { JsxElement } from "typescript";
 
-//console.log({ ssrElement: globalThis.ssrElement });
-
 type _Builderoptions = {
   main: _Mainoptions;
   bypass?: _bypassOptions;
@@ -308,7 +306,6 @@ export class Builder {
           { namespace: "client", filter: /\.ts[x]$/ },
           async ({ path, loader }) => {
             let fileContent = await Bun.file(path).text();
-            console.log(path);
             if (
               ["layout.tsx"]
                 .map((endswith) => path.endsWith(endswith))
@@ -355,6 +352,8 @@ export class Builder {
             fileContent = new Bun.Transpiler({
               loader: "jsx",
               autoImportJSX: true,
+              trimUnusedImports: true,
+              jsxOptimizationInline: true,
             }).transformSync(fileContent);
             return {
               contents: fileContent,
@@ -390,7 +389,6 @@ export class Builder {
         continue;
       }
     }
-    //console.log(replaceServerElement);
     return replaceServerElement;
   }
   /**
