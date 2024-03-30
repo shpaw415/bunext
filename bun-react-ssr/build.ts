@@ -389,27 +389,6 @@ export class Builder {
         else replaceServerElement[Func.name] = ssrElement;
         continue;
       }
-      /*
-      const FuncString = Func.toString();
-      if (!FuncString.match(regex)) continue;
-      const value = await Func();
-      if (!isValidElement(value)) continue;
-      const elementToString = reactElementToJSXString(value, {
-        showFunctions: true,
-        showDefaultProps: true,
-      });
-      const TagElement = `<!Bunext_Element_${Func.name}!>`;
-      if (defaultName == Func.name)
-        replaceServerElement.default = {
-          tag: TagElement,
-          reactElement: elementToString,
-        };
-      else
-        replaceServerElement[Func.name] = {
-          tag: TagElement,
-          reactElement: elementToString,
-        };
-        */
     }
     //console.log(replaceServerElement);
     return replaceServerElement;
