@@ -1,7 +1,7 @@
 #!/bin/env bun
 
 import { __setHead__ } from "../componants/internal_head";
-import { exitCodes, paths } from "../globals";
+import { exitCodes, paths } from "../internal/globals";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { sendSignal } from "../dev/hotServer";
 import type { Subprocess } from "bun";

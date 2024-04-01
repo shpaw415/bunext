@@ -1,9 +1,6 @@
 {
   "version": "0.2.41",
   "include": [
-    "index.ts",
-    "globals.ts",
-    "server_global.ts",
     "README.md",
     "LICENSE",
     "features",

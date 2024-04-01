@@ -1,4 +1,4 @@
-import { paths } from "../globals";
+import { paths } from "../internal/globals";
 import { normalize } from "path";
 import { Glob } from "bun";
 

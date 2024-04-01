@@ -303,6 +303,18 @@ export class Builder {
           }
         );
         build.onLoad(
+          {
+            filter: /\.js$/,
+          },
+          async (props) => {
+            console.log(props);
+            return {
+              contents: await Bun.file(props.path).text(),
+              loader: "js",
+            };
+          }
+        );
+        build.onLoad(
           { namespace: "client", filter: /\.ts[x]$/ },
           async ({ path, loader }) => {
             let fileContent = await Bun.file(path).text();

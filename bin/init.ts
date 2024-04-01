@@ -1,7 +1,7 @@
 #!/bin/env bun
 
 import { lstatSync, cpSync } from "fs";
-import { paths } from "../globals";
+import { paths } from "../internal/globals";
 import { $ } from "bun";
 import { generateUuid } from "../features/utils";
 await (async () => {

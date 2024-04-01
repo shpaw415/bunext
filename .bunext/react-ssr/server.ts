@@ -2,7 +2,7 @@ import { builder } from "@bunpmjs/bunext/internal/build";
 import { doPreBuild, resetRouter, router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
-import { exitCodes, names, paths } from "@bunpmjs/bunext/globals";
+import { exitCodes, names, paths } from "@bunpmjs/bunext/internal/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import "@bunpmjs/bunext/internal/server_global";
 import { renderToReadableStream } from "react-dom/server";
