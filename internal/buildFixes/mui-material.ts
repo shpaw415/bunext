@@ -1,5 +1,5 @@
 import { BuildFix } from ".";
-
+import { cpSync } from "node:fs";
 async function makeFile(filepath: string) {
   const _module = await import(filepath);
   const clientSidePath = filepath.split("@mui")[1];
@@ -46,7 +46,20 @@ const muiFix = new BuildFix({
     },
   },
   afterBuild(buildPath) {
-    console.log("afterbuild", buildPath);
+    const basePath = process.cwd();
+    const nodeModulePath = `${basePath}/node_modules`;
+    const copies = [
+      {
+        from: nodeModulePath + "/@mui",
+        to: `${basePath}/${buildPath}/@mui`,
+      },
+    ] as Array<{ from: string; to: string }>;
+    console.log(copies);
+    for (const i of copies) {
+      cpSync(i.from, i.to, {
+        recursive: true,
+      });
+    }
   },
 });
 
