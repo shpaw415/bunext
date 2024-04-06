@@ -75,6 +75,7 @@ export class StaticRouters {
     const staticResponse = await serveFromDir({
       directory: this.buildDir,
       path: pathname,
+      suffixes: [".js", ".html"],
     });
     if (staticResponse)
       return new Response(staticResponse, {
