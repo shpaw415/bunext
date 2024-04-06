@@ -37,8 +37,6 @@ const muiFix = new BuildFix({
             };
           }
           const fileContent = await makeFile(path);
-          //console.log(path);
-          console.log(fileContent);
           return {
             contents: fileContent,
             loader: "js",

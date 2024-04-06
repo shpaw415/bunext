@@ -438,7 +438,15 @@ export class Builder {
       splitting: true,
     });
     if (!build.success) return build;
+
+    await this.afterBuild();
+
     return build;
+  }
+  private async afterBuild() {
+    for await (const i of globalThis.afterBuild) {
+      await i(this.options.buildDir as string);
+    }
   }
   isFunction(functionToCheck: any) {
     return typeof functionToCheck == "function";

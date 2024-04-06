@@ -25,6 +25,8 @@ declare global {
     actions: Array<Function>;
   }>;
   var __HEAD_DATA__: { [key: string]: _Head };
+
+  var afterBuild: Array<(buildPath: string) => void | Promise<void>>;
 }
 globalThis.pages ??= JSON.parse(process.env.__PAGE__ ?? "[]");
 globalThis.ssrElement ??= JSON.parse(process.env.ssrElement ?? "[]");
@@ -34,7 +36,7 @@ globalThis.socketList ??= [];
 globalThis.serverActions ??= [];
 globalThis.pages ??= [];
 globalThis.__HEAD_DATA__ ??= JSON.parse(process.env.__HEAD_DATA__ ?? "{}");
-
+globalThis.afterBuild ??= [];
 //DEV globals
 interface devConsole {
   servePort: number;
