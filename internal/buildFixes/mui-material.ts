@@ -6,7 +6,7 @@ async function makeFile(filepath: string) {
   const moduleExports = Object.keys(_module);
 
   return `
-  const _modulePath = "@mui${clientSidePath}";
+  const _modulePath = "/@mui${clientSidePath}";
   const _module = import(_modulePath);
 
   ${moduleExports.map((n) => `const _${n} = _module.${n}`).join(";\n")}
