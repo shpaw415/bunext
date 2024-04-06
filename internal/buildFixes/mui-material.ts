@@ -5,9 +5,11 @@ async function makeFile(filepath: string) {
   const clientSidePath = filepath.split("@mui")[1];
   const moduleExports = Object.keys(_module);
 
+  console.log(_module);
+
   return `
   const _modulePath = "/@mui${clientSidePath}";
-  const _module = import(_modulePath);
+  const _module = await import(_modulePath);
 
   ${moduleExports.map((n) => `const _${n} = _module.${n}`).join(";\n")}
 
@@ -54,7 +56,6 @@ const muiFix = new BuildFix({
         to: `${basePath}/${buildPath}/@mui`,
       },
     ] as Array<{ from: string; to: string }>;
-    console.log(copies);
     for (const i of copies) {
       cpSync(i.from, i.to, {
         recursive: true,
