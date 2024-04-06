@@ -351,6 +351,7 @@ export async function serveFromDir(config: {
 
   for await (const suffix of suffixes) {
     const pathWithSuffix = join(basePath, suffix);
+    console.log(pathWithSuffix);
     const file = Bun.file(pathWithSuffix);
     if (await file.exists()) {
       return Bun.file(pathWithSuffix);
