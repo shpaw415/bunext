@@ -5,8 +5,6 @@ async function makeFile(filepath: string) {
   const clientSidePath = filepath.split("@mui")[1];
   const moduleExports = Object.keys(_module);
 
-  console.log(_module);
-
   return `
   const _modulePath = "/@mui${clientSidePath}";
   const _module = await import(_modulePath);
