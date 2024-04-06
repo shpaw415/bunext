@@ -75,7 +75,6 @@ export class StaticRouters {
     const staticResponse = await serveFromDir({
       directory: this.buildDir,
       path: pathname,
-      suffixes: [".js", ".html"],
     });
     if (staticResponse)
       return new Response(staticResponse, {
@@ -348,7 +347,7 @@ export async function serveFromDir(config: {
   suffixes?: string[];
 }) {
   const basePath = join(config.directory, config.path);
-  const suffixes = config.suffixes ?? ["", ".html", "index.html"];
+  const suffixes = config.suffixes ?? ["", ".html", "index.html", ".js"];
 
   for (const suffix of suffixes) {
     try {
