@@ -9,7 +9,7 @@ export const builder = new Builder({
     buildDir: buildDir,
     pageDir: "src/pages",
     hydrate: ".bunext/react-ssr/hydrate.ts",
-    //plugins: [(await import("./buildFixes/mui-material")).default.plugin],
+    plugins: [(await import("./buildFixes/mui-material")).default.plugin],
   },
   display: {
     nextjs: {
