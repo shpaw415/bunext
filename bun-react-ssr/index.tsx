@@ -349,14 +349,12 @@ export async function serveFromDir(config: {
   const basePath = join(config.directory, config.path);
   const suffixes = config.suffixes ?? ["", ".html", "index.html", ".js"];
 
-  for (const suffix of suffixes) {
-    try {
-      const pathWithSuffix = join(basePath, suffix);
-      const file = Bun.file(pathWithSuffix);
-      if (await file.exists()) {
-        return Bun.file(pathWithSuffix);
-      }
-    } catch (err) {}
+  for await (const suffix of suffixes) {
+    const pathWithSuffix = join(basePath, suffix);
+    const file = Bun.file(pathWithSuffix);
+    if (await file.exists()) {
+      return Bun.file(pathWithSuffix);
+    }
   }
 
   return null;
