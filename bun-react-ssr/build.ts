@@ -211,7 +211,13 @@ export class Builder {
     )}`;
   }
   private ClientSideFeatures(fileContent: string, filePath: string) {
-    return fileContent;
+    const transpiler = new Bun.Transpiler({
+      loader: "tsx",
+      autoImportJSX: true,
+      deadCodeElimination: true,
+      jsxOptimizationInline: true,
+    });
+    return transpiler.transformSync(fileContent);
   }
   private async ServerSideFeatures({
     modulePath,
@@ -318,6 +324,12 @@ export class Builder {
             }
             const isServer = !isUseClient(fileContent);
 
+            if (!isServer)
+              return {
+                contents: self.ClientSideFeatures(fileContent, path),
+                loader: "js",
+              };
+
             let transpiler = new Bun.Transpiler({ loader: "tsx" });
 
             const serverComponants = isServer
@@ -331,7 +343,6 @@ export class Builder {
             );
             transpiler = new Bun.Transpiler({
               loader: "tsx",
-              deadCodeElimination: true,
               trimUnusedImports: true,
               exports: isServer
                 ? {
@@ -349,8 +360,9 @@ export class Builder {
                 fileContent: fileContent,
                 serverComponants: serverComponants,
               });
+
             fileContent = new Bun.Transpiler({
-              loader: "jsx",
+              loader: "tsx",
               autoImportJSX: true,
               trimUnusedImports: true,
               jsxOptimizationInline: true,
