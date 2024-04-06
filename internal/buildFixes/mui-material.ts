@@ -58,6 +58,7 @@ const muiFix = new BuildFix({
     for (const i of copies) {
       cpSync(i.from, i.to, {
         recursive: true,
+        force: true,
       });
     }
   },

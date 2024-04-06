@@ -108,7 +108,7 @@ export class Builder {
       if (result.outputs.find((o) => o.path == file)) continue;
       await unlink(file);
     }
-
+    await this.afterBuild();
     return result;
   }
   // globalThis.ssrElement setting
@@ -438,9 +438,6 @@ export class Builder {
       splitting: true,
     });
     if (!build.success) return build;
-
-    await this.afterBuild();
-
     return build;
   }
   private async afterBuild() {
