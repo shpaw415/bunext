@@ -352,8 +352,8 @@ export async function serveFromDir(config: {
   for (const suffix of suffixes) {
     try {
       const pathWithSuffix = join(basePath, suffix);
-      const stat = statSync(pathWithSuffix);
-      if (stat?.isFile()) {
+      const file = Bun.file(pathWithSuffix);
+      if (await file.exists()) {
         return Bun.file(pathWithSuffix);
       }
     } catch (err) {}
