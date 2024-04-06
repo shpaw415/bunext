@@ -302,28 +302,6 @@ export class Builder {
             };
           }
         );
-        build.onResolve(
-          {
-            filter: /\.js$/,
-          },
-          async (props) => {
-            console.log(props);
-            if (
-              props.path.startsWith(
-                normalize([self.options.baseDir, "node_modules"].join("/"))
-              )
-            ) {
-              return {
-                path: props.path.replace(self.options.baseDir, ""),
-                external: true,
-              };
-            }
-            return {
-              path: props.path,
-              loader: "js",
-            };
-          }
-        );
         build.onLoad(
           { namespace: "client", filter: /\.ts[x]$/ },
           async ({ path, loader }) => {
