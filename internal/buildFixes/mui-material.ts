@@ -1,5 +1,5 @@
 import { BuildFix } from ".";
-import { cpSync } from "node:fs";
+
 async function makeFile(filepath: string) {
   const _module = await import(filepath);
   const clientSidePath = filepath.split("@mui")[1];
@@ -19,6 +19,10 @@ async function makeFile(filepath: string) {
   `;
 }
 
+async function makeMui(fileContent: string) {
+  return fileContent;
+}
+
 const muiFix = new BuildFix({
   plugin: {
     name: "mui-material",
@@ -29,14 +33,16 @@ const muiFix = new BuildFix({
           filter: /\.js$/,
         },
         async ({ path }) => {
+          let fileContent = await Bun.file(path).text();
           const target = "/node_modules/@mui/";
           if (!path.includes(target)) {
             return {
-              contents: await Bun.file(path).text(),
+              contents: fileContent,
               loader: "js",
             };
           }
-          const fileContent = await makeFile(path);
+          //const fileContent = await makeFile(path);
+          fileContent = await makeMui(fileContent);
           return {
             contents: fileContent,
             loader: "js",
@@ -44,22 +50,6 @@ const muiFix = new BuildFix({
         }
       );
     },
-  },
-  afterBuild(buildPath) {
-    const basePath = process.cwd();
-    const nodeModulePath = `${basePath}/node_modules`;
-    const copies = [
-      {
-        from: nodeModulePath + "/@mui",
-        to: `${basePath}/${buildPath}/@mui`,
-      },
-    ] as Array<{ from: string; to: string }>;
-    for (const i of copies) {
-      cpSync(i.from, i.to, {
-        recursive: true,
-        force: true,
-      });
-    }
   },
 });
 
