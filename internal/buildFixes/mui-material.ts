@@ -30,19 +30,12 @@ const muiFix = new BuildFix({
     async setup(build) {
       build.onLoad(
         {
-          filter: /\.js$/,
+          filter: /\@mui\/system\/createStyled.js$/,
         },
         async ({ path }) => {
           let fileContent = await Bun.file(path).text();
-          const target = "/node_modules/@mui/";
-          if (!path.includes(target)) {
-            return {
-              contents: fileContent,
-              loader: "js",
-            };
-          }
-          //const fileContent = await makeFile(path);
-          fileContent = await makeMui(fileContent);
+          fileContent = `${fileContent}\ncreateStyled.default = createStyled.default.default;`;
+          console.log("test");
           return {
             contents: fileContent,
             loader: "js",
