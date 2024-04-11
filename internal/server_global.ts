@@ -1,5 +1,6 @@
 import type { ServerWebSocket } from "bun";
 import type { _Head } from "../componants/head";
+import type { afterBuildCallback } from "./buildFixes";
 
 declare global {
   var socketList: ServerWebSocket<unknown>[];
@@ -26,7 +27,7 @@ declare global {
   }>;
   var __HEAD_DATA__: { [key: string]: _Head };
 
-  var afterBuild: Array<(buildPath: string) => void | Promise<void>>;
+  var afterBuild: Array<afterBuildCallback>;
 }
 globalThis.pages ??= JSON.parse(process.env.__PAGE__ ?? "[]");
 globalThis.ssrElement ??= JSON.parse(process.env.ssrElement ?? "[]");
@@ -47,8 +48,13 @@ declare global {
   var __BUNEXT_DEV_INIT: boolean;
   var webSocket: undefined | WebSocket;
   var devConsole: devConsole;
+  var dev: {
+    clientOnly: boolean;
+  };
 }
-
+globalThis.dev ??= {
+  clientOnly: false,
+};
 globalThis.devConsole ??= {
   servePort: 3000,
   hostName: "localhost",

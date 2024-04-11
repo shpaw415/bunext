@@ -10,6 +10,7 @@ type _cmd =
   | "init"
   | "build"
   | "dev"
+  | "onlyClient"
   | "database_create"
   | "database_merge"
   | "devTest";
@@ -39,11 +40,15 @@ if (import.meta.main)
       break;
     case "devTest":
       await __setHead__();
-      dev(false, true);
+      dev({ showBuildError: false, hotServerDisable: true });
       break;
     case "dev":
       await __setHead__();
-      dev(false);
+      dev({ showBuildError: false });
+      break;
+    case "onlyClient":
+      await __setHead__();
+      dev({ showBuildError: false, onlyClient: true });
       break;
     case "database_create":
       await databaseSchemaMaker();
@@ -100,7 +105,15 @@ async function databaseCreator() {
   });
 }
 
-function dev(showBuildError: boolean, hotServerDisable?: boolean) {
+function dev({
+  showBuildError,
+  hotServerDisable,
+  onlyClient,
+}: {
+  showBuildError: boolean;
+  hotServerDisable?: boolean;
+  onlyClient?: boolean;
+}) {
   const proc = Bun.spawn({
     cmd: [
       "bun",
@@ -108,6 +121,7 @@ function dev(showBuildError: boolean, hotServerDisable?: boolean) {
       `${paths.bunextDirName}/react-ssr/server.ts`,
       "dev",
       showBuildError ? "showError" : "",
+      onlyClient ? "onlyClient" : "",
     ],
     env: {
       ...process.env,
@@ -119,9 +133,9 @@ function dev(showBuildError: boolean, hotServerDisable?: boolean) {
     stdout: "inherit",
     onExit(subprocess, exitCode, signalCode, error) {
       if (exitCode == exitCodes.runtime) {
-        dev(false);
+        dev({ showBuildError: false });
       } else if (exitCode == exitCodes.build) {
-        dev(true);
+        dev({ showBuildError: true });
       } else {
         console.log("Bunext Dev Exited.");
       }

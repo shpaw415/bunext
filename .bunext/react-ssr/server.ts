@@ -12,6 +12,7 @@ import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
 
 const arg = process.argv[3] as undefined | "showError";
+globalThis.dev.clientOnly = Boolean(process.argv[4]);
 
 globalThis.devConsole.error = undefined;
 

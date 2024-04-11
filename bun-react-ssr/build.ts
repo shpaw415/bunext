@@ -9,6 +9,7 @@ import { isUseClient } from "../bun-react-ssr";
 import { unlink } from "node:fs/promises";
 import "../internal/server_global";
 import type { JsxElement } from "typescript";
+import { BuildFix } from "../internal/buildFixes";
 
 type _Builderoptions = {
   main: _Mainoptions;
@@ -99,17 +100,26 @@ export class Builder {
       outdir: join(baseDir, buildDir as string),
       minify,
       plugins: [...(plugins ?? [])],
+      external: ["react"],
     });
     const fileInBuildDir = await Array.fromAsync(
       this.glob(this.options.buildDir as string)
     );
 
     for await (const file of fileInBuildDir) {
-      if (result.outputs.find((o) => o.path == file)) continue;
+      if (result.outputs.find((o) => o.path == file)) {
+        this.setFileImportToBrowser(file);
+        continue;
+      }
       await unlink(file);
     }
     await this.afterBuild();
     return result;
+  }
+  private async setFileImportToBrowser(filePath: string) {
+    const file = Bun.file(filePath);
+    const res = BuildFix.convertImportsToBrowser(await file.text());
+    await Bun.write(file, res);
   }
   // globalThis.ssrElement setting
   static async preBuild(modulePath: string) {
@@ -442,7 +452,10 @@ export class Builder {
   }
   private async afterBuild() {
     for await (const i of globalThis.afterBuild) {
-      await i(this.options.buildDir as string);
+      await i({
+        buildPath: this.options.buildDir as string,
+        tmpPath: normalize([this.options.buildDir, "..", "tmp"].join("/")),
+      });
     }
   }
   isFunction(functionToCheck: any) {

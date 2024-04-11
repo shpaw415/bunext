@@ -1,6 +1,6 @@
 #!/bin/env bun
 
-import { lstatSync, cpSync } from "fs";
+import { lstatSync, cpSync, existsSync, mkdirSync } from "fs";
 import { paths } from "../internal/globals";
 import { $ } from "bun";
 import { generateUuid } from "../features/utils";
@@ -46,7 +46,10 @@ async function install(total: boolean) {
       force: true,
     });
   }
-
+  if (!existsSync(".bunext/tmp"))
+    mkdirSync(".bunext/tmp", {
+      recursive: true,
+    });
   const packageJson = (await Bun.file("package.json").json()) as packageJson;
   packageJson.scripts = {
     ...packageJson.scripts,

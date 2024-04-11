@@ -1,6 +1,5 @@
 import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
 import { NJSON } from "next-json";
-import { statSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
   renderToReadableStream,
@@ -162,18 +161,24 @@ export class StaticRouters {
       });
     }
 
-    let jsxToServe: JSX.Element = <module.default {...result?.props} />;
-    switch (Object.keys(this.options.displayMode)[0] as keyof _DisplayMode) {
-      case "nextjs":
-        jsxToServe = await this.stackLayouts(serverSide, jsxToServe);
-        break;
+    let jsxToServe: JSX.Element = globalThis.dev.clientOnly ? (
+      <></>
+    ) : (
+      <module.default {...result?.props} />
+    );
+    if (!globalThis.dev.clientOnly) {
+      switch (Object.keys(this.options.displayMode)[0] as keyof _DisplayMode) {
+        case "nextjs":
+          jsxToServe = await this.stackLayouts(serverSide, jsxToServe);
+          break;
+      }
     }
-
     const FinalJSX = (
       <Shell route={serverSide.pathname + search} {...result}>
         {jsxToServe}
       </Shell>
     );
+
     return this.makeStream({
       jsx: FinalJSX,
       renderOptions: renderOptionData,
