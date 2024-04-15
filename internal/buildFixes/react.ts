@@ -10,6 +10,8 @@ const ReactExternal = new BuildFix({
       Bun.build({
         publicPath: "./",
         outdir: tmpFullPath,
+        splitting: true,
+        target: "browser",
         entrypoints: [
           `${basePath}/index.js`,
           `${basePath}/jsx-dev-runtime.js`,
@@ -28,4 +30,4 @@ const ReactExternal = new BuildFix({
   },
 });
 
-export default ReactExternal;
+//export default ReactExternal;

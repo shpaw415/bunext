@@ -15,11 +15,11 @@ const files = (
 ).filter((e) => !e.endsWith("index.ts"));
 
 let fixes = (
-  (await Promise.all(files.map((f) => import(f)))) as { default: BuildFix }[]
+  (await Promise.all(files.map((f) => import(f)))) as { default?: BuildFix }[]
 ).map((e) => e.default);
 
 for await (const i of fixes) {
-  if (await i.hasDependency()) {
+  if (i && (await i.hasDependency())) {
     if (i.afterBuildCallback) globalThis.afterBuild.push(i.afterBuildCallback);
   } else fixes.splice(fixes.indexOf(i), 1);
 }

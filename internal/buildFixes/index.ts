@@ -36,16 +36,14 @@ export class BuildFix {
     return false;
   }
   static convertImportsToBrowser(fileContent: string) {
-    const imports = new Bun.Transpiler({ loader: "js" }).scanImports(
-      fileContent
-    );
+    const { imports } = new Bun.Transpiler({ loader: "js" }).scan(fileContent);
     for (const path of imports
       .map((e) => e.path)
       .filter((e) => !e.startsWith(".") && !e.startsWith("/"))) {
       if (fileContent.includes(`'${path}'`))
-        fileContent = fileContent.replace(`'${path}'`, `"/${path}"`);
+        fileContent = fileContent.replace(`from '${path}'`, `from "/${path}"`);
       else if (fileContent.includes(`"${path}"`))
-        fileContent = fileContent.replace(`"${path}"`, `"/${path}"`);
+        fileContent = fileContent.replace(`from "${path}"`, `from "/${path}"`);
     }
     return fileContent;
   }

@@ -2,13 +2,14 @@ import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
 import { NJSON } from "next-json";
 import { join, relative } from "node:path";
 import {
-  renderToReadableStream,
+  renderToString,
   type RenderToReadableStreamOptions,
 } from "react-dom/server";
 import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
 import "../internal/server_global";
+import { Dev } from "../dev/dev";
 export class StaticRouters {
   readonly server: FileSystemRouter;
   readonly client: FileSystemRouter;
@@ -75,10 +76,15 @@ export class StaticRouters {
       directory: this.buildDir,
       path: pathname,
     });
-    if (staticResponse)
+    if (staticResponse) {
+      console.log(pathname);
       return new Response(staticResponse, {
-        headers: response.headers,
+        headers: {
+          ...response.headers,
+          "Content-Type": "text/javascript",
+        },
       });
+    }
     const serverSide = this.server.match(request);
     if (!serverSide) return null;
     const clientSide = this.client.match(request);
@@ -124,7 +130,7 @@ export class StaticRouters {
       __LAYOUT_ROUTE__: isNextJs
         ? JSON.stringify(await this.getlayoutPaths())
         : "",
-      __DEV_MODE__: Boolean(process.env.NODE_ENV === "development"),
+      __DEV_MODE__: Boolean(process.env.NODE_ENV == "development"),
       ...preloadScript,
     } as const;
 
@@ -137,14 +143,13 @@ export class StaticRouters {
       bootstrapScriptContent: preloadSriptsStrList.join(";"),
       bootstrapModules,
       onError,
-    };
-
-    if (isNextJs) {
+    } as RenderToReadableStreamOptions;
+    if (isNextJs && process.env.NODE_ENV != "development") {
       const page = globalThis.pages.find(
         (p) => p.path === serverSide.pathname
       )?.page;
       if (page) {
-        return new Response(page.stream(), {
+        return new Response(page, {
           headers: {
             ...response.headers,
             "Content-Type": "text/html; charset=utf-8",
@@ -173,9 +178,16 @@ export class StaticRouters {
           break;
       }
     }
+
     const FinalJSX = (
       <Shell route={serverSide.pathname + search} {...result}>
         {jsxToServe}
+        <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: renderOptionData.bootstrapScriptContent || "",
+          }}
+        />
       </Shell>
     );
 
@@ -198,19 +210,17 @@ export class StaticRouters {
     serverSide: MatchedRoute;
     response: Response;
   }): Promise<Response | null> {
-    const stream = await renderToReadableStream(jsx, renderOptions);
-    const [mainStream, secondStream] = stream.tee();
+    const page = renderToString(jsx);
     switch (this.options.ssrMode) {
       case "nextjs":
         if (globalThis.pages.find((p) => p.path === serverSide.pathname)) break;
         globalThis.pages.push({
-          page: await Bun.readableStreamToBlob(secondStream),
+          page: page,
           path: serverSide.pathname,
         });
         break;
     }
-
-    return new Response(mainStream, {
+    return new Response(page, {
       headers: {
         ...response.headers,
         "Content-Type": "text/html; charset=utf-8",
@@ -352,13 +362,19 @@ export async function serveFromDir(config: {
   suffixes?: string[];
 }) {
   const basePath = join(config.directory, config.path);
-  const suffixes = config.suffixes ?? ["", ".html", "index.html", ".js"];
-
+  const suffixes = config.suffixes ?? [
+    "",
+    ".html",
+    "index.html",
+    ".js",
+    "/index.js",
+  ];
   for await (const suffix of suffixes) {
     const pathWithSuffix = basePath + suffix;
-    const file = Bun.file(pathWithSuffix);
+    let file = Bun.file(pathWithSuffix);
     if (await file.exists()) {
-      return Bun.file(pathWithSuffix);
+      const content = file.text();
+      return content;
     }
   }
 

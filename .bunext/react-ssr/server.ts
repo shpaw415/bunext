@@ -5,7 +5,7 @@ import "./global";
 import { exitCodes, names, paths } from "@bunpmjs/bunext/internal/globals";
 import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import "@bunpmjs/bunext/internal/server_global";
-import { renderToReadableStream } from "react-dom/server";
+import { renderToString } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild, doBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
@@ -84,11 +84,10 @@ async function serve(request: Request) {
     if (route && globalThis.mode === "dev") {
       await doPreBuild(route.filePath);
       builder.resetPath(route.filePath);
-      doBuild();
     }
 
     const session = await import("@bunpmjs/bunext/features/session");
-
+    await doBuild();
     const response = await router.serve(
       request,
       __REQUEST_CONTEXT__.response as Response,
@@ -105,12 +104,7 @@ async function serve(request: Request) {
     );
     return response;
   } catch (e) {
-    const res = async () =>
-      new Response(
-        await renderToReadableStream(ErrorFallback(), {
-          bootstrapModules: ["/bunext-scripts"],
-        })
-      );
+    const res = async () => new Response(renderToString(ErrorFallback()));
     if ((e as Error).name == "TypeError") process.exit(exitCodes.runtime);
     return res();
   }

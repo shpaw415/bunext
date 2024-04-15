@@ -100,18 +100,13 @@ export class Builder {
       outdir: join(baseDir, buildDir as string),
       minify,
       plugins: [...(plugins ?? [])],
-      external: ["react"],
     });
     const fileInBuildDir = await Array.fromAsync(
       this.glob(this.options.buildDir as string)
     );
-
     for await (const file of fileInBuildDir) {
-      if (result.outputs.find((o) => o.path == file)) {
-        this.setFileImportToBrowser(file);
-        continue;
-      }
-      await unlink(file);
+      if (result.outputs.find((o) => o.path == file)) continue;
+      else await unlink(file);
     }
     await this.afterBuild();
     return result;
@@ -154,7 +149,6 @@ export class Builder {
       const ElementToString = () =>
         reactElementToJSXString(element, {
           showFunctions: true,
-          showDefaultProps: true,
         });
       if (SSRelement) {
         SSRelement.reactElement = ElementToString();

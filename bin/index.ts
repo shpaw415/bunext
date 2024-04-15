@@ -22,7 +22,7 @@ const DBPath = (process.env.DATABASE_NAME || "database") + ".sqlite";
 
 declare global {
   var pages: {
-    page: Blob;
+    page: string;
     path: string;
   }[];
   var processes: Subprocess[];
@@ -36,7 +36,7 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      doBuild();
+      await doBuild();
       break;
     case "devTest":
       await __setHead__();
@@ -114,6 +114,7 @@ function dev({
   hotServerDisable?: boolean;
   onlyClient?: boolean;
 }) {
+  process.env.NODE_ENV = "development";
   const proc = Bun.spawn({
     cmd: [
       "bun",
@@ -126,6 +127,7 @@ function dev({
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),
+      NODE_ENV: process.env.NODE_ENV,
     },
     ipc(message, subprocess) {
       if (message == "signal") sendSignal();

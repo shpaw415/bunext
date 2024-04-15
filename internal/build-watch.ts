@@ -5,14 +5,15 @@ import "../dev/dev";
 
 export const doWatchBuild = (showError: boolean) =>
   watchBuild(async () => {
-    const res = doBuild();
+    const res = await doBuild();
+    console.log(res);
     if (!res && !showError) process.exit(exitCodes.build);
     else if (!res && showError) globalThis.devConsole.error = "Build Error";
     sendSignal();
   }, [paths.basePagePath, "static"]);
 
-export function doBuild() {
-  const proc = Bun.spawnSync({
+export async function doBuild() {
+  const proc = Bun.spawn({
     cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
     stdout: "inherit",
     env: {
@@ -25,5 +26,5 @@ export function doBuild() {
       ssrElement: JSON.stringify(globalThis.ssrElement ?? []),
     },
   });
-  return proc.success;
+  return (await proc.exited) == 0;
 }
