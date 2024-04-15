@@ -5,10 +5,6 @@ import "../dev/dev";
 
 export const doWatchBuild = (showError: boolean) =>
   watchBuild(async () => {
-    const res = await doBuild();
-    console.log(res);
-    if (!res && !showError) process.exit(exitCodes.build);
-    else if (!res && showError) globalThis.devConsole.error = "Build Error";
     sendSignal();
   }, [paths.basePagePath, "static"]);
 
