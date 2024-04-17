@@ -9,7 +9,7 @@ export const doWatchBuild = (showError: boolean) =>
   }, [paths.basePagePath, "static"]);
 
 export async function doBuild() {
-  const proc = Bun.spawn({
+  const proc = Bun.spawnSync({
     cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
     stdout: "inherit",
     env: {
@@ -22,5 +22,5 @@ export async function doBuild() {
       ssrElement: JSON.stringify(globalThis.ssrElement ?? []),
     },
   });
-  return (await proc.exited) == 0;
+  return proc.exitCode == 0;
 }

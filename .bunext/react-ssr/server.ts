@@ -73,35 +73,49 @@ function logDevConsole(noClear?: boolean) {
   const toLog = [
     `Serving: http://${dev.hostName}:${dev.servePort}`,
     `current Error: ${dev.error || "none"}`,
+    dev.message ? `Log: ${dev.message}` : "Log: None",
   ];
 
   toLog.forEach((c) => console.log(c));
+  dev.message = undefined;
 }
 
 async function serve(request: Request) {
   try {
     const route = router.server.match(request);
-    if (route && globalThis.mode === "dev") {
+    const devConsole = globalThis.devConsole;
+    const isDev = globalThis.mode == "dev";
+    let pass = !isDev;
+    if (route && isDev) {
       await doPreBuild(route.filePath);
       builder.resetPath(route.filePath);
+      pass = await doBuild();
     }
+    if (isDev && !pass) pass = await doBuild();
 
     const session = await import("@bunpmjs/bunext/features/session");
-    await doBuild();
-    const response = await router.serve(
-      request,
-      __REQUEST_CONTEXT__.response as Response,
-      {
-        Shell: Shell as any,
-        bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
-        preloadScript: {
-          __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
-          __PUBLIC_SESSION_DATA__: JSON.stringify(
-            session.__GET_PUBLIC_SESSION_DATA__() ?? {}
-          ),
-        },
-      }
-    );
+    let response: Response | null = null;
+    if (pass)
+      response = await router.serve(
+        request,
+        __REQUEST_CONTEXT__.response as Response,
+        {
+          Shell: Shell as any,
+          bootstrapModules: [
+            "/.bunext/react-ssr/hydrate.js",
+            "/bunext-scripts",
+          ],
+          preloadScript: {
+            __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
+            __PUBLIC_SESSION_DATA__: JSON.stringify(
+              session.__GET_PUBLIC_SESSION_DATA__() ?? {}
+            ),
+          },
+        }
+      );
+    else {
+      devConsole.error = "build error";
+    }
     return response;
   } catch (e) {
     const res = async () => new Response(renderToString(ErrorFallback()));

@@ -77,7 +77,6 @@ export class StaticRouters {
       path: pathname,
     });
     if (staticResponse) {
-      console.log(pathname);
       return new Response(staticResponse, {
         headers: {
           ...response.headers,
@@ -166,17 +165,11 @@ export class StaticRouters {
       });
     }
 
-    let jsxToServe: JSX.Element = globalThis.dev.clientOnly ? (
-      <></>
-    ) : (
-      <module.default {...result?.props} />
-    );
-    if (!globalThis.dev.clientOnly) {
-      switch (Object.keys(this.options.displayMode)[0] as keyof _DisplayMode) {
-        case "nextjs":
-          jsxToServe = await this.stackLayouts(serverSide, jsxToServe);
-          break;
-      }
+    let jsxToServe: JSX.Element = <module.default {...result?.props} />;
+    switch (Object.keys(this.options.displayMode)[0] as keyof _DisplayMode) {
+      case "nextjs":
+        jsxToServe = await this.stackLayouts(serverSide, jsxToServe);
+        break;
     }
 
     const FinalJSX = (

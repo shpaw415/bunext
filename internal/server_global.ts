@@ -14,11 +14,11 @@ declare global {
     }>;
   }>;
   var pages: {
-    page: Blob;
+    page: string;
     path: string;
   }[];
   var pages: Array<{
-    page: Blob;
+    page: string;
     path: string;
   }>;
   var serverActions: Array<{
@@ -43,6 +43,7 @@ interface devConsole {
   servePort: number;
   hostName: string;
   error?: string;
+  message?: any;
 }
 declare global {
   var __BUNEXT_DEV_INIT: boolean;

@@ -149,6 +149,7 @@ export class Builder {
       const ElementToString = () =>
         reactElementToJSXString(element, {
           showFunctions: true,
+          sortProps: false,
         });
       if (SSRelement) {
         SSRelement.reactElement = ElementToString();
