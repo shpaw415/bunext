@@ -118,6 +118,7 @@ export class Builder {
   }
   // globalThis.ssrElement setting
   static async preBuild(modulePath: string) {
+    const _console = globalThis.devConsole;
     const moduleContent = await Bun.file(modulePath).text();
     const _module = await import(modulePath);
     const isServer = !isUseClient(moduleContent);
@@ -164,8 +165,8 @@ export class Builder {
       let path;
       try {
         if (imported.path == ".") throw new Error();
-        path = import.meta.resolveSync(imported.path);
-      } catch {
+        path = import.meta.resolveSync(imported.path, process.env.PWD);
+      } catch (e) {
         path = import.meta.resolveSync(
           normalize(
             [...modulePath.split("/").slice(0, -1), imported.path].join("/")

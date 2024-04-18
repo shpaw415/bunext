@@ -1,7 +1,7 @@
 import { StaticRouters } from "@bunpmjs/bunext/bun-react-ssr";
 import { Builder } from "@bunpmjs/bunext/bun-react-ssr/build";
 import { normalize } from "node:path";
-
+import "@bunpmjs/bunext/internal/server_global";
 const pageDir = "src/pages" as const;
 const baseDir = process.cwd();
 

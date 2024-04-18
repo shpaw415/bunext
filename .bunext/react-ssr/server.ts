@@ -73,17 +73,16 @@ function logDevConsole(noClear?: boolean) {
   const toLog = [
     `Serving: http://${dev.hostName}:${dev.servePort}`,
     `current Error: ${dev.error || "none"}`,
-    dev.message ? `Log: ${dev.message}` : "Log: None",
   ];
 
   toLog.forEach((c) => console.log(c));
-  dev.message = undefined;
+  if (dev.message) console.log("Log:", dev.message);
+  else console.log("Log: None");
 }
 
 async function serve(request: Request) {
   try {
     const route = router.server.match(request);
-    const devConsole = globalThis.devConsole;
     const isDev = globalThis.mode == "dev";
     let pass = !isDev;
     if (route && isDev) {
@@ -116,11 +115,18 @@ async function serve(request: Request) {
     else {
       devConsole.error = "build error";
     }
+    logDevConsole();
     return response;
   } catch (e) {
-    const res = async () => new Response(renderToString(ErrorFallback()));
+    const res = async (error: Error) =>
+      new Response(renderToString(ErrorFallback(error)), {
+        headers: {
+          "Content-Type": "text/html",
+        },
+      });
     if ((e as Error).name == "TypeError") process.exit(exitCodes.runtime);
-    return res();
+    logDevConsole();
+    return res(e);
   }
 }
 
