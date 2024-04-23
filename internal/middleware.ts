@@ -1,3 +1,4 @@
+//server only
 import { webToken } from "@bunpmjs/json-webtoken";
 import {
   __SET_CURRENT__,
