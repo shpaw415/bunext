@@ -46,6 +46,12 @@ async function install(total: boolean) {
       force: true,
     });
   }
+  if (total || !(await Bun.file(`bunfig.toml`).exists())) {
+    cpSync(`${paths.bunextModulePath}/bin/bunfig.toml`, "./bunfig.toml", {
+      force: true,
+      recursive: true,
+    });
+  }
   if (!existsSync(".bunext/tmp"))
     mkdirSync(".bunext/tmp", {
       recursive: true,
@@ -84,6 +90,7 @@ async function install(total: boolean) {
 
     Bun.write("tsconfig.json", beautify(tsConfig(), null, 2, 50));
   }
+  cpSync;
   await $`bun i`;
 }
 
@@ -116,5 +123,6 @@ function tsConfig() {
       },
     },
     exclude: ["node_modules"],
+    include: [".bunext/custom.d.ts", "src"],
   };
 }

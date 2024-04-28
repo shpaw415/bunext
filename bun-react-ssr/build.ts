@@ -161,18 +161,39 @@ export class Builder {
         });
       }
     }
-    for await (const imported of imports) {
-      let path;
-      try {
-        if (imported.path == ".") throw new Error();
-        path = import.meta.resolveSync(imported.path, process.env.PWD);
-      } catch (e) {
-        path = import.meta.resolveSync(
-          normalize(
-            [...modulePath.split("/").slice(0, -1), imported.path].join("/")
-          )
-        );
+
+    const tryier = async (tests: Array<() => string | Error>) => {
+      for await (const i of tests) {
+        try {
+          const res = i();
+          if (typeof res != "string") throw res;
+          return res as string;
+        } catch (e) {}
       }
+      throw new Error("tryier cannot succeed");
+    };
+
+    for await (const imported of imports) {
+      const isDot = imported.path == ".";
+      const path = await tryier([
+        () =>
+          isDot
+            ? new Error()
+            : import.meta.resolveSync(imported.path, process.env.PWD),
+        () =>
+          isDot
+            ? new Error()
+            : import.meta.resolveSync(
+                normalize(
+                  [...modulePath.split("/").slice(0, -1), imported.path].join(
+                    "/"
+                  )
+                )
+              ),
+        () => (isDot ? new Error() : import.meta.resolveSync(imported.path)),
+      ]);
+
+      if (path.includes("@mui")) throw new Error(path);
       if (!path.endsWith(".tsx")) continue;
       if (this.preBuildPaths.includes(path)) continue;
       else this.preBuildPaths.push(path);
