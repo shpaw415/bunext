@@ -162,8 +162,8 @@ export class Builder {
       }
     }
 
-    const tryier = async (tests: Array<() => string | Error>) => {
-      for await (const i of tests) {
+    const tryier = (tests: Array<() => string | Error>) => {
+      for (const i of tests) {
         try {
           const res = i();
           if (typeof res != "string") throw res;
@@ -175,25 +175,31 @@ export class Builder {
 
     for await (const imported of imports) {
       const isDot = imported.path == ".";
-      const path = await tryier([
-        () =>
-          isDot
-            ? new Error()
-            : import.meta.resolveSync(imported.path, process.env.PWD),
-        () =>
-          isDot
-            ? new Error()
-            : import.meta.resolveSync(
-                normalize(
-                  [...modulePath.split("/").slice(0, -1), imported.path].join(
-                    "/"
+      let path = "";
+      try {
+        path = tryier([
+          () =>
+            isDot
+              ? new Error()
+              : import.meta.resolveSync(imported.path, process.env.PWD),
+          () =>
+            isDot
+              ? new Error()
+              : import.meta.resolveSync(
+                  normalize(
+                    [...modulePath.split("/").slice(0, -1), imported.path].join(
+                      "/"
+                    )
                   )
-                )
-              ),
-        () => (isDot ? new Error() : import.meta.resolveSync(imported.path)),
-      ]);
+                ),
+          () => (isDot ? new Error() : import.meta.resolveSync(imported.path)),
+        ]);
+      } catch (e) {
+        throw new Error(
+          import.meta.resolveSync(imported.path, process.env.PWD)
+        );
+      }
 
-      if (path.includes("@mui")) throw new Error(path);
       if (!path.endsWith(".tsx")) continue;
       if (this.preBuildPaths.includes(path)) continue;
       else this.preBuildPaths.push(path);
