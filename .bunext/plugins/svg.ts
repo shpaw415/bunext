@@ -8,18 +8,10 @@ const SvgPlugin: BunPlugin = {
         filter: /\.svg$/,
       },
       async (props) => {
-        const content = await Bun.file(props.path).text();
-        const transpiled = new Bun.Transpiler({
-          loader: "jsx",
-          autoImportJSX: true,
-        }).transformSync(
-          `
-          const Def = () => ${content};
-          export default Def;
-          `
-        );
         return {
-          contents: transpiled,
+          contents: `const Svg = () => ${await Bun.file(props.path).text()};
+          export default Svg;
+          `,
           loader: "js",
         };
       }

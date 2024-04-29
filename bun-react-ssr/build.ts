@@ -409,6 +409,28 @@ export class Builder {
       },
     } as BunPlugin;
   }
+  private SvgPlugin() {
+    return {
+      name: "SvgIntegrationPlugin",
+      target: "browser",
+      setup(build) {
+        build.onLoad(
+          {
+            filter: /\.svg$/,
+          },
+          async (props) => {
+            return {
+              contents: `
+              const Svg = () => ${await Bun.file(props.path).text()};
+              export default Svg;
+              `,
+              loader: "jsx",
+            };
+          }
+        );
+      },
+    } as BunPlugin;
+  }
   private async ServerComponantsToTag(modulePath: string) {
     // ServerComponant
     const ssrModule = globalThis.ssrElement.find((e) => e.path == modulePath);
@@ -460,6 +482,7 @@ export class Builder {
         ...(plugins ?? []),
         ...(options.plugins ?? []),
         this.NextJsPlugin(),
+        this.SvgPlugin(),
       ],
       target: "browser",
       define: {
