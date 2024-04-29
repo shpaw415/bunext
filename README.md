@@ -10,20 +10,20 @@
     - Static assets
     - Server componants ("use server" & "use client")
     - Hot reload
-    - Revalidate
+    - Revalidate ( beta version )
     - Server action
-    - Links
+    - Session Management
     - Session Management ( public & private )
     - SQlite Management
+    - Server componants
 
 ## What is planed
 
+    - Links
     - Hot reload (features state memory)
     - React (some tweek needed for full compatibility)
     - Documentation
-    - Revalidate ( beta version )
-    - Session Management ( beta version )
-    - Server componants ( Cleanup and refactoring for performance and reliability )
+    - Revalidate ( testing for edge cases )
     - SQlite performance & features
 
 ### To install and run
