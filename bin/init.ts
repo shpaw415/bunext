@@ -88,7 +88,7 @@ async function install(total: boolean) {
         `${envFileContent}\nWEB_TOKEN_SECRET="${generateUuid()}"`
       ));
 
-    Bun.write("tsconfig.json", beautify(tsConfig(), null, 2, 50));
+    await Bun.write("tsconfig.json", beautify(tsConfig(), null, 2, 50));
   }
   cpSync;
   await $`bun i`;

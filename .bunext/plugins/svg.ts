@@ -9,7 +9,9 @@ const SvgPlugin: BunPlugin = {
       },
       async (props) => {
         return {
-          contents: `const Svg = () => ${await Bun.file(props.path).text()};
+          contents: `
+          "use client";
+          const Svg = () => ${await Bun.file(props.path).text()};
           export default Svg;
           `,
           loader: "js",
