@@ -165,7 +165,7 @@ export class StaticRouters {
       });
     }
 
-    let jsxToServe: JSX.Element = <module.default {...result?.props} />;
+    let jsxToServe: JSX.Element = await module.default({ ...result?.props });
     switch (Object.keys(this.options.displayMode)[0] as keyof _DisplayMode) {
       case "nextjs":
         jsxToServe = await this.stackLayouts(serverSide, jsxToServe);
