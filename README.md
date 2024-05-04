@@ -1,3 +1,9 @@
+# Compatibility
+
+    compatible: bun 1.1.7 & under
+
+    N.B : Bun is in continuous changement and compatibility between version is a huge problem for Bunext there is possible crash over some new version i will keep up to date the framework for what it needs
+
 # bunext
 
     - Nextjs Framwork compatible with Bun Runtime
@@ -12,7 +18,6 @@
     - Hot reload
     - Revalidate ( beta version )
     - Server action
-    - Session Management
     - Session Management ( public & private )
     - SQlite Management
     - Server componants
@@ -41,13 +46,13 @@ bun run dev
 
 ### Set Session
 
-```TypeScript
+```JavaScript XML
 
 ```
 
 ### Get Session
 
-```TypeScript
+```JavaScript XML
     "use server";
     export default function Page() {
 
