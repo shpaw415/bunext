@@ -168,7 +168,7 @@ export class StaticRouters {
       .find((e) => e.path == serverSide.filePath)
       ?.elements.find((e) =>
         e.tag.endsWith(`${module.default.name}!>`)
-      )?.reactElement;
+      )?.htmlElement;
 
     let jsxToServe: JSX.Element;
     if (preBuiledPage) {

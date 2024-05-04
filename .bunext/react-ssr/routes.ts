@@ -9,7 +9,9 @@ export let router = undefined as unknown as StaticRouters;
 
 export async function doPreBuild(filePath?: string) {
   if (filePath)
-    return await Builder.preBuild(import.meta.resolveSync(filePath));
+    return await Builder.preBuild(
+      import.meta.resolve(filePath).replace("file://", "")
+    );
   for await (const i of StaticRouters.getFileFromPageDir(pageDir)) {
     await Builder.preBuild(normalize([baseDir, pageDir, i].join("/")));
   }

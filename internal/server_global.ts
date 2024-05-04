@@ -11,6 +11,7 @@ declare global {
     elements: Array<{
       tag: string;
       reactElement: string;
+      htmlElement: string;
     }>;
   }>;
   var pages: {

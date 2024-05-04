@@ -138,7 +138,7 @@ export class Builder {
       let moduleSSR = globalThis.ssrElement.find(findModule);
       if (!moduleSSR) {
         globalThis.ssrElement.push({
-          path: import.meta.resolveSync(modulePath),
+          path: import.meta.resolve(modulePath).replace("file://", ""),
           elements: [],
         });
         moduleSSR = globalThis.ssrElement.find(findModule);
@@ -148,12 +148,18 @@ export class Builder {
         (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
       );
 
+      const toJSX = (el: React.ReactNode) =>
+        reactElementToJSXString(el, {
+          showFunctions: true,
+        });
       if (SSRelement) {
-        SSRelement.reactElement = renderToString(element);
+        SSRelement.reactElement = toJSX(element);
+        SSRelement.htmlElement = renderToString(element);
       } else {
         moduleSSR.elements.push({
           tag: `<!Bunext_Element_${exported.name}!>`,
-          reactElement: renderToString(element),
+          reactElement: toJSX(element),
+          htmlElement: renderToString(element),
         });
       }
     }
@@ -177,22 +183,32 @@ export class Builder {
           () =>
             isDot
               ? new Error()
-              : import.meta.resolveSync(imported.path, process.env.PWD),
+              : import.meta
+                  .resolve(imported.path, process.env.PWD)
+                  .replace("file://", ""),
           () =>
             isDot
               ? new Error()
-              : import.meta.resolveSync(
-                  normalize(
-                    [...modulePath.split("/").slice(0, -1), imported.path].join(
-                      "/"
+              : import.meta
+                  .resolve(
+                    normalize(
+                      [
+                        ...modulePath.split("/").slice(0, -1),
+                        imported.path,
+                      ].join("/")
                     )
                   )
-                ),
-          () => (isDot ? new Error() : import.meta.resolveSync(imported.path)),
+                  .replace("file://", ""),
+          () =>
+            isDot
+              ? new Error()
+              : import.meta.resolve(imported.path).replace("file://", ""),
         ]);
       } catch (e) {
         throw new Error(
-          import.meta.resolveSync(imported.path, process.env.PWD)
+          import.meta
+            .resolve(imported.path, process.env.PWD)
+            .replace("file://", "")
         );
       }
 
