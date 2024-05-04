@@ -9,7 +9,7 @@ import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
 import "../internal/server_global";
-import { Dev } from "../dev/dev";
+
 export class StaticRouters {
   readonly server: FileSystemRouter;
   readonly client: FileSystemRouter;
@@ -164,8 +164,21 @@ export class StaticRouters {
         headers: { Location: result.redirect },
       });
     }
+    const preBuiledPage = globalThis.ssrElement
+      .find((e) => e.path == serverSide.filePath)
+      ?.elements.find((e) =>
+        e.tag.endsWith(`${module.default.name}!>`)
+      )?.reactElement;
 
-    let jsxToServe: JSX.Element = await module.default({ ...result?.props });
+    let jsxToServe: JSX.Element;
+    if (preBuiledPage) {
+      jsxToServe = (
+        <div
+          id="BUNEXT_INNER_PAGE_INSERTER"
+          dangerouslySetInnerHTML={{ __html: preBuiledPage }}
+        />
+      );
+    } else jsxToServe = await module.default({ ...result?.props });
     switch (Object.keys(this.options.displayMode)[0] as keyof _DisplayMode) {
       case "nextjs":
         jsxToServe = await this.stackLayouts(serverSide, jsxToServe);
@@ -203,7 +216,12 @@ export class StaticRouters {
     serverSide: MatchedRoute;
     response: Response;
   }): Promise<Response | null> {
-    const page = renderToString(jsx);
+    const rewriter = new HTMLRewriter().on("#BUNEXT_INNER_PAGE_INSERTER", {
+      element(element) {
+        element.removeAndKeepContent();
+      },
+    });
+    const page = rewriter.transform(renderToString(jsx));
     switch (this.options.ssrMode) {
       case "nextjs":
         if (globalThis.pages.find((p) => p.path === serverSide.pathname)) break;
@@ -273,7 +291,7 @@ export class StaticRouters {
   async stackLayouts(route: MatchedRoute, pageElement: JSX.Element) {
     const layouts = route.pathname == "/" ? [""] : route.pathname.split("/");
     type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
-    let layoutsJsxList: Array<_layout> = [];
+    let layoutsJsxList: Array<_layout | string> = [];
     let index = 0;
     for await (const i of layouts) {
       const path = layouts.slice(0, index + 1).join("/");

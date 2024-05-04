@@ -10,6 +10,7 @@ import { unlink } from "node:fs/promises";
 import "../internal/server_global";
 import type { JsxElement } from "typescript";
 import { BuildFix } from "../internal/buildFixes";
+import { renderToString } from "react-dom/server";
 
 type _Builderoptions = {
   main: _Mainoptions;
@@ -118,7 +119,6 @@ export class Builder {
   }
   // globalThis.ssrElement setting
   static async preBuild(modulePath: string) {
-    const _console = globalThis.devConsole;
     const moduleContent = await Bun.file(modulePath).text();
     const _module = await import(modulePath);
     const isServer = !isUseClient(moduleContent);
@@ -132,7 +132,7 @@ export class Builder {
       if (typeof exported != "function") continue;
       const FuncString = exported.toString();
       if (!FuncString.match(EmptyParamsFunctionRegex)) continue;
-      const element = exported() as JsxElement | any;
+      const element = (await exported()) as JsxElement | any;
       if (!isValidElement(element)) continue;
       const findModule = (e: any) => e.path == modulePath;
       let moduleSSR = globalThis.ssrElement.find(findModule);
@@ -147,17 +147,13 @@ export class Builder {
       const SSRelement = moduleSSR.elements.find(
         (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
       );
-      const ElementToString = () =>
-        reactElementToJSXString(element, {
-          showFunctions: true,
-          sortProps: false,
-        });
+
       if (SSRelement) {
-        SSRelement.reactElement = ElementToString();
+        SSRelement.reactElement = renderToString(element);
       } else {
         moduleSSR.elements.push({
           tag: `<!Bunext_Element_${exported.name}!>`,
-          reactElement: ElementToString(),
+          reactElement: renderToString(element),
         });
       }
     }
