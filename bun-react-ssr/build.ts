@@ -1,6 +1,6 @@
 import { Glob, fileURLToPath, pathToFileURL } from "bun";
 import { join, basename } from "node:path";
-import type { BunPlugin } from "bun";
+import type { BuildOutput, BunPlugin } from "bun";
 import { normalize } from "path";
 import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
@@ -11,6 +11,7 @@ import "../internal/server_global";
 import type { JsxElement } from "typescript";
 import { BuildFix } from "../internal/buildFixes";
 import { renderToString } from "react-dom/server";
+import { generateRandomString } from "../features/utils";
 
 type _Builderoptions = {
   main: _Mainoptions;
@@ -56,6 +57,7 @@ export class Builder {
   private options: _Mainoptions;
   private bypassoptions: _bypassOptions;
   static preBuildPaths: Array<string> = [];
+  private buildOutput?: BuildOutput;
   constructor(options: _Builderoptions) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
@@ -515,7 +517,31 @@ export class Builder {
         tmpPath: normalize([this.options.buildDir, "..", "tmp"].join("/")),
       });
     }
+
+    if (process.env.NODE_ENV == "development") await this.afterBuildDev();
   }
+
+  private async afterBuildDev() {
+    if (!this.buildOutput) return;
+
+    for await (const i of this.buildOutput.outputs) {
+      const Path = i.path;
+      const file = Bun.file(Path);
+      let fileContent = await file.text();
+      const imports = new Bun.Transpiler({ loader: "js" }).scanImports(
+        fileContent
+      );
+
+      for (const imported of imports) {
+        fileContent = fileContent.replace(
+          imported.path,
+          imported.path + "?" + generateRandomString(5)
+        );
+      }
+      await Bun.write(file, fileContent);
+    }
+  }
+
   isFunction(functionToCheck: any) {
     return typeof functionToCheck == "function";
   }
