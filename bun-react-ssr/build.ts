@@ -506,7 +506,11 @@ export class Builder {
         ...define,
       },
       splitting: true,
-      naming: `[dir]/[name]-${generateRandomString(5)}.[ext]`,
+      naming: {
+        entry: "[dir]/[name].[ext]",
+        asset: "[dir]/[name].[ext]",
+        chunk: `[dir]/[name]-[hash]-${generateRandomString(5)}.[ext]`,
+      },
     });
     if (!build.success) return build;
     return build;
