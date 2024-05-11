@@ -506,7 +506,7 @@ export class Builder {
         ...define,
       },
       splitting: true,
-      naming: `[dir]/[name].[ext]?${generateRandomString(5)}`,
+      naming: `[dir]/[name]-${generateRandomString(5)}.[ext]`,
     });
     if (!build.success) return build;
     return build;
