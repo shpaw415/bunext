@@ -506,6 +506,9 @@ export class Builder {
         ...define,
       },
       splitting: true,
+      naming: {
+        chunk: `[dir]/[name]-[hash]-${generateRandomString(5)}.[ext]`,
+      },
     });
     if (!build.success) return build;
     return build;
@@ -518,7 +521,7 @@ export class Builder {
       });
     }
 
-    if (process.env.NODE_ENV == "development") await this.afterBuildDev();
+    //if (process.env.NODE_ENV == "development") await this.afterBuildDev();
   }
 
   private async afterBuildDev() {
