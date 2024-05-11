@@ -503,7 +503,7 @@ export class Builder {
         ),
         ...define,
       },
-      splitting: true,
+      splitting: process.env.NODE_ENV == "production" ? true : false,
     });
     if (!build.success) return build;
     return build;

@@ -2,7 +2,9 @@
 
     compatible: bun 1.1.7 & under
 
-    N.B : Bun is in continuous changement and compatibility between version is a huge problem for Bunext there is possible crash over some new version i will keep up to date the framework for what it needs
+    N.B : Bun is in continuous changement and compatibility between version is a
+     huge problem for Bunext there is possible crash over some new version i will
+     keep up to date the framework for what it needs
 
 # bunext
 
