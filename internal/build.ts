@@ -1,3 +1,4 @@
+import type { BunPlugin } from "bun";
 import { Builder } from "../bun-react-ssr/build";
 import type { BuildFix } from "./buildFixes";
 import "./server_global";
@@ -13,16 +14,19 @@ const files = (
     })
   )
 ).filter((e) => !e.endsWith("index.ts"));
-
 let fixes = (
   (await Promise.all(files.map((f) => import(f)))) as { default?: BuildFix }[]
 ).map((e) => e.default);
 
 for await (const i of fixes) {
-  if (i && (await i.hasDependency())) {
+  if (i) {
     if (i.afterBuildCallback) globalThis.afterBuild.push(i.afterBuildCallback);
-  } else fixes.splice(fixes.indexOf(i), 1);
+  }
 }
+
+const Plugins = fixes
+  .filter((e) => e != undefined && e.plugin != undefined)
+  .map((e) => e?.plugin) as BunPlugin[];
 
 export const builder = new Builder({
   main: {
@@ -30,7 +34,6 @@ export const builder = new Builder({
     buildDir: buildDir,
     pageDir: "src/pages",
     hydrate: ".bunext/react-ssr/hydrate.ts",
-    plugins: fixes.map((e) => e?.plugin).filter((e) => typeof e != "undefined"),
   },
   display: {
     nextjs: {
@@ -38,5 +41,4 @@ export const builder = new Builder({
     },
   },
 });
-
 if (import.meta.main) await builder.build();

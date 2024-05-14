@@ -6,12 +6,11 @@ import { isValidElement } from "react";
 import reactElementToJSXString from "react-element-to-jsx-string";
 import { URLpaths } from "../bun-react-ssr/types";
 import { isUseClient } from "../bun-react-ssr";
-import { unlink } from "node:fs/promises";
+import { unlinkSync } from "node:fs";
 import "../internal/server_global";
 import type { JsxElement } from "typescript";
 import { BuildFix } from "../internal/buildFixes";
 import { renderToString } from "react-dom/server";
-import { generateRandomString } from "../features/utils";
 
 type _Builderoptions = {
   main: _Mainoptions;
@@ -97,22 +96,23 @@ export class Builder {
       if (allowedEndsWith.includes(e.split("/").at(-1) as string)) return true;
       return false;
     });
-    const result = await this.CreateBuild({
+    this.buildOutput = await this.CreateBuild({
       entrypoints: entrypoints,
       sourcemap,
       outdir: join(baseDir, buildDir as string),
       minify,
       plugins: [...(plugins ?? [])],
     });
-    const fileInBuildDir = await Array.fromAsync(
-      this.glob(this.options.buildDir as string)
-    );
-    for await (const file of fileInBuildDir) {
-      if (result.outputs.find((o) => o.path == file)) continue;
-      else await unlink(file);
+    for await (const file of this.glob(
+      this.options.buildDir as string,
+      "**/*.js"
+    )) {
+      if (this.buildOutput.outputs.find((e) => e.path == file)) continue;
+      else unlinkSync(file);
     }
     await this.afterBuild();
-    return result;
+
+    return this.buildOutput;
   }
   private async setFileImportToBrowser(filePath: string) {
     const file = Bun.file(filePath);
@@ -506,11 +506,6 @@ export class Builder {
         ...define,
       },
       splitting: true,
-      naming: {
-        entry: "[dir]/[name].[ext]",
-        asset: "[dir]/[name].[ext]",
-        chunk: `[dir]/[name]-[hash]-${generateRandomString(5)}.[ext]`,
-      },
     });
     if (!build.success) return build;
     return build;
@@ -520,30 +515,8 @@ export class Builder {
       await i({
         buildPath: this.options.buildDir as string,
         tmpPath: normalize([this.options.buildDir, "..", "tmp"].join("/")),
+        outputs: this.buildOutput as BuildOutput,
       });
-    }
-
-    //if (process.env.NODE_ENV == "development") await this.afterBuildDev();
-  }
-
-  private async afterBuildDev() {
-    if (!this.buildOutput) return;
-
-    for await (const i of this.buildOutput.outputs) {
-      const Path = i.path;
-      const file = Bun.file(Path);
-      let fileContent = await file.text();
-      const imports = new Bun.Transpiler({ loader: "js" }).scanImports(
-        fileContent
-      );
-
-      for (const imported of imports) {
-        fileContent = fileContent.replace(
-          imported.path,
-          imported.path + "?" + generateRandomString(5)
-        );
-      }
-      await Bun.write(file, fileContent);
     }
   }
 

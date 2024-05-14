@@ -1,39 +1,28 @@
-import type { BunPlugin } from "bun";
+import type { BuildOutput, BunPlugin } from "bun";
 import "../server_global";
 
 export type afterBuildCallback = ({
   buildPath,
   tmpPath,
+  outputs,
 }: {
   buildPath: string;
   tmpPath: string;
+  outputs: BuildOutput;
 }) => void | Promise<void>;
+
 export class BuildFix {
   plugin?: BunPlugin;
   afterBuildCallback?: afterBuildCallback;
-  depName: string;
   constructor({
-    dependencyName,
     plugin,
     afterBuild,
   }: {
-    dependencyName: string;
     plugin?: BunPlugin;
     afterBuild?: afterBuildCallback;
   }) {
-    this.depName = dependencyName;
     this.plugin = plugin;
     this.afterBuildCallback = afterBuild;
-  }
-  async hasDependency() {
-    const packageJson = JSON.parse(
-      await Bun.file(process.cwd() + "/package.json").text()
-    ) as {
-      dependencies?: Record<string, string>;
-    };
-    if (!packageJson.dependencies) return false;
-    if (packageJson.dependencies[this.depName]) return true;
-    return false;
   }
   static convertImportsToBrowser(fileContent: string) {
     const { imports } = new Bun.Transpiler({ loader: "js" }).scan(fileContent);
