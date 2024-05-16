@@ -1,14 +1,17 @@
 import type { BuildOutput, BunPlugin } from "bun";
 import "../server_global";
+import type { Builder } from "../../bun-react-ssr/build";
 
 export type afterBuildCallback = ({
   buildPath,
   tmpPath,
   outputs,
+  builder,
 }: {
   buildPath: string;
   tmpPath: string;
   outputs: BuildOutput;
+  builder: Builder;
 }) => void | Promise<void>;
 
 export class BuildFix {

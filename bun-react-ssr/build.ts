@@ -53,7 +53,7 @@ type _CreateBuild = Partial<_Mainoptions> &
   Partial<_otherOptions>;
 
 export class Builder {
-  private options: _Mainoptions;
+  public options: _Mainoptions;
   private bypassoptions: _bypassOptions;
   static preBuildPaths: Array<string> = [];
   private buildOutput?: BuildOutput;
@@ -516,6 +516,7 @@ export class Builder {
         buildPath: this.options.buildDir as string,
         tmpPath: normalize([this.options.buildDir, "..", "tmp"].join("/")),
         outputs: this.buildOutput as BuildOutput,
+        builder: this,
       });
     }
   }
