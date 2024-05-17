@@ -1,6 +1,6 @@
 # Compatibility
 
-    compatible: bun 1.1.7 & under
+    compatible: bun 1.1.8 & under
 
     N.B : Bun is in continuous changement and compatibility between version is a
      huge problem for Bunext there is possible crash over some new version i will
