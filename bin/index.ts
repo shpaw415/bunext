@@ -13,7 +13,8 @@ type _cmd =
   | "onlyClient"
   | "database_create"
   | "database_merge"
-  | "devTest";
+  | "devTest"
+  | "production";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
 
@@ -45,6 +46,10 @@ if (import.meta.main)
     case "dev":
       await __setHead__();
       dev({ showBuildError: false });
+      break;
+    case "production":
+      await __setHead__();
+      production();
       break;
     case "onlyClient":
       await __setHead__();
@@ -145,6 +150,33 @@ function dev({
   });
   globalThis.processes.push(proc);
 }
+
+function production() {
+  process.env.NODE_ENV = "production";
+  const proc = Bun.spawn({
+    cmd: [
+      "bun",
+      "--production",
+      `${paths.bunextDirName}/react-ssr/server.ts`,
+      "production",
+    ],
+    env: {
+      ...process.env,
+      __HEAD_DATA__: JSON.stringify(globalThis.head),
+      NODE_ENV: process.env.NODE_ENV,
+    },
+    stdout: "inherit",
+    onExit(subprocess, exitCode, signalCode, error) {
+      if (exitCode == exitCodes.runtime || exitCode == exitCodes.build) {
+        production();
+      } else {
+        console.log("Bunext Exited.");
+      }
+    },
+  });
+  globalThis.processes.push(proc);
+}
+
 function init() {
   return import("./init");
 }

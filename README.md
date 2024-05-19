@@ -23,6 +23,7 @@
     - Session Management ( public & private )
     - SQlite Management
     - Server componants
+    - Devloppement mode ( beta version )
 
 ## What is planed
 
@@ -32,6 +33,7 @@
     - Documentation
     - Revalidate ( testing for edge cases )
     - SQlite performance & features
+    - Production mode
 
 ### To install and run
 
