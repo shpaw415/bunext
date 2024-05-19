@@ -1,6 +1,7 @@
 import { StaticRouters } from "@bunpmjs/bunext/bun-react-ssr";
 import { Builder } from "@bunpmjs/bunext/bun-react-ssr/build";
 import { normalize } from "node:path";
+import { mkdirSync } from "node:fs";
 import "@bunpmjs/bunext/internal/server_global";
 const pageDir = "src/pages" as const;
 const baseDir = process.cwd();
@@ -35,6 +36,7 @@ export function resetRouter() {
     router = route;
   } catch {
     console.log("cannot set static router");
+    mkdirSync(".bunext/build", { recursive: true });
   }
 }
 resetRouter();

@@ -55,13 +55,14 @@ function RunServer() {
   }
 }
 async function init() {
-  if (globalThis.mode === "dev" && globalThis.dryRun) {
-    serveHotServer();
-  }
   if (globalThis.dryRun) {
     RunServer();
+  }
+  if (process.env.NODE_ENV === "development" && globalThis.dryRun) {
+    serveHotServer();
     doWatchBuild(arg == "showError" ? true : false);
   }
+
   resetRouter();
   logDevConsole();
   globalThis.dryRun = false;
@@ -83,7 +84,7 @@ function logDevConsole(noClear?: boolean) {
 async function serve(request: Request) {
   try {
     const route = router.server.match(request);
-    const isDev = globalThis.mode == "dev";
+    const isDev = process.env.NODE_ENV == "development";
     let pass = !isDev;
     if (route && isDev) {
       await doPreBuild(route.filePath);
@@ -112,9 +113,7 @@ async function serve(request: Request) {
           },
         }
       );
-    else {
-      devConsole.error = "build error";
-    }
+    else devConsole.error = "build error";
     logDevConsole();
     return response;
   } catch (e) {

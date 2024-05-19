@@ -41,4 +41,7 @@ export const builder = new Builder({
     },
   },
 });
-if (import.meta.main) await builder.build();
+if (import.meta.main) {
+  await builder.preBuildAll();
+  await builder.build();
+}

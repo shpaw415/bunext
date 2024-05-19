@@ -220,6 +220,16 @@ export class Builder {
       await this.preBuild(path);
     }
   }
+  async preBuildAll() {
+    const files = await Array.fromAsync(
+      this.glob(
+        normalize([this.options.baseDir, this.options.pageDir].join("/"))
+      )
+    );
+    for await (const file of files) {
+      await Builder.preBuild(file);
+    }
+  }
   resetPath(path: string) {
     const index = globalThis.pages.findIndex((p) => p.path === path);
     if (index == -1) return;
