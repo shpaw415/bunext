@@ -37,7 +37,7 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      await doBuild();
+      await doBuild(true);
       break;
     case "devTest":
       await __setHead__();

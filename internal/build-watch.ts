@@ -8,7 +8,7 @@ export const doWatchBuild = (showError: boolean) =>
     sendSignal();
   }, [paths.basePagePath, "static"]);
 
-export async function doBuild() {
+export async function doBuild(production?: boolean) {
   const proc = Bun.spawnSync({
     cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
     stdout: "inherit",
@@ -19,6 +19,7 @@ export async function doBuild() {
           return { page: "", path: e.path };
         })
       ),
+      NODE_ENV: production ? "production" : "development",
       ssrElement: JSON.stringify(globalThis.ssrElement ?? []),
     },
   });
