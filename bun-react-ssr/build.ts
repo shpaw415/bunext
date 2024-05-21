@@ -135,7 +135,10 @@ export class Builder {
         continue;
       const FuncString = exported.toString();
       if (!FuncString.match(EmptyParamsFunctionRegex)) continue;
-      const element = (await exported()) as JsxElement | any;
+      let element: JsxElement | any = undefined;
+      try {
+        element = await exported();
+      } catch {}
       if (!isValidElement(element)) continue;
       const findModule = (e: any) => e.path == modulePath;
       let moduleSSR = globalThis.ssrElement.find(findModule);
@@ -543,6 +546,7 @@ export class Builder {
         ),
         ...define,
       },
+      external: ["bun:sqlite"],
       splitting: true,
     });
     if (!build.success) return build;

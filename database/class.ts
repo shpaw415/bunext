@@ -1,3 +1,4 @@
+"use client";
 import { Database as _BunDB } from "bun:sqlite";
 import type { _DataType, DBSchema, TableSchema } from "./schema";
 
