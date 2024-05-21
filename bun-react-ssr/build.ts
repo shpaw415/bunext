@@ -131,7 +131,8 @@ export class Builder {
     const EmptyParamsFunctionRegex = /\b\w+\s*\(\s*\)/;
     for await (const ex of exports) {
       const exported = _module[ex] as Function | unknown;
-      if (typeof exported != "function") continue;
+      if (typeof exported != "function" || exported.name.startsWith("Server"))
+        continue;
       const FuncString = exported.toString();
       if (!FuncString.match(EmptyParamsFunctionRegex)) continue;
       const element = (await exported()) as JsxElement | any;
@@ -497,7 +498,7 @@ export class Builder {
     } = {};
     for await (const exported of Object.keys(_module)) {
       const Func = _module[exported] as Function;
-      if (!this.isFunction(Func)) continue;
+      if (!this.isFunction(Func) || Func.name.startsWith("Server")) continue;
       const ssrElement = ssrModule?.elements.find(
         (e) => e.tag == `<!Bunext_Element_${Func.name}!>`
       );
