@@ -1,4 +1,5 @@
 import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
+import { readFileSync } from "fs";
 import { NJSON } from "next-json";
 import { join, relative } from "node:path";
 import {
@@ -8,8 +9,8 @@ import {
 import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
+import React from "react";
 import "../internal/server_global";
-
 export class StaticRouters {
   readonly server: FileSystemRouter;
   readonly client: FileSystemRouter;
@@ -51,6 +52,7 @@ export class StaticRouters {
   async serve<T = void>(
     request: Request,
     response: Response,
+    data: FormData,
     {
       Shell,
       preloadScript,
@@ -69,7 +71,8 @@ export class StaticRouters {
     }
   ): Promise<Response | null> {
     const { pathname, search } = new URL(request.url);
-    const serverAction = await this.serverActionGetter(request, response);
+    console.log(pathname);
+    const serverAction = await this.serverActionGetter(request, response, data);
     if (serverAction) return serverAction;
 
     const staticResponse = await serveFromDir({
@@ -169,7 +172,7 @@ export class StaticRouters {
       ?.elements.find((e) =>
         e.tag.endsWith(`${module.default.name}!>`)
       )?.htmlElement;
-
+    console.log(preBuiledPage);
     let jsxToServe: JSX.Element;
     if (preBuiledPage) {
       jsxToServe = (
@@ -247,13 +250,15 @@ export class StaticRouters {
 
   private async serverActionGetter(
     request: Request,
-    response: Response
+    response: Response,
+    data: FormData
   ): Promise<Response | null> {
     const { pathname } = new URL(request.url);
     if (pathname !== "/ServerActionGetter") return null;
     const reqData = this.extractServerActionHeader(request);
+
     if (!reqData) return null;
-    const props = await this.extractPostData(request);
+    const props = this.extractPostData(data);
     const module = globalThis.serverActions.find(
       (s) => s.path === reqData.path.slice(1)
     );
@@ -269,14 +274,22 @@ export class StaticRouters {
   }
   private extractServerActionHeader(request: Request) {
     const serverActionData = request.headers.get("serveractionid")?.split(":");
+
     if (!serverActionData) return null;
     return {
       path: serverActionData[0],
       call: serverActionData[1],
     };
   }
-  private async extractPostData(request: Request) {
-    return JSON.parse(decodeURI(await request.json()));
+  private extractPostData(data: FormData) {
+    return (
+      JSON.parse(decodeURI(data.get("props") as string)) as Array<any>
+    ).map((prop) => {
+      if (typeof prop == "string" && prop.startsWith("BUNEXT_FILE_")) {
+        return data.get(prop) as File;
+      }
+      return prop;
+    });
   }
 
   async updateRoute(path: string) {
@@ -384,7 +397,9 @@ export async function serveFromDir(config: {
     const pathWithSuffix = basePath + suffix;
     let file = Bun.file(pathWithSuffix);
     if (await file.exists()) {
-      const content = file.text();
+      const content = readFileSync(pathWithSuffix, {
+        encoding: "ascii",
+      });
       return content;
     }
   }

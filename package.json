@@ -1,6 +1,6 @@
 {
   "name": "bunext",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
@@ -13,7 +13,7 @@
     "typescript": "^5.0.0",
     "react": "*",
     "react-dom": "*",
-    "@bunpmjs/bunext": "^0.2.5",
+    "@bunpmjs/bunext": "link:bunext",
     "react-element-to-jsx-string": "15.0.0",
     "@bunpmjs/json-webtoken": "0.0.22"
   },

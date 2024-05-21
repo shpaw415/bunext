@@ -19,11 +19,12 @@
     - Server componants ("use server" & "use client")
     - Hot reload
     - Revalidate ( beta version )
-    - Server action
+    - Server action ( File can be uploaded )
     - Session Management ( public & private )
     - SQlite Management
     - Server componants
     - Devloppement mode ( beta version )
+    - Production mode ( Beta )
 
 ## What is planed
 
@@ -33,7 +34,6 @@
     - Documentation
     - Revalidate ( testing for edge cases )
     - SQlite performance & features
-    - Production mode
 
 ### To install and run
 

@@ -22,7 +22,9 @@ function RunServer() {
   try {
     const server = Bun.serve({
       port: 3000,
+      maxRequestBodySize: Number.MAX_SAFE_INTEGER,
       async fetch(request) {
+        console.clear();
         // header probable memory leak
         const _MiddleWaremodule = await import(
           "@bunpmjs/bunext/internal/middleware"
@@ -69,7 +71,6 @@ async function init() {
 }
 
 function logDevConsole(noClear?: boolean) {
-  noClear ?? console.clear();
   const dev = globalThis.devConsole;
   const toLog = [
     `Serving: http://${dev.hostName}:${dev.servePort}`,
@@ -82,6 +83,11 @@ function logDevConsole(noClear?: boolean) {
 }
 
 async function serve(request: Request) {
+  let serverActionData: FormData = new FormData();
+  if (request.url.endsWith("/ServerActionGetter")) {
+    serverActionData = await request.formData();
+  }
+
   try {
     const route = router.server.match(request);
     const isDev = process.env.NODE_ENV == "development";
@@ -99,6 +105,7 @@ async function serve(request: Request) {
       response = await router.serve(
         request,
         __REQUEST_CONTEXT__.response as Response,
+        serverActionData,
         {
           Shell: Shell as any,
           bootstrapModules: [

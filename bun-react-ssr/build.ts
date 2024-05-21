@@ -8,7 +8,7 @@ import { URLpaths } from "../bun-react-ssr/types";
 import { isUseClient } from "../bun-react-ssr";
 import { unlinkSync } from "node:fs";
 import "../internal/server_global";
-import type { JsxElement } from "typescript";
+import { type JsxElement } from "typescript";
 import { BuildFix } from "../internal/buildFixes";
 import { renderToString } from "react-dom/server";
 
@@ -242,12 +242,39 @@ export class Builder {
 
     const ServerActionClient = (ModulePath: string, funcName: string) => {
       return async function (...props: Array<any>) {
+        function generateRandomString(length: number) {
+          let result = "";
+          const characters =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+          const charactersLength = characters.length;
+
+          for (let i = 0; i < length; i++) {
+            result += characters.charAt(
+              Math.floor(Math.random() * charactersLength)
+            );
+          }
+
+          return result;
+        }
+        const formatToFile = () => `BUNEXT_FILE_${generateRandomString(10)}`;
+
+        const formData = new FormData();
+
+        let _props: Array<any> = props.map((prop) => {
+          if (prop instanceof File) {
+            const id = formatToFile();
+            formData.append(id, prop);
+            return id;
+          } else return prop;
+        });
+        formData.append("props", encodeURI(JSON.stringify(_props)));
+
         const response = await fetch("<!URLPATH!>", {
           headers: {
             serverActionID: "<!ModulePath!>:<!FuncName!>",
           },
           method: "POST",
-          body: JSON.stringify(encodeURI(JSON.stringify(props))),
+          body: formData,
         });
         if (!response.ok)
           throw new Error(
