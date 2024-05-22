@@ -79,6 +79,11 @@ type _Update<Table> = {
   limit?: number;
 };
 
+type _Delete<Table> = {
+  where: _Where<Table>;
+  limit?: number;
+};
+
 type _Create = TableSchema;
 
 export class Table<T> {
@@ -216,5 +221,49 @@ export class Table<T> {
     const db = BunDB.prepare(queryString);
     const res = db.all(...this.parseParams(params)) as T[];
     return res;
+  }
+  delete(data: _Delete<T>) {
+    let queyString = `DELETE FROM ${this.name} `;
+
+    const hasORAND =
+      data.where &&
+      Object.keys(data.where).filter((k) => k == "OR" || k == "AND").length == 0
+        ? false
+        : true;
+
+    if (data.where && !hasORAND) {
+      queyString +=
+        " WHERE " +
+        (Object.keys(data.where) as Array<keyof _Select<T>["where"]>)
+          .map((where) => {
+            return `${where} = ?`;
+          })
+          .join(", ");
+    } else if (data.where && Object.keys(data.where)[0] == "OR") {
+      const ORlist = (data.where as any)["OR"] as Partial<T>[];
+      console.log(ORlist);
+      queyString +=
+        " WHERE " +
+        ORlist.map((or) => {
+          return Object.keys(or).map((key) => {
+            return `${key} = ?`;
+          });
+        }).join(" OR ");
+    }
+
+    if (data.limit) queyString += ` LIMIT ${data.limit}`;
+
+    let params: string[] = [];
+    if (data.where && !hasORAND) params = Object.values(data.where);
+    else if (data.where && typeof (data.where as any)["OR"] !== "undefined")
+      params = this.extractParams("OR", data.where);
+    else if (data.where && typeof (data.where as any)["AND"] !== "undefined")
+      params = this.extractParams("AND", data.where);
+
+    const query = BunDB.prepare(queyString);
+    let res = query.all(...params) as Partial<T>[];
+    query.finalize();
+
+    return res.map((row) => this.restoreParams(row)) as Partial<T>[];
   }
 }
