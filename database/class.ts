@@ -263,7 +263,5 @@ export class Table<T> {
     const query = BunDB.prepare(queyString);
     let res = query.all(...params) as Partial<T>[];
     query.finalize();
-
-    return res.map((row) => this.restoreParams(row)) as Partial<T>[];
   }
 }
