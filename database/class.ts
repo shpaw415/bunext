@@ -80,8 +80,6 @@ type _Update<Table> = {
 
 type _Delete<Table> = {
   where: _Where<Table>;
-  limit?: number;
-  skip?: number;
 };
 
 type _Create = TableSchema;
@@ -222,7 +220,7 @@ export class Table<T> {
     return res;
   }
   delete(data: _Delete<T>) {
-    let queyString = `DELETE FROM ${this.name} `;
+    let queyString = `DELETE FROM ${this.name}`;
 
     const hasORAND =
       data.where &&
@@ -249,15 +247,13 @@ export class Table<T> {
         }).join(" OR ");
     }
 
-    if (data.limit) queyString += ` LIMIT ${data.limit}`;
-
     let params: string[] = [];
     if (data.where && !hasORAND) params = Object.values(data.where);
     else if (data.where && typeof (data.where as any)["OR"] !== "undefined")
       params = this.extractParams("OR", data.where);
     else if (data.where && typeof (data.where as any)["AND"] !== "undefined")
       params = this.extractParams("AND", data.where);
-
+    console.log(queyString);
     const query = BunDB.prepare(queyString);
     let res = query.all(...params) as Partial<T>[];
     query.finalize();
