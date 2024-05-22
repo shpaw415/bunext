@@ -21,7 +21,7 @@
     - Revalidate ( beta version )
     - Server action ( File can be uploaded )
     - Session Management ( public & private )
-    - SQlite Management
+    - SQlite Management ( Beta )
     - Server componants
     - Devloppement mode ( beta version )
     - Production mode ( Beta )
