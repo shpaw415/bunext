@@ -42,7 +42,9 @@ export const builder = new Builder({
   },
 });
 if (import.meta.main) {
-  console.log("build for", process.env.NODE_ENV);
-  if (process.env.NODE_ENV == "production") await builder.preBuildAll();
+  if (process.env.NODE_ENV == "production") {
+    console.log("build for production");
+    await builder.preBuildAll();
+  }
   await builder.build();
 }

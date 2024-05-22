@@ -75,7 +75,6 @@ type _Where<Table> = { OR: Partial<Table>[]; AND?: undefined } | Partial<Table>;
 type _Update<Table> = {
   where: _Where<Table>;
   values: Partial<Table>;
-  skip?: number;
   limit?: number;
 };
 
@@ -251,9 +250,6 @@ export class Table<T> {
     }
 
     if (data.limit) queyString += ` LIMIT ${data.limit}`;
-    else if (data.skip) queyString += ` LIMIT -1`;
-
-    if (data.skip) queyString += ` OFFSET ${data.skip}`;
 
     let params: string[] = [];
     if (data.where && !hasORAND) params = Object.values(data.where);
