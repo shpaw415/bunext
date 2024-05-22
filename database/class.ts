@@ -82,6 +82,7 @@ type _Update<Table> = {
 type _Delete<Table> = {
   where: _Where<Table>;
   limit?: number;
+  skip?: number;
 };
 
 type _Create = TableSchema;
@@ -147,7 +148,6 @@ export class Table<T> {
           .join(", ");
     } else if (data.where && Object.keys(data.where)[0] == "OR") {
       const ORlist = (data.where as any)["OR"] as Partial<T>[];
-      console.log(ORlist);
       queyString +=
         " WHERE " +
         ORlist.map((or) => {
@@ -241,7 +241,6 @@ export class Table<T> {
           .join(", ");
     } else if (data.where && Object.keys(data.where)[0] == "OR") {
       const ORlist = (data.where as any)["OR"] as Partial<T>[];
-      console.log(ORlist);
       queyString +=
         " WHERE " +
         ORlist.map((or) => {
@@ -252,6 +251,9 @@ export class Table<T> {
     }
 
     if (data.limit) queyString += ` LIMIT ${data.limit}`;
+    else if (data.skip) queyString += ` LIMIT -1`;
+
+    if (data.skip) queyString += ` OFFSET ${data.skip}`;
 
     let params: string[] = [];
     if (data.where && !hasORAND) params = Object.values(data.where);

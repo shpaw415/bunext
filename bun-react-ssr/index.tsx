@@ -71,7 +71,6 @@ export class StaticRouters {
     }
   ): Promise<Response | null> {
     const { pathname, search } = new URL(request.url);
-    console.log(pathname);
     const serverAction = await this.serverActionGetter(request, response, data);
     if (serverAction) return serverAction;
 
@@ -172,7 +171,6 @@ export class StaticRouters {
       ?.elements.find((e) =>
         e.tag.endsWith(`${module.default.name}!>`)
       )?.htmlElement;
-    console.log(preBuiledPage);
     let jsxToServe: JSX.Element;
     if (preBuiledPage) {
       jsxToServe = (
