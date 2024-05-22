@@ -27,9 +27,13 @@ export type ColumnsSchema =
   | ({
       type: "float";
       default?: number;
+    } & common)
+  | ({
+      type: "boolean";
+      default?: boolean;
     } & common);
 
-type _TypeJson = "number" | "string" | "undefined" | "float" | "number";
+type _TypeJson = "number" | "string" | "undefined" | "float" | "boolean";
 
 type _DataTypeObject = {
   [key: string]: _TypeJson | _TypeJson[] | _DataType;
@@ -63,6 +67,7 @@ export async function ConvertShemaToType(filePath: string) {
           case "string":
           case "number":
           case "Date":
+          case "boolean":
             dataType = column.type;
             break;
           case "float":
@@ -89,6 +94,7 @@ function sqliteTypeToTypeScript(type: _TypeJson): _TypeJson | undefined {
   switch (type) {
     case "number":
     case "string":
+    case "boolean":
       return type;
     case "float":
       return "number";

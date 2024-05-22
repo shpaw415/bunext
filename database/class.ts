@@ -22,7 +22,7 @@ export class _Database {
       "(" +
       data.columns
         .map((column) => {
-          if (column.primary) hasPrimary = true;
+          if (typeof column.primary) hasPrimary = true;
           let dataType: string;
           let autoIncrement = "";
           switch (column.type) {
@@ -31,6 +31,7 @@ export class _Database {
               autoIncrement = column.autoIncrement ? "AUTOINCREMENT" : "";
               break;
             case "Date":
+            case "boolean":
               dataType = "INTEGER";
               break;
             case "float":
@@ -98,8 +99,9 @@ export class Table<T> {
   }
   private parseParams(params: any[]) {
     return params.map((param) => {
-      const passType = ["number", "string", "boolean"];
+      const passType = ["number", "string"];
       if (passType.includes(typeof param)) return param;
+      if (typeof param == "boolean") return param ? 1 : 0;
       return JSON.stringify(param);
     });
   }
@@ -110,13 +112,18 @@ export class Table<T> {
         const column = globalThis.dbShema
           .find((schema) => schema.name === this.name)
           ?.columns.find((c) => c.name === key);
-        if (column?.type === "Date") return { [key]: new Date(params[key]) };
-        if (column?.type === "json") {
-          column.DataType;
-          return {
-            [key]: JSON.parse(params[key]),
-          };
-        } else return { [key]: params[key] };
+        switch (column?.type) {
+          case "Date":
+            return { [key]: new Date(params[key]) };
+          case "json":
+            return {
+              [key]: JSON.parse(params[key]),
+            };
+          case "boolean":
+            return { [key]: params[key] == 1 ? true : false };
+          default:
+            return { [key]: params[key] };
+        }
       })
     );
   }
