@@ -71,7 +71,11 @@ type _Select<Table> = {
 };
 type _Insert<Table> = Table;
 
-type _Where<Table> = { OR: Partial<Table>[]; AND?: undefined } | Partial<Table>;
+type _Where<Table> =
+  | Partial<Table>
+  | {
+      OR: Partial<Table>[];
+    };
 
 type _Update<Table> = {
   where: _Where<Table>;
@@ -84,6 +88,8 @@ type _Delete<Table> = {
 };
 
 type _Create = TableSchema;
+
+type _FormatString<T> = _Select<T> | _Update<T> | _Delete<T>;
 
 export class Table<T> {
   private name: string;
@@ -127,6 +133,49 @@ export class Table<T> {
       })
     );
   }
+  private hasOR(data: _FormatString<T>) {
+    return data.where && Object.keys(data.where).find((e) => e == "OR")
+      ? true
+      : false;
+  }
+  private extractAndOrParams(data: _FormatString<T>) {
+    let params: string[] = [];
+    if (data.where && !this.hasOR(data)) params = Object.values(data.where);
+    else if (data.where && typeof (data.where as any)["OR"] !== "undefined")
+      params = this.extractParams("OR", data.where);
+    else if (data.where && typeof (data.where as any)["AND"] !== "undefined")
+      params = this.extractParams("AND", data.where);
+
+    return params;
+  }
+  private formatQueryString(data: _FormatString<T>) {
+    let queyString = "";
+
+    const hasOR = this.hasOR(data);
+
+    if (data.where && !hasOR) {
+      queyString +=
+        " WHERE " +
+        (Object.keys(data.where) as Array<keyof _Select<T>["where"]>)
+          .map((where) => {
+            return `${where} = ?`;
+          })
+          .join(" AND ");
+    } else if (data.where && hasOR) {
+      const ORlist = (data.where as any).OR as Partial<T>[];
+      queyString +=
+        " WHERE " +
+        ORlist.map((or) => {
+          return Object.keys(or)
+            .map((key) => {
+              return `${key} = ?`;
+            })
+            .join(" AND ");
+        }).join(" OR ");
+    }
+    return queyString;
+  }
+
   select(data: _Select<T>) {
     let queyString = "SELECT ";
     if (typeof data.select !== "undefined" && data.select != "*") {
@@ -135,46 +184,15 @@ export class Table<T> {
         .join(", ");
     } else queyString += "*";
 
-    queyString += ` FROM ${this.name}`;
-    const hasORAND =
-      data.where &&
-      Object.keys(data.where).filter((k) => k == "OR" || k == "AND").length == 0
-        ? false
-        : true;
-
-    if (data.where && !hasORAND) {
-      queyString +=
-        " WHERE " +
-        (Object.keys(data.where) as Array<keyof _Select<T>["where"]>)
-          .map((where) => {
-            return `${where} = ?`;
-          })
-          .join(", ");
-    } else if (data.where && Object.keys(data.where)[0] == "OR") {
-      const ORlist = (data.where as any)["OR"] as Partial<T>[];
-      queyString +=
-        " WHERE " +
-        ORlist.map((or) => {
-          return Object.keys(or).map((key) => {
-            return `${key} = ?`;
-          });
-        }).join(" OR ");
-    }
+    queyString += ` FROM ${this.name} ${this.formatQueryString(data)}`;
 
     if (data.limit) queyString += ` LIMIT ${data.limit}`;
     else if (data.skip) queyString += ` LIMIT -1`;
 
     if (data.skip) queyString += ` OFFSET ${data.skip}`;
 
-    let params: string[] = [];
-    if (data.where && !hasORAND) params = Object.values(data.where);
-    else if (data.where && typeof (data.where as any)["OR"] !== "undefined")
-      params = this.extractParams("OR", data.where);
-    else if (data.where && typeof (data.where as any)["AND"] !== "undefined")
-      params = this.extractParams("AND", data.where);
-
     const query = BunDB.prepare(queyString);
-    let res = query.all(...params) as Partial<T>[];
+    let res = query.all(...this.extractAndOrParams(data)) as Partial<T>[];
     query.finalize();
 
     return res.map((row) => this.restoreParams(row)) as Partial<T>[];
@@ -205,64 +223,25 @@ export class Table<T> {
   update(data: _Update<T>) {
     let queryString = `UPDATE ${this.name} SET `;
 
-    const isOR = Object.keys(data.where)[0] === "OR";
-
     let params: string[] = Object.values(data.values);
     queryString += Object.keys(data.values)
       .map((key) => `${key} = ?`)
       .join(", ");
-    queryString += " WHERE ";
-    if (isOR) {
-      params.push(...this.extractParams("OR", data.where));
-      queryString += ((data.where as any)["OR"] as string[])
-        .map((k) => Object.keys(k).map((v) => `${v} = ?`))
-        .join(" OR ");
-    } else {
-      const where = Object.keys(data.where);
-      params.push(...Object.values(data.where));
-      queryString += where.map((v) => `${v} = ?`).join(" AND ");
-    }
+    queryString += this.formatQueryString(data);
+
+    if (this.hasOR(data)) params.push(...this.extractParams("OR", data.where));
+    else params.push(...Object.values(data.where));
+
     const db = BunDB.prepare(queryString);
     const res = db.all(...this.parseParams(params)) as T[];
     return res;
   }
   delete(data: _Delete<T>) {
-    let queyString = `DELETE FROM ${this.name}`;
+    let queyString = `DELETE FROM ${this.name} ${this.formatQueryString(data)}`;
 
-    const hasORAND =
-      data.where &&
-      Object.keys(data.where).filter((k) => k == "OR" || k == "AND").length == 0
-        ? false
-        : true;
-
-    if (data.where && !hasORAND) {
-      queyString +=
-        " WHERE " +
-        (Object.keys(data.where) as Array<keyof _Select<T>["where"]>)
-          .map((where) => {
-            return `${where} = ?`;
-          })
-          .join(", ");
-    } else if (data.where && Object.keys(data.where)[0] == "OR") {
-      const ORlist = (data.where as any)["OR"] as Partial<T>[];
-      queyString +=
-        " WHERE " +
-        ORlist.map((or) => {
-          return Object.keys(or).map((key) => {
-            return `${key} = ?`;
-          });
-        }).join(" OR ");
-    }
-
-    let params: string[] = [];
-    if (data.where && !hasORAND) params = Object.values(data.where);
-    else if (data.where && typeof (data.where as any)["OR"] !== "undefined")
-      params = this.extractParams("OR", data.where);
-    else if (data.where && typeof (data.where as any)["AND"] !== "undefined")
-      params = this.extractParams("AND", data.where);
     console.log(queyString);
     const query = BunDB.prepare(queyString);
-    let res = query.all(...params) as Partial<T>[];
+    query.all(...this.extractAndOrParams(data));
     query.finalize();
   }
 }
