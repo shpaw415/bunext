@@ -80,7 +80,6 @@ type _Where<Table> =
 type _Update<Table> = {
   where: _Where<Table>;
   values: Partial<Table>;
-  limit?: number;
 };
 
 type _Delete<Table> = {
@@ -155,7 +154,7 @@ export class Table<T> {
 
     if (data.where && !hasOR) {
       queyString +=
-        " WHERE " +
+        "WHERE " +
         (Object.keys(data.where) as Array<keyof _Select<T>["where"]>)
           .map((where) => {
             return `${where} = ?`;
@@ -164,7 +163,7 @@ export class Table<T> {
     } else if (data.where && hasOR) {
       const ORlist = (data.where as any).OR as Partial<T>[];
       queyString +=
-        " WHERE " +
+        "WHERE " +
         ORlist.map((or) => {
           return Object.keys(or)
             .map((key) => {
@@ -227,7 +226,7 @@ export class Table<T> {
     queryString += Object.keys(data.values)
       .map((key) => `${key} = ?`)
       .join(", ");
-    queryString += this.formatQueryString(data);
+    queryString += ` ${this.formatQueryString(data)}`;
 
     if (this.hasOR(data)) params.push(...this.extractParams("OR", data.where));
     else params.push(...Object.values(data.where));
