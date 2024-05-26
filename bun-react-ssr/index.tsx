@@ -11,6 +11,7 @@ import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
 import React from "react";
 import "../internal/server_global";
+import { __GET_PUBLIC_SESSION_DATA__ } from "../features/session";
 export class StaticRouters {
   readonly server: FileSystemRouter;
   readonly client: FileSystemRouter;
@@ -237,7 +238,10 @@ export class StaticRouters {
     if (!call) return null;
     const res = await call(...props);
 
-    const result = JSON.stringify(typeof res === "undefined" ? "" : res);
+    const result = JSON.stringify({
+      props: typeof res == "undefined" ? undefined : res,
+      session: __GET_PUBLIC_SESSION_DATA__(),
+    });
     return new Response(result, {
       headers: response.headers,
     });

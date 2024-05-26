@@ -1,3 +1,6 @@
+import { createContext, useContext, useEffect, useState } from "react";
+import { generateRandomString } from "./utils";
+
 export interface _SessionData<_SessionData> {
   public: Record<string, _SessionData>;
   private: Record<string, _SessionData>;
@@ -72,7 +75,7 @@ class _Session {
    * Session.getData(); // {data: "someData"} | undefined
    */
   getData(): undefined | Record<string, any> {
-    if (typeof window != "undefined") return this.publicSessionData;
+    if (typeof window != "undefined") return globalThis.__PUBLIC_SESSION_DATA__;
     return __USER_ACTION__.__SESSION_DATA__?.private;
   }
   /**
@@ -101,3 +104,27 @@ class _Session {
 }
 
 export const Session = new _Session();
+
+class SessionUpdateClass {
+  public states: React.Dispatch<React.SetStateAction<boolean>>[] = [];
+  public update() {
+    for (const i of this.states) {
+      i((c) => !c);
+    }
+  }
+}
+
+export const SessionUpdate = createContext(new SessionUpdateClass());
+
+export function useSession(props?: { PreventRenderOnUpdate: boolean }) {
+  const [state, setState] = useState(true);
+  const _SessionContext = useContext(SessionUpdate);
+  const _SessionUpdateContext = useContext(SessionUpdate);
+  useEffect(() => {
+    if (!props?.PreventRenderOnUpdate) _SessionContext.states.push(setState);
+  }, []);
+  return {
+    session: Session,
+    management: _SessionUpdateContext,
+  };
+}

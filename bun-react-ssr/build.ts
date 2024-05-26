@@ -114,11 +114,6 @@ export class Builder {
 
     return this.buildOutput;
   }
-  private async setFileImportToBrowser(filePath: string) {
-    const file = Bun.file(filePath);
-    const res = BuildFix.convertImportsToBrowser(await file.text());
-    await Bun.write(file, res);
-  }
   // globalThis.ssrElement setting
   static async preBuild(modulePath: string) {
     const moduleContent = await Bun.file(modulePath).text();
@@ -138,7 +133,9 @@ export class Builder {
       let element: JsxElement | any = undefined;
       try {
         element = await exported();
-      } catch {}
+      } catch (e) {
+        console.log(e);
+      }
       if (!isValidElement(element)) continue;
       const findModule = (e: any) => e.path == modulePath;
       let moduleSSR = globalThis.ssrElement.find(findModule);
@@ -284,7 +281,11 @@ export class Builder {
           throw new Error(
             "error when Calling server action <!ModulePath!>:<!FuncName!>"
           );
-        return response.json();
+        const resObject = await response.json();
+
+        __PUBLIC_SESSION_DATA__ = resObject.session;
+
+        return resObject.props;
       }
         .toString()
         .replace("async function", "")
@@ -492,7 +493,6 @@ export class Builder {
 
     const _module = await import(modulePath);
     const defaultName = _module.default?.name as undefined | string;
-    const regex = /\b\w+\s*\(\s*\)/;
     let replaceServerElement: {
       [key: string]: {
         tag: string;
