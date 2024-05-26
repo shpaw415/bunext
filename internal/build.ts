@@ -41,10 +41,12 @@ export const builder = new Builder({
     },
   },
 });
+
 if (import.meta.main) {
   if (process.env.NODE_ENV == "production") {
-    console.log("build for production");
     await builder.preBuildAll();
+    await builder.build();
+    process.stdout.write(JSON.stringify(globalThis.ssrElement));
   }
   await builder.build();
 }

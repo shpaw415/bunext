@@ -145,20 +145,6 @@ export class StaticRouters {
       bootstrapModules,
       onError,
     } as RenderToReadableStreamOptions;
-    if (isNextJs && process.env.NODE_ENV != "development") {
-      const page = globalThis.pages.find(
-        (p) => p.path === serverSide.pathname
-      )?.page;
-      if (page) {
-        return new Response(page, {
-          headers: {
-            ...response.headers,
-            "Content-Type": "text/html; charset=utf-8",
-            "Cache-Control": "no-store",
-          },
-        });
-      }
-    }
 
     if (result?.redirect) {
       return new Response(null, {
@@ -171,6 +157,7 @@ export class StaticRouters {
       ?.elements.find((e) =>
         e.tag.endsWith(`${module.default.name}!>`)
       )?.htmlElement;
+    console.log(preBuiledPage);
     let jsxToServe: JSX.Element;
     if (preBuiledPage) {
       jsxToServe = (
@@ -200,21 +187,15 @@ export class StaticRouters {
 
     return this.makeStream({
       jsx: FinalJSX,
-      renderOptions: renderOptionData,
-      serverSide,
       response,
     });
   }
 
   private async makeStream({
     jsx,
-    renderOptions,
-    serverSide,
     response,
   }: {
     jsx: JSX.Element;
-    renderOptions: RenderToReadableStreamOptions | undefined;
-    serverSide: MatchedRoute;
     response: Response;
   }): Promise<Response | null> {
     const rewriter = new HTMLRewriter().on("#BUNEXT_INNER_PAGE_INSERTER", {
@@ -223,15 +204,6 @@ export class StaticRouters {
       },
     });
     const page = rewriter.transform(renderToString(jsx));
-    switch (this.options.ssrMode) {
-      case "nextjs":
-        if (globalThis.pages.find((p) => p.path === serverSide.pathname)) break;
-        globalThis.pages.push({
-          page: page,
-          path: serverSide.pathname,
-        });
-        break;
-    }
     return new Response(page, {
       headers: {
         ...response.headers,

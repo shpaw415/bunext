@@ -22,10 +22,8 @@ function RunServer() {
   try {
     const server = Bun.serve({
       port: 3000,
-      maxRequestBodySize: Number.MAX_SAFE_INTEGER,
       async fetch(request) {
         console.clear();
-        // header probable memory leak
         const _MiddleWaremodule = await import(
           "@bunpmjs/bunext/internal/middleware"
         );
@@ -60,9 +58,11 @@ async function init() {
   if (globalThis.dryRun) {
     RunServer();
   }
-  if (process.env.NODE_ENV === "development" && globalThis.dryRun) {
+  if (process.env.NODE_ENV == "development" && globalThis.dryRun) {
     serveHotServer();
     doWatchBuild(arg == "showError" ? true : false);
+  } else if (process.env.NODE_ENV == "production") {
+    makeProductionBuildInit();
   }
 
   resetRouter();
@@ -156,4 +156,16 @@ function serveScript(request: Request) {
       "Content-Type": "text/javascript;charset=utf-8",
     },
   });
+}
+
+function makeProductionBuildInit() {
+  globalThis.ssrElement = JSON.parse(
+    Bun.spawnSync({
+      cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
+      env: {
+        ...process.env,
+        NODE_ENV: "production",
+      },
+    }).stdout.toString()
+  );
 }

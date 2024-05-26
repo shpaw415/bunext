@@ -100,4 +100,4 @@ class _Session {
   }
 }
 
-export let Session = new _Session();
+export const Session = new _Session();
