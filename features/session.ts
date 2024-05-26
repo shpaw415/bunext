@@ -27,7 +27,6 @@ export function __GET_PUBLIC_SESSION_DATA__() {
 
 class _Session {
   private cookieName = "bunext_session_token";
-  private publicSessionData = globalThis.__PUBLIC_SESSION_DATA__;
   public __UPDATE__?: SessionUpdateClass;
   /**
    * Server side only
