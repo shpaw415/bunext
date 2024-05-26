@@ -28,6 +28,7 @@ export function __GET_PUBLIC_SESSION_DATA__() {
 class _Session {
   private cookieName = "bunext_session_token";
   private publicSessionData = globalThis.__PUBLIC_SESSION_DATA__;
+  public __UPDATE__?: SessionUpdateClass;
   /**
    * Server side only
    * @param data data to set in the token
@@ -86,6 +87,9 @@ class _Session {
     if (this.isClient()) this.deleteClientSession();
     else __USER_ACTION__.__DELETE__ = true;
   }
+  update() {
+    this.__UPDATE__?.update();
+  }
   /**
    * Error if client side
    * @param error to be logged
@@ -119,12 +123,9 @@ export const SessionUpdate = createContext(new SessionUpdateClass());
 export function useSession(props?: { PreventRenderOnUpdate: boolean }) {
   const [state, setState] = useState(true);
   const _SessionContext = useContext(SessionUpdate);
-  const _SessionUpdateContext = useContext(SessionUpdate);
   useEffect(() => {
     if (!props?.PreventRenderOnUpdate) _SessionContext.states.push(setState);
+    Session.__UPDATE__ = _SessionContext;
   }, []);
-  return {
-    session: Session,
-    management: _SessionUpdateContext,
-  };
+  return Session;
 }
