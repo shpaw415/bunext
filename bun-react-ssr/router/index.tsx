@@ -120,13 +120,13 @@ export const RouterHost = ({
     async (target = location.pathname + location.search) => {
       if (typeof target !== "string") throw new Error("invalid target", target);
       const currentVersion = ++versionRef.current;
-      const [module, props] = await Promise.all([
+      const [props, module] = await Promise.all([
+        fetchServerSideProps(target),
         import(
           `${match(target.split("?")[0])!.value}${
             globalX.__DEV_MODE__ ? `?${currentVersion}` : ""
           }`
         ),
-        fetchServerSideProps(target),
       ]);
       let JsxToDisplay = <module.default {...props?.props} />;
       switch (globalX.__DISPLAY_MODE__) {

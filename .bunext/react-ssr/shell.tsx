@@ -13,7 +13,8 @@ export const Shell = ({
     <html>
       <Head currentPath={route} />
       <body>{children}</body>
-      {process.env.NODE_ENV == "development" || globalThis.__DEV_MODE__ ? (
+      {process.env.NODE_ENV == "development" ||
+      globalThis.__NODE_ENV__ == "development" ? (
         <Dev />
       ) : (
         <></>

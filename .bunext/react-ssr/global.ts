@@ -3,7 +3,7 @@ import type { _Head } from "@bunpmjs/bunext/componants/head";
 
 declare global {
   var head: { [key: string]: _Head };
-  var mode: "dev" | "prod";
+  var __NODE_ENV__: "development" | "production";
 }
 
-globalThis.mode ??= "dev";
+globalThis.__NODE_ENV__ ??= "development";

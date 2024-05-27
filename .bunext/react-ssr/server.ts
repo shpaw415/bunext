@@ -99,7 +99,22 @@ async function serve(request: Request) {
   try {
     const route = router.server.match(request);
     const isDev = process.env.NODE_ENV == "development";
-    if (route && isDev) {
+
+    if (request.url.includes(".js?") && isDev) {
+      const url = new URL(request.url);
+      const pathname = url.pathname
+        .split("/")
+        .slice(0, -1)
+        .join("/")
+        .replace(builder.options.pageDir as string, "");
+      const devRoute = router.server.match(pathname);
+      if (devRoute) {
+        builder.resetPath(devRoute.filePath);
+        makeBuild(devRoute.filePath);
+      }
+    }
+
+    if (route && isDev && !request.url.includes(".js?")) {
       builder.resetPath(route.filePath);
       makeBuild(route.filePath);
     }
@@ -124,6 +139,7 @@ async function serve(request: Request) {
         preloadScript: {
           __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
           __PUBLIC_SESSION_DATA__: "undefined",
+          __NODE_ENV__: `"${process.env.NODE_ENV}"`,
         },
       }
     );
