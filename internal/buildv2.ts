@@ -14,5 +14,10 @@ try {
 } catch {
   process.exit(exitCodes.build);
 }
-process.stdout.write(JSON.stringify(globalThis.ssrElement));
+process.stdout.write(
+  JSON.stringify({
+    ssrElement: globalThis.ssrElement,
+    revalidates: globalThis.revalidates,
+  })
+);
 process.exit(0);

@@ -1,5 +1,5 @@
 import { builder } from "@bunpmjs/bunext/internal/build";
-import { doPreBuild, resetRouter, router } from "./routes";
+import { resetRouter, router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
 import { exitCodes, names, paths } from "@bunpmjs/bunext/internal/globals";
@@ -10,6 +10,8 @@ import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
+import type { ssrElement } from "@bunpmjs/bunext/internal/server_global";
+import { revalidate } from "@bunpmjs/bunext/features/router";
 
 const arg = process.argv[3] as undefined | "showError";
 globalThis.dev.clientOnly = Boolean(process.argv[4]);
@@ -68,7 +70,7 @@ async function init() {
     serveHotServer();
     doWatchBuild(arg == "showError" ? true : false);
   } else if (process.env.NODE_ENV == "production") {
-    makeBuild();
+    setRevalidate((await makeBuild()).revalidates);
   }
 
   resetRouter();
@@ -136,7 +138,7 @@ async function serve(request: Request) {
       });
     if ((e as Error).name == "TypeError") process.exit(exitCodes.runtime);
     logDevConsole();
-    return res(e);
+    return res(e as Error);
   }
 }
 
@@ -162,13 +164,13 @@ function serveScript(request: Request) {
   });
 }
 
-async function makeBuild(path?: string) {
+export async function makeBuild(path?: string) {
   const res = Bun.spawnSync({
     cmd: ["bun", `${paths.bunextModulePath}/internal/buildv2.ts`],
     env: {
       ...process.env,
       NODE_ENV: process.env.NODE_ENV,
-      ssrElement: JSON.stringify(globalThis.ssrElement),
+      ssrElement: JSON.stringify(globalThis.ssrElement || []),
       BuildPath: path || undefined,
     },
   });
@@ -176,6 +178,28 @@ async function makeBuild(path?: string) {
     throw new Error(
       `Build Error. Code: ${res.exitCode} - ${res.stderr.toString()}`
     );
-  const strRes = res.stdout.toString();
-  globalThis.ssrElement = JSON.parse(strRes);
+  const strRes = JSON.parse(res.stdout.toString()) as {
+    ssrElement: ssrElement[];
+    revalidates: Array<{
+      path: string;
+      time: number;
+    }>;
+  };
+  globalThis.ssrElement = strRes.ssrElement;
+  return {
+    revalidates: strRes.revalidates,
+  };
+}
+
+function setRevalidate(
+  revalidates: {
+    path: string;
+    time: number;
+  }[]
+) {
+  for (const reval of revalidates) {
+    setInterval(async () => {
+      await revalidate(reval.path);
+    }, reval.time);
+  }
 }

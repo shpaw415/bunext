@@ -238,7 +238,6 @@ export class Table<T> {
   delete(data: _Delete<T>) {
     let queyString = `DELETE FROM ${this.name} ${this.formatQueryString(data)}`;
 
-    console.log(queyString);
     const query = BunDB.prepare(queyString);
     query.all(...this.extractAndOrParams(data));
     query.finalize();

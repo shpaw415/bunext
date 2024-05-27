@@ -12,26 +12,27 @@ export type ssrElement = {
 };
 declare global {
   var socketList: ServerWebSocket<unknown>[];
-  var mode: "dev" | "prod";
   var dryRun: boolean;
   var ssrElement: ssrElement[];
   var serverActions: Array<{
     path: string;
     actions: Array<Function>;
   }>;
+  var revalidates: Array<{
+    path: string;
+    time: number;
+  }>;
   var __HEAD_DATA__: { [key: string]: _Head };
 
   var afterBuild: Array<afterBuildCallback>;
 }
-globalThis.pages ??= JSON.parse(process.env.__PAGE__ ?? "[]");
 globalThis.ssrElement ??= JSON.parse(process.env.ssrElement ?? "[]");
-globalThis.mode ??= "dev";
 globalThis.dryRun ??= true;
 globalThis.socketList ??= [];
 globalThis.serverActions ??= [];
-globalThis.pages ??= [];
 globalThis.__HEAD_DATA__ ??= JSON.parse(process.env.__HEAD_DATA__ ?? "{}");
 globalThis.afterBuild ??= [];
+globalThis.revalidates ??= [];
 //DEV globals
 interface devConsole {
   servePort: number;
