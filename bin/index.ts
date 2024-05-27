@@ -22,14 +22,9 @@ const DBShemaPath = "database.ts";
 const DBPath = (process.env.DATABASE_NAME || "database") + ".sqlite";
 
 declare global {
-  var pages: {
-    page: string;
-    path: string;
-  }[];
   var processes: Subprocess[];
 }
 globalThis.processes ??= [];
-globalThis.pages ??= [];
 globalThis.head ??= {};
 if (import.meta.main)
   switch (cmd) {
@@ -37,7 +32,7 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      await doBuild(true);
+      await import("../internal/buildv2.ts");
       break;
     case "devTest":
       await __setHead__();

@@ -7,7 +7,7 @@ import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import "@bunpmjs/bunext/internal/server_global";
 import { renderToString } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
-import { doWatchBuild, doBuild } from "@bunpmjs/bunext/internal/build-watch";
+import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
 
@@ -23,15 +23,21 @@ function RunServer() {
     const server = Bun.serve({
       port: 3000,
       async fetch(request) {
-        console.clear();
+        //console.clear();
         const _MiddleWaremodule = await import(
           "@bunpmjs/bunext/internal/middleware"
         );
-        request.headers.toJSON(); // <---- inhibit the problem for some reason
-        _MiddleWaremodule.setMiddleWare(request); // <---- the error occure when the request is passed to this function
+
+        request.headers.toJSON();
+        _MiddleWaremodule.setMiddleWare(request);
+        if (request.url.endsWith("/bunextgetSessionData")) {
+          return new Response(
+            JSON.stringify(_MiddleWaremodule.Session.getData()?.public)
+          );
+        }
         try {
           const response =
-            (await serve(request)) || // <----- or this function
+            (await serve(request)) ||
             (await serveStatic(request)) ||
             serveScript(request);
           if (response) return _MiddleWaremodule.Session.setToken(response);
@@ -40,7 +46,7 @@ function RunServer() {
             console.log("Runtime error... Reloading!");
             process.exit(exitCodes.runtime);
           }
-          console.log(e);
+          //console.log(e);
         }
         globalThis.dryRun = false;
         return new Response("Not found", {
@@ -50,7 +56,7 @@ function RunServer() {
     });
     globalThis.devConsole.servePort = server.port;
   } catch (e) {
-    console.log(e);
+    //console.log(e);
     process.exit(0);
   }
 }
@@ -62,7 +68,7 @@ async function init() {
     serveHotServer();
     doWatchBuild(arg == "showError" ? true : false);
   } else if (process.env.NODE_ENV == "production") {
-    makeProductionBuildInit();
+    makeBuild();
   }
 
   resetRouter();
@@ -91,36 +97,34 @@ async function serve(request: Request) {
   try {
     const route = router.server.match(request);
     const isDev = process.env.NODE_ENV == "development";
-    let pass = !isDev;
     if (route && isDev) {
-      await doPreBuild(route.filePath);
       builder.resetPath(route.filePath);
-      pass = await doBuild();
+      makeBuild(route.filePath);
     }
-    if (isDev && !pass) pass = await doBuild();
+
+    if (
+      !isDev &&
+      route &&
+      !globalThis.ssrElement.find((e) => e.path == route.filePath)
+    )
+      makeBuild(route.filePath);
 
     const session = await import("@bunpmjs/bunext/features/session");
     let response: Response | null = null;
-    if (pass)
-      response = await router.serve(
-        request,
-        __REQUEST_CONTEXT__.response as Response,
-        serverActionData,
-        {
-          Shell: Shell as any,
-          bootstrapModules: [
-            "/.bunext/react-ssr/hydrate.js",
-            "/bunext-scripts",
-          ],
-          preloadScript: {
-            __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
-            __PUBLIC_SESSION_DATA__: JSON.stringify(
-              session.__GET_PUBLIC_SESSION_DATA__() ?? {}
-            ),
-          },
-        }
-      );
-    else devConsole.error = "build error";
+    console;
+    response = await router.serve(
+      request,
+      __REQUEST_CONTEXT__.response as Response,
+      serverActionData,
+      {
+        Shell: Shell as any,
+        bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
+        preloadScript: {
+          __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
+          __PUBLIC_SESSION_DATA__: "undefined",
+        },
+      }
+    );
     logDevConsole();
     return response;
   } catch (e) {
@@ -158,14 +162,20 @@ function serveScript(request: Request) {
   });
 }
 
-function makeProductionBuildInit() {
-  globalThis.ssrElement = JSON.parse(
-    Bun.spawnSync({
-      cmd: ["bun", `${paths.bunextModulePath}/internal/build.ts`],
-      env: {
-        ...process.env,
-        NODE_ENV: "production",
-      },
-    }).stdout.toString()
-  );
+async function makeBuild(path?: string) {
+  const res = Bun.spawnSync({
+    cmd: ["bun", `${paths.bunextModulePath}/internal/buildv2.ts`],
+    env: {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV,
+      ssrElement: JSON.stringify(globalThis.ssrElement),
+      BuildPath: path || undefined,
+    },
+  });
+  if (res.exitCode != 0)
+    throw new Error(
+      `Build Error. Code: ${res.exitCode} - ${res.stderr.toString()}`
+    );
+  const strRes = res.stdout.toString();
+  globalThis.ssrElement = JSON.parse(strRes);
 }

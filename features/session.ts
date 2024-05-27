@@ -28,6 +28,7 @@ export function __GET_PUBLIC_SESSION_DATA__() {
 class _Session {
   private cookieName = "bunext_session_token";
   public __UPDATE__?: SessionUpdateClass;
+  private inited = false;
   /**
    * Server side only
    * @param data data to set in the token
@@ -72,10 +73,21 @@ class _Session {
    * Session.setData({data: "someData"}, true); // true for public access
    * // other file
    * "use client";
-   * Session.getData(); // {data: "someData"} | undefined
+   * await Session.getData(); // {data: "someData"} | undefined
    */
   getData(): undefined | Record<string, any> {
-    if (typeof window != "undefined") return globalThis.__PUBLIC_SESSION_DATA__;
+    if (typeof window != "undefined") {
+      if (!this.inited) {
+        const setter = async () => {
+          const res = await (await fetch("/bunextgetSessionData")).json();
+          globalThis.__PUBLIC_SESSION_DATA__ = res;
+          this.update();
+          this.inited = true;
+        };
+        setter();
+      }
+      return globalThis.__PUBLIC_SESSION_DATA__;
+    }
     return __USER_ACTION__.__SESSION_DATA__?.private;
   }
   /**

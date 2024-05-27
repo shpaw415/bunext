@@ -9,8 +9,8 @@ import { isUseClient } from "../bun-react-ssr";
 import { unlinkSync } from "node:fs";
 import "../internal/server_global";
 import { type JsxElement } from "typescript";
-import { BuildFix } from "../internal/buildFixes";
 import { renderToString } from "react-dom/server";
+import type { ssrElement } from "../internal/server_global";
 
 type _Builderoptions = {
   main: _Mainoptions;
@@ -78,24 +78,30 @@ export class Builder {
       ...options.bypass,
     };
   }
-  async build() {
+  async build(onlyPath?: string) {
     const { baseDir, hydrate, pageDir, sourcemap, buildDir, minify, plugins } =
       this.options;
     let entrypoints = [join(baseDir, hydrate)];
-    const absPageDir = join(baseDir, pageDir as string);
-    for await (const path of this.glob(absPageDir)) {
-      entrypoints.push(path);
+    if (!onlyPath) {
+      const absPageDir = join(baseDir, pageDir as string);
+      for await (const path of this.glob(absPageDir)) {
+        entrypoints.push(path);
+      }
+      entrypoints = entrypoints.filter((e) => {
+        const allowedEndsWith = [
+          "hydrate.ts",
+          "layout.tsx",
+          "index.tsx",
+          "[id].tsx",
+        ];
+        if (allowedEndsWith.includes(e.split("/").at(-1) as string))
+          return true;
+        return false;
+      });
+    } else {
+      entrypoints.push(onlyPath);
     }
-    entrypoints = entrypoints.filter((e) => {
-      const allowedEndsWith = [
-        "hydrate.ts",
-        "layout.tsx",
-        "index.tsx",
-        "[id].tsx",
-      ];
-      if (allowedEndsWith.includes(e.split("/").at(-1) as string)) return true;
-      return false;
-    });
+
     this.buildOutput = await this.CreateBuild({
       entrypoints: entrypoints,
       sourcemap,
@@ -221,20 +227,21 @@ export class Builder {
       await this.preBuild(path);
     }
   }
-  async preBuildAll() {
+  async preBuildAll(skip?: ssrElement[]) {
     const files = await Array.fromAsync(
       this.glob(
         normalize([this.options.baseDir, this.options.pageDir].join("/"))
       )
     );
     for await (const file of files) {
+      if (skip?.find((e) => e.path == file)) continue;
       await Builder.preBuild(file);
     }
   }
   resetPath(path: string) {
-    const index = globalThis.pages.findIndex((p) => p.path === path);
+    const index = globalThis.ssrElement.findIndex((p) => p.path === path);
     if (index == -1) return;
-    globalThis.pages.splice(index, 1);
+    globalThis.ssrElement.splice(index, 1);
   }
   private ServerActionToClient(func: Function, ModulePath: string): string {
     const path = ModulePath.split(this.options.pageDir as string).at(

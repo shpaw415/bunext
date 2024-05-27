@@ -47,6 +47,5 @@ if (import.meta.main) {
     await builder.preBuildAll();
     await builder.build();
     process.stdout.write(JSON.stringify(globalThis.ssrElement));
-  }
-  await builder.build();
+  } else await builder.build();
 }

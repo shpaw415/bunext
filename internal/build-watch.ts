@@ -14,11 +14,6 @@ export async function doBuild(production?: boolean) {
     stdout: "inherit",
     env: {
       ...process.env,
-      __PAGE__: JSON.stringify(
-        globalThis.pages.map((e) => {
-          return { page: "", path: e.path };
-        })
-      ),
       NODE_ENV: production ? "production" : "development",
       ssrElement: JSON.stringify(globalThis.ssrElement ?? []),
     },

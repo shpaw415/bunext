@@ -2,26 +2,19 @@ import type { ServerWebSocket } from "bun";
 import type { _Head } from "../componants/head";
 import type { afterBuildCallback } from "./buildFixes";
 
+export type ssrElement = {
+  path: string;
+  elements: Array<{
+    tag: string;
+    reactElement: string;
+    htmlElement: string;
+  }>;
+};
 declare global {
   var socketList: ServerWebSocket<unknown>[];
   var mode: "dev" | "prod";
   var dryRun: boolean;
-  var ssrElement: Array<{
-    path: string;
-    elements: Array<{
-      tag: string;
-      reactElement: string;
-      htmlElement: string;
-    }>;
-  }>;
-  var pages: {
-    page: string;
-    path: string;
-  }[];
-  var pages: Array<{
-    page: string;
-    path: string;
-  }>;
+  var ssrElement: ssrElement[];
   var serverActions: Array<{
     path: string;
     actions: Array<Function>;
