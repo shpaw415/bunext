@@ -82,8 +82,8 @@ class _Session {
           const res = await (await fetch("/bunextgetSessionData")).json();
           globalThis.__PUBLIC_SESSION_DATA__ = res;
           this.update();
-          this.inited = true;
         };
+        this.inited = true;
         setter();
       }
       return globalThis.__PUBLIC_SESSION_DATA__;
