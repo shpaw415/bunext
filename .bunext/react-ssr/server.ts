@@ -119,13 +119,6 @@ async function serve(request: Request) {
       makeBuild(route.filePath);
     }
 
-    if (
-      !isDev &&
-      route &&
-      !globalThis.ssrElement.find((e) => e.path == route.filePath)
-    )
-      makeBuild(route.filePath);
-
     const session = await import("@bunpmjs/bunext/features/session");
     let response: Response | null = null;
     console;
