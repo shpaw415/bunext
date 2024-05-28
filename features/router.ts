@@ -21,7 +21,7 @@ export async function revalidate(path: string) {
   if (index == -1) return;
   await findRouteOrThrow(path);
   globalThis.ssrElement.splice(index, 1);
-  await serverModule.makeBuild(path);
+  await serverModule.makeBuild();
 }
 /**
  *
