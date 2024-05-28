@@ -114,11 +114,6 @@ async function serve(request: Request) {
       }
     }
 
-    if (route && isDev && !request.url.includes(".js?")) {
-      builder.resetPath(route.filePath);
-      makeBuild(route.filePath);
-    }
-
     const session = await import("@bunpmjs/bunext/features/session");
     let response: Response | null = null;
     console;
