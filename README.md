@@ -77,53 +77,66 @@ Manage the session from your users by setting a session and optionaly make it ac
 ### Set Session data
 
 ```JavaScript XML
-import { Session, useSession } from  "@bunpmjs/bunext/features/session";
+import { Session, useSession } from "@bunpmjs/bunext/features/session";
 
 export default function Page() {
-	return <div>
-		<LoggedIndicator/>
-		<SetSession />
-	</div>
+  return (
+    <div>
+      <LoggedIndicator />
+      <SetSession />
+    </div>
+  );
 }
 
 function SetSession() {
-	const session = useSession({
-		PreventRenderOnUpdate: true,
-	});
-	return 	<button onClick={async () => {
-				await ServerSetSession({
-					username: "foo",
-					password: "bar"
-				});
-				session.update();
-				/*
+  const session = useSession({
+    PreventRenderOnUpdate: true,
+  });
+  return (
+    <button
+      onClick={async () => {
+        await ServerSetSession({
+          username: "foo",
+          password: "bar",
+        });
+        session.update();
+        /*
 					Will update every React Element using useSession
 					without PreventRenderOnUpdate
 				*/
-	}}>
-		Click to update Session
-	</button>
+      }}
+    >
+      Click to update Session
+    </button>
+  );
 }
 
 function LoggedIndicator() {
-	const session = useSession();
-	return <span>{session.getData()?.username || "not logged"}</span>
+  const session = useSession();
+  return <span>{session.getData()?.username || "not logged"}</span>;
 }
 
 export async function ServerSetSession({
-	username,
-	password
-}:{
-	usename: string,
-	password:string
+  username,
+  password,
+}: {
+  usename: string;
+  password: string;
 }) {
-	Session.setData({
-		username: username
-	}, true); // accessed from Client & Server Side
-	Session.setData({
-		password: password
-	}, false); // Only accessed from Server Side
+  Session.setData(
+    {
+      username: username,
+    },
+    true
+  ); // accessed from Client & Server Side
+  Session.setData(
+    {
+      password: password,
+    },
+    false
+  ); // Only accessed from Server Side
 }
+
 ```
 
 ### Get Session data
@@ -182,43 +195,47 @@ Key informations:
 ```Javascript XML
 // index.tsx
 export default function FormPage() {
-	return (
-		<form onSubmit={async (e) => {
-			e.preventDefault();
-			const form = new FormData(e.currentTarget);
-			const res = await ServerUploadFile(
-				{
-					username:  form.get("username") as string,
-					password:  form.get("password") as string,
-				},
-				form.get("file") as File
-			);
-			alert(JSON.stringify(res));
-}}>
-			<input type="file" name="file"/>
-			<input type="text" placeholder="username" name="username"/>
-			<input type="text" placeholder="password" name="password"/>
-			<button type="submit">Send</button>
-		</form>
-	);
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const form = new FormData(e.currentTarget);
+        const res = await ServerUploadFile(
+          {
+            username: form.get("username") as string,
+            password: form.get("password") as string,
+          },
+          form.get("file") as File
+        );
+        alert(JSON.stringify(res));
+      }}
+    >
+      <input type="file" name="file" />
+      <input type="text" placeholder="username" name="username" />
+      <input type="text" placeholder="password" name="password" />
+      <button type="submit">Send</button>
+    </form>
+  );
 }
 
-export async function ServerUploadFile({
-		username,
-		password
-	}:{
-		username:string,
-		password:string
-	},
-	file: File
+export async function ServerUploadFile(
+  {
+    username,
+    password,
+  }: {
+    username: string;
+    password: string;
+  },
+  file: File
 ) {
-	// do stuff
-	await Bun.write("path/" + file.name, file);
-	return {
-		success: true,
-		message: "file saved successfuly"
-	};
+  // do stuff
+  await Bun.write("path/" + file.name, file);
+  return {
+    success: true,
+    message: "file saved successfuly",
+  };
 }
+
 ```
 
 ### Server Componants
@@ -235,35 +252,37 @@ Will run only once at build time and when revalidate is ran.
 // index.tsx
 
 export default function Page() {
-	return (
-		<div>
-			<Componants />
-			<NotValid />
-		</div>
-	);
+  return (
+    <div>
+      <Componants />
+      <NotValid />
+    </div>
+  );
 }
 // valid Server Componant
 export function Componants() {
-	const res = (await fetch("https://some-api.com/api")).json();
-	return <div>{JSON.stringify(res)}</div>
+  const res = (await fetch("https://some-api.com/api")).json();
+  return <div>{JSON.stringify(res)}</div>;
 }
 
 // not valid Server Componant
-export function NotValid({someProps}:{someProps: string}) {
-	return <div></div>
+export function NotValid({ someProps }: { someProps: string }) {
+  return <div></div>;
 }
+
 ```
 
 ### Revalidate a Server Componant
 
 ```Javascript XML
 // index.tsx
-import { revalidateEvery } from  "@bunpmjs/bunext/features/router";
+import { revalidateEvery } from "@bunpmjs/bunext/features/router";
 export default function Page() {
-	revalidateEvery("/", 3600);
-	// will revalidate the page at every 3600 second
-	return <div></div>;
+  revalidateEvery("/", 3600);
+  // will revalidate the page at every 3600 second
+  return <div></div>;
 }
+
 ```
 
 ## Database
@@ -335,34 +354,40 @@ Database is only allowed in Server Side
 
 ```Javascript XML
 // index.tsx
-import { Database } from  "@bunpmjs/bunext/database";
+import { Database } from "@bunpmjs/bunext/database";
 
 //in a Server Componant
 export async function ReactElement() {
-	const db = await Database();
+  const db = await Database();
 
-	return (
-		<div>{db.tableName.select({
-			select: {
-				column1: true,
-				column2: true
-			},
-			where: {
-				OR: [
-					{
-						column1: "foo",
-						column2: "bar"
-					},
-					{
-						column1: "fizz",
-						column2: "buzz"
-					}
-				]
-			}
-			}).map((row) => { /*...doStuff*/ })
-		}</div>
-	);
+  return (
+    <div>
+      {db.tableName
+        .select({
+          select: {
+            column1: true,
+            column2: true,
+          },
+          where: {
+            OR: [
+              {
+                column1: "foo",
+                column2: "bar",
+              },
+              {
+                column1: "fizz",
+                column2: "buzz",
+              },
+            ],
+          },
+        })
+        .map((row) => {
+          /*...doStuff*/
+        })}
+    </div>
+  );
 }
+
 ```
 
 ## Router
@@ -373,8 +398,9 @@ this method is temporary a new version will be avalable in a new release
 
 ```Javascript XML
 // index.tsx
-import { navigate } from  "@bunpmjs/bunext/bun-react-ssr/router"
+import { navigate } from "@bunpmjs/bunext/bun-react-ssr/router";
 function NextPage() {
-	return <button onClick={() => navigate("/new/location")}>Next page</button>
+  return <button onClick={() => navigate("/new/location")}>Next page</button>;
 }
+
 ```
