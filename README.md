@@ -1,6 +1,10 @@
-# Compatibility
+﻿# Compatibility
+
+  
 
 compatible: bun 1.1.10 & under
+
+  
 
 N.B : Bun is in continuous changement and compatibility between version is a
 
@@ -8,9 +12,13 @@ huge problem for Bunext there is possible crash over some new version i will
 
 keep up to date the framework for what it needs
 
+  
+
 # bunext
 
 - Nextjs Framwork compatible with Bun Runtime
+
+- Facing problemes? [Open an issue ](https://github.com/shpaw415/bunext/issues)
 
 ## What is ready
 
@@ -47,9 +55,13 @@ keep up to date the framework for what it needs
 - Documentation
 
 - SQlite performance & features
-- .ts extention for serverAction ( only .tsx is allowed for now )
+-  .ts extention for serverAction ( only .tsx is allowed for now )
+- FormData support for Server Action
+  
 
 ### To install and run
+
+  
 
 ```Bash
 #!/bin/env bash
@@ -60,22 +72,23 @@ bun run dev
 
 ## Documentation
 
-## Session
+  
 
+## Session
 Manage the session from your users by setting a session and optionaly make it accessible from the client side ( default to only Server Side ).
 
 - SetData only from the Server Side is allowed.
-- Delete Session data can be Client or Server Side
+- Delete Session data can be Client or Server Side 
 - GetData can be Client or Server Side ( but Client only have access to what is made public )
 
 - **useSession**
-  - will automaticaly update the element when the session is updated
+	- will automaticaly update the element when the session is updated
 
 ### Set Session data
 
 ```TypeScript XML
 import { Session, useSession } from  "@bunpmjs/bunext/features/session";
-
+	
 export default function Page() {
 	return <div>
 		<LoggedIndicator/>
@@ -89,10 +102,10 @@ function SetSession() {
 	});
 	return 	<button onClick={async () => {
 				await ServerSetSession({
-					username: "foo",
+					username: "foo", 
 					password: "bar"
 				});
-				session.update();
+				session.update(); 
 				/*
 					Will update every React Element using useSession
 					without PreventRenderOnUpdate
@@ -108,10 +121,10 @@ function LoggedIndicator() {
 }
 
 export async function ServerSetSession({
-	username,
+	username, 
 	password
 }:{
-	usename: string,
+	usename: string, 
 	password:string
 }) {
 	Session.setData({
@@ -148,17 +161,13 @@ export default function Page() {
 	return <div>
 		<ReactElement />
 	</div>
-
+  
 
 }
 // using a JS event from a React Element
 function ReactElement() {
 	const session = useSession();
-	return (
-		<button onClick={() => session.delete()}>
-			Click to delete the session
-		</button>
-	);
+	return <button onClick={() => session.delete()}>Click to delete the session</button>
 }
 
 // using a serverAction
@@ -170,7 +179,7 @@ export async function ServerDeleteSesion() {
 
 ## Server Action
 
-Like Next offer a ServerAction method Bunext does it as well.
+Like Next offer a ServerAction method Bunext does it as well. 
 Key informations:
 
 - As long there is no **"use client"** on top of the file the serverAction will be Server Side
@@ -187,14 +196,14 @@ export default function FormPage() {
 		<form onSubmit={async (e) => {
 			e.preventDefault();
 			const form = new FormData(e.currentTarget);
-			await ServerUploadFile(
+			const res = await ServerUploadFile(
 				{
 					username:  form.get("username") as string,
 					password:  form.get("password") as string,
-				},
+				}, 
 				form.get("file") as File
 			);
-
+			alert(JSON.stringify(res));
 }}>
 			<input type="file" name="file"/>
 			<input type="text" placeholder="username" name="username"/>
@@ -205,15 +214,20 @@ export default function FormPage() {
 }
 
 export async function ServerUploadFile({
-		username,
+		username, 
 		password
 	}:{
 		username:string,
 		password:string
-	},
+	}, 
 	file: File
 ) {
 	// do stuff
+	await Bun.write("path/" + file.name, file);
+	return {
+		success: true,
+		message: "file saved successfuly"
+	};
 }
 ```
 
@@ -226,7 +240,6 @@ Will run only once at build time and when revalidate is ran.
 - Must be empty props.
 - **Must be exported** and can be async as well.
 - revalidate will invalidate every componants that are in the page.
-
 ```TypeScript XML
 // index.tsx
 
@@ -247,5 +260,126 @@ export function Componants() {
 // not valid Server Componant
 export function NotValid({someProps}:{someProps: string}) {
 	return <div></div>
+}
+```
+
+### Revalidate a Server Componant
+
+```TypeScript XML
+// index.tsx
+import { revalidateEvery } from  "@bunpmjs/bunext/features/router";
+export default function Page() {
+	revalidateEvery("/", 3600); 
+	// will revalidate the page at every 3600 second
+	return <div></div>;
+}
+```
+
+## Database
+
+### Configure the database
+
+In **/config/database.ts** is for the database Shema.
+
+this is pretty much a basic structure that will make type safe your database call.
+
+Exemple: 
+```TypeScript
+const  MyDatabaseShema: DBSchema = [
+	{
+		name:  "Users",
+		columns: [
+			{
+				name:  "id",
+				type:  "number",
+				unique:  true,
+				autoIncrement:  true,
+				primary:  true,
+			},
+			{
+				name:  "username",
+				unique:  true,
+				type:  "string",
+			},
+			{
+				name:  "test",
+				type:  "boolean",
+			},
+			{
+				name:  "foo",
+				type:  "json",
+				DataType: [
+					{
+						foo:  "string",
+						bar: ["number"],
+					},
+				],
+			},
+		],
+	},
+];
+
+export default MyDatabaseShema;
+
+```
+
+#### Create the database and Type
+run this script
+```bash
+#!/bin/bash
+bun run databaseCreate
+```
+
+### Query the Database
+
+Database is only allowed in Server Side
+
+- select => Array of rows containing what you selected ( default to everything )
+- delete => void
+- insert => void
+- update => void
+
+```TypeScript XML
+// index.tsx
+import { Database } from  "@bunpmjs/bunext/database";
+
+//in a Server Componant
+export async function ReactElement() {
+	const db = await Database();
+
+	return (
+		<div>{db.tableName.select({
+			select: {
+				column1: true,
+				column2: true
+			},
+			where: {
+				OR: [
+					{
+						column1: "foo", 
+						column2: "bar"
+					},
+					{
+						column1: "fizz",
+						column2: "buzz"
+					}
+				]
+			}
+			}).map((row) => { /*...doStuff*/ })
+		}</div>
+	);
+}
+```
+
+## Router
+
+### Navigate
+this method is temporary a new version will be avalable in a new release
+
+```TypeScript XML
+// index.tsx
+import { navigate } from  "@bunpmjs/bunext/bun-react-ssr/router"
+function NextPage() {
+	return <button onClick={() => navigate("/new/location")}>Next page</button>
 }
 ```
