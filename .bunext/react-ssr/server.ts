@@ -187,8 +187,6 @@ export async function makeBuild(path?: string) {
     "<!BUNEXT!>"
   )[1];
 
-  console.log(decoded);
-
   const strRes = JSON.parse(decoded) as {
     ssrElement: ssrElement[];
     revalidates: Array<{
