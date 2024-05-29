@@ -10,9 +10,11 @@ try {
   BuildPath
     ? await Builder.preBuild(BuildPath)
     : await builder.preBuildAll(ssrElements);
-  await builder.build(BuildPath);
+  const output = await builder.build(BuildPath);
+  if (!output.success) console.log(output);
 } catch (e: any) {
-  process.stderr.write((e as Error).message);
+  console.log("Build Error");
+  console.log(e);
   process.exitCode = exitCodes.build;
   process.exit(exitCodes.build);
 }

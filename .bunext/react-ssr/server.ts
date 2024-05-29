@@ -21,50 +21,44 @@ globalThis.devConsole.error = undefined;
 await init();
 
 function RunServer() {
-  try {
-    const server = Bun.serve({
-      port: 3000,
-      async fetch(request) {
-        console.clear();
-        const _MiddleWaremodule = await import(
-          "@bunpmjs/bunext/internal/middleware"
-        );
+  const server = Bun.serve({
+    port: 3000,
+    async fetch(request) {
+      //console.clear();
+      const _MiddleWaremodule = await import(
+        "@bunpmjs/bunext/internal/middleware"
+      );
 
-        request.headers.toJSON();
-        _MiddleWaremodule.setMiddleWare(request);
-        if (request.url.endsWith("/bunextgetSessionData")) {
-          return new Response(
-            JSON.stringify(_MiddleWaremodule.Session.getData()?.public)
-          );
+      request.headers.toJSON();
+      _MiddleWaremodule.setMiddleWare(request);
+      if (request.url.endsWith("/bunextgetSessionData")) {
+        return new Response(
+          JSON.stringify(_MiddleWaremodule.Session.getData()?.public)
+        );
+      }
+      try {
+        const response =
+          (await serve(request)) ||
+          (await serveStatic(request)) ||
+          serveScript(request);
+        if (response) return _MiddleWaremodule.Session.setToken(response);
+      } catch (e) {
+        if ((e as Error).name == "TypeError") {
+          console.log(e);
         }
-        try {
-          const response =
-            (await serve(request)) ||
-            (await serveStatic(request)) ||
-            serveScript(request);
-          if (response) return _MiddleWaremodule.Session.setToken(response);
-        } catch (e) {
-          if ((e as Error).name == "TypeError") {
-            console.log("Runtime error... Reloading!");
-            process.exit(exitCodes.runtime);
-          }
-          //console.log(e);
-        }
-        globalThis.dryRun = false;
-        return new Response("Not found", {
-          status: 404,
-        });
-      },
-    });
-    globalThis.devConsole.servePort = server.port;
-  } catch (e) {
-    //console.log(e);
-    process.exit(0);
-  }
+      }
+      globalThis.dryRun = false;
+      return new Response("Not found", {
+        status: 404,
+      });
+    },
+  });
+  globalThis.devConsole.servePort = server.port;
 }
 async function init() {
   if (globalThis.dryRun) {
     RunServer();
+    logDevConsole();
   }
   if (process.env.NODE_ENV == "development" && globalThis.dryRun) {
     serveHotServer();
@@ -74,7 +68,7 @@ async function init() {
   }
 
   resetRouter();
-  logDevConsole();
+
   globalThis.dryRun = false;
 }
 
@@ -99,7 +93,7 @@ async function serve(request: Request) {
   try {
     const isDev = process.env.NODE_ENV == "development";
 
-    if (request.url.includes(".js?") && isDev) {
+    if (request.url.includes("index.js?") && isDev) {
       const url = new URL(request.url);
       const pathname = url.pathname
         .split("/")
@@ -130,7 +124,6 @@ async function serve(request: Request) {
         },
       }
     );
-    logDevConsole();
     return response;
   } catch (e) {
     const res = async (error: Error) =>
@@ -139,8 +132,9 @@ async function serve(request: Request) {
           "Content-Type": "text/html",
         },
       });
-    if ((e as Error).name == "TypeError") process.exit(exitCodes.runtime);
-    logDevConsole();
+    if ((e as Error).name == "TypeError") {
+      console.log(e);
+    }
     return res(e as Error);
   }
 }

@@ -24,7 +24,7 @@ export function resetRouter() {
     console.log("cannot set static router");
     mkdirSync(".bunext/build/src/pages", { recursive: true });
     Bun.sleepSync(1000);
-    return resetRouter();
+    resetRouter();
   }
 }
 await router?.InitServerActions();
