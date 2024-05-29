@@ -100,10 +100,10 @@ function SetSession() {
           password: "bar",
         });
         session.update();
-        /*
-					Will update every React Element using useSession
-					without PreventRenderOnUpdate
-				*/
+    /*
+			Will update every React Element using useSession
+			without PreventRenderOnUpdate
+		*/
       }}
     >
       Click to update Session
