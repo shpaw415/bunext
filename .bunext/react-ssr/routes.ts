@@ -20,10 +20,13 @@ export function resetRouter() {
       }
     );
     router = route;
+    return true;
   } catch {
     console.log("cannot set static router");
-    mkdirSync(".bunext/build", { recursive: true });
+    mkdirSync(".bunext/build/src/pages", { recursive: true });
+    return false;
   }
 }
-resetRouter();
+if (!resetRouter()) resetRouter();
+
 await router?.InitServerActions();
