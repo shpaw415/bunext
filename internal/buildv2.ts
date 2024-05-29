@@ -16,6 +16,7 @@ try {
   process.exitCode = exitCodes.build;
   process.exit(exitCodes.build);
 }
+
 process.stdout.write(
   "<!BUNEXT!>" +
     JSON.stringify({

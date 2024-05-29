@@ -25,7 +25,7 @@ function RunServer() {
     const server = Bun.serve({
       port: 3000,
       async fetch(request) {
-        //console.clear();
+        console.clear();
         const _MiddleWaremodule = await import(
           "@bunpmjs/bunext/internal/middleware"
         );
@@ -186,6 +186,8 @@ export async function makeBuild(path?: string) {
   const decoded = (await new Response(res.stdout).text()).split(
     "<!BUNEXT!>"
   )[1];
+
+  console.log(decoded);
 
   const strRes = JSON.parse(decoded) as {
     ssrElement: ssrElement[];
