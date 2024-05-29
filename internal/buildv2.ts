@@ -11,7 +11,9 @@ try {
     ? await Builder.preBuild(BuildPath)
     : await builder.preBuildAll(ssrElements);
   await builder.build(BuildPath);
-} catch {
+} catch (e: any) {
+  process.stderr.write((e as Error).message);
+  process.exitCode = exitCodes.build;
   process.exit(exitCodes.build);
 }
 process.stdout.write(
