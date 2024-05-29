@@ -114,6 +114,11 @@ async function serve(request: Request) {
       }
     }
 
+    if (route && isDev && !request.url.includes(".js?")) {
+      builder.resetPath(route.filePath);
+      makeBuild(route.filePath);
+    }
+
     const session = await import("@bunpmjs/bunext/features/session");
     let response: Response | null = null;
     console;
@@ -178,11 +183,11 @@ export async function makeBuild(path?: string) {
       BuildPath: path || undefined,
     },
   });
-  if (res.exitCode != 0)
-    throw new Error(
-      `Build Error. Code: ${res.exitCode} - ${res.stderr.toString()}`
-    );
-  const strRes = JSON.parse(res.stdout.toString()) as {
+  let decoded = await new Response(res.stdout).text();
+  if (decoded.startsWith("undefined"))
+    decoded = decoded.replace("undefined", "");
+
+  const strRes = JSON.parse(decoded) as {
     ssrElement: ssrElement[];
     revalidates: Array<{
       path: string;
