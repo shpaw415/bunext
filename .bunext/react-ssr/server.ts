@@ -183,9 +183,9 @@ export async function makeBuild(path?: string) {
       BuildPath: path || undefined,
     },
   });
-  let decoded = await new Response(res.stdout).text();
-  if (decoded.startsWith("undefined"))
-    decoded = decoded.replace("undefined", "");
+  const decoded = (await new Response(res.stdout).text()).split(
+    "<!BUNEXT!>"
+  )[1];
 
   const strRes = JSON.parse(decoded) as {
     ssrElement: ssrElement[];
