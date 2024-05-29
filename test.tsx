@@ -1,4 +1,33 @@
-import { navigate } from "@bunpmjs/bunext/bun-react-ssr/router";
-function NextPage() {
-  return <button onClick={() => navigate("/new/location")}>Next page</button>;
-}
+const MyDatabaseShema: DBSchema = [
+  {
+    name: "Users",
+    columns: [
+      {
+        name: "id",
+        type: "number",
+        unique: true,
+        autoIncrement: true,
+        primary: true,
+      },
+      {
+        name: "username",
+        unique: true,
+        type: "string",
+      },
+      {
+        name: "test",
+        type: "boolean",
+      },
+      {
+        name: "foo",
+        type: "json",
+        DataType: [
+          {
+            foo: "string",
+            bar: ["number"],
+          },
+        ],
+      },
+    ],
+  },
+];
