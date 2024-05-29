@@ -97,7 +97,6 @@ async function serve(request: Request) {
   }
 
   try {
-    const route = router.server.match(request);
     const isDev = process.env.NODE_ENV == "development";
 
     if (request.url.includes(".js?") && isDev) {
@@ -112,11 +111,6 @@ async function serve(request: Request) {
         builder.resetPath(devRoute.filePath);
         makeBuild(devRoute.filePath);
       }
-    }
-
-    if (route && isDev && !request.url.includes(".js?")) {
-      builder.resetPath(route.filePath);
-      makeBuild(route.filePath);
     }
 
     const session = await import("@bunpmjs/bunext/features/session");
