@@ -15,7 +15,7 @@ const findRouteOrThrow = async (path: string) => {
 
 export async function revalidate(path: string) {
   if (!isServer) publicThrow();
-  const serverModule = await import("../internal/build");
+  const serverModule = await import("../internal/makeBuild");
   const index = globalThis.ssrElement.findIndex((p) => p.path === path);
   if (index == -1) return;
   await findRouteOrThrow(path);
