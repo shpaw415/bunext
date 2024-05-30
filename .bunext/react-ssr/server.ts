@@ -1,4 +1,4 @@
-import { builder } from "@bunpmjs/bunext/internal/build";
+import { builder, makeBuild } from "@bunpmjs/bunext/internal/build";
 import { router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
@@ -10,7 +10,6 @@ import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
-import type { ssrElement } from "@bunpmjs/bunext/internal/server_global";
 import { revalidate } from "@bunpmjs/bunext/features/router";
 
 const arg = process.argv[3] as undefined | "showError";
@@ -161,36 +160,6 @@ function serveScript(request: Request) {
       "Content-Type": "text/javascript;charset=utf-8",
     },
   });
-}
-
-export async function makeBuild(path?: string) {
-  const res = Bun.spawnSync({
-    cmd: ["bun", `${paths.bunextModulePath}/internal/buildv2.ts`],
-    env: {
-      ...process.env,
-      NODE_ENV: process.env.NODE_ENV,
-      ssrElement: JSON.stringify(globalThis.ssrElement || []),
-      BuildPath: path || undefined,
-    },
-  });
-  const decoded = (await new Response(res.stdout).text()).split("<!BUNEXT!>");
-  console.log(decoded[0]);
-  try {
-    const strRes = JSON.parse(decoded[1]) as {
-      ssrElement: ssrElement[];
-      revalidates: Array<{
-        path: string;
-        time: number;
-      }>;
-    };
-    globalThis.ssrElement = strRes.ssrElement;
-    return {
-      revalidates: strRes.revalidates,
-      error: false,
-    };
-  } catch {
-    throw new Error(decoded[0]);
-  }
 }
 
 function setRevalidate(
