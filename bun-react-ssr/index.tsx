@@ -13,8 +13,8 @@ import React from "react";
 import "../internal/server_global";
 import { __GET_PUBLIC_SESSION_DATA__ } from "../features/session";
 export class StaticRouters {
-  server: FileSystemRouter;
-  client: FileSystemRouter;
+  server?: FileSystemRouter;
+  client?: FileSystemRouter;
   #routes_dump: string;
 
   baseDir = process.cwd();
@@ -109,9 +109,9 @@ export class StaticRouters {
         },
       });
     }
-    const serverSide = this.server.match(request);
+    const serverSide = this.server?.match(request);
     if (!serverSide) return null;
-    const clientSide = this.client.match(request);
+    const clientSide = this.client?.match(request);
     if (!clientSide)
       throw new TypeError(
         "No client-side script found for server-side component: " +
