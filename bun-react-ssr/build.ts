@@ -1,4 +1,3 @@
-import { Glob, fileURLToPath, pathToFileURL } from "bun";
 import { join, basename } from "node:path";
 import type { BuildOutput, BunPlugin } from "bun";
 import { normalize } from "path";
@@ -101,7 +100,6 @@ export class Builder {
     } else {
       entrypoints.push(onlyPath);
     }
-
     this.buildOutput = await this.CreateBuild({
       entrypoints: entrypoints,
       sourcemap,
@@ -114,7 +112,10 @@ export class Builder {
       "**/*.js"
     )) {
       if (this.buildOutput.outputs.find((e) => e.path == file)) continue;
-      else unlinkSync(file);
+      else
+        try {
+          unlinkSync(file);
+        } catch {}
     }
     await this.afterBuild();
 
@@ -140,7 +141,7 @@ export class Builder {
       try {
         element = await exported();
       } catch (e) {
-        console.log(e);
+        //console.log(e);
       }
       if (!isValidElement(element)) continue;
       const findModule = (e: any) => e.path == modulePath;
@@ -396,8 +397,8 @@ export class Builder {
         build.onResolve(
           { filter: /\.ts[x]\?client$/ },
           async ({ importer, path }) => {
-            const url = pathToFileURL(importer);
-            const filePath = fileURLToPath(new URL(path, url));
+            const url = Bun.pathToFileURL(importer);
+            const filePath = Bun.fileURLToPath(new URL(path, url));
             return {
               path: filePath,
               namespace: "client",
@@ -577,7 +578,7 @@ export class Builder {
     path: string,
     pattern = "**/*.{ts,tsx,js,jsx}"
   ): AsyncIterableIterator<string> {
-    const glob = new Glob(pattern);
+    const glob = new Bun.Glob(pattern);
     return glob.scan({ cwd: path, onlyFiles: true, absolute: true });
   }
   private escapeRegExp(string: string) {

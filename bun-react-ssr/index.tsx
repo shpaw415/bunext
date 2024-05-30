@@ -1,4 +1,4 @@
-import { FileSystemRouter, type MatchedRoute, Glob } from "bun";
+import type { FileSystemRouter, MatchedRoute } from "bun";
 import { readFileSync } from "fs";
 import { NJSON } from "next-json";
 import { join, relative } from "node:path";
@@ -13,37 +13,59 @@ import React from "react";
 import "../internal/server_global";
 import { __GET_PUBLIC_SESSION_DATA__ } from "../features/session";
 export class StaticRouters {
-  readonly server: FileSystemRouter;
-  readonly client: FileSystemRouter;
-  readonly #routes_dump: string;
+  server: FileSystemRouter;
+  client: FileSystemRouter;
+  #routes_dump: string;
 
-  constructor(
-    public baseDir: string,
-    public buildDir = ".build",
-    public pageDir = "pages",
-    public options: {
-      displayMode: _DisplayMode;
-      ssrMode: _SsrMode;
-    } = {
-      displayMode: {
-        none: "none",
+  baseDir = process.cwd();
+  buildDir = ".bunext/build";
+  pageDir = "src/pages";
+  options = {
+    displayMode: {
+      nextjs: {
+        layout: "layout.tsx",
       },
-      ssrMode: "none",
-    }
-  ) {
-    this.server = new FileSystemRouter({
-      dir: join(baseDir, pageDir),
+      ssrMode: "nextjs",
+    },
+  };
+
+  constructor() {
+    this.server = new Bun.FileSystemRouter({
+      dir: join(this.baseDir, this.pageDir),
       style: "nextjs",
     });
-    this.client = new FileSystemRouter({
-      dir: join(baseDir, buildDir, pageDir),
+    this.client = new Bun.FileSystemRouter({
+      dir: join(this.baseDir, this.buildDir, this.pageDir),
       style: "nextjs",
     });
     this.#routes_dump = NJSON.stringify(
       Object.fromEntries(
         Object.entries(this.client.routes).map(([path, filePath]) => [
           path,
-          "/" + relative(join(baseDir, buildDir), filePath),
+          "/" + relative(join(this.baseDir, this.buildDir), filePath),
+        ])
+      ),
+      { omitStack: true }
+    );
+  }
+
+  reset() {
+    this.setRoutes();
+  }
+  private setRoutes() {
+    this.server = new Bun.FileSystemRouter({
+      dir: join(this.baseDir, this.pageDir),
+      style: "nextjs",
+    });
+    this.client = new Bun.FileSystemRouter({
+      dir: join(this.baseDir, this.buildDir, this.pageDir),
+      style: "nextjs",
+    });
+    this.#routes_dump = NJSON.stringify(
+      Object.fromEntries(
+        Object.entries(this.client.routes).map(([path, filePath]) => [
+          path,
+          "/" + relative(join(this.baseDir, this.buildDir), filePath),
         ])
       ),
       { omitStack: true }
@@ -298,7 +320,7 @@ export class StaticRouters {
     return currentJsx;
   }
   public getFilesFromPageDir() {
-    const glob = new Glob("**/*.{ts,tsx,js,jsx}");
+    const glob = new Bun.Glob("**/*.{ts,tsx,js,jsx}");
     return Array.from(
       glob.scanSync({
         cwd: this.pageDir,
@@ -307,7 +329,7 @@ export class StaticRouters {
     );
   }
   static getFileFromPageDir(pageDir?: string) {
-    const glob = new Glob("**/*.{ts,tsx,js,jsx}");
+    const glob = new Bun.Glob("**/*.{ts,tsx,js,jsx}");
     return Array.from(
       glob.scanSync({
         cwd: pageDir,

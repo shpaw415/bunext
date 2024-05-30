@@ -1,5 +1,5 @@
 import { builder } from "@bunpmjs/bunext/internal/build";
-import { resetRouter, router } from "./routes";
+import { router } from "./routes";
 import { Shell } from "./shell";
 import "./global";
 import { exitCodes, names, paths } from "@bunpmjs/bunext/internal/globals";
@@ -67,8 +67,6 @@ async function init() {
     setRevalidate((await makeBuild()).revalidates);
   }
 
-  resetRouter();
-
   globalThis.dryRun = false;
 }
 
@@ -92,6 +90,7 @@ async function serve(request: Request) {
 
   try {
     const isDev = process.env.NODE_ENV == "development";
+    if (!router) throw new Error("reset router failed");
     const filepath = router.server.match(request)?.filePath;
     if (request.url.includes("index.js?") && isDev) {
       const url = new URL(request.url);
@@ -109,6 +108,8 @@ async function serve(request: Request) {
       builder.resetPath(filepath);
       makeBuild(filepath);
     }
+
+    if (isDev) router.reset();
 
     const session = await import("@bunpmjs/bunext/features/session");
     let response: Response | null = null;
