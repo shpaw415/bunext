@@ -70,6 +70,7 @@ export class StaticRouters {
 
   async serve<T = void>(
     request: Request,
+    request_header: Record<string, string>,
     response: Response,
     data: FormData,
     {
@@ -90,7 +91,12 @@ export class StaticRouters {
     }
   ): Promise<Response | null> {
     const { pathname, search } = new URL(request.url);
-    const serverAction = await this.serverActionGetter(request, response, data);
+    const serverAction = await this.serverActionGetter(
+      request,
+      request_header,
+      response,
+      data
+    );
     if (serverAction) return serverAction;
 
     const staticResponse = await serveFromDir({
@@ -122,7 +128,10 @@ export class StaticRouters {
       context,
     });
     const stringified = NJSON.stringify(result, { omitStack: true });
-    if (request.headers.get("Accept") === "application/vnd.server-side-props") {
+    if (
+      typeof request_header.accept != "undefined" &&
+      request_header.accept == "application/vnd.server-side-props"
+    ) {
       return new Response(stringified, {
         headers: {
           ...response.headers,
@@ -238,12 +247,13 @@ export class StaticRouters {
 
   private async serverActionGetter(
     request: Request,
+    request_header: Record<string, string>,
     response: Response,
     data: FormData
   ): Promise<Response | null> {
     const { pathname } = new URL(request.url);
     if (pathname !== "/ServerActionGetter") return null;
-    const reqData = this.extractServerActionHeader(request);
+    const reqData = this.extractServerActionHeader(request_header);
 
     if (!reqData) return null;
     const props = this.extractPostData(data);
@@ -263,8 +273,9 @@ export class StaticRouters {
       headers: response.headers,
     });
   }
-  private extractServerActionHeader(request: Request) {
-    const serverActionData = request.headers.get("serveractionid")?.split(":");
+  private extractServerActionHeader(header: Record<string, string>) {
+    if (!header.serveractionid) return null;
+    const serverActionData = header.serveractionid.split(":");
 
     if (!serverActionData) return null;
     return {

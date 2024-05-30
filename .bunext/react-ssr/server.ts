@@ -102,17 +102,18 @@ async function serve(request: Request) {
       const devRoute = router.server?.match(pathname);
       if (devRoute) {
         builder.resetPath(devRoute.filePath);
-        makeBuild();
+        await makeBuild();
       }
     } else if (isDev && filepath) {
       builder.resetPath(filepath);
-      makeBuild();
+      await makeBuild();
     }
 
     const session = await import("@bunpmjs/bunext/features/session");
     let response: Response | null = null;
     response = await router.serve(
       request,
+      request.headers.toJSON(),
       __REQUEST_CONTEXT__.response as Response,
       serverActionData,
       {
@@ -185,11 +186,10 @@ export async function makeBuild(path?: string) {
     globalThis.ssrElement = strRes.ssrElement;
     return {
       revalidates: strRes.revalidates,
+      error: false,
     };
   } catch {
-    return {
-      revalidates: [],
-    };
+    throw new Error(decoded[0]);
   }
 }
 

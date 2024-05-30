@@ -6,10 +6,6 @@ declare global {
 }
 globalThis.__BUNEXT_DEV_INIT ??= true;
 
-export function setDevEnvironement() {
-  globalThis.mode = "dev";
-}
-
 export function Dev() {
   if (typeof window === "undefined" || !globalThis.__BUNEXT_DEV_INIT)
     return <></>;
@@ -19,7 +15,14 @@ export function Dev() {
   const ws = new WebSocket(
     `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${3001}`
   );
-  ws.addEventListener("message", (ev) => ev.data == "reload" && reload());
+  ws.addEventListener("message", (ev) => {
+    if (ev.data != "reload") return;
+    try {
+      reload();
+    } catch {
+      window.location.reload();
+    }
+  });
   ws.addEventListener("close", () => window.location.reload());
   globalThis.webSocket = ws;
   return <></>;
