@@ -48,10 +48,6 @@ export class StaticRouters {
       { omitStack: true }
     );
   }
-
-  reset() {
-    this.setRoutes();
-  }
   private setRoutes() {
     this.server = new Bun.FileSystemRouter({
       dir: join(this.baseDir, this.pageDir),

@@ -174,17 +174,23 @@ export async function makeBuild(path?: string) {
   });
   const decoded = (await new Response(res.stdout).text()).split("<!BUNEXT!>");
   console.log(decoded[0]);
-  const strRes = JSON.parse(decoded[1]) as {
-    ssrElement: ssrElement[];
-    revalidates: Array<{
-      path: string;
-      time: number;
-    }>;
-  };
-  globalThis.ssrElement = strRes.ssrElement;
-  return {
-    revalidates: strRes.revalidates,
-  };
+  try {
+    const strRes = JSON.parse(decoded[1]) as {
+      ssrElement: ssrElement[];
+      revalidates: Array<{
+        path: string;
+        time: number;
+      }>;
+    };
+    globalThis.ssrElement = strRes.ssrElement;
+    return {
+      revalidates: strRes.revalidates,
+    };
+  } catch {
+    return {
+      revalidates: [],
+    };
+  }
 }
 
 function setRevalidate(
