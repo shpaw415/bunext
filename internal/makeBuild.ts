@@ -9,6 +9,7 @@ export async function makeBuild(path?: string) {
       NODE_ENV: process.env.NODE_ENV,
       ssrElement: JSON.stringify(globalThis.ssrElement || []),
       BuildPath: path || undefined,
+      __BUILD_MODE__: "true",
     },
   });
   const decoded = (await new Response(res.stdout).text()).split("<!BUNEXT!>");
