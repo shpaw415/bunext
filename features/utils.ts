@@ -51,3 +51,18 @@ export function normalize(path: string) {
   }
   return normalizedPath;
 }
+
+export function dataURLtoFile(dataurl: string, filename: string) {
+  var arr = dataurl.split(","),
+    mime = arr
+      .at(0)
+      ?.match(/:(.*?);/)
+      ?.at(1),
+    bstr = atob(arr[arr.length - 1]),
+    n = bstr.length,
+    u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
