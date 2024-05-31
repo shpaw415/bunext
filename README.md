@@ -1,6 +1,7 @@
 ﻿# Compatibility
 
 compatible: bun 1.1.10 & under
+compatible OS: Linux, WSL
 
 N.B : Bun is in continuous changement and compatibility between version is a
 
@@ -42,15 +43,17 @@ keep up to date the framework for what it needs
 
 - Production mode ( Beta )
 
-- Links
-
 ## What is planed
 
 - Documentation
 
 - SQlite performance & features
+
 - .ts extention for serverAction ( only .tsx is allowed for now )
+
 - FormData support for Server Action
+
+- Links
 
 ### To install and run
 
@@ -251,16 +254,16 @@ Will run only once at build time and when revalidate is ran.
 ```Javascript XML
 // index.tsx
 
-export default function Page() {
+export default async function Page() {
   return (
     <div>
-      <Componants />
+      {await Componants()}
       <NotValid />
     </div>
   );
 }
 // valid Server Componant
-export function Componants() {
+export async function Componants() {
   const res = (await fetch("https://some-api.com/api")).json();
   return <div>{JSON.stringify(res)}</div>;
 }
@@ -405,3 +408,11 @@ function NextPage() {
 }
 
 ```
+
+## Run Script at Startup
+
+config/preload.ts will run at startup
+
+## Configure Server
+
+config/server.ts contain server related configuration
