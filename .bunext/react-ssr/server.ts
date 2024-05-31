@@ -57,7 +57,7 @@ function RunServer() {
 }
 async function init() {
   if (globalThis.dryRun) {
-    await require("../../config/run.ts");
+    await require("../../config/preload.ts");
     RunServer();
     logDevConsole();
   }
