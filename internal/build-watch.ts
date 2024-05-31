@@ -1,8 +1,7 @@
 import { watchBuild } from "../bun-react-ssr/watch";
 import { sendSignal } from "../dev/hotServer";
-import { exitCodes, paths } from "./globals";
+import { paths } from "./globals";
 import "../dev/dev";
-import { builder } from "./build";
 
 export const doWatchBuild = (showError: boolean) =>
   watchBuild(async () => {

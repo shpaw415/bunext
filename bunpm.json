@@ -10,6 +10,7 @@
     "bin",
     "internal",
     "database",
-    ".bunext"
+    ".bunext",
+    "config"
   ]
 }

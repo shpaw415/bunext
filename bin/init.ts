@@ -41,7 +41,7 @@ async function install(total: boolean) {
       force: true,
     });
   if (total || !(await Bun.file(`config/database.ts`).exists())) {
-    cpSync(`${paths.bunextModulePath}/componants/config`, "config", {
+    cpSync(`${paths.bunextModulePath}/config`, "config", {
       recursive: true,
       force: true,
     });
@@ -98,7 +98,7 @@ async function install(total: boolean) {
 function tsConfig() {
   return {
     compilerOptions: {
-      lib: ["ESNext", "DOM"],
+      lib: ["ESNext", "DOM", "DOM.Iterable"],
       target: "ESNext",
       module: "ESNext",
       moduleDetection: "force",

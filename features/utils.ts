@@ -66,3 +66,28 @@ export function dataURLtoFile(dataurl: string, filename: string) {
   }
   return new File([u8arr], filename, { type: mime });
 }
+
+export async function urltoFile(
+  url: string,
+  filename: string,
+  mimeType: string
+) {
+  if (url.startsWith("data:")) {
+    var arr = url.split(","),
+      mime = arr
+        .at(0)
+        ?.match(/:(.*?);/)
+        ?.at(1),
+      bstr = atob(arr[arr.length - 1]),
+      n = bstr.length,
+      u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    var file = new File([u8arr], filename, { type: mime || mimeType });
+    return Promise.resolve(file);
+  }
+  return fetch(url)
+    .then((res) => res.arrayBuffer())
+    .then((buf) => new File([buf], filename, { type: mimeType }));
+}

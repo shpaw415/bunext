@@ -11,6 +11,7 @@ import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
 import { revalidate } from "@bunpmjs/bunext/features/router";
+import ServerConfig from "../../config/server";
 
 const arg = process.argv[3] as undefined | "showError";
 globalThis.dev.clientOnly = Boolean(process.argv[4]);
@@ -21,7 +22,7 @@ await init();
 
 function RunServer() {
   const server = Bun.serve({
-    port: 3000,
+    port: ServerConfig.HTTPServer.port,
     async fetch(request) {
       //console.clear();
       const _MiddleWaremodule = await import(
@@ -56,11 +57,12 @@ function RunServer() {
 }
 async function init() {
   if (globalThis.dryRun) {
+    await require("../../config/run.ts");
     RunServer();
     logDevConsole();
   }
   if (process.env.NODE_ENV == "development" && globalThis.dryRun) {
-    serveHotServer();
+    serveHotServer(ServerConfig.Dev.hotServerPort);
     doWatchBuild(arg == "showError" ? true : false);
   } else if (process.env.NODE_ENV == "production") {
     setRevalidate((await makeBuild()).revalidates);

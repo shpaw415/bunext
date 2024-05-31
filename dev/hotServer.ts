@@ -7,7 +7,7 @@ declare global {
 
 globalThis.socketList ??= [];
 
-export function serveHotServer() {
+export function serveHotServer(port: number) {
   const clearSocket = () => {
     globalThis.socketList = globalThis.socketList.filter(
       (s) => s.readyState == 0 || s.readyState == 1
@@ -37,7 +37,7 @@ export function serveHotServer() {
       }
       return new Response("OK");
     },
-    port: 3001,
+    port: port,
   });
 
   setInterval(() => {
