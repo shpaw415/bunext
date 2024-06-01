@@ -32,7 +32,10 @@ function RunServer() {
       request.headers.toJSON();
       _MiddleWaremodule.setMiddleWare(request);
 
-      await (await import("../../config/onRequest")).default(request);
+      const OnRequestResponse = await (
+        await import("../../config/onRequest")
+      ).default(request);
+      if (OnRequestResponse) return OnRequestResponse;
 
       if (request.url.endsWith("/bunextgetSessionData")) {
         return new Response(
