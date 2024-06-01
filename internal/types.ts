@@ -20,3 +20,7 @@ export type ServerConfig = {
     hotServerPort: number;
   };
 };
+
+export type OnRequestType = (
+  request: Request
+) => Response | Promise<Response> | Promise<void> | void;

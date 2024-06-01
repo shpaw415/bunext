@@ -31,6 +31,9 @@ function RunServer() {
 
       request.headers.toJSON();
       _MiddleWaremodule.setMiddleWare(request);
+
+      await (await import("../../config/onRequest")).default(request);
+
       if (request.url.endsWith("/bunextgetSessionData")) {
         return new Response(
           JSON.stringify(_MiddleWaremodule.Session.getData()?.public)
