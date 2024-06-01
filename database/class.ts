@@ -217,7 +217,7 @@ export class Table<T> {
         })
       )
     );
-    return inserter(entries) as number;
+    return inserter(entries) as void;
   }
   update(data: _Update<T>) {
     let queryString = `UPDATE ${this.name} SET `;
