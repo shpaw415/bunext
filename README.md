@@ -289,11 +289,18 @@ export function NotValid({ someProps }: { someProps: string }) {
 
 ```Javascript XML
 // index.tsx
-import { revalidateEvery } from "@bunpmjs/bunext/features/router";
+import { revalidateEvery, revalidate } from "@bunpmjs/bunext/features/router";
 export default function Page() {
   revalidateEvery("/", 3600);
   // will revalidate the page at every 3600 second
-  return <div></div>;
+  return <div>
+    <button onClick={() => ServerRevalidate("/")}></button>
+  </div>;
+}
+
+export async function ServerRevalidate(path: string) {
+  await revalidate(path);
+  // will revalidate the page right now
 }
 
 ```
