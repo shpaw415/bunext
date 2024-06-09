@@ -15,6 +15,16 @@ keep up to date the framework for what it needs
 
 - Facing problemes? [Open an issue ](https://github.com/shpaw415/bunext/issues)
 
+## Updating to a new Version
+
+When an update of Bunext is made you must run:
+
+```Bash
+#!/usr/bin/env bash
+bun run init
+bun run databaseCreate # only create the types
+```
+
 ## What is ready
 
 - SSR and CSR

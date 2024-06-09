@@ -2,23 +2,27 @@ const isServer = typeof window == "undefined";
 const publicThrow = () => {
   throw new Error("you cannot call revalidate in a client context");
 };
-const noRouteThrow = (route: string) => {
-  throw new Error(`route ${route} does not exsits`);
-};
-const findRouteOrThrow = async (path: string) => {
+const noRouteThrow = (route: string) =>
+  new Error(`route ${route} does not exsits`);
+
+const findRouteOrThrow = (path: string) => {
   const router = new Bun.FileSystemRouter({
     style: "nextjs",
     dir: process.cwd() + "/src/pages",
   });
-  if (!router.match(path)) noRouteThrow(path);
+  const matched = router.match(path);
+  if (!matched) throw noRouteThrow(path);
+  return matched;
 };
 
 export async function revalidate(path: string) {
   if (!isServer) publicThrow();
   const serverModule = await import("../internal/makeBuild");
-  const index = globalThis.ssrElement.findIndex((p) => p.path === path);
+  const route = findRouteOrThrow(path);
+  const index = globalThis.ssrElement.findIndex(
+    (p) => p.path === route.filePath
+  );
   if (index == -1) return;
-  await findRouteOrThrow(path);
   globalThis.ssrElement.splice(index, 1);
   await serverModule.makeBuild();
 }

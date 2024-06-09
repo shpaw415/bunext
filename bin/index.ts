@@ -5,7 +5,6 @@ import { exitCodes, paths } from "../internal/globals";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { sendSignal } from "../dev/hotServer";
 import type { Subprocess } from "bun";
-import { doBuild } from "../internal/build-watch";
 type _cmd =
   | "init"
   | "build"
