@@ -294,7 +294,7 @@ export default function Page() {
   revalidateEvery("/", 3600);
   // will revalidate the page at every 3600 second
   return <div>
-    <button onClick={() => ServerRevalidate("/")}></button>
+    <button onClick={() => ServerRevalidate("/")}>Revalidate / path</button>
   </div>;
 }
 

@@ -10,16 +10,7 @@ import "../internal/server_global";
 import { type JsxElement } from "typescript";
 import { renderToString } from "react-dom/server";
 import type { ssrElement } from "../internal/server_global";
-
-type _Builderoptions = {
-  main: _Mainoptions;
-  bypass?: _bypassOptions;
-  display?: {
-    nextjs: {
-      layout: string;
-    };
-  };
-};
+import { GetBuildFixFiles, type BuildFix } from "../internal/buildFixes";
 
 type _Mainoptions = {
   baseDir: string;
@@ -30,13 +21,6 @@ type _Mainoptions = {
   minify?: boolean;
   define?: Record<string, string>;
   plugins?: import("bun").BunPlugin[];
-};
-
-type _bypassOptions = {
-  useServer: {
-    pageName: string[];
-    functionName: string[];
-  };
 };
 
 type _requiredBuildoptions = {
@@ -53,30 +37,35 @@ type _CreateBuild = Partial<_Mainoptions> &
 
 export class Builder {
   public options: _Mainoptions;
-  private bypassoptions: _bypassOptions;
   static preBuildPaths: Array<string> = [];
   private buildOutput?: BuildOutput;
-  constructor(options: _Builderoptions) {
+  private buildFixes: BuildFix[] = [];
+  constructor(baseDir: string) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
-      pageDir: "pages",
-      buildDir: ".build",
-      ...options.main,
-    };
-    this.bypassoptions = {
-      useServer: {
-        pageName: [
-          ...(options.display?.nextjs ? [options.display.nextjs.layout] : []),
-          ...(options.bypass?.useServer.pageName ?? []),
-        ],
-        functionName: [
-          "getServerSideProps",
-          ...(options.bypass?.useServer.functionName ?? []),
-        ],
-      },
-      ...options.bypass,
+      pageDir: "src/pages",
+      buildDir: ".bunext/build",
+      hydrate: ".bunext/react-ssr/hydrate.ts",
+      baseDir,
     };
   }
+
+  async Init() {
+    await this.InitBuildFix();
+    return this;
+  }
+
+  async InitBuildFix() {
+    const buildFixFiles = await GetBuildFixFiles();
+    this.buildFixes = (
+      (await Promise.all(buildFixFiles.map((f) => import(f)))) as {
+        default?: BuildFix;
+      }[]
+    )
+      .map((e) => e.default)
+      .filter((e) => e != undefined);
+  }
+
   async build(onlyPath?: string) {
     const { baseDir, hydrate, pageDir, sourcemap, buildDir, minify, plugins } =
       this.options;
@@ -105,7 +94,10 @@ export class Builder {
       sourcemap,
       outdir: join(baseDir, buildDir as string),
       minify,
-      plugins: [...(plugins ?? [])],
+      plugins: [
+        ...(plugins ?? []),
+        ...this.buildFixes.map((e) => e.plugin).filter((e) => e != undefined),
+      ],
     });
     for await (const file of this.glob(
       this.options.buildDir as string,
@@ -554,15 +546,15 @@ export class Builder {
         ),
         ...define,
       },
-      external: ["bun:sqlite"],
+      external: ["bun:sqlite", "bun"],
       splitting: true,
     });
-    if (!build.success) return build;
     return build;
   }
   private async afterBuild() {
-    for await (const i of globalThis.afterBuild) {
-      await i({
+    for await (const i of this.buildFixes) {
+      if (!i.afterBuildCallback) return;
+      await i.afterBuildCallback({
         buildPath: this.options.buildDir as string,
         tmpPath: normalize([this.options.buildDir, "..", "tmp"].join("/")),
         outputs: this.buildOutput as BuildOutput,

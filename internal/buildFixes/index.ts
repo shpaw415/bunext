@@ -40,3 +40,15 @@ export class BuildFix {
     return fileContent;
   }
 }
+
+export async function GetBuildFixFiles() {
+  return (
+    await Array.fromAsync(
+      new Bun.Glob("*.ts").scan({
+        cwd: import.meta.dirname,
+        onlyFiles: true,
+        absolute: true,
+      })
+    )
+  ).filter((e) => !e.endsWith("index.ts"));
+}
