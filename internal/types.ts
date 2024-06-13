@@ -23,4 +23,4 @@ export type ServerConfig = {
 
 export type OnRequestType = (
   request: Request
-) => Response | Promise<Response> | Promise<void> | void;
+) => Response | void | Promise<Response | void>;

@@ -71,7 +71,9 @@ async function init() {
     serveHotServer(ServerConfig.Dev.hotServerPort);
     doWatchBuild(arg == "showError" ? true : false);
   } else if (process.env.NODE_ENV == "production") {
-    setRevalidate((await makeBuild()).revalidates);
+    const buildoutput = await makeBuild();
+    if (!buildoutput) throw new Error("Production build failed");
+    setRevalidate(buildoutput.revalidates);
   }
 
   globalThis.dryRun = false;

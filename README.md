@@ -433,3 +433,10 @@ config/preload.ts will run at startup
 ## Configure Server
 
 config/server.ts contain server related configuration
+
+## Bypass request
+
+To make a custom Response in _config/onRequest.ts_,
+return Response. To bypass the default behaviour, or
+return undefined to use the default behaviour.
+_Can be async_

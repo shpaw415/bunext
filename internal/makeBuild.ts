@@ -1,8 +1,31 @@
 import { paths } from "./globals";
 import type { ssrElement } from "./server_global";
 
+type procIPCdata =
+  | {
+      type: "build";
+      ssrElement: ssrElement[];
+      revalidates: {
+        path: string;
+        time: number;
+      }[];
+    }
+  | {
+      type: "error";
+      error: Error;
+    };
+
+type BuildOuts = {
+  ssrElement: ssrElement[];
+  revalidates: {
+    path: string;
+    time: number;
+  }[];
+};
+
 export async function makeBuild(path?: string) {
-  const res = Bun.spawnSync({
+  let strRes: BuildOuts | undefined;
+  const proc = Bun.spawn({
     cmd: ["bun", `${paths.bunextModulePath}/internal/buildv2.ts`],
     env: {
       ...process.env,
@@ -11,25 +34,29 @@ export async function makeBuild(path?: string) {
       BuildPath: path || undefined,
       __BUILD_MODE__: "true",
     },
+    stdout: "ignore",
+    ipc(message) {
+      const data = JSON.parse(message) as procIPCdata;
+
+      switch (data.type) {
+        case "build":
+          strRes = {
+            ssrElement: data.ssrElement,
+            revalidates: data.revalidates,
+          };
+          break;
+        case "error":
+          throw data.error;
+      }
+    },
   });
-  const decoded = (await new Response(res.stdout).text()).split("<!BUNEXT!>");
-  console.log(decoded[0]);
-  try {
-    const strRes = JSON.parse(decoded[1]) as {
-      ssrElement: ssrElement[];
-      revalidates: Array<{
-        path: string;
-        time: number;
-      }>;
-    };
-    globalThis.ssrElement = strRes.ssrElement;
-    return {
-      revalidates: strRes.revalidates,
-      error: false,
-    };
-  } catch {
-    throw new Error(decoded[0]);
+  const code = await proc.exited;
+  if (code != 0) {
+    console.log("Build exited with code", code);
+    return;
   }
+  globalThis.ssrElement = strRes?.ssrElement || [];
+  return strRes as BuildOuts;
 }
 
 if (import.meta.main) makeBuild();

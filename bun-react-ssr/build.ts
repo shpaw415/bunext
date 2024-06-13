@@ -37,7 +37,7 @@ type _CreateBuild = Partial<_Mainoptions> &
 
 export class Builder {
   public options: _Mainoptions;
-  static preBuildPaths: Array<string> = [];
+  public preBuildPaths: Array<string> = [];
   private buildOutput?: BuildOutput;
   private buildFixes: BuildFix[] = [];
   constructor(baseDir: string) {
@@ -109,19 +109,34 @@ export class Builder {
           unlinkSync(file);
         } catch {}
     }
-    await this.afterBuild();
+    //await this.afterBuild();
 
     return this.buildOutput;
   }
   // globalThis.ssrElement setting
-  static async preBuild(modulePath: string) {
+  async preBuild(modulePath: string) {
     const moduleContent = await Bun.file(modulePath).text();
     const _module = await import(modulePath);
     const isServer = !isUseClient(moduleContent);
-    if (!isServer) return;
     const { exports, imports } = new Bun.Transpiler({ loader: "tsx" }).scan(
       moduleContent
     );
+
+    if (modulePath.endsWith("index.tsx")) {
+      const extCheck = ["ts", "tsx"];
+      for await (const imp of imports) {
+        for await (const ext of extCheck) {
+          const filePath =
+            import.meta.resolve(imp.path, modulePath).replace("file://", "") +
+            `.${ext}`;
+          if (!(await Bun.file(filePath).exists())) continue;
+          this.resetPath(filePath);
+          this.preBuild(filePath);
+        }
+      }
+    }
+
+    if (!isServer) return;
     const EmptyParamsFunctionRegex = /\b\w+\s*\(\s*\)/;
     for await (const ex of exports) {
       const exported = _module[ex] as Function | unknown;
@@ -133,7 +148,7 @@ export class Builder {
       try {
         element = await exported();
       } catch (e) {
-        //console.log(e);
+        console.log(e);
       }
       if (!isValidElement(element)) continue;
       const findModule = (e: any) => e.path == modulePath;
@@ -216,8 +231,8 @@ export class Builder {
 
       if (!path.endsWith(".tsx")) continue;
       if (this.preBuildPaths.includes(path)) continue;
-      else this.preBuildPaths.push(path);
-      await this.preBuild(path);
+      //else this.preBuildPaths.push(path);
+      //await this.preBuild(path);
     }
   }
   async preBuildAll(skip?: ssrElement[]) {
@@ -228,14 +243,16 @@ export class Builder {
     );
     for await (const file of files) {
       if (skip?.find((e) => e.path == file)) continue;
-      await Builder.preBuild(file);
+      await this.preBuild(file);
     }
   }
   resetPath(path: string) {
-    const index = globalThis.ssrElement.findIndex((p) => p.path === path);
+    const index = globalThis.ssrElement.findIndex((p) => p.path == path);
     if (index == -1) return;
     globalThis.ssrElement.splice(index, 1);
+    return index;
   }
+
   private ServerActionToClient(func: Function, ModulePath: string): string {
     const path = ModulePath.split(this.options.pageDir as string).at(
       1
