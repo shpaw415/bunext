@@ -11,7 +11,7 @@ import { Server } from "../.bunext/react-ssr/server.ts";
 describe("Build features", () => {
   test("Build", async () => {
     const buildOut = await builder.makeBuild();
-    expect(buildOut?.ssrElement.length).toBe(2);
+    expect(buildOut?.ssrElement.length).toBe(3);
     expect(buildOut?.revalidates.length).toBe(1);
     const matched = router.client?.match("/");
     expect(matched).not.toBe(null);
@@ -22,7 +22,7 @@ describe("Build features", () => {
   });
 
   test("Header data", () => {
-    expect(Object.keys(Head.head).length).toBe(2);
+    expect(Object.keys(Head.head).length).toBe(3);
   });
 });
 
