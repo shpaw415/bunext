@@ -19,18 +19,18 @@ const findRouteOrThrow = (path: string) => {
 };
 const noBuilderThrow = () => new Error("Builder could't be loaded");
 
-let builder = isServer
-  ? (await import("../internal/build.ts")).builder
+const builderModule = isServer
+  ? await import("../internal/build.ts")
   : undefined;
 
 export async function revalidate(path: string) {
   if (!isServer) publicThrow();
-  if (!builder) throw noBuilderThrow();
+  if (!builderModule?.builder) throw noBuilderThrow();
 
   const route = findRouteOrThrow(path);
-  if (builder.findPathIndex(route.filePath) == -1) return;
-  builder.resetPath(route.filePath);
-  await builder.makeBuild();
+  if (builderModule.builder.findPathIndex(route.filePath) == -1) return;
+  builderModule.builder.resetPath(route.filePath);
+  await builderModule.builder.makeBuild();
 }
 /**
  *
@@ -40,11 +40,13 @@ export async function revalidate(path: string) {
 
 export function revalidateEvery(path: string, seconde: number) {
   if (!isServer) return;
-  if (!builder) throw noBuilderThrow();
+  if (!builderModule?.builder) throw noBuilderThrow();
 
-  const _revalidate = builder.revalidates.find((r: any) => r.path === path);
+  const _revalidate = builderModule.builder.revalidates.find(
+    (r: any) => r.path === path
+  );
   if (!_revalidate) {
-    builder.revalidates.push({
+    builderModule.builder.revalidates.push({
       path: path,
       time: seconde * 1000,
     });

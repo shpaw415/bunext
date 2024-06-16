@@ -18,8 +18,6 @@ import { Head } from "@bunpmjs/bunext/features/head";
 import ServerConfig from "../../config/server"; // must be relative
 import type { Server as _Server } from "bun";
 
-const arg = process.argv[3] as undefined | "showError";
-
 class BunextServer {
   port = ServerConfig.HTTPServer.port || 3000;
   server?: _Server;
@@ -114,11 +112,14 @@ class BunextServer {
     }
     if (process.env.NODE_ENV == "development" && globalThis.dryRun) {
       this.serveHotServer(ServerConfig.Dev.hotServerPort);
-      doWatchBuild(arg == "showError" ? true : false);
+      doWatchBuild();
+      await builder.makeBuild();
+      await router.InitServerActions();
     } else if (process.env.NODE_ENV == "production") {
       const buildoutput = await builder.makeBuild();
       if (!buildoutput) throw new Error("Production build failed");
       setRevalidate(buildoutput.revalidates);
+      await router.InitServerActions();
     }
 
     globalThis.dryRun = false;

@@ -10,14 +10,6 @@ export type _Head = {
   }[];
 };
 
-declare global {
-  /** the key is the path to the page  */
-  var head: { [key: string]: _Head };
-  var currentPath: string;
-}
-globalThis.currentPath ??= "";
-globalThis.head ??= {};
-
 class HeadDataClass {
   public head: Record<string, _Head> = {};
   public currentPath?: string;

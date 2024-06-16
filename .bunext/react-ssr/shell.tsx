@@ -1,5 +1,5 @@
 import "@bunpmjs/bunext/internal/globals";
-import { HeadElement } from "../../features/head";
+import { HeadElement } from "@bunpmjs/bunext/features/head";
 import { Dev } from "@bunpmjs/bunext/dev/dev";
 import React from "react";
 export const Shell = ({

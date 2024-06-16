@@ -5,19 +5,14 @@ import { builder } from "../internal/build";
 import { revalidate } from "../features/router.ts";
 import { rmSync, mkdirSync } from "fs";
 import { router } from "../internal/router.tsx";
-
-process.env.__TEST_MODE__ = "true";
-
-const getServer = async () =>
-  (await import("../.bunext/react-ssr/server.ts")).Server;
+import { Head } from "../features/head.tsx";
+import { Server } from "../.bunext/react-ssr/server.ts";
 
 describe("Build features", () => {
   test("Build", async () => {
     const buildOut = await builder.makeBuild();
     expect(buildOut?.ssrElement.length).toBe(2);
     expect(buildOut?.revalidates.length).toBe(1);
-    const buildOutputs = await builder.build();
-    expect(buildOutputs.success).toBe(true);
     const matched = router.client?.match("/");
     expect(matched).not.toBe(null);
   });
@@ -25,23 +20,25 @@ describe("Build features", () => {
   test("revalidate", async () => {
     await revalidate("/");
   });
+
+  test("Header data", () => {
+    expect(Object.keys(Head.head).length).toBe(2);
+  });
 });
 
 describe("Server Features", () => {
   test("start server", async () => {
-    const server = await getServer(); // serverStart auto
-    expect(server.server).not.toBe(undefined);
+    expect(Server.server).not.toBe(undefined);
 
-    const res = await fetch(`http://localhost:${server.port}/`);
+    const res = await fetch(`http://localhost:${Server.port}/`);
     expect(res.ok).toBe(true);
   });
 
   test("start hotServer", async () => {
-    const server = await getServer();
-    server.serveHotServer(3001);
-    expect(server.hotServer).not.toBe(undefined);
+    Server.serveHotServer(3001);
+    expect(Server.hotServer).not.toBe(undefined);
     const promiseRes = await new Promise<boolean>((resolve) => {
-      const ws = new WebSocket(`ws://localhost:${server.hotServerPort}`);
+      const ws = new WebSocket(`ws://localhost:${Server.hotServerPort}`);
       ws.addEventListener("message", (ev) => {
         if (ev.data == "welcome") resolve(true);
       });
@@ -53,6 +50,7 @@ describe("Server Features", () => {
   });
 
   test("Server Action", async () => {
+    await router.InitServerActions();
     expect(
       Array.prototype.concat(...router.serverActions.map((e) => e.actions))
         .length
@@ -60,7 +58,7 @@ describe("Server Features", () => {
     const form = new FormData();
     form.append("props", encodeURI(JSON.stringify([])));
     const res = await fetch(
-      `http://localhost:${(await getServer()).port}/ServerActionGetter`,
+      `http://localhost:${Server.port}/ServerActionGetter`,
       {
         headers: {
           serveractionid: "/index.tsx:ServerAction",

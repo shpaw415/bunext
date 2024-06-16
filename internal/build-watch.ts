@@ -34,7 +34,7 @@ export function watchBuild(build: () => Promise<any>, paths: string[]) {
   );
 }
 
-export const doWatchBuild = (showError: boolean) =>
+export const doWatchBuild = () =>
   watchBuild(async () => {
     sendSignal();
   }, [paths.basePagePath, "static"]);

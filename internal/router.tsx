@@ -417,6 +417,6 @@ class StaticRouters {
 
 if (!existsSync(".bunext/build/src/pages"))
   mkdirSync(".bunext/build/src/pages", { recursive: true });
-const router = await new StaticRouters().InitServerActions();
+const router = new StaticRouters();
 
 export { router, StaticRouters };

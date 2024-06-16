@@ -12,6 +12,7 @@ import type { ssrElement } from "./types";
 import { GetBuildFixFiles, type BuildFix } from "./buildFixes";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
+import { router } from "./router";
 
 type BuildOuts = {
   ssrElement: ssrElement[];
@@ -345,7 +346,7 @@ class Builder {
         ...process.env,
         NODE_ENV: process.env.NODE_ENV,
         ssrElement: JSON.stringify(this.ssrElement || []),
-        BuildPath: path || undefined,
+        BuildPath: path,
         __BUILD_MODE__: "true",
       },
       stdout: "inherit",
@@ -376,7 +377,7 @@ class Builder {
     this.ssrElement = strRes?.ssrElement || [];
     this.revalidates = strRes?.revalidates || [];
     Head.head = strRes?.head || {};
-
+    router.setRoutes();
     return strRes as BuildOuts;
   }
 
