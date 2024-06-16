@@ -11,20 +11,7 @@ import { renderToString } from "react-dom/server";
 import type { ssrElement } from "./types";
 import { GetBuildFixFiles, type BuildFix } from "./buildFixes";
 import { exitCodes } from "./globals";
-
-type procIPCdata =
-  | {
-      type: "build";
-      ssrElement: ssrElement[];
-      revalidates: {
-        path: string;
-        time: number;
-      }[];
-    }
-  | {
-      type: "error";
-      error: Error;
-    };
+import { Head, type _Head } from "../features/head";
 
 type BuildOuts = {
   ssrElement: ssrElement[];
@@ -32,7 +19,17 @@ type BuildOuts = {
     path: string;
     time: number;
   }[];
+  head: Record<string, _Head>;
 };
+
+type procIPCdata =
+  | ({
+      type: "build";
+    } & BuildOuts)
+  | {
+      type: "error";
+      error: Error;
+    };
 
 type _Mainoptions = {
   baseDir: string;
@@ -152,6 +149,7 @@ class Builder {
     return false;
   }
   async preBuild(modulePath: string) {
+    Head._setCurrentPath(modulePath);
     const moduleContent = await Bun.file(modulePath).text();
     const _module = await import(modulePath);
     const isServer = !this.isUseClient(moduleContent);
@@ -325,6 +323,7 @@ class Builder {
     const data = {
       ssrElement: this.ssrElement,
       revalidates: this.revalidates,
+      head: Head.head,
       type: "build",
     };
 
@@ -349,7 +348,7 @@ class Builder {
         BuildPath: path || undefined,
         __BUILD_MODE__: "true",
       },
-      stdout: "ignore",
+      stdout: "inherit",
       ipc(message) {
         const data = JSON.parse(message) as procIPCdata;
 
@@ -358,6 +357,10 @@ class Builder {
             strRes = {
               ssrElement: data.ssrElement,
               revalidates: data.revalidates,
+              head: {
+                ...data.head,
+                ...Head.head,
+              },
             };
             break;
           case "error":
@@ -370,9 +373,9 @@ class Builder {
       console.log("Build exited with code", code);
       return;
     }
-
     this.ssrElement = strRes?.ssrElement || [];
     this.revalidates = strRes?.revalidates || [];
+    Head.head = strRes?.head || {};
 
     return strRes as BuildOuts;
   }

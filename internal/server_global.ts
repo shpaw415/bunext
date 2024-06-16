@@ -1,5 +1,5 @@
 import type { ServerWebSocket, Subprocess } from "bun";
-import type { _Head } from "../componants/head";
+import type { _Head } from "../features/head";
 
 declare global {
   var socketList: ServerWebSocket<unknown>[];

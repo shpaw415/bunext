@@ -1,4 +1,4 @@
-import type { _Head } from "@bunpmjs/bunext/componants/head";
+import type { _Head } from "../features/head";
 
 declare global {
   var head: { [key: string]: _Head };

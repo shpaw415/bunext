@@ -13,6 +13,7 @@ import {
   serveScript,
   serveStatic,
 } from "@bunpmjs/bunext/internal/server-features";
+import { Head } from "@bunpmjs/bunext/features/head";
 
 import ServerConfig from "../../config/server"; // must be relative
 import type { Server as _Server } from "bun";
@@ -182,7 +183,7 @@ class BunextServer {
             "/bunext-scripts",
           ],
           preloadScript: {
-            __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
+            __HEAD_DATA__: JSON.stringify(Head.head),
             __PUBLIC_SESSION_DATA__: "undefined",
             __NODE_ENV__: `"${process.env.NODE_ENV}"`,
           },

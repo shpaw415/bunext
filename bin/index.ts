@@ -1,6 +1,5 @@
 #!/bin/env bun
 
-import { __setHead__ } from "../componants/internal_head";
 import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
@@ -31,13 +30,12 @@ if (import.meta.main)
     case "build":
       const builder = (await import("../internal/build.ts")).builder;
       const res = await builder.build();
+      console.log(res);
       break;
     case "dev":
-      await __setHead__();
       dev();
       break;
     case "production":
-      await __setHead__();
       production();
       break;
     case "database_create":
@@ -99,6 +97,7 @@ function dev() {
   process.env.NODE_ENV = "development";
   Bun.spawnSync({
     cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
+    stdout: "inherit",
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),

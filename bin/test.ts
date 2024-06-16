@@ -14,7 +14,7 @@ const getServer = async () =>
 describe("Build features", () => {
   test("Build", async () => {
     const buildOut = await builder.makeBuild();
-    expect(buildOut?.ssrElement.length).toBe(1);
+    expect(buildOut?.ssrElement.length).toBe(2);
     expect(buildOut?.revalidates.length).toBe(1);
     const buildOutputs = await builder.build();
     expect(buildOutputs.success).toBe(true);
@@ -53,7 +53,10 @@ describe("Server Features", () => {
   });
 
   test("Server Action", async () => {
-    expect(router.serverActions.length).toBe(1);
+    expect(
+      Array.prototype.concat(...router.serverActions.map((e) => e.actions))
+        .length
+    ).toBe(1);
     const form = new FormData();
     form.append("props", encodeURI(JSON.stringify([])));
     const res = await fetch(
@@ -71,7 +74,7 @@ describe("Server Features", () => {
 });
 
 afterAll(async () => {
-  //cleanUpBuild();
+  cleanUpBuild();
   await cleanUpServers();
 });
 

@@ -1,3 +1,4 @@
+export { navigate } from "../internal/router/index.tsx";
 // only use this module in a server context
 
 const isServer = typeof window == "undefined";
@@ -18,7 +19,9 @@ const findRouteOrThrow = (path: string) => {
 };
 const noBuilderThrow = () => new Error("Builder could't be loaded");
 
-let builder = (await import("../internal/build.ts")).builder;
+let builder = isServer
+  ? (await import("../internal/build.ts")).builder
+  : undefined;
 
 export async function revalidate(path: string) {
   if (!isServer) publicThrow();

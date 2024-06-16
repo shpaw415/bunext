@@ -1,4 +1,4 @@
-import type { _Head } from "../componants/head";
+import type { _Head } from "../features/head";
 
 export interface ServerSideProps {
   props?: any;
