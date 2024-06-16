@@ -65,6 +65,9 @@ class Builder {
     path: string;
     time: number;
   }[] = [];
+
+  private currentRecursivePreBuilds: string[] = [];
+
   constructor(baseDir: string) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
@@ -158,8 +161,7 @@ class Builder {
       moduleContent
     );
 
-    /*
-    TODO: disabled for now but need to test for revalidation of imported react Element from current page
+    //TODO: need to test for revalidation of imported react Element from current page
     if (modulePath.endsWith("index.tsx")) {
       const extCheck = ["ts", "tsx"];
       for await (const imp of imports) {
@@ -168,12 +170,16 @@ class Builder {
             import.meta.resolve(imp.path, modulePath).replace("file://", "") +
             `.${ext}`;
           if (!(await Bun.file(filePath).exists())) continue;
-          this.resetPath(filePath);
-          this.preBuild(filePath);
+          if (this.currentRecursivePreBuilds.includes(filePath)) continue;
+          else {
+            this.currentRecursivePreBuilds.push(filePath);
+            this.resetPath(filePath);
+            this.preBuild(filePath);
+          }
         }
       }
     }
-    */
+
     if (!isServer) return;
     const EmptyParamsFunctionRegex = /\b\w+\s*\(\s*\)/;
     for await (const ex of exports) {
@@ -377,7 +383,6 @@ class Builder {
     this.ssrElement = strRes?.ssrElement || [];
     this.revalidates = strRes?.revalidates || [];
     Head.head = strRes?.head || {};
-    router.setRoutes();
     return strRes as BuildOuts;
   }
 

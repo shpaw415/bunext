@@ -115,6 +115,7 @@ class BunextServer {
       doWatchBuild();
       await builder.makeBuild();
       await router.InitServerActions();
+      router.setRoutes();
     } else if (process.env.NODE_ENV == "production") {
       const buildoutput = await builder.makeBuild();
       if (!buildoutput) throw new Error("Production build failed");

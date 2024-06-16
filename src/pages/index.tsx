@@ -1,6 +1,7 @@
 import { Head } from "@bunpmjs/bunext/features/head";
 import { revalidateEvery } from "@bunpmjs/bunext/features/router";
 import { navigate } from "@bunpmjs/bunext/features/router";
+import { TestElement } from "./test";
 
 Head.setHead({
   data: {
@@ -20,7 +21,7 @@ export default function Page() {
   revalidateEvery("/", 1000);
   return (
     <div>
-      Some Test
+      <TestElement />
       <button onClick={() => navigate("/other")}>Other page</button>
     </div>
   );
