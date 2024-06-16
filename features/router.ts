@@ -1,4 +1,5 @@
 export { navigate } from "../internal/router/index.tsx";
+
 // only use this module in a server context
 
 const isServer = typeof window == "undefined";
