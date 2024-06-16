@@ -73,7 +73,12 @@ describe("Server Features", () => {
 });
 
 afterAll(async () => {
-  setTimeout(() => cleanUpBuild(), 2000);
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      cleanUpBuild();
+      resolve(true);
+    }, 2000);
+  });
   await cleanUpServers();
 });
 
