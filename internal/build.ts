@@ -66,7 +66,7 @@ class Builder {
     time: number;
   }[] = [];
 
-  private currentRecursivePreBuilds: string[] = [];
+  private currentRecursivePreBuildsPages: string[] = [];
 
   constructor(baseDir: string) {
     this.options = {
@@ -170,9 +170,9 @@ class Builder {
             import.meta.resolve(imp.path, modulePath).replace("file://", "") +
             `.${ext}`;
           if (!(await Bun.file(filePath).exists())) continue;
-          if (this.currentRecursivePreBuilds.includes(filePath)) continue;
+          if (this.currentRecursivePreBuildsPages.includes(filePath)) continue;
           else {
-            this.currentRecursivePreBuilds.push(filePath);
+            this.currentRecursivePreBuildsPages.push(filePath);
             this.resetPath(filePath);
             this.preBuild(filePath);
           }

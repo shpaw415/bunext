@@ -13,6 +13,7 @@ describe("Build features", () => {
     const buildOut = await builder.makeBuild();
     expect(buildOut?.ssrElement.length).toBe(3);
     expect(buildOut?.revalidates.length).toBe(1);
+    router.setRoutes();
     const matched = router.client?.match("/");
     expect(matched).not.toBe(null);
   });
@@ -72,7 +73,7 @@ describe("Server Features", () => {
 });
 
 afterAll(async () => {
-  cleanUpBuild();
+  setTimeout(() => cleanUpBuild(), 2000);
   await cleanUpServers();
 });
 
