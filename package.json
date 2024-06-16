@@ -23,5 +23,8 @@
   },
   "bin": {
     "bunext": "bin/index.ts"
+  },
+  "scripts": {
+    "test": "bun test ./bin/test.ts"
   }
 }

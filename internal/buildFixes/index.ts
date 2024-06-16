@@ -1,6 +1,6 @@
 import type { BuildOutput, BunPlugin } from "bun";
 import "../server_global";
-import type { Builder } from "../../bun-react-ssr/build";
+import type { Builder } from "../build";
 
 export type afterBuildCallback = ({
   buildPath,

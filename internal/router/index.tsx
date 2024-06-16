@@ -13,8 +13,6 @@ import React, {
 import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher } from "./utils/get-route-matcher";
 import type { _GlobalData } from "../types";
-export * from "./components/Link";
-export * from "./hooks/useLink";
 
 const globalX = globalThis as unknown as _GlobalData;
 

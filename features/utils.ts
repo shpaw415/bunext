@@ -1,3 +1,5 @@
+"use client";
+
 export function generateUuid() {
   return String("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx").replace(
     /[xy]/g,

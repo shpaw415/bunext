@@ -1,6 +1,6 @@
 "use client";
 import { hydrateRoot, type ErrorInfo } from "react-dom/client";
-import { RouterHost } from "./router";
+import { RouterHost } from "./router/index";
 import { getRouteMatcher } from "./router/utils/get-route-matcher";
 import type { ServerSideProps, _DisplayMode, _GlobalData } from "./types";
 

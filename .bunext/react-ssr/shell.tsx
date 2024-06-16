@@ -1,4 +1,4 @@
-import "./global";
+import "@bunpmjs/bunext/internal/globals";
 import { Head } from "@bunpmjs/bunext/componants/head";
 import { Dev } from "@bunpmjs/bunext/dev/dev";
 import React from "react";

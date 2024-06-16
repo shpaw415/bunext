@@ -1,19 +1,16 @@
 #!/bin/env bun
 
 import { __setHead__ } from "../componants/internal_head";
-import { exitCodes, paths } from "../internal/globals";
+import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
-import { sendSignal } from "../dev/hotServer";
-import type { Subprocess } from "bun";
+import { type Subprocess } from "bun";
 
 type _cmd =
   | "init"
   | "build"
   | "dev"
-  | "onlyClient"
   | "database_create"
   | "database_merge"
-  | "devTest"
   | "production";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
@@ -32,23 +29,16 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      await import("../internal/buildv2.ts");
-      break;
-    case "devTest":
-      await __setHead__();
-      dev({ showBuildError: false, hotServerDisable: true });
+      const builder = (await import("../internal/build.ts")).builder;
+      const res = await builder.build();
       break;
     case "dev":
       await __setHead__();
-      dev({ showBuildError: false });
+      dev();
       break;
     case "production":
       await __setHead__();
       production();
-      break;
-    case "onlyClient":
-      await __setHead__();
-      dev({ showBuildError: false, onlyClient: true });
       break;
     case "database_create":
       await databaseSchemaMaker();
@@ -105,45 +95,17 @@ async function databaseCreator() {
   });
 }
 
-function dev({
-  showBuildError,
-  hotServerDisable,
-  onlyClient,
-}: {
-  showBuildError: boolean;
-  hotServerDisable?: boolean;
-  onlyClient?: boolean;
-}) {
+function dev() {
   process.env.NODE_ENV = "development";
-  const proc = Bun.spawn({
-    cmd: [
-      "bun",
-      hotServerDisable ? "" : "--hot",
-      `${paths.bunextDirName}/react-ssr/server.ts`,
-      "dev",
-      showBuildError ? "showError" : "",
-      onlyClient ? "onlyClient" : "",
-    ],
+  Bun.spawnSync({
+    cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),
       NODE_ENV: process.env.NODE_ENV,
     },
-    ipc(message, subprocess) {
-      if (message == "signal") sendSignal();
-    },
-    stdout: "inherit",
-    onExit(subprocess, exitCode, signalCode, error) {
-      if (exitCode == exitCodes.runtime) {
-        dev({ showBuildError: false });
-      } else if (exitCode == exitCodes.build) {
-        dev({ showBuildError: true });
-      } else {
-        console.log("Bunext Dev Exited.");
-      }
-    },
   });
-  globalThis.processes.push(proc);
+  dev();
 }
 
 function production() {
