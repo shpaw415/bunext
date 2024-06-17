@@ -9,10 +9,8 @@ import "./server_global";
 import { type JsxElement } from "typescript";
 import { renderToString } from "react-dom/server";
 import type { ssrElement } from "./types";
-import { GetBuildFixFiles, type BuildFix } from "./buildFixes";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
-import { router } from "./router";
 
 type BuildOuts = {
   ssrElement: ssrElement[];
@@ -40,7 +38,6 @@ type _Mainoptions = {
   sourcemap?: "external" | "none" | "inline";
   minify?: boolean;
   define?: Record<string, string>;
-  plugins?: import("bun").BunPlugin[];
 };
 
 type _requiredBuildoptions = {
@@ -59,7 +56,7 @@ class Builder {
   public options: _Mainoptions;
   public preBuildPaths: Array<string> = [];
   private buildOutput?: BuildOutput;
-  private buildFixes: BuildFix[] = [];
+  private plugins: BunPlugin[] = [];
   public ssrElement: ssrElement[] = [];
   public revalidates: {
     path: string;
@@ -79,24 +76,19 @@ class Builder {
   }
 
   async Init() {
-    await this.InitBuildFix();
+    await this.InitGetCustomPluginsFromUser();
     return this;
   }
 
-  async InitBuildFix() {
-    const buildFixFiles = await GetBuildFixFiles();
-    this.buildFixes = (
-      (await Promise.all(buildFixFiles.map((f) => import(f)))) as {
-        default?: BuildFix;
-      }[]
-    )
-      .map((e) => e.default)
-      .filter((e) => e != undefined);
+  async InitGetCustomPluginsFromUser() {
+    const serverConfig = (await import(process.cwd() + "/config/server"))
+      .default;
+    this.plugins.push(...serverConfig.build.plugins);
   }
 
   async build(onlyPath?: string) {
     process.env.__BUILD_MODE__ = "true";
-    const { baseDir, hydrate, pageDir, sourcemap, buildDir, minify, plugins } =
+    const { baseDir, hydrate, pageDir, sourcemap, buildDir, minify } =
       this.options;
     let entrypoints = [join(baseDir, hydrate)];
     if (!onlyPath) {
@@ -123,10 +115,6 @@ class Builder {
       sourcemap,
       outdir: join(baseDir, buildDir as string),
       minify,
-      plugins: [
-        ...(plugins ?? []),
-        ...this.buildFixes.map((e) => e.plugin).filter((e) => e != undefined),
-      ],
     });
     for await (const file of this.glob(
       this.options.buildDir as string,
@@ -679,16 +667,11 @@ class Builder {
   }
 
   private async CreateBuild(options: _CreateBuild) {
-    const { plugins, define } = this.options;
+    const { define } = this.options;
     const build = await Bun.build({
       ...options,
       publicPath: "./",
-      plugins: [
-        ...(plugins ?? []),
-        ...(options.plugins ?? []),
-        this.NextJsPlugin(),
-        this.SvgPlugin(),
-      ],
+      plugins: [...this.plugins, this.NextJsPlugin(), this.SvgPlugin()],
       target: "browser",
       define: {
         "process.env.NODE_ENV": JSON.stringify(
@@ -708,17 +691,6 @@ class Builder {
       splitting: true,
     });
     return build;
-  }
-  private async afterBuild() {
-    for await (const i of this.buildFixes) {
-      if (!i.afterBuildCallback) return;
-      await i.afterBuildCallback({
-        buildPath: this.options.buildDir as string,
-        tmpPath: normalize([this.options.buildDir, "..", "tmp"].join("/")),
-        outputs: this.buildOutput as BuildOutput,
-        builder: this,
-      });
-    }
   }
 
   private isFunction(functionToCheck: any) {

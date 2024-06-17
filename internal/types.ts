@@ -1,3 +1,4 @@
+import type { BunPlugin } from "bun";
 import type { _Head } from "../features/head";
 
 export interface ServerSideProps {
@@ -38,6 +39,9 @@ export type _globalThis = _GlobalData & {
  *
  * Dev
  *  - hotServerPort: Hot reload Server port
+ *
+ * build
+ *  - plugins: custom plugins for the build
  */
 export type ServerConfig = {
   HTTPServer: {
@@ -45,6 +49,9 @@ export type ServerConfig = {
   };
   Dev: {
     hotServerPort: number;
+  };
+  build: {
+    plugins: BunPlugin[];
   };
 };
 
