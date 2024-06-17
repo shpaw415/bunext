@@ -1,5 +1,5 @@
 import { Dev } from "../dev/dev";
-import "../.bunext/react-ssr/global";
+import "../internal/globals";
 
 export function ErrorFallback(ErrorInfo: Error) {
   return (

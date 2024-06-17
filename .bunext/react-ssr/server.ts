@@ -1,186 +1,211 @@
-import { builder, makeBuild } from "@bunpmjs/bunext/internal/build";
-import { router } from "./routes";
-import { Shell } from "./shell";
-import "./global";
-import { names, paths } from "@bunpmjs/bunext/internal/globals";
-import { generateRandomString } from "@bunpmjs/bunext/features/utils";
+import "@bunpmjs/bunext/internal/globals";
 import "@bunpmjs/bunext/internal/server_global";
+
+import { builder } from "@bunpmjs/bunext/internal/build";
+import { router } from "@bunpmjs/bunext/internal/router";
+import { Shell } from "./shell";
 import { renderToString } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
-import { serveHotServer } from "@bunpmjs/bunext/dev/hotServer";
 import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
-import { revalidate } from "@bunpmjs/bunext/features/router";
-import ServerConfig from "../../config/server";
+import {
+  setRevalidate,
+  serveScript,
+  serveStatic,
+} from "@bunpmjs/bunext/internal/server-features";
+import { Head } from "@bunpmjs/bunext/features/head";
 
-const arg = process.argv[3] as undefined | "showError";
-globalThis.dev.clientOnly = Boolean(process.argv[4]);
+import ServerConfig from "../../config/server"; // must be relative
+import type { Server as _Server } from "bun";
 
-globalThis.devConsole.error = undefined;
+class BunextServer {
+  port = ServerConfig.HTTPServer.port || 3000;
+  server?: _Server;
+  hotServerPort = ServerConfig.Dev.hotServerPort || 3001;
+  hotServer?: _Server;
 
-await init();
-
-function RunServer() {
-  const server = Bun.serve({
-    port: ServerConfig.HTTPServer.port,
-    async fetch(request) {
-      //console.clear();
-      const _MiddleWaremodule = await import(
-        "@bunpmjs/bunext/internal/middleware"
-      );
-
-      request.headers.toJSON();
-      _MiddleWaremodule.setMiddleWare(request);
-
-      const OnRequestResponse = await (
-        await import("../../config/onRequest")
-      ).default(request);
-      if (OnRequestResponse) return OnRequestResponse;
-
-      if (request.url.endsWith("/bunextgetSessionData")) {
-        return new Response(
-          JSON.stringify(_MiddleWaremodule.Session.getData()?.public)
+  RunServer() {
+    const self = this;
+    this.server = Bun.serve({
+      port: this.port,
+      async fetch(request) {
+        //console.clear();
+        const _MiddleWaremodule = await import(
+          "@bunpmjs/bunext/internal/middleware"
         );
-      }
-      try {
-        const response =
-          (await serve(request)) ||
-          (await serveStatic(request)) ||
-          serveScript(request);
-        if (response) return _MiddleWaremodule.Session.setToken(response);
-      } catch (e) {
-        if ((e as Error).name == "TypeError") {
-          console.log(e);
+
+        request.headers.toJSON();
+        _MiddleWaremodule.setMiddleWare(request);
+
+        const OnRequestResponse = await (
+          await import("../../config/onRequest")
+        ).default(request);
+        if (OnRequestResponse) return OnRequestResponse;
+
+        if (request.url.endsWith("/bunextgetSessionData")) {
+          return new Response(
+            JSON.stringify(_MiddleWaremodule.Session.getData()?.public)
+          );
         }
-      }
-      globalThis.dryRun = false;
-      return new Response("Not found", {
-        status: 404,
-      });
-    },
-  });
-  globalThis.devConsole.servePort = server.port;
-}
-async function init() {
-  if (globalThis.dryRun) {
-    await require("../../config/preload.ts");
-    RunServer();
-    logDevConsole();
-  }
-  if (process.env.NODE_ENV == "development" && globalThis.dryRun) {
-    serveHotServer(ServerConfig.Dev.hotServerPort);
-    doWatchBuild(arg == "showError" ? true : false);
-  } else if (process.env.NODE_ENV == "production") {
-    const buildoutput = await makeBuild();
-    if (!buildoutput) throw new Error("Production build failed");
-    setRevalidate(buildoutput.revalidates);
+        try {
+          const response =
+            (await self.serve(request)) ||
+            (await serveStatic(request)) ||
+            serveScript(request);
+          if (response) return _MiddleWaremodule.Session.setToken(response);
+        } catch (e) {
+          if ((e as Error).name == "TypeError") {
+            console.log(e);
+          }
+        }
+        globalThis.dryRun = false;
+        return new Response("Not found", {
+          status: 404,
+        });
+      },
+    });
   }
 
-  globalThis.dryRun = false;
-}
+  serveHotServer(port: number) {
+    const clearSocket = () => {
+      globalThis.socketList = globalThis.socketList.filter(
+        (s) => s.readyState == 0 || s.readyState == 1
+      );
+    };
 
-function logDevConsole(noClear?: boolean) {
-  const dev = globalThis.devConsole;
-  const toLog = [
-    `Serving: http://${dev.hostName}:${dev.servePort}`,
-    `current Error: ${dev.error || "none"}`,
-  ];
+    this.hotServer = Bun.serve({
+      websocket: {
+        message: (ws, message) => {},
+        open(ws) {
+          ws.send("welcome");
+          socketList.push(ws);
+          clearSocket();
+        },
+        close(ws) {
+          globalThis.socketList.splice(
+            socketList.findIndex((s) => s == ws),
+            1
+          );
+          clearSocket();
+        },
+      },
+      fetch(req, server) {
+        const upgraded = server.upgrade(req);
+        if (!upgraded) {
+          return new Response("Error", { status: 400 });
+        }
+        return new Response("OK");
+      },
+      port: port,
+    });
 
-  toLog.forEach((c) => console.log(c));
-  if (dev.message) console.log("Log:", dev.message);
-  else console.log("Log: None");
-}
-
-async function serve(request: Request) {
-  let serverActionData: FormData = new FormData();
-  if (request.url.endsWith("/ServerActionGetter")) {
-    serverActionData = await request.formData();
+    setInterval(() => {
+      clearSocket();
+    }, 10000);
   }
 
-  try {
-    const isDev = process.env.NODE_ENV == "development";
-    if (!router) throw new Error("reset router failed");
-    const filepath = router.server?.match(request)?.filePath;
-    if (request.url.includes("index.js?") && isDev) {
-      const url = new URL(request.url);
-      const pathname = url.pathname
-        .split("/")
-        .slice(0, -1)
-        .join("/")
-        .replace(builder.options.pageDir as string, "");
-      const devRoute = router.server?.match(pathname);
-      if (devRoute) {
-        builder.resetPath(devRoute.filePath);
-        await makeBuild();
-      }
-    } else if (isDev && filepath) {
-      builder.resetPath(filepath);
-      await makeBuild();
+  async init() {
+    if (globalThis.dryRun) {
+      await require("../../config/preload.ts");
+      this.RunServer();
+      this.logDevConsole();
+    }
+    if (process.env.NODE_ENV == "development" && globalThis.dryRun) {
+      this.serveHotServer(ServerConfig.Dev.hotServerPort);
+      doWatchBuild();
+      await builder.makeBuild();
+      await router.InitServerActions();
+    } else if (process.env.NODE_ENV == "production") {
+      const buildoutput = await builder.makeBuild();
+      if (!buildoutput) throw new Error("Production build failed");
+      setRevalidate(buildoutput.revalidates);
+      await router.InitServerActions();
     }
 
-    const session = await import("@bunpmjs/bunext/features/session");
-    let response: Response | null = null;
-    response = await router.serve(
-      request,
-      request.headers.toJSON(),
-      __REQUEST_CONTEXT__.response as Response,
-      serverActionData,
-      {
-        Shell: Shell as any,
-        bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
-        preloadScript: {
-          __HEAD_DATA__: process.env.__HEAD_DATA__ as string,
-          __PUBLIC_SESSION_DATA__: "undefined",
-          __NODE_ENV__: `"${process.env.NODE_ENV}"`,
-        },
-      }
-    );
-    return response;
-  } catch (e) {
-    const res = async (error: Error) =>
-      new Response(renderToString(ErrorFallback(error)), {
-        headers: {
-          "Content-Type": "text/html",
-        },
-      });
-    if ((e as Error).name == "TypeError") {
-      console.log(e);
+    globalThis.dryRun = false;
+    return this;
+  }
+
+  logDevConsole(noClear?: boolean) {
+    if (
+      typeof process.env.__TEST_MODE__ != "undefined" &&
+      process.env.__TEST_MODE__ == "true"
+    )
+      return;
+    const dev = globalThis.devConsole;
+    const toLog = [
+      `Serving: http://${dev.hostName}:${dev.servePort}`,
+      `current Error: ${dev.error || "none"}`,
+    ];
+
+    toLog.forEach((c) => console.log(c));
+    if (dev.message) console.log("Log:", dev.message);
+    else console.log("Log: None");
+  }
+
+  async serve(request: Request) {
+    let serverActionData: FormData = new FormData();
+    if (request.url.endsWith("/ServerActionGetter")) {
+      serverActionData = await request.formData();
     }
-    return res(e as Error);
+
+    try {
+      const isDev = process.env.NODE_ENV == "development";
+      if (!router) throw new Error("reset router failed");
+      const filepath = router.server?.match(request)?.filePath;
+      if (request.url.includes("index.js?") && isDev) {
+        const url = new URL(request.url);
+        const pathname = url.pathname
+          .split("/")
+          .slice(0, -1)
+          .join("/")
+          .replace(builder.options.pageDir as string, "");
+        const devRoute = router.server?.match(pathname);
+        if (devRoute) {
+          builder.resetPath(devRoute.filePath);
+          await builder.makeBuild();
+        }
+      } else if (isDev && filepath) {
+        builder.resetPath(filepath);
+        await builder.makeBuild();
+      }
+
+      const session = await import("@bunpmjs/bunext/features/session");
+      let response: Response | null = null;
+      response = await router.serve(
+        request,
+        request.headers.toJSON(),
+        __REQUEST_CONTEXT__.response as Response,
+        serverActionData,
+        {
+          Shell: Shell as any,
+          bootstrapModules: [
+            "/.bunext/react-ssr/hydrate.js",
+            "/bunext-scripts",
+          ],
+          preloadScript: {
+            __HEAD_DATA__: JSON.stringify(Head.head),
+            __PUBLIC_SESSION_DATA__: "undefined",
+            __NODE_ENV__: `"${process.env.NODE_ENV}"`,
+          },
+        }
+      );
+      return response;
+    } catch (e) {
+      const res = async (error: Error) =>
+        new Response(renderToString(ErrorFallback(error)), {
+          headers: {
+            "Content-Type": "text/html",
+          },
+        });
+      if ((e as Error).name == "TypeError") {
+        console.log(e);
+      }
+      return res(e as Error);
+    }
   }
 }
 
-async function serveStatic(request: Request) {
-  const path = new URL(request.url).pathname;
-  const file = Bun.file(paths.staticPath + path);
-  if (!(await file.exists())) return null;
-  return new Response(file);
-}
+const Server = await new BunextServer().init();
 
-function serveScript(request: Request) {
-  globalThis.scriptsList ??= [];
-  const path = new URL(request.url).pathname;
-  if (names.loadScriptPath != path) return null;
-  const _scriptsStr = globalThis.scriptsList.map((sc) => {
-    const variable = `__${generateRandomString(5)}__`;
-    return `const ${variable} = ${sc}; ${variable}();`;
-  });
-  return new Response(_scriptsStr.join("\n"), {
-    headers: {
-      "Content-Type": "text/javascript;charset=utf-8",
-    },
-  });
-}
-
-function setRevalidate(
-  revalidates: {
-    path: string;
-    time: number;
-  }[]
-) {
-  for (const reval of revalidates) {
-    setInterval(async () => {
-      await revalidate(reval.path);
-    }, reval.time);
-  }
-}
+export { Server, BunextServer };

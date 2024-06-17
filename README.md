@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible: bun 1.1.10 & under
+compatible: bun 1.1.13 & under
 compatible OS: Linux, WSL
 
 N.B : Bun is in continuous changement and compatibility between version is a
@@ -419,11 +419,37 @@ this method is temporary a new version will be avalable in a new release
 
 ```Javascript XML
 // index.tsx
-import { navigate } from "@bunpmjs/bunext/bun-react-ssr/router";
+import { navigate } from "@bunpmjs/bunext/internal/router";
 function NextPage() {
   return <button onClick={() => navigate("/new/location")}>Next page</button>;
 }
 
+```
+
+## Set Head meta data
+
+- Head will be set for the current page
+- set _path_ to set data for another path
+- will be revalidate on build time ( can be dynamic )
+
+```Javascript XML
+// /index.tsx
+import { Head } from "@bunpmjs/bunext/features/head";
+
+Head.setHead({
+  data: {
+    author: "John Doe",
+    title: "my Hompage",
+    publisher: "Bunext",
+    meta: [
+      {
+        name: "foo",
+        content: "bar",
+      },
+    ],
+  },
+  path: "/otherPath",
+});
 ```
 
 ## Run Script at Startup
@@ -437,6 +463,5 @@ config/server.ts contain server related configuration
 ## Bypass request
 
 To make a custom Response in _config/onRequest.ts_,
-return Response. To bypass the default behaviour, or
+return (Response or async Response) to bypass the default behaviour, or
 return undefined to use the default behaviour.
-_Can be async_

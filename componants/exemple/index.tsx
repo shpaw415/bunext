@@ -1,4 +1,4 @@
-import { setHead } from "@bunpmjs/bunext/componants/head";
+import { setHead } from "../../features/head";
 import { Register } from "./register";
 import { Session } from "@bunpmjs/bunext/features/session";
 

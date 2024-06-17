@@ -6,16 +6,29 @@ import {
   renderToString,
   type RenderToReadableStreamOptions,
 } from "react-dom/server";
-import { ClientOnlyError } from "./client";
 import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
 import React from "react";
-import "../internal/server_global";
+import "./server_global";
 import { __GET_PUBLIC_SESSION_DATA__ } from "../features/session";
-export class StaticRouters {
+import { mkdirSync, existsSync } from "node:fs";
+import { builder } from "./build";
+
+class ClientOnlyError extends Error {
+  constructor() {
+    super("client only");
+  }
+}
+
+class StaticRouters {
   server?: FileSystemRouter;
   client?: FileSystemRouter;
   #routes_dump: string;
+
+  serverActions: {
+    path: string;
+    actions: Array<Function>;
+  }[] = [];
 
   baseDir = process.cwd();
   buildDir = ".bunext/build";
@@ -48,7 +61,7 @@ export class StaticRouters {
       { omitStack: true }
     );
   }
-  private setRoutes() {
+  public setRoutes() {
     this.server = new Bun.FileSystemRouter({
       dir: join(this.baseDir, this.pageDir),
       style: "nextjs",
@@ -99,7 +112,7 @@ export class StaticRouters {
     );
     if (serverAction) return serverAction;
 
-    const staticResponse = await serveFromDir({
+    const staticResponse = await this.serveFromDir({
       directory: this.buildDir,
       path: pathname,
     });
@@ -180,7 +193,7 @@ export class StaticRouters {
         headers: { Location: result.redirect },
       });
     }
-    const preBuiledPage = globalThis.ssrElement
+    const preBuiledPage = builder.ssrElement
       .find((e) => e.path == serverSide.filePath)
       ?.elements.find((e) =>
         e.tag.endsWith(`${module.default.name}!>`)
@@ -257,7 +270,7 @@ export class StaticRouters {
 
     if (!reqData) return null;
     const props = this.extractPostData(data);
-    const module = globalThis.serverActions.find(
+    const module = this.serverActions.find(
       (s) => s.path === reqData.path.slice(1)
     );
     if (!module) return null;
@@ -345,60 +358,65 @@ export class StaticRouters {
     );
   }
   async InitServerActions() {
-    globalThis.serverActions = [];
     const files = this.getFilesFromPageDir();
 
     for await (const f of files) {
       const filePath = normalize(`${this.pageDir}/${f}`);
       const file = await Bun.file(filePath).text();
-      if (isUseClient(file)) continue;
+      if (this.isUseClient(file)) continue;
       const _module = await import(normalize(`${process.cwd()}/${filePath}`));
       const ServerActions = Object.keys(_module).filter((f) =>
         f.startsWith("Server")
       );
-      globalThis.serverActions.push({
+      this.serverActions.push({
         path: f,
         actions: ServerActions.map((name) => _module[name]),
       });
     }
     return this;
   }
-}
 
-export function isUseClient(fileData: string) {
-  const line = fileData
-    .split("\n")
-    .filter((l) => l.trim().length > 0)
-    .at(0);
-  if (!line) return false;
-  if (line.startsWith("'use client'") || line.startsWith('"use client"'))
-    return true;
-  return false;
-}
-
-export async function serveFromDir(config: {
-  directory: string;
-  path: string;
-  suffixes?: string[];
-}) {
-  const basePath = join(config.directory, config.path);
-  const suffixes = config.suffixes ?? [
-    "",
-    ".html",
-    "index.html",
-    ".js",
-    "/index.js",
-  ];
-  for await (const suffix of suffixes) {
-    const pathWithSuffix = basePath + suffix;
-    let file = Bun.file(pathWithSuffix);
-    if (await file.exists()) {
-      const content = readFileSync(pathWithSuffix, {
-        encoding: "ascii",
-      });
-      return content;
-    }
+  isUseClient(fileData: string) {
+    const line = fileData
+      .split("\n")
+      .filter((l) => l.trim().length > 0)
+      .at(0);
+    if (!line) return false;
+    if (line.startsWith("'use client'") || line.startsWith('"use client"'))
+      return true;
+    return false;
   }
 
-  return null;
+  async serveFromDir(config: {
+    directory: string;
+    path: string;
+    suffixes?: string[];
+  }) {
+    const basePath = join(config.directory, config.path);
+    const suffixes = config.suffixes ?? [
+      "",
+      ".html",
+      "index.html",
+      ".js",
+      "/index.js",
+    ];
+    for await (const suffix of suffixes) {
+      const pathWithSuffix = basePath + suffix;
+      let file = Bun.file(pathWithSuffix);
+      if (await file.exists()) {
+        const content = readFileSync(pathWithSuffix, {
+          encoding: "ascii",
+        });
+        return content;
+      }
+    }
+
+    return null;
+  }
 }
+
+if (!existsSync(".bunext/build/src/pages"))
+  mkdirSync(".bunext/build/src/pages", { recursive: true });
+const router = new StaticRouters();
+
+export { router, StaticRouters };

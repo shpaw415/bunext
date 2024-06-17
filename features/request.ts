@@ -1,3 +1,5 @@
+// only use this module in a server context
+
 export const __REQUEST_CONTEXT__ = {
   request: undefined as undefined | Request,
   response: undefined as undefined | Response,

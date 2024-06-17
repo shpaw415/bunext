@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { generateRandomString } from "./utils";
 
 export interface _SessionData<_SessionData> {
   public: Record<string, _SessionData>;

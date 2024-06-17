@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { ReloadContext } from "../bun-react-ssr/router";
+import { ReloadContext } from "../internal/router/index";
 
 declare global {
   var __BUNEXT_DEV_INIT: boolean;

@@ -13,8 +13,6 @@ import React, {
 import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher } from "./utils/get-route-matcher";
 import type { _GlobalData } from "../types";
-export * from "./components/Link";
-export * from "./hooks/useLink";
 
 const globalX = globalThis as unknown as _GlobalData;
 
@@ -198,7 +196,9 @@ async function NextJsLayoutStacker(
         (
           await import(
             normalize(
-              `${globalX.__PAGES_DIR__}${currentPath}/${globalX.__LAYOUT_NAME__}.js?${currentVersion}`
+              `${globalX.__PAGES_DIR__}${currentPath}/${
+                globalX.__LAYOUT_NAME__
+              }.js${globalX.__DEV_MODE__ ? "?" + currentVersion : ""}`
             )
           )
         ).default

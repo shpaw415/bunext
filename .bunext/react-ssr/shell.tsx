@@ -1,5 +1,5 @@
-import "./global";
-import { Head } from "@bunpmjs/bunext/componants/head";
+import "@bunpmjs/bunext/internal/globals";
+import { HeadElement } from "@bunpmjs/bunext/features/head";
 import { Dev } from "@bunpmjs/bunext/dev/dev";
 import React from "react";
 export const Shell = ({
@@ -11,7 +11,7 @@ export const Shell = ({
 }) => {
   return (
     <html>
-      <Head currentPath={route} />
+      <HeadElement currentPath={route} />
       <body>{children}</body>
       {process.env.NODE_ENV == "development" ||
       globalThis.__NODE_ENV__ == "development" ? (
