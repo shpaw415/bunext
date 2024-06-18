@@ -1,16 +1,16 @@
 {
-  "version": "0.5.1",
+  "version": "0.5.2",
   "include": [
-    "README.md",
-    "LICENSE",
-    "features",
-    "dev",
-    "componants",
-    "bin",
-    "internal",
-    "database",
     ".bunext",
+    "bin",
+    "componants",
     "config",
-    "plugins"
+    "database",
+    "dev",
+    "features",
+    "internal",
+    "plugins",
+    "LICENSE",
+    "README.md"
   ]
 }

@@ -1,8 +1,7 @@
-import { setHead } from "../../features/head";
+import { Head } from "@bunpmjs/bunext/features/head";
 import { Register } from "./register";
-import { Session } from "@bunpmjs/bunext/features/session";
 
-setHead({
+Head.setHead({
   data: {
     title: "My Bunext powered WebSite",
     author: "shpaw415",
@@ -18,19 +17,4 @@ export default function page() {
       <Register content="Register Now!" />
     </>
   );
-}
-
-export async function ServerCreateUser({
-  username,
-  password,
-}: {
-  username: string;
-  password: string;
-}) {
-  Bun.sleepSync(1000); // some backend work
-  Session.setData({
-    username: username,
-    password: password,
-  });
-  return `Data: ${username} with password: ${password} now registered`;
 }

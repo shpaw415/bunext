@@ -1,7 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import { ServerCreateUser } from ".";
+import { Session } from "@bunpmjs/bunext/features/session";
 
 export function Register({ content }: { content: string }) {
   const [state, set] = useState({
@@ -44,4 +42,19 @@ export function Register({ content }: { content: string }) {
       </button>
     </>
   );
+}
+
+export async function ServerCreateUser({
+  username,
+  password,
+}: {
+  username: string;
+  password: string;
+}) {
+  Bun.sleepSync(1000); // some backend work
+  Session.setData({
+    username: username,
+    password: password,
+  });
+  return `Data: ${username} with password: ${password} now registered`;
 }

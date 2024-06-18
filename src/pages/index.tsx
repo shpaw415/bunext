@@ -30,3 +30,7 @@ export default function Page() {
 export async function ServerAction() {
   return true;
 }
+
+export async function POST(req: Request) {
+  return new Response("allo");
+}

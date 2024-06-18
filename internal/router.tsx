@@ -127,11 +127,18 @@ class StaticRouters {
     const serverSide = this.server?.match(request);
     if (!serverSide) return null;
     const clientSide = this.client?.match(request);
-    if (!clientSide)
-      throw new TypeError(
-        "No client-side script found for server-side component: " +
-          serverSide.filePath
+    if (!clientSide) {
+      const apiEndpointResult = await this.VerifyApiEndpoint(
+        request,
+        serverSide
       );
+      if (!apiEndpointResult)
+        throw new TypeError(
+          "No client-side script found for server-side component: " +
+            serverSide.filePath
+        );
+      else return apiEndpointResult;
+    }
 
     const module = await import(serverSide.filePath);
     const result = await module.getServerSideProps?.({
@@ -229,6 +236,18 @@ class StaticRouters {
       jsx: FinalJSX,
       response,
     });
+  }
+
+  private async VerifyApiEndpoint(request: Request, route: MatchedRoute) {
+    const ApiModule = await import(route.filePath);
+    if (typeof ApiModule[request.method] == "undefined") return;
+    const res = ApiModule[request.method](request) as Response | undefined;
+
+    if (res instanceof Response) return res;
+    else
+      throw new Error(
+        `Api Endpoint ${route.filePath} did not returned a Response Object`
+      );
   }
 
   private async makeStream({
