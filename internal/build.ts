@@ -77,10 +77,22 @@ class Builder {
 
   async Init() {
     await this.InitGetCustomPluginsFromUser();
+    await this.InitGetFixingPlugins();
     return this;
   }
 
-  async InitGetCustomPluginsFromUser() {
+  private async InitGetFixingPlugins() {
+    const fixesFiles = await Array.fromAsync(
+      this.glob(`${import.meta.dirname}/../plugins`, "**/*.ts")
+    );
+    for await (const filePath of fixesFiles) {
+      const plugin = (await import(filePath))?.default;
+      if (!plugin) continue;
+      this.plugins.push(plugin);
+    }
+  }
+
+  private async InitGetCustomPluginsFromUser() {
     const serverConfig = (await import(process.cwd() + "/config/server"))
       .default;
     this.plugins.push(...serverConfig.build.plugins);
