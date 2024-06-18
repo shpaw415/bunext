@@ -10,6 +10,7 @@
     "internal",
     "database",
     ".bunext",
-    "config"
+    "config",
+    "plugins"
   ]
 }
