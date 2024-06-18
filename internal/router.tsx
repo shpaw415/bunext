@@ -240,7 +240,7 @@ class StaticRouters {
 
   private async VerifyApiEndpoint(request: Request, route: MatchedRoute) {
     const ApiModule = await import(route.filePath);
-    if (typeof ApiModule[request.method] == "undefined") return;
+    if (typeof ApiModule[request.method.toUpperCase()] == "undefined") return;
     const res = (await ApiModule[request.method](request)) as
       | Response
       | undefined;
