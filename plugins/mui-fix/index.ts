@@ -12,7 +12,7 @@ const Plugin: BunPlugin = {
       {
         filter: /@mui\/material\/styles\/styled.js$/,
       },
-      async ({ path, loader }) => {
+      async ({ path }) => {
         const transformed = async () => {
           const fileContent = await Bun.file(path).text();
           return fileContent
