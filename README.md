@@ -465,3 +465,29 @@ config/server.ts contain server related configuration
 To make a custom Response in _config/onRequest.ts_,
 return (Response or async Response) to bypass the default behaviour, or
 return undefined to use the default behaviour.
+
+## Api Endpoint
+
+- access the Endpoint via src/pages as root
+
+```TypeScript
+// /src/pages/api/v1/index.ts
+export async function POST(request: Request) {
+  return new Response("You made a POST request");
+}
+export async function GET(request: Response) {
+  return new Response("You made a GET request");
+}
+export async function DELETE(request: Response) {
+  return new Response("You made a DELETE request");
+}
+export async function PUT(request: Response) {
+  return new Response("You made a PUT request");
+}
+
+// Client request
+await fetch("my.site.com/api/v1", {
+  method: "POST",
+  body: JSON.stringify({ foo: "bar" })
+}); // return the post data
+```

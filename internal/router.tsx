@@ -241,7 +241,9 @@ class StaticRouters {
   private async VerifyApiEndpoint(request: Request, route: MatchedRoute) {
     const ApiModule = await import(route.filePath);
     if (typeof ApiModule[request.method] == "undefined") return;
-    const res = ApiModule[request.method](request) as Response | undefined;
+    const res = (await ApiModule[request.method](request)) as
+      | Response
+      | undefined;
 
     if (res instanceof Response) return res;
     else
