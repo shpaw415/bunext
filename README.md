@@ -59,8 +59,6 @@ bun run databaseCreate # only create the types
 
 - SQlite performance & features
 
-- .ts extention for serverAction ( only .tsx is allowed for now )
-
 - FormData support for Server Action
 
 - Links
@@ -203,7 +201,6 @@ Key informations:
 - Server Action must be **exported async function**
 - It can be called like a normal async function from the client side
 - File must be on the **first level of params** you cannot put a file in an object
-- File extension must be .tsx
 
 ```Javascript XML
 // index.tsx
