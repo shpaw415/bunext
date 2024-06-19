@@ -67,6 +67,7 @@ class BunextServer {
   }
 
   serveHotServer(port: number) {
+    this.hotServerPort = port;
     const clearSocket = () => {
       globalThis.socketList = globalThis.socketList.filter(
         (s) => s.readyState == 0 || s.readyState == 1
@@ -110,11 +111,13 @@ class BunextServer {
       this.RunServer();
       this.logDevConsole();
     }
+    if (process.env.NODE_ENV == "development") {
+      await router.InitServerActions();
+    }
     if (process.env.NODE_ENV == "development" && globalThis.dryRun) {
       this.serveHotServer(ServerConfig.Dev.hotServerPort);
       doWatchBuild();
       await builder.makeBuild();
-      await router.InitServerActions();
     } else if (process.env.NODE_ENV == "production") {
       const buildoutput = await builder.makeBuild();
       if (!buildoutput) throw new Error("Production build failed");

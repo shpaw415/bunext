@@ -198,7 +198,7 @@ export async function ServerDeleteSesion() {
 Like Next offer a ServerAction method Bunext does it as well.
 Key informations:
 
-- As long there is no **"use client"** on top of the file the serverAction will be Server Side
+- Works with _use server_ and _use client_
 - Server Action name should always start with **Server** key word
 - Server Action must be **exported async function**
 - It can be called like a normal async function from the client side

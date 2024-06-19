@@ -383,8 +383,6 @@ class StaticRouters {
 
     for await (const f of files) {
       const filePath = normalize(`${this.pageDir}/${f}`);
-      const file = await Bun.file(filePath).text();
-      if (this.isUseClient(file)) continue;
       const _module = await import(normalize(`${process.cwd()}/${filePath}`));
       const ServerActions = Object.keys(_module).filter((f) =>
         f.startsWith("Server")

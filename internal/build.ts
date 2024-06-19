@@ -142,16 +142,6 @@ class Builder {
     process.env.__BUILD_MODE__ = "false";
     return this.buildOutput;
   }
-  isUseClient(fileData: string) {
-    const line = fileData
-      .split("\n")
-      .filter((l) => l.trim().length > 0)
-      .at(0);
-    if (!line) return false;
-    if (line.startsWith("'use client'") || line.startsWith('"use client"'))
-      return true;
-    return false;
-  }
   async preBuild(modulePath: string) {
     Head._setCurrentPath(modulePath);
     const moduleContent = await Bun.file(modulePath).text();
@@ -163,19 +153,21 @@ class Builder {
 
     //TODO: need to test for revalidation of imported react Element from current page
     if (modulePath.endsWith("index.tsx")) {
-      const extCheck = ["ts", "tsx"];
+      const MainModulePath = import.meta
+        .resolve(modulePath)
+        .replace("file://", "");
+      this.currentRecursivePreBuildsPages.push(MainModulePath);
+      const ext = "tsx";
       for await (const imp of imports) {
-        for await (const ext of extCheck) {
-          const filePath =
-            import.meta.resolve(imp.path, modulePath).replace("file://", "") +
-            `.${ext}`;
-          if (!(await Bun.file(filePath).exists())) continue;
-          if (this.currentRecursivePreBuildsPages.includes(filePath)) continue;
-          else {
-            this.currentRecursivePreBuildsPages.push(filePath);
-            this.resetPath(filePath);
-            this.preBuild(filePath);
-          }
+        const filePath =
+          import.meta.resolve(imp.path, modulePath).replace("file://", "") +
+          `.${ext}`;
+        if (!(await Bun.file(filePath).exists())) continue;
+        if (this.currentRecursivePreBuildsPages.includes(filePath)) continue;
+        else {
+          this.currentRecursivePreBuildsPages.push(filePath);
+          this.resetPath(filePath);
+          this.preBuild(filePath);
         }
       }
     }
@@ -275,8 +267,6 @@ class Builder {
 
       if (!path.endsWith(".tsx")) continue;
       if (this.preBuildPaths.includes(path)) continue;
-      //else this.preBuildPaths.push(path);
-      //await this.preBuild(path);
     }
   }
   async preBuildAll(skip?: ssrElement[]) {
@@ -289,6 +279,16 @@ class Builder {
       if (skip?.find((e) => e.path == file)) continue;
       await this.preBuild(file);
     }
+  }
+  isUseClient(fileData: string) {
+    const line = fileData
+      .split("\n")
+      .filter((l) => l.trim().length > 0)
+      .at(0);
+    if (!line) return false;
+    if (line.startsWith("'use client'") || line.startsWith('"use client"'))
+      return true;
+    return false;
   }
   resetPath(path: string) {
     const index = this.ssrElement.findIndex((p) => p.path == path);
@@ -449,15 +449,26 @@ class Builder {
       func.name
     )}`;
   }
-  private ClientSideFeatures(fileContent: string, filePath: string) {
+  private async ClientSideFeatures(fileContent: string, filePath: string) {
     const transpiler = new Bun.Transpiler({
       loader: "tsx",
       autoImportJSX: true,
       deadCodeElimination: true,
       jsxOptimizationInline: true,
+      exports: {
+        replace: {
+          ...this.ServerActionToTag(fileContent),
+        },
+      },
     });
-    return transpiler.transformSync(fileContent);
+
+    return this.ServerActionCompiler(
+      (await import(filePath)) as Record<string, Function>,
+      transpiler.transformSync(fileContent),
+      filePath
+    );
   }
+
   private async ServerSideFeatures({
     modulePath,
     fileContent,
@@ -472,23 +483,24 @@ class Builder {
       };
     };
   }) {
-    const _module = (await import(modulePath)) as Record<string, Function>;
-    const ServerActionsExports = Object.keys(_module).filter(
-      (k) =>
-        k.startsWith("Server") ||
-        (k == "default" && _module[k].name.startsWith("Server"))
+    fileContent = this.ServerActionCompiler(
+      (await import(modulePath)) as Record<string, Function>,
+      fileContent,
+      modulePath
     );
-    // ServerAction
-    for await (const serverAction of ServerActionsExports) {
-      const SAFunc = _module[serverAction] as Function;
-      const SAString = SAFunc.toString();
-      if (!SAString.startsWith("async")) continue;
-      fileContent = fileContent.replace(
-        `"<!BUNEXT_ServerAction_${serverAction}!>"`,
-        this.ServerActionToClient(SAFunc, modulePath)
-      );
-    }
-    // ServerComponants
+    fileContent = this.ServerComponantsCompiler(serverComponants, fileContent);
+
+    return fileContent;
+  }
+  private ServerComponantsCompiler(
+    serverComponants: {
+      [key: string]: {
+        tag: string; // "<!Bunext_Element_FunctionName!>"
+        reactElement: string;
+      };
+    },
+    fileContent: string
+  ) {
     for (const _componant of Object.keys(serverComponants)) {
       const componant = (serverComponants as any)[_componant] as {
         tag: string;
@@ -497,6 +509,29 @@ class Builder {
       fileContent = fileContent.replace(
         `"${componant.tag}"`,
         `() => ${componant.reactElement}`
+      );
+    }
+
+    return fileContent;
+  }
+  private ServerActionCompiler(
+    _module: Record<string, Function>,
+    fileContent: string,
+    modulePath: string
+  ) {
+    const ServerActionsExports = Object.keys(_module).filter(
+      (k) =>
+        k.startsWith("Server") ||
+        (k == "default" && _module[k].name.startsWith("Server"))
+    );
+    // ServerAction
+    for (const serverAction of ServerActionsExports) {
+      const SAFunc = _module[serverAction] as Function;
+      const SAString = SAFunc.toString();
+      if (!SAString.startsWith("async")) continue;
+      fileContent = fileContent.replace(
+        `"<!BUNEXT_ServerAction_${serverAction}!>"`,
+        this.ServerActionToClient(SAFunc, modulePath)
       );
     }
 
@@ -518,16 +553,14 @@ class Builder {
                   )
                 ) +
                 "/.*" +
-                "\\.ts[x]$"
+                "\\.(ts|tsx|jsx)$"
             ),
           },
-          async ({ path, loader }) => {
-            const search = new URLSearchParams();
-            search.append("client", "1");
-            search.append("loader", loader);
+          async ({ path, loader, ...props }) => {
+            const fileText = await Bun.file(path).text();
             const { exports } = new Bun.Transpiler({
-              loader: "tsx",
-            }).scan(await Bun.file(path).text());
+              loader: loader as "tsx" | "ts",
+            }).scan(fileText);
             return {
               contents:
                 `export { ${exports.join(", ")} } from ` +
@@ -537,7 +570,7 @@ class Builder {
           }
         );
         build.onResolve(
-          { filter: /\.ts[x]\?client$/ },
+          { filter: /\.(ts|tsx)\?client$/ },
           async ({ importer, path }) => {
             const url = Bun.pathToFileURL(importer);
             const filePath = Bun.fileURLToPath(new URL(path, url));
@@ -548,7 +581,7 @@ class Builder {
           }
         );
         build.onLoad(
-          { namespace: "client", filter: /\.ts[x]$/ },
+          { namespace: "client", filter: /\.tsx$/ },
           async ({ path, loader }) => {
             let fileContent = await Bun.file(path).text();
             if (
@@ -565,7 +598,7 @@ class Builder {
 
             if (!isServer)
               return {
-                contents: self.ClientSideFeatures(fileContent, path),
+                contents: await self.ClientSideFeatures(fileContent, path),
                 loader: "js",
               };
 
@@ -608,6 +641,18 @@ class Builder {
             }).transformSync(fileContent);
             return {
               contents: fileContent,
+              loader: "js",
+            };
+          }
+        );
+        build.onLoad(
+          { namespace: "client", filter: /\.ts$/ },
+          async ({ path }) => {
+            return {
+              contents: await self.ClientSideFeatures(
+                await Bun.file(path).text(),
+                path
+              ),
               loader: "js",
             };
           }
