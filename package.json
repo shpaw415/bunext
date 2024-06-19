@@ -1,6 +1,6 @@
 {
   "name": "bunext",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
@@ -25,6 +25,7 @@
     "bunext": "bin/index.ts"
   },
   "scripts": {
-    "test": "bun test ./bin/test.ts"
+    "test": "bun test ./bin/test.ts",
+    "clear-build": "rm -rf .bunext/build/* .bunext/build/.bunext"
   }
 }

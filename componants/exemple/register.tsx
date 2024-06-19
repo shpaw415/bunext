@@ -1,3 +1,4 @@
+"use client";
 import { useState } from "react";
 import { Session } from "@bunpmjs/bunext/features/session";
 
