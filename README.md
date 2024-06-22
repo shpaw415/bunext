@@ -141,7 +141,9 @@ without PreventRenderOnUpdate
 
 function LoggedIndicator() {
   const session = useSession();
-  return <span>{session.getData()?.username || "not logged"}</span>;
+  return (<span>
+      {session.getData()?.username ? `logged as ${session.getData().username}` : "not logged"}
+    </span>);
 }
 
 export async function ServerSetSession({
