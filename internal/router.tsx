@@ -1,4 +1,4 @@
-import type { FileSystemRouter, MatchedRoute } from "bun";
+import { $, type FileSystemRouter, type MatchedRoute } from "bun";
 import { readFileSync } from "fs";
 import { NJSON } from "next-json";
 import { join, relative } from "node:path";
@@ -13,7 +13,7 @@ import "./server_global";
 import { __GET_PUBLIC_SESSION_DATA__ } from "../features/session";
 import { mkdirSync, existsSync } from "node:fs";
 import { builder } from "./build";
-
+import { Head } from "../features/head";
 class ClientOnlyError extends Error {
   constructor() {
     super("client only");
@@ -88,8 +88,6 @@ class StaticRouters {
     data: FormData,
     {
       Shell,
-      preloadScript,
-      bootstrapModules,
       context,
       onError = (error, errorInfo) => {
         if (error instanceof ClientOnlyError) return;
@@ -111,6 +109,13 @@ class StaticRouters {
       data
     );
     if (serverAction) return serverAction;
+
+    if (request.url.endsWith("/bunextgetSessionData")) {
+      const _MiddleWaremodule = await import("./middleware");
+      return new Response(
+        JSON.stringify(_MiddleWaremodule.Session.getData()?.public)
+      );
+    }
 
     const staticResponse = await this.serveFromDir({
       directory: this.buildDir,
@@ -141,7 +146,7 @@ class StaticRouters {
     }
 
     const module = await import(serverSide.filePath);
-    const result = await module.getServerSideProps?.({
+    const result = await module?.getServerSideProps?.({
       params: serverSide.params,
       req: request,
       query: serverSide.query,
@@ -161,26 +166,64 @@ class StaticRouters {
       });
     }
 
-    const isNextJs = Boolean(this.options.displayMode?.nextjs);
+    if (result?.redirect) {
+      return new Response(null, {
+        status: 302,
+        headers: { Location: result.redirect },
+      });
+    }
+    return this.makeStream({
+      jsx: await this.makeJSXPage({
+        Shell,
+        module: serverSide.filePath,
+        onError,
+        serverSidePropsString: stringified,
+        request,
+        search,
+        serverSide,
+        serverSidePropsResult: result,
+      }),
+      response,
+    });
+  }
 
+  private async makeJSXPage({
+    request,
+    serverSidePropsString,
+    onError,
+    serverSide,
+    module,
+    serverSidePropsResult,
+    search,
+    Shell,
+  }: {
+    request: Request;
+    serverSidePropsString: string;
+    onError: (error: unknown, errorInfo: React.ErrorInfo) => string | void;
+    serverSide: MatchedRoute;
+    module: string;
+    serverSidePropsResult: any;
+    search: string;
+    Shell: React.ComponentType<{
+      children: React.ReactElement;
+    }>;
+  }) {
     const preloadScriptObj = {
       __PAGES_DIR__: JSON.stringify(this.pageDir),
       __INITIAL_ROUTE__: JSON.stringify(serverSide.pathname + search),
       __ROUTES__: this.#routes_dump,
-      __SERVERSIDE_PROPS__: stringified,
+      __SERVERSIDE_PROPS__: serverSidePropsString,
       __DISPLAY_MODE__: JSON.stringify(
         Object.keys(this.options.displayMode)[0]
       ),
-      __LAYOUT_NAME__: isNextJs
-        ? JSON.stringify(
-            this.options?.displayMode?.nextjs?.layout.split(".").at(0)
-          )
-        : "",
-      __LAYOUT_ROUTE__: isNextJs
-        ? JSON.stringify(await this.getlayoutPaths())
-        : "",
+      __LAYOUT_NAME__: JSON.stringify(
+        this.options?.displayMode?.nextjs?.layout.split(".").at(0)
+      ),
+      __LAYOUT_ROUTE__: JSON.stringify(await this.getlayoutPaths()),
       __DEV_MODE__: Boolean(process.env.NODE_ENV == "development"),
-      ...preloadScript,
+      __HEAD_DATA__: JSON.stringify(Head.head),
+      __PUBLIC_SESSION_DATA__: "undefined",
+      __NODE_ENV__: `"${process.env.NODE_ENV}"`,
     } as const;
 
     const preloadSriptsStrList = Object.keys(preloadScriptObj)
@@ -190,38 +233,21 @@ class StaticRouters {
     const renderOptionData = {
       signal: request.signal,
       bootstrapScriptContent: preloadSriptsStrList.join(";"),
-      bootstrapModules,
+      bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
       onError,
     } as RenderToReadableStreamOptions;
-
-    if (result?.redirect) {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: result.redirect },
-      });
-    }
-    const preBuiledPage = builder.ssrElement
-      .find((e) => e.path == serverSide.filePath)
-      ?.elements.find((e) =>
-        e.tag.endsWith(`${module.default.name}!>`)
-      )?.htmlElement;
-    let jsxToServe: JSX.Element;
-    if (preBuiledPage) {
-      jsxToServe = (
-        <div
-          id="BUNEXT_INNER_PAGE_INSERTER"
-          dangerouslySetInnerHTML={{ __html: preBuiledPage }}
-        />
-      );
-    } else jsxToServe = await module.default({ ...result?.props });
-    switch (Object.keys(this.options.displayMode)[0] as keyof _DisplayMode) {
-      case "nextjs":
-        jsxToServe = await this.stackLayouts(serverSide, jsxToServe);
-        break;
-    }
-
-    const FinalJSX = (
-      <Shell route={serverSide.pathname + search} {...result}>
+    const jsxToServe: JSX.Element =
+      (await this.serverPrebuiltPage(serverSide, await import(module))) ||
+      (await this.CreateDynamicPage(
+        module,
+        {
+          props: serverSidePropsResult,
+          params: serverSide.params,
+        },
+        serverSide
+      ));
+    return (
+      <Shell route={serverSide.pathname + search} {...serverSidePropsResult}>
         {jsxToServe}
         <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>
         <script
@@ -231,11 +257,67 @@ class StaticRouters {
         />
       </Shell>
     );
+  }
 
-    return this.makeStream({
-      jsx: FinalJSX,
-      response,
-    });
+  private async serverPrebuiltPage(
+    serverSide: MatchedRoute,
+    module: Record<string, Function>
+  ) {
+    const preBuiledPage = builder.ssrElement
+      .find((e) => e.path == serverSide.filePath)
+      ?.elements.find((e) =>
+        e.tag.endsWith(`${module.default.name}!>`)
+      )?.htmlElement;
+    if (preBuiledPage) {
+      return await this.stackLayouts(
+        serverSide,
+        <div
+          id="BUNEXT_INNER_PAGE_INSERTER"
+          dangerouslySetInnerHTML={{ __html: preBuiledPage }}
+        />
+      );
+    }
+  }
+
+  public async CreateDynamicPage(
+    module: string,
+    props: { props: any; params: Record<string, string> },
+    serverSide: MatchedRoute
+  ): Promise<JSX.Element> {
+    if (process.env.NODE_ENV == "production") {
+      const jsxToServe = (await import(module)).default({
+        props: props.props,
+        params: props.params,
+      }) as JSX.Element;
+      return await this.stackLayouts(serverSide, jsxToServe);
+    } else {
+      if (!import.meta.main) {
+        const processResponse = Bun.spawnSync({
+          cmd: ["bun", import.meta.filename, "--makeJSX"],
+          env: {
+            __PROPS__: JSON.stringify(props),
+            __MODULE_PATTH__: module,
+            __MATCHED_ROUTE__: serverSide.pathname,
+          },
+        });
+        const responseText = (
+          await new Response(processResponse.stdout).text()
+        ).split("<!BUNEXT_RESPONSE>")[1];
+        return (
+          <div
+            id="BUNEXT_INNER_PAGE_INSERTER"
+            dangerouslySetInnerHTML={{ __html: responseText }}
+          />
+        );
+      } else {
+        const jsxToServe = (await import(module)).default({
+          props: props.props,
+          params: props.params,
+        }) as JSX.Element;
+        const stacked = await this.stackLayouts(serverSide, jsxToServe);
+        return stacked;
+      }
+    }
   }
 
   private async VerifyApiEndpoint(request: Request, route: MatchedRoute) {
@@ -422,12 +504,7 @@ class StaticRouters {
     for await (const suffix of suffixes) {
       const pathWithSuffix = basePath + suffix;
       let file = Bun.file(pathWithSuffix);
-      if (await file.exists()) {
-        const content = readFileSync(pathWithSuffix, {
-          encoding: "ascii",
-        });
-        return content;
-      }
+      if (await file.exists()) return await file.text();
     }
 
     return null;
@@ -437,5 +514,26 @@ class StaticRouters {
 if (!existsSync(".bunext/build/src/pages"))
   mkdirSync(".bunext/build/src/pages", { recursive: true });
 const router = new StaticRouters();
+
+if (import.meta.main) {
+  const taskID = process.argv[2] as "--makeJSX";
+  switch (taskID) {
+    case "--makeJSX":
+      const jsxElement = await router.CreateDynamicPage(
+        process.env.__MODULE_PATTH__ as string,
+        JSON.parse(process.env.__PROPS__ as string) as {
+          props: any;
+          params: Record<string, string>;
+        },
+        router.server?.match(
+          process.env.__MATCHED_ROUTE__ as string
+        ) as MatchedRoute
+      );
+      process.stdout.write(
+        "<!BUNEXT_RESPONSE>" + renderToString(jsxElement) + "<!BUNEXT_RESPONSE>"
+      );
+      break;
+  }
+}
 
 export { router, StaticRouters };

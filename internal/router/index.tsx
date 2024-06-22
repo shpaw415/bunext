@@ -119,24 +119,28 @@ export const RouterHost = ({
       if (typeof target !== "string") throw new Error("invalid target", target);
       const currentVersion = ++versionRef.current;
       try {
+        const matched = match(target.split("?").at(0) as string);
+        if (!matched) throw new Error("no match found");
         const [props, module] = await Promise.all([
           fetchServerSideProps(target),
           import(
-            `${match(target.split("?")[0])!.value}${
+            `${matched.value}${
               globalX.__DEV_MODE__ ? `?${currentVersion}` : ""
             }`
           ),
         ]);
-        let JsxToDisplay = <module.default {...props?.props} />;
-        switch (globalX.__DISPLAY_MODE__) {
-          case "nextjs":
-            JsxToDisplay = await NextJsLayoutStacker(
-              JsxToDisplay,
-              target,
-              currentVersion
-            );
-            break;
-        }
+
+        let JsxToDisplay = module.default({
+          props,
+          params: matched.params,
+        });
+
+        JsxToDisplay = await NextJsLayoutStacker(
+          JsxToDisplay,
+          target,
+          currentVersion
+        );
+
         if (currentVersion === versionRef.current) {
           if (props?.redirect) {
             navigate(props.redirect);
@@ -153,8 +157,9 @@ export const RouterHost = ({
             });
           }
         }
-      } catch {
-        window.location.reload();
+      } catch (e) {
+        console.log(e);
+        //window.location.reload();
       }
     },
     []

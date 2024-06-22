@@ -57,6 +57,9 @@ class Builder {
   public preBuildPaths: Array<string> = [];
   private buildOutput?: BuildOutput;
   private plugins: BunPlugin[] = [];
+  /**
+   * absolute path
+   */
   public ssrElement: ssrElement[] = [];
   public revalidates: {
     path: string;
@@ -459,6 +462,7 @@ class Builder {
         replace: {
           ...this.ServerActionToTag(fileContent),
         },
+        eliminate: ["getServerSideProps"],
       },
     });
 
@@ -558,9 +562,13 @@ class Builder {
           },
           async ({ path, loader, ...props }) => {
             const fileText = await Bun.file(path).text();
-            const { exports } = new Bun.Transpiler({
+            const exports = new Bun.Transpiler({
               loader: loader as "tsx" | "ts",
-            }).scan(fileText);
+              exports: {
+                eliminate: ["getServerSideProps"],
+              },
+            }).scan(fileText).exports;
+
             return {
               contents:
                 `export { ${exports.join(", ")} } from ` +
@@ -594,51 +602,48 @@ class Builder {
                 loader: "tsx",
               };
             }
-            const isServer = !self.isUseClient(fileContent);
 
-            if (!isServer)
+            if (self.isUseClient(fileContent))
               return {
                 contents: await self.ClientSideFeatures(fileContent, path),
                 loader: "js",
               };
 
-            let transpiler = new Bun.Transpiler({ loader: "tsx" });
+            const serverComponants = await self.ServerComponantsToTag(path);
 
-            const serverComponants = isServer
-              ? await self.ServerComponantsToTag(path)
-              : {};
             const serverCompotantsForTranspiler = Object.assign(
               {},
               ...Object.keys(serverComponants).map((componant) => ({
                 [componant]: serverComponants[componant].tag,
               }))
             );
-            transpiler = new Bun.Transpiler({
+            let transpiler = new Bun.Transpiler({
               loader: "tsx",
               trimUnusedImports: true,
-              exports: isServer
-                ? {
-                    replace: {
-                      ...self.ServerActionToTag(fileContent),
-                      ...serverCompotantsForTranspiler,
-                    },
-                  }
-                : {},
+              autoImportJSX: true,
+              jsxOptimizationInline: true,
+              deadCodeElimination: true,
+              exports: {
+                replace: {
+                  ...self.ServerActionToTag(fileContent),
+                  ...serverCompotantsForTranspiler,
+                },
+              },
             });
             fileContent = transpiler.transformSync(fileContent);
-            if (isServer)
+
+            if (Object.keys(serverComponants).length > 0) {
               fileContent = await self.ServerSideFeatures({
                 modulePath: path,
                 fileContent: fileContent,
                 serverComponants: serverComponants,
               });
 
-            fileContent = new Bun.Transpiler({
-              loader: "tsx",
-              autoImportJSX: true,
-              trimUnusedImports: true,
-              jsxOptimizationInline: true,
-            }).transformSync(fileContent);
+              fileContent = new Bun.Transpiler({
+                loader: "jsx",
+                jsxOptimizationInline: true,
+              }).transformSync(fileContent);
+            }
             return {
               contents: fileContent,
               loader: "js",
@@ -732,7 +737,7 @@ class Builder {
       target: "browser",
       define: {
         "process.env.NODE_ENV": JSON.stringify(
-          Bun.env.NODE_ENV || "development"
+          process.env.NODE_ENV || "development"
         ),
         ...define,
       },

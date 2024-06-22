@@ -72,6 +72,19 @@ describe("Server Features", () => {
   });
 });
 
+test("API EndPoint", async () => {
+  const methods = ["POST", "GET", "PUT", "DELETE"];
+  for await (const method of methods) {
+    expect(
+      await (
+        await fetch(`http://localhost:${Server.port}/api/v1`, {
+          method,
+        })
+      ).text()
+    ).toBe(method);
+  }
+});
+
 afterAll(async () => {
   //cleanUpBuild();
   await cleanUpServers();

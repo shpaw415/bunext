@@ -42,6 +42,9 @@ export type _globalThis = _GlobalData & {
  *
  * build
  *  - plugins: custom plugins for the build
+ *
+ * session
+ *  - timeout: Invalidate session after X seconds of Idle
  */
 export type ServerConfig = {
   HTTPServer: {
@@ -52,6 +55,9 @@ export type ServerConfig = {
   };
   build: {
     plugins: BunPlugin[];
+  };
+  session?: {
+    timeout: number;
   };
 };
 

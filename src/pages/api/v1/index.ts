@@ -1,9 +1,15 @@
-export function POST(request: Request) {}
-
-export function GET(request: Request) {
-  return "allo";
+export function POST(request: Request) {
+  return new Response("POST");
 }
 
-export function PUT(request: Request) {}
+export function GET(request: Request) {
+  return new Response("GET");
+}
 
-export function DELETE(request: Request) {}
+export function PUT(request: Request) {
+  return new Response("PUT");
+}
+
+export function DELETE(request: Request) {
+  return new Response("DELETE");
+}

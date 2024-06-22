@@ -31,10 +31,10 @@ class _Session {
   /**
    * Server side only
    * @param data data to set in the token
-   * @param Public the data can be accessed in the client context
+   * @param Public the data can be accessed in the client context ( default: false )
    * @description update the data in the session. Current data will be keept
    */
-  setData(data: Record<string, any>, Public?: true) {
+  setData(data: Record<string, any>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
     if (typeof __USER_ACTION__.__SESSION_DATA__?.private == "undefined") return;
     __USER_ACTION__.__SESSION_DATA__.private = {

@@ -25,9 +25,10 @@ export async function hydrate(
   const matched = match(globalX.__INITIAL_ROUTE__.split("?")[0])!;
   const Initial = await import(matched.value);
 
-  let JsxToDisplay: JSX.Element = (
-    <Initial.default {...globalX.__SERVERSIDE_PROPS__?.props} />
-  );
+  let JsxToDisplay: JSX.Element = Initial.default({
+    props: globalX.__SERVERSIDE_PROPS__,
+    params: matched.params,
+  });
 
   switch (globalX.__DISPLAY_MODE__) {
     case "nextjs":

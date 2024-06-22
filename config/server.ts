@@ -9,6 +9,9 @@ const Config: ServerConfig = {
   build: {
     plugins: [],
   },
+  session: {
+    timeout: 3600,
+  },
 };
 
 export default Config;

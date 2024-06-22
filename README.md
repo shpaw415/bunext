@@ -74,9 +74,26 @@ bun run dev
 
 ## Documentation
 
+## Router
+
+Like NextJs the routes are in src/pages.
+
+- _index.tsx_ is the main page for the route
+- _[id].tsx_ is a dynamic page loading and is a good oportunity to use getServerSideProps
+- _layout.tsx_ is the layout for the current route and sub-directory routes
+
+```Javascript XML
+//index.tsx
+export default function Page() {
+  return <div>My page</div>
+}
+
+```
+
 ## Session
 
-Manage the session from your users by setting a session and optionaly make it accessible from the client side ( default to only Server Side ).
+Manage the session from your users by setting a
+session and optionaly make it accessible from the client side ( default to only Server Side ).
 
 - SetData only from the Server Side is allowed.
 - Delete Session data can be Client or Server Side
@@ -300,6 +317,39 @@ export async function ServerRevalidate(path: string) {
   // will revalidate the page right now
 }
 
+```
+
+## GetServerSideProps
+
+Loading dynamic data directly into the main React Element.
+
+```Javascript XML
+// Request URL /informationID
+// [id].tsx
+export default function Page(props: {
+  props: {
+    foo: string,
+    name: {
+      john: string
+      }
+    },
+  params: {
+    id: string
+  }
+  }) {
+    return <div>{props.foo + " - " +params.id}</div> // bar - informationID
+  }
+
+
+export async function getServerSideProps() {
+  // go get some api data, database, etc...
+  return {
+    foo: "bar",
+    name: {
+      john: "Doe"
+    }
+  };
+}
 ```
 
 ## Database
