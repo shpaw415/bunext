@@ -3,7 +3,7 @@
 compatible: bun 1.1.13 & under
 compatible OS: Linux, WSL
 
-**SOME MAJOR CHANGE HAS BEEN MADE PAY ATTENTION TO THE SESSION SECTION DUE TO**
+**SOME MAJOR CHANGE HAS BEEN MADE PAY ATTENTION TO THE SESSION & API-ENDPOINT SECTION DUE TO**
 **A RACE CONDITION THAT COULD LEAD TO A SECURITY ISSUE AND OTHER UNDEFINED BEHAVIOURS**
 
 N.B : Bun is in continuous changement and compatibility between version is a
@@ -102,13 +102,13 @@ session and optionaly make it accessible from the client side ( default to only 
 - Delete Session data can be Client or Server Side
 - GetData can be Client or Server Side ( but Client only have access to what is made public )
 
-- **useSession**
+  - **useSession**
   - will automaticaly update the element when the session is updated
 
 ### Set Session data
 
 ```JavaScript XML
-import { Session, useSession } from "@bunpmjs/bunext/features/session";
+import { GetBunextRequest, useSession } from "@bunpmjs/bunext/features/session";
 
 export default function Page() {
   return (
@@ -156,6 +156,7 @@ export async function ServerSetSession({
   usename: string;
   password: string;
 }) {
+  const Session = GetBunextRequest(arguments).session;
   Session.setData(
     {
       username: username,

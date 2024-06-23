@@ -3,7 +3,7 @@ import { revalidateEvery } from "@bunpmjs/bunext/features/router";
 import { navigate } from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
 import { useSession } from "../../features/session";
-import { GetBunextRequest } from "../../features/bunextRequest";
+import { GetSession } from "../../features/session";
 
 Head.setHead({
   data: {
@@ -40,13 +40,13 @@ function IsLogged() {
 }
 
 export async function ServerSetSession() {
-  const request = GetBunextRequest(arguments);
+  const session = GetSession(arguments);
 
-  request?.session.setData(
+  /*session.setData(
     {
       test: true,
     },
     true
-  );
-  console.log(request?.session.getData());
+  );*/
+  console.log(session.getData());
 }

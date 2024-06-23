@@ -1,0 +1,1 @@
+export { GetRequest } from "./bunextRequest";

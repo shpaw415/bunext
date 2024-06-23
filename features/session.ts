@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
+export { GetSession } from "./bunextRequest";
 
 export type _SessionData<_SessionData> = {
   public: Record<string, _SessionData>;
