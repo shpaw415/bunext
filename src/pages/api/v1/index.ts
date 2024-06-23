@@ -1,15 +1,21 @@
-export function POST(request: Request) {
-  return new Response("POST");
+import type { BunextRequest } from "../../../../internal/bunextRequest";
+
+export function POST(request: BunextRequest) {
+  request.response = new Response("POST");
+  return request;
 }
 
-export function GET(request: Request) {
-  return new Response("GET");
+export function GET(request: BunextRequest) {
+  request.response = new Response("GET");
+  return request;
 }
 
-export function PUT(request: Request) {
-  return new Response("PUT");
+export function PUT(request: BunextRequest) {
+  request.response = new Response("PUT");
+  return request;
 }
 
-export function DELETE(request: Request) {
-  return new Response("DELETE");
+export function DELETE(request: BunextRequest) {
+  request.response = new Response("DELETE");
+  return request;
 }

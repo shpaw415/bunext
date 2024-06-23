@@ -3,6 +3,9 @@
 compatible: bun 1.1.13 & under
 compatible OS: Linux, WSL
 
+**SOME MAJOR CHANGE HAS BEEN MADE PAY ATTENTION TO THE SESSION SECTION DUE TO**
+**A RACE CONDITION THAT COULD LEAD TO A SECURITY ISSUE AND OTHER UNDEFINED BEHAVIOURS**
+
 N.B : Bun is in continuous changement and compatibility between version is a
 
 huge problem for Bunext there is possible crash over some new version i will

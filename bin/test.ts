@@ -55,7 +55,7 @@ describe("Server Features", () => {
     expect(
       Array.prototype.concat(...router.serverActions.map((e) => e.actions))
         .length
-    ).toBe(1);
+    ).toBe(2);
     const form = new FormData();
     form.append("props", encodeURI(JSON.stringify([])));
     const res = await fetch(

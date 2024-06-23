@@ -7,7 +7,6 @@ import { Shell } from "./shell";
 import { renderToString } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
-import { __REQUEST_CONTEXT__ } from "@bunpmjs/bunext/features/request";
 import {
   setRevalidate,
   serveScript,
@@ -29,14 +28,7 @@ class BunextServer {
     this.server = Bun.serve({
       port: this.port,
       async fetch(request) {
-        const _MiddleWaremodule = await import(
-          "@bunpmjs/bunext/internal/middleware"
-        );
-
         request.headers.toJSON();
-        _MiddleWaremodule.setMiddleWare(request, {
-          sessionTimeout: ServerConfig.session?.timeout,
-        });
 
         const OnRequestResponse = await (
           await import("../../config/onRequest")
@@ -48,11 +40,9 @@ class BunextServer {
             (await self.serve(request)) ||
             (await serveStatic(request)) ||
             serveScript(request);
-          if (response) return _MiddleWaremodule.Session.setToken(response);
+          if (response) return response;
         } catch (e) {
-          if ((e as Error).name == "TypeError") {
-            console.log(e);
-          }
+          console.log(e);
         }
         return new Response("Not found", {
           status: 404,
@@ -103,6 +93,7 @@ class BunextServer {
   async init() {
     const isDev = process.env.NODE_ENV == "development";
     if (globalThis.dryRun) {
+      globalThis.serverConfig = ServerConfig;
       await require("../../config/preload.ts");
       this.RunServer();
       this.logDevConsole();
@@ -156,12 +147,10 @@ class BunextServer {
         } else await builder.makeBuild();
       }
 
-      const session = await import("@bunpmjs/bunext/features/session");
       let response: Response | null = null;
       response = await router.serve(
         request,
         request.headers.toJSON(),
-        __REQUEST_CONTEXT__.response as Response,
         serverActionData,
         {
           Shell: Shell as any,

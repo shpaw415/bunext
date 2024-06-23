@@ -1,5 +1,4 @@
-import { $, type FileSystemRouter, type MatchedRoute } from "bun";
-import { readFileSync } from "fs";
+import type { FileSystemRouter, MatchedRoute } from "bun";
 import { NJSON } from "next-json";
 import { join, relative } from "node:path";
 import {
@@ -10,15 +9,18 @@ import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
 import React from "react";
 import "./server_global";
-import { __GET_PUBLIC_SESSION_DATA__ } from "../features/session";
 import { mkdirSync, existsSync } from "node:fs";
 import { builder } from "./build";
 import { Head } from "../features/head";
+import { BunextRequest } from "./bunextRequest";
+import "./server_global";
 class ClientOnlyError extends Error {
   constructor() {
     super("client only");
   }
 }
+
+type pathNames = "/bunextgetSessionData" | "/ServerActionGetter" | string;
 
 class StaticRouters {
   server?: FileSystemRouter;
@@ -33,7 +35,7 @@ class StaticRouters {
   baseDir = process.cwd();
   buildDir = ".bunext/build";
   pageDir = "src/pages";
-  options = {
+  optionst = {
     displayMode: {
       nextjs: {
         layout: "layout.tsx",
@@ -81,14 +83,12 @@ class StaticRouters {
     );
   }
 
-  async serve<T = void>(
+  async serve(
     request: Request,
     request_header: Record<string, string>,
-    response: Response,
     data: FormData,
     {
       Shell,
-      context,
       onError = (error, errorInfo) => {
         if (error instanceof ClientOnlyError) return;
         console.error(error, errorInfo);
@@ -97,44 +97,42 @@ class StaticRouters {
       Shell: React.ComponentType<{ children: React.ReactElement }>;
       preloadScript?: Record<string, string>;
       bootstrapModules?: string[];
-      context?: T;
       onError?(error: unknown, errorInfo: React.ErrorInfo): string | void;
     }
   ): Promise<Response | null> {
     const { pathname, search } = new URL(request.url);
-    const serverAction = await this.serverActionGetter(
-      request,
-      request_header,
-      response,
-      data
-    );
-    if (serverAction) return serverAction;
-
-    if (request.url.endsWith("/bunextgetSessionData")) {
-      const _MiddleWaremodule = await import("./middleware");
-      return new Response(
-        JSON.stringify(_MiddleWaremodule.Session.getData()?.public)
-      );
-    }
-
-    const staticResponse = await this.serveFromDir({
-      directory: this.buildDir,
-      path: pathname,
-    });
-    if (staticResponse) {
-      return new Response(staticResponse, {
-        headers: {
-          ...response.headers,
-          "Content-Type": "text/javascript",
-        },
-      });
-    }
     const serverSide = this.server?.match(request);
-    if (!serverSide) return null;
     const clientSide = this.client?.match(request);
+
+    const bunextReq = new BunextRequest({
+      request,
+      response: new Response(),
+    });
+
+    switch (pathname as pathNames) {
+      case "/ServerActionGetter":
+        return await this.serverActionGetter(request_header, data, bunextReq);
+      case "/bunextgetSessionData":
+        return new Response(JSON.stringify(bunextReq.session.__DATA__.public));
+      default:
+        const staticResponse = await this.serveFromDir({
+          directory: this.buildDir,
+          path: pathname,
+        });
+        if (staticResponse) {
+          return new Response(staticResponse, {
+            headers: {
+              "Content-Type": "text/javascript",
+            },
+          });
+        }
+        break;
+    }
+
+    if (!serverSide) return null;
     if (!clientSide) {
       const apiEndpointResult = await this.VerifyApiEndpoint(
-        request,
+        bunextReq,
         serverSide
       );
       if (!apiEndpointResult)
@@ -150,7 +148,6 @@ class StaticRouters {
       params: serverSide.params,
       req: request,
       query: serverSide.query,
-      context,
     });
     const stringified = NJSON.stringify(result, { omitStack: true });
     if (
@@ -159,7 +156,7 @@ class StaticRouters {
     ) {
       return new Response(stringified, {
         headers: {
-          ...response.headers,
+          ...bunextReq.response.headers,
           "Content-Type": "application/vnd.server-side-props",
           "Cache-Control": "no-store",
         },
@@ -172,8 +169,8 @@ class StaticRouters {
         headers: { Location: result.redirect },
       });
     }
-    return this.makeStream({
-      jsx: await this.makeJSXPage({
+    return this.makeStream(
+      await this.makeJSXPage({
         Shell,
         module: serverSide.filePath,
         onError,
@@ -182,9 +179,8 @@ class StaticRouters {
         search,
         serverSide,
         serverSidePropsResult: result,
-      }),
-      response,
-    });
+      })
+    );
   }
 
   private async makeJSXPage({
@@ -213,12 +209,8 @@ class StaticRouters {
       __INITIAL_ROUTE__: JSON.stringify(serverSide.pathname + search),
       __ROUTES__: this.#routes_dump,
       __SERVERSIDE_PROPS__: serverSidePropsString,
-      __DISPLAY_MODE__: JSON.stringify(
-        Object.keys(this.options.displayMode)[0]
-      ),
-      __LAYOUT_NAME__: JSON.stringify(
-        this.options?.displayMode?.nextjs?.layout.split(".").at(0)
-      ),
+      __DISPLAY_MODE__: JSON.stringify("nextjs"),
+      __LAYOUT_NAME__: JSON.stringify("layout"),
       __LAYOUT_ROUTE__: JSON.stringify(await this.getlayoutPaths()),
       __DEV_MODE__: Boolean(process.env.NODE_ENV == "development"),
       __HEAD_DATA__: JSON.stringify(Head.head),
@@ -320,27 +312,35 @@ class StaticRouters {
     }
   }
 
-  private async VerifyApiEndpoint(request: Request, route: MatchedRoute) {
+  private async VerifyApiEndpoint(
+    bunextreq: BunextRequest,
+    route: MatchedRoute
+  ) {
     const ApiModule = await import(route.filePath);
-    if (typeof ApiModule[request.method.toUpperCase()] == "undefined") return;
-    const res = (await ApiModule[request.method](request)) as
-      | Response
+    if (typeof ApiModule[bunextreq.request.method.toUpperCase()] == "undefined")
+      return;
+    const res = (await ApiModule[bunextreq.request.method](bunextreq)) as
+      | BunextRequest
       | undefined;
 
-    if (res instanceof Response) return res;
-    else
-      throw new Error(
-        `Api Endpoint ${route.filePath} did not returned a Response Object`
-      );
+    if (res instanceof BunextRequest) {
+      return this.setCookie(bunextreq, res.response);
+    }
+    throw new Error(
+      `Api Endpoint ${route.filePath} did not returned a BunextRequest Object`
+    );
   }
 
-  private async makeStream({
-    jsx,
-    response,
-  }: {
-    jsx: JSX.Element;
-    response: Response;
-  }): Promise<Response | null> {
+  private setCookie(bunextreq: BunextRequest, response: Response) {
+    bunextreq.webtoken.setData(bunextreq.session.__DATA__);
+    return bunextreq.webtoken.setCookie(response, {
+      expire: globalThis.serverConfig.session?.timeout || 3600,
+      httpOnly: true,
+      secure: false,
+    });
+  }
+
+  private async makeStream(jsx: JSX.Element): Promise<Response | null> {
     const rewriter = new HTMLRewriter().on("#BUNEXT_INNER_PAGE_INSERTER", {
       element(element) {
         element.removeAndKeepContent();
@@ -349,7 +349,6 @@ class StaticRouters {
     const page = rewriter.transform(renderToString(jsx));
     return new Response(page, {
       headers: {
-        ...response.headers,
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
       },
@@ -362,13 +361,10 @@ class StaticRouters {
   }
 
   private async serverActionGetter(
-    request: Request,
     request_header: Record<string, string>,
-    response: Response,
-    data: FormData
+    data: FormData,
+    bunextReq: BunextRequest
   ): Promise<Response | null> {
-    const { pathname } = new URL(request.url);
-    if (pathname !== "/ServerActionGetter") return null;
     const reqData = this.extractServerActionHeader(request_header);
 
     if (!reqData) return null;
@@ -379,15 +375,23 @@ class StaticRouters {
     if (!module) return null;
     const call = module.actions.find((f) => f.name === reqData.call);
     if (!call) return null;
-    const res = await call(...props);
+    const agrsNbr = call.length - props.length - 1;
+    const fillUndefinedParams =
+      agrsNbr > 0
+        ? (Array.apply(null, Array(agrsNbr)) as Array<undefined>)
+        : [];
+    const res = await call(...[...props, ...fillUndefinedParams, bunextReq]);
 
     const result = JSON.stringify({
       props: typeof res == "undefined" ? undefined : res,
-      session: __GET_PUBLIC_SESSION_DATA__(),
+      session: bunextReq.session.__DATA__.public,
     });
-    return new Response(result, {
-      headers: response.headers,
-    });
+    return this.setCookie(
+      bunextReq,
+      new Response(result, {
+        headers: bunextReq.response.headers,
+      })
+    );
   }
   private extractServerActionHeader(header: Record<string, string>) {
     if (!header.serveractionid) return null;
@@ -421,9 +425,7 @@ class StaticRouters {
     for await (const i of layouts) {
       const path = layouts.slice(0, index + 1).join("/");
       const pathToFile = normalize(
-        `${this.baseDir}/${this.pageDir}/${path}/${
-          this.options.displayMode.nextjs?.layout as string
-        }`
+        `${this.baseDir}/${this.pageDir}/${path}/layout.tsx`
       );
       if (!(await Bun.file(pathToFile).exists())) continue;
       const defaultExport = (await import(pathToFile)).default;

@@ -10,7 +10,7 @@ const Config: ServerConfig = {
     plugins: [],
   },
   session: {
-    timeout: 3600,
+    timeout: 3000,
   },
 };
 
