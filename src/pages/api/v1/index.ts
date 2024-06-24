@@ -1,4 +1,4 @@
-import type { BunextRequest } from "../../../../internal/bunextRequest";
+import type { BunextRequest } from "../../../../features/request";
 
 export function POST(request: BunextRequest) {
   request.response = new Response("POST");

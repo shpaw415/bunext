@@ -15,6 +15,7 @@ import {
 
 import ServerConfig from "../../config/server"; // must be relative
 import type { Server as _Server } from "bun";
+import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
 
 class BunextServer {
   port = ServerConfig.HTTPServer.port || 3000;
@@ -40,7 +41,8 @@ class BunextServer {
             (await self.serve(request)) ||
             (await serveStatic(request)) ||
             serveScript(request);
-          if (response) return response;
+          if (response instanceof Response) return response;
+          else if (response instanceof BunextRequest) return response.response;
         } catch (e) {
           console.log(e);
         }
@@ -147,8 +149,7 @@ class BunextServer {
         } else await builder.makeBuild();
       }
 
-      let response: Response | null = null;
-      response = await router.serve(
+      let response: BunextRequest | null = await router.serve(
         request,
         request.headers.toJSON(),
         serverActionData,
@@ -163,6 +164,7 @@ class BunextServer {
           headers: {
             "Content-Type": "text/html",
           },
+          status: 500,
         });
       console.log(e);
       return res(e as Error);

@@ -1,1 +1,1 @@
-export { GetRequest } from "./bunextRequest";
+export { GetRequest, type BunextRequest } from "./bunextRequest";

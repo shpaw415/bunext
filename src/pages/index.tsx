@@ -2,8 +2,7 @@ import { Head } from "@bunpmjs/bunext/features/head";
 import { revalidateEvery } from "@bunpmjs/bunext/features/router";
 import { navigate } from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
-import { useSession } from "../../features/session";
-import { GetSession } from "../../features/session";
+import { useSession, GetSession, Session } from "../../features/session";
 
 Head.setHead({
   data: {
@@ -25,8 +24,21 @@ export default function Page() {
     <div>
       <TestElement />
       <button onClick={() => navigate("/other")}>Other page</button>
-      <button onClick={async () => await ServerSetSession()}>
+      <button
+        onClick={async () => {
+          await ServerSetSession();
+          Session.update();
+        }}
+      >
         Set Session
+      </button>
+      <button
+        onClick={async () => {
+          await ServerDeleteSession();
+          Session.update();
+        }}
+      >
+        Delete Session
       </button>
       <IsLogged />
     </div>
@@ -40,13 +52,14 @@ function IsLogged() {
 }
 
 export async function ServerSetSession() {
-  const session = GetSession(arguments);
-
-  /*session.setData(
+  GetSession(arguments).setData(
     {
       test: true,
     },
     true
-  );*/
-  console.log(session.getData());
+  );
+}
+
+export async function ServerDeleteSession() {
+  GetSession(arguments).delete();
 }

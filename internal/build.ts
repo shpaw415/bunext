@@ -435,8 +435,7 @@ class Builder {
             "error when Calling server action <!ModulePath!>:<!FuncName!>"
           );
         const resObject = await response.json();
-
-        __PUBLIC_SESSION_DATA__ = resObject.session;
+        globalThis.__PUBLIC_SESSION_DATA__ = resObject.session;
 
         return resObject.props;
       }

@@ -108,7 +108,7 @@ session and optionaly make it accessible from the client side ( default to only 
 ### Set Session data
 
 ```JavaScript XML
-import { GetBunextRequest, useSession } from "@bunpmjs/bunext/features/session";
+import { GetSession, useSession } from "@bunpmjs/bunext/features/session";
 
 export default function Page() {
   return (
@@ -156,7 +156,7 @@ export async function ServerSetSession({
   usename: string;
   password: string;
 }) {
-  const Session = GetBunextRequest(arguments).session;
+  const Session = GetSession(arguments);
   Session.setData(
     {
       username: username,
@@ -193,7 +193,11 @@ function ReactElement() {
 
 ```Javascript XML
 // index.tsx
-import { useSession, Session } from  "@bunpmjs/bunext/features/session";
+import {
+  useSession,
+  GetSession
+} from  "@bunpmjs/bunext/features/session";
+
 export default function Page() {
 	return <div>
 		<ReactElement />
@@ -209,7 +213,7 @@ function ReactElement() {
 
 // using a serverAction
 export async function ServerDeleteSesion() {
-	Session.delete();
+	GetSession(arguments).delete();
 	return "Session has been deleted by the server"
 }
 ```
@@ -524,19 +528,29 @@ return undefined to use the default behaviour.
 - access the Endpoint via src/pages as root
 
 ```TypeScript
+import type { BunextRequest } from "@bunpmjs/bunext/features/request";
+
 // /src/pages/api/v1/index.ts
-export async function POST(request: Request) {
-  return new Response("You made a POST request");
+export function POST(request: BunextRequest) {
+  request.response = new Response("POST");
+  return request;
 }
-export async function GET(request: Response) {
-  return new Response("You made a GET request");
+
+export function GET(request: BunextRequest) {
+  request.response = new Response("GET");
+  return request;
 }
-export async function DELETE(request: Response) {
-  return new Response("You made a DELETE request");
+
+export function PUT(request: BunextRequest) {
+  request.response = new Response("PUT");
+  return request;
 }
-export async function PUT(request: Response) {
-  return new Response("You made a PUT request");
+
+export function DELETE(request: BunextRequest) {
+  request.response = new Response("DELETE");
+  return request;
 }
+
 
 // Client request
 await fetch("my.site.com/api/v1", {

@@ -21,10 +21,27 @@ export class _Session {
   public __DELETE__: boolean = false;
   private sessionTimeout = 3600;
   private inited = false;
+  private onlyClient = false;
 
-  constructor(data?: _SessionData<any>, sessionTimeout?: number) {
+  constructor(
+    data?: _SessionData<any>,
+    sessionTimeout?: number,
+    onlyClient?: boolean
+  ) {
     if (data) this.__DATA__ = data;
     if (sessionTimeout) this.sessionTimeout = sessionTimeout;
+    if (onlyClient) this.onlyClient = onlyClient;
+  }
+
+  private throwOnServer() {
+    return;
+    if (
+      typeof window == "undefined" &&
+      this.onlyClient &&
+      typeof process.env.__BUILD_MODE__ == "undefined" &&
+      typeof process.env.__JSX_TO_STRING__ == "undefined"
+    )
+      throw new Error(`Use GetSession() from a server context"`);
   }
 
   /**
@@ -35,7 +52,7 @@ export class _Session {
    */
   setData(data: Record<string, any>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
-
+    this.throwOnServer();
     const setPrivate = () => {
       this.__DATA__.private = {
         ...this.__DATA__.private,
@@ -64,6 +81,8 @@ export class _Session {
    */
   reset() {
     this.PublicThrow("Session.reset cannot be called in a client context");
+    this.throwOnServer();
+
     this.__DATA__ = {
       public: {},
       private: {},
@@ -81,6 +100,8 @@ export class _Session {
    * await Session.getData(); // {data: "someData"} | undefined
    */
   getData(): undefined | Record<string, any> {
+    this.throwOnServer();
+
     if (typeof window != "undefined") {
       if (!this.inited) {
         const setter = async () => {
@@ -91,10 +112,14 @@ export class _Session {
         this.inited = true;
         setter();
       }
+      this.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
       return this.__DATA__.public;
     }
 
-    if (this.isExpired()) return undefined;
+    if (this.isExpired()) {
+      this.delete();
+      return undefined;
+    }
 
     return this.__DATA__.private;
   }
@@ -103,13 +128,23 @@ export class _Session {
    * @description delete Session
    */
   delete() {
+    this.throwOnServer();
+
     if (this.isClient()) {
       document.cookie =
         this.cookieName + "=; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
       this.__DATA__.public = {};
-    } else this.__DELETE__ = true;
+    } else {
+      this.__DELETE__ = true;
+      this.__DATA__ = {
+        public: {},
+        private: {},
+      };
+    }
   }
   update() {
+    this.throwOnServer();
+
     if (typeof globalThis.__PUBLIC_SESSION_DATA__ != "undefined")
       this.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
     this.__UPDATE__?.update();
@@ -135,7 +170,8 @@ export class _Session {
     return Math.floor(new Date().getTime() / 1000);
   }
 }
-export const Session = new _Session();
+
+export const Session = new _Session(undefined, undefined, true);
 
 class SessionUpdateClass {
   public states: React.Dispatch<React.SetStateAction<boolean>>[] = [];
