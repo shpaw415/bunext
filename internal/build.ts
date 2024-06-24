@@ -700,7 +700,13 @@ class Builder {
     } = {};
     for await (const exported of Object.keys(_module)) {
       const Func = _module[exported] as Function;
-      if (!this.isFunction(Func) || Func.name.startsWith("Server")) continue;
+
+      if (
+        !this.isFunction(Func) ||
+        Func.name.startsWith("Server") ||
+        Func.length > 0
+      )
+        continue;
       const ssrElement = ssrModule?.elements.find(
         (e) => e.tag == `<!Bunext_Element_${Func.name}!>`
       );
