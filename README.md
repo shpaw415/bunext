@@ -66,6 +66,8 @@ bun run databaseCreate # only create the types
 
 - Links
 
+- Windows compatibility
+
 ### To install and run
 
 ```Bash
@@ -336,7 +338,7 @@ Loading dynamic data directly into the main React Element.
 ```Javascript XML
 // Request URL /informationID
 // [id].tsx
-export default function Page(props: {
+export default function Page(data: {
   props: {
     foo: string,
     name: {
@@ -347,7 +349,7 @@ export default function Page(props: {
     id: string
   }
   }) {
-    return <div>{props.foo + " - " +params.id}</div> // bar - informationID
+    return <div>{data.props.foo + " - " + data.params.id}</div> // bar - informationID
   }
 
 
