@@ -292,8 +292,9 @@ class StaticRouters {
       const jsxToServe = (await import(module)).default({
         props: props.props,
         params: props.params,
-      }) as JSX.Element;
-      return await this.stackLayouts(serverSide, jsxToServe);
+      }) as Promise<JSX.Element>;
+
+      return await this.stackLayouts(serverSide, await jsxToServe);
     } else {
       if (!import.meta.main) {
         const processResponse = Bun.spawnSync({
@@ -318,8 +319,9 @@ class StaticRouters {
         const jsxToServe = (await import(module)).default({
           props: props.props,
           params: props.params,
-        }) as JSX.Element;
-        const stacked = await this.stackLayouts(serverSide, jsxToServe);
+        }) as Promise<JSX.Element>;
+
+        const stacked = await this.stackLayouts(serverSide, await jsxToServe);
         return stacked;
       }
     }

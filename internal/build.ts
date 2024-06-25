@@ -176,13 +176,14 @@ class Builder {
     }
 
     if (!isServer) return;
-    const EmptyParamsFunctionRegex = /\b\w+\s*\(\s*\)/;
     for await (const ex of exports) {
       const exported = _module[ex] as Function | unknown;
-      if (typeof exported != "function" || exported.name.startsWith("Server"))
+      if (
+        typeof exported != "function" ||
+        exported.name.startsWith("Server") ||
+        exported.length > 0
+      )
         continue;
-      const FuncString = exported.toString();
-      if (!FuncString.match(EmptyParamsFunctionRegex)) continue;
       let element: JsxElement | any = undefined;
       try {
         element = await exported();
