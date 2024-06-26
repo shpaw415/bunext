@@ -82,7 +82,6 @@ class StaticRouters {
       { omitStack: true }
     );
   }
-
   async serve(
     request: Request,
     request_header: Record<string, string>,
@@ -504,7 +503,7 @@ class StaticRouters {
     path: string;
     suffixes?: string[];
   }) {
-    const basePath = join(config.directory, config.path);
+    const basePath = join(config.directory, normalize(config.path));
     const suffixes = config.suffixes ?? [
       "",
       ".html",

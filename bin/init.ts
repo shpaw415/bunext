@@ -4,6 +4,13 @@ import { lstatSync, cpSync, existsSync, mkdirSync } from "fs";
 import { paths } from "../internal/globals";
 import { $ } from "bun";
 import { generateUuid } from "../features/utils";
+import readline from "readline";
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
 await (async () => {
   try {
     throw new Error();
@@ -94,6 +101,14 @@ async function install(total: boolean) {
   }
   cpSync;
   await $`bun i`;
+}
+
+function AskForTailwind() {
+  rl.question("install tailwind y/n", async (res) => {
+    if (res != "y") return;
+    await $`bun i -D tailwindcss`;
+    await $`bunx tailwindcss init`;
+  });
 }
 
 function tsConfig() {
