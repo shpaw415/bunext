@@ -642,6 +642,7 @@ class Builder {
               fileContent = new Bun.Transpiler({
                 loader: "jsx",
                 jsxOptimizationInline: true,
+                trimUnusedImports: true,
               }).transformSync(fileContent);
             }
             return {

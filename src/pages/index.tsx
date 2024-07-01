@@ -3,6 +3,7 @@ import { revalidateEvery } from "@bunpmjs/bunext/features/router";
 import { navigate } from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
 import { useSession, GetSession, Session } from "../../features/session";
+import { Database } from "../../database";
 
 Head.setHead({
   data: {
@@ -52,6 +53,8 @@ function IsLogged() {
 }
 
 export async function ServerSetSession() {
+  const db = await Database();
+
   GetSession(arguments).setData(
     {
       test: true,
