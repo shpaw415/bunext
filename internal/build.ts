@@ -458,6 +458,7 @@ class Builder {
     const transpiler = new Bun.Transpiler({
       loader: "tsx",
       autoImportJSX: true,
+      trimUnusedImports: true,
       deadCodeElimination: true,
       jsxOptimizationInline: true,
       exports: {
@@ -592,7 +593,7 @@ class Builder {
         );
         build.onLoad(
           { namespace: "client", filter: /\.tsx$/ },
-          async ({ path, loader }) => {
+          async ({ path }) => {
             let fileContent = await Bun.file(path).text();
             if (
               ["layout.tsx"]
@@ -630,6 +631,7 @@ class Builder {
                   ...self.ServerActionToTag(fileContent),
                   ...serverCompotantsForTranspiler,
                 },
+                eliminate: ["getServerSideProps"],
               },
             });
             fileContent = transpiler.transformSync(fileContent);
@@ -758,7 +760,6 @@ class Builder {
         import.meta.filename,
         "@bunpmjs/bunext/features/router.ts",
         "@bunpmjs/bunext/features/request.ts",
-        "@bunpmjs/bunext/database",
         "@bunpmjs/bunext/internal/bunextRequest.ts",
         "@bunpmjs/json-webtoken",
       ],
