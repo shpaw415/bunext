@@ -107,6 +107,8 @@ export class _Session {
         const setter = async () => {
           const res = await (await fetch("/bunextgetSessionData")).json();
           this.__DATA__.public = res;
+          if (typeof window != "undefined")
+            globalThis.__PUBLIC_SESSION_DATA__ = res;
           this.update();
         };
         this.inited = true;

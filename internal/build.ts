@@ -172,9 +172,10 @@ class Builder {
         else {
           this.currentRecursivePreBuildsPages.push(filePath);
           this.resetPath(filePath);
-          this.preBuild(filePath);
+          await this.preBuild(filePath);
         }
       }
+      this.currentRecursivePreBuildsPages = [];
     }
 
     if (!isServer) return;

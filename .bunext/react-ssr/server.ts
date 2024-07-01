@@ -106,6 +106,7 @@ class BunextServer {
 
     if (isDev && globalThis.dryRun) {
       this.serveHotServer(ServerConfig.Dev.hotServerPort);
+      await builder.preBuildAll();
       await builder.makeBuild();
     } else if (process.env.NODE_ENV == "production") {
       const buildoutput = await builder.makeBuild();
@@ -138,15 +139,19 @@ class BunextServer {
       const urlData = new URL(request.url);
 
       if (isDev) {
-        if (filepath) builder.resetPath(filepath);
-        else if (
+        if (filepath) {
+          builder.resetPath(filepath);
+          await builder.preBuild(filepath);
+        } else if (
           !urlData.pathname.endsWith("index.js") &&
           !urlData.pathname.endsWith("].js")
         ) {
           ("pass");
         } else if (!urlData.search.startsWith("?")) {
           ("pass");
-        } else await builder.makeBuild();
+        } else {
+          await builder.makeBuild();
+        }
       }
 
       let response: BunextRequest | null = await router.serve(
