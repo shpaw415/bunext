@@ -311,6 +311,7 @@ class Builder {
     const ssrElements: ssrElement[] = JSON.parse(
       process.env.ssrElement || "[]"
     );
+    this.ssrElement = ssrElements;
     const BuildPath: string | undefined = process.env.BuildPath;
     try {
       BuildPath
@@ -621,15 +622,17 @@ class Builder {
                 [componant]: serverComponants[componant].tag,
               }))
             );
+
+            const serverActionsTags = self.ServerActionToTag(fileContent);
+
             let transpiler = new Bun.Transpiler({
               loader: "tsx",
-              trimUnusedImports: true,
               autoImportJSX: true,
               jsxOptimizationInline: true,
               deadCodeElimination: true,
               exports: {
                 replace: {
-                  ...self.ServerActionToTag(fileContent),
+                  ...serverActionsTags,
                   ...serverCompotantsForTranspiler,
                 },
                 eliminate: ["getServerSideProps"],
@@ -637,7 +640,10 @@ class Builder {
             });
             fileContent = transpiler.transformSync(fileContent);
 
-            if (Object.keys(serverComponants).length > 0) {
+            if (
+              Object.keys(serverComponants).length > 0 ||
+              Object.keys(serverActionsTags).length > 0
+            ) {
               fileContent = await self.ServerSideFeatures({
                 modulePath: path,
                 fileContent: fileContent,
