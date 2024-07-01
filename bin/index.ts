@@ -95,7 +95,7 @@ async function databaseCreator() {
 
 function dev() {
   process.env.NODE_ENV = "development";
-  Bun.spawnSync({
+  Bun.spawn({
     cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
     stdout: "inherit",
     env: {
@@ -103,8 +103,10 @@ function dev() {
       __HEAD_DATA__: JSON.stringify(globalThis.head),
       NODE_ENV: process.env.NODE_ENV,
     },
+    onExit() {
+      dev();
+    },
   });
-  dev();
 }
 
 function production() {

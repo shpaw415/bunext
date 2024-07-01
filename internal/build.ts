@@ -80,7 +80,9 @@ class Builder {
 
   async Init() {
     await this.InitGetCustomPluginsFromUser();
-    await this.InitGetFixingPlugins();
+    try {
+      await this.InitGetFixingPlugins();
+    } catch {}
     return this;
   }
 
