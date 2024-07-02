@@ -4,6 +4,8 @@ import { navigate } from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
 import { useSession, GetSession, Session } from "../../features/session";
 import { Database } from "../../database";
+import { generateRandomString } from "../../features/utils";
+import { TestServerElement } from "./serverElement";
 
 Head.setHead({
   data: {
@@ -20,10 +22,11 @@ Head.setHead({
 });
 
 export default function Page() {
-  revalidateEvery("/", 1000);
+  revalidateEvery("/", 5);
   return (
     <div>
       <TestElement />
+      {TestServerElement()}
       <button onClick={() => navigate("/other")}>Other page</button>
       <button
         onClick={async () => {
@@ -31,7 +34,7 @@ export default function Page() {
           Session.update();
         }}
       >
-        Set Session
+        {generateRandomString(5)}
       </button>
       <button
         onClick={async () => {

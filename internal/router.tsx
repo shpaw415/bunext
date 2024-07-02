@@ -271,6 +271,7 @@ class StaticRouters {
       ?.elements.find((e) =>
         e.tag.endsWith(`${module.default.name}!>`)
       )?.htmlElement;
+
     if (preBuiledPage) {
       return await this.stackLayouts(
         serverSide,

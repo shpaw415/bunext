@@ -152,31 +152,9 @@ class Builder {
     const moduleContent = await Bun.file(modulePath).text();
     const _module = await import(modulePath);
     const isServer = !this.isUseClient(moduleContent);
-    const { exports, imports } = new Bun.Transpiler({ loader: "tsx" }).scan(
+    const { exports } = new Bun.Transpiler({ loader: "tsx" }).scan(
       moduleContent
     );
-
-    //TODO: need to test for revalidation of imported react Element from current page
-    if (modulePath.endsWith("index.tsx")) {
-      const MainModulePath = import.meta
-        .resolve(modulePath)
-        .replace("file://", "");
-      this.currentRecursivePreBuildsPages.push(MainModulePath);
-      const ext = "tsx";
-      for await (const imp of imports) {
-        const filePath =
-          import.meta.resolve(imp.path, modulePath).replace("file://", "") +
-          `.${ext}`;
-        if (!(await Bun.file(filePath).exists())) continue;
-        if (this.currentRecursivePreBuildsPages.includes(filePath)) continue;
-        else {
-          this.currentRecursivePreBuildsPages.push(filePath);
-          this.resetPath(filePath);
-          await this.preBuild(filePath);
-        }
-      }
-      this.currentRecursivePreBuildsPages = [];
-    }
 
     if (!isServer) return;
     for await (const ex of exports) {
@@ -203,8 +181,8 @@ class Builder {
         });
         moduleSSR = this.ssrElement.find(findModule);
       }
-      if (!moduleSSR) throw new Error();
-      const SSRelement = moduleSSR.elements.find(
+      if (!moduleSSR) throw new Error("SSR Module has not been created");
+      let SSRelement = moduleSSR.elements.find(
         (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
       );
 
@@ -225,58 +203,6 @@ class Builder {
           htmlElement: renderToString(element),
         });
       }
-    }
-
-    const tryier = (tests: Array<() => string | Error>) => {
-      for (const i of tests) {
-        try {
-          const res = i();
-          if (typeof res != "string") throw res;
-          return res as string;
-        } catch (e) {}
-      }
-      throw new Error("tryier cannot succeed");
-    };
-
-    for await (const imported of imports) {
-      const isDot = imported.path == ".";
-      let path = "";
-      try {
-        path = tryier([
-          () =>
-            isDot
-              ? new Error()
-              : import.meta
-                  .resolve(imported.path, process.env.PWD)
-                  .replace("file://", ""),
-          () =>
-            isDot
-              ? new Error()
-              : import.meta
-                  .resolve(
-                    normalize(
-                      [
-                        ...modulePath.split("/").slice(0, -1),
-                        imported.path,
-                      ].join("/")
-                    )
-                  )
-                  .replace("file://", ""),
-          () =>
-            isDot
-              ? new Error()
-              : import.meta.resolve(imported.path).replace("file://", ""),
-        ]);
-      } catch (e) {
-        throw new Error(
-          import.meta
-            .resolve(imported.path, process.env.PWD)
-            .replace("file://", "")
-        );
-      }
-
-      if (!path.endsWith(".tsx")) continue;
-      if (this.preBuildPaths.includes(path)) continue;
     }
   }
   async preBuildAll(skip?: ssrElement[]) {
@@ -578,9 +504,8 @@ class Builder {
             }).scan(fileText).exports;
 
             return {
-              contents:
-                `export { ${exports.join(", ")} } from ` +
-                JSON.stringify("./" + basename(path) + "?client"),
+              contents: `export { ${exports.join(", ")} } from 
+              ${JSON.stringify("./" + basename(path) + "?client")}`,
               loader: "ts",
             };
           }
@@ -630,7 +555,6 @@ class Builder {
 
             let transpiler = new Bun.Transpiler({
               loader: "tsx",
-              autoImportJSX: true,
               jsxOptimizationInline: true,
               deadCodeElimination: true,
               exports: {
@@ -657,6 +581,7 @@ class Builder {
                 loader: "jsx",
                 jsxOptimizationInline: true,
                 trimUnusedImports: true,
+                autoImportJSX: true,
               }).transformSync(fileContent);
             }
             return {

@@ -14,7 +14,7 @@ import {
 } from "@bunpmjs/bunext/internal/server-features";
 
 import ServerConfig from "../../config/server"; // must be relative
-import type { Server as _Server } from "bun";
+import { build, type Server as _Server } from "bun";
 import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
 
 class BunextServer {
@@ -142,6 +142,7 @@ class BunextServer {
         if (filepath) {
           builder.resetPath(filepath);
           await builder.preBuild(filepath);
+          await builder.makeBuild();
         } else if (
           !urlData.pathname.endsWith("index.js") &&
           !urlData.pathname.endsWith("].js")
