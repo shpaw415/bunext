@@ -211,6 +211,9 @@ class Builder {
       const toJSX = (el: React.ReactNode) =>
         reactElementToJSXString(el, {
           showFunctions: true,
+          showDefaultProps: true,
+          useFragmentShortSyntax: true,
+          sortProps: false,
         });
       if (SSRelement) {
         SSRelement.reactElement = toJSX(element);
