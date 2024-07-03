@@ -11,6 +11,7 @@ import { renderToString } from "react-dom/server";
 import type { ssrElement } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
+import { router } from "./router";
 
 type BuildOuts = {
   ssrElement: ssrElement[];
@@ -65,8 +66,6 @@ class Builder {
     path: string;
     time: number;
   }[] = [];
-
-  private currentRecursivePreBuildsPages: string[] = [];
 
   constructor(baseDir: string) {
     this.options = {
@@ -131,7 +130,7 @@ class Builder {
       entrypoints: entrypoints,
       sourcemap,
       outdir: join(baseDir, buildDir as string),
-      minify,
+      minify: false,
     });
     for await (const file of this.glob(
       this.options.buildDir as string,
@@ -396,7 +395,6 @@ class Builder {
         replace: {
           ...this.ServerActionToTag(fileContent),
         },
-        eliminate: ["getServerSideProps"],
       },
     });
 
@@ -524,6 +522,7 @@ class Builder {
         build.onLoad(
           { namespace: "client", filter: /\.tsx$/ },
           async ({ path }) => {
+            const isProduction = process.env.NODE_ENV == "production";
             let fileContent = await Bun.file(path).text();
             if (
               ["layout.tsx"]
@@ -553,16 +552,18 @@ class Builder {
 
             const serverActionsTags = self.ServerActionToTag(fileContent);
 
-            let transpiler = new Bun.Transpiler({
+            const transpiler = new Bun.Transpiler({
               loader: "tsx",
               jsxOptimizationInline: true,
               deadCodeElimination: true,
+              autoImportJSX: isProduction ? true : true,
+              trimUnusedImports: true,
+              treeShaking: true,
               exports: {
                 replace: {
                   ...serverActionsTags,
                   ...serverCompotantsForTranspiler,
                 },
-                eliminate: ["getServerSideProps"],
               },
             });
             fileContent = transpiler.transformSync(fileContent);
@@ -580,8 +581,6 @@ class Builder {
               fileContent = new Bun.Transpiler({
                 loader: "jsx",
                 jsxOptimizationInline: true,
-                trimUnusedImports: true,
-                autoImportJSX: true,
               }).transformSync(fileContent);
             }
             return {
@@ -645,12 +644,16 @@ class Builder {
       if (
         !this.isFunction(Func) ||
         Func.name.startsWith("Server") ||
+        Func.name == "getServerSideProps" ||
         Func.length > 0
-      )
+      ) {
         continue;
+      }
+
       const ssrElement = ssrModule?.elements.find(
         (e) => e.tag == `<!Bunext_Element_${Func.name}!>`
       );
+
       if (!ssrElement) continue;
       if (defaultName == Func.name) replaceServerElement.default = ssrElement;
       else replaceServerElement[Func.name] = ssrElement;

@@ -14,6 +14,10 @@ function Test() {
   return <div>{state}</div>;
 }
 
+export async function TestElement() {
+  return <div></div>;
+}
+
 export async function getServerSideProps(props: any) {
   return {
     allo: true,
