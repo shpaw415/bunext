@@ -28,11 +28,11 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      const builder = (await import("../internal/build.ts")).builder;
-      const res = await builder.build();
+      const res = await (await import("../internal/build.ts")).builder.build();
       console.log(res);
       break;
     case "dev":
+      await (await import("../internal/build.ts")).builder.build();
       dev();
       break;
     case "production":

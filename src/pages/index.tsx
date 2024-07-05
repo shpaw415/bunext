@@ -21,7 +21,7 @@ Head.setHead({
   },
 });
 
-export default function Page() {
+export default async function Page() {
   revalidateEvery("/", 5);
   return (
     <div>

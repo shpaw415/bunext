@@ -14,7 +14,7 @@ import {
 } from "@bunpmjs/bunext/internal/server-features";
 
 import ServerConfig from "../../config/server"; // must be relative
-import { build, type Server as _Server } from "bun";
+import type { Server as _Server } from "bun";
 import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
 
 class BunextServer {
@@ -46,7 +46,7 @@ class BunextServer {
         } catch (e) {
           console.log(e);
         }
-        return new Response("Not found", {
+        return new Response("Not found!!", {
           status: 404,
         });
       },

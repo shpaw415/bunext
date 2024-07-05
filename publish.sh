@@ -1,5 +1,5 @@
 #!/bin/env bash
 
 bun clear-build
-bash ./git.sh
+bash ./git.sh "$*"
 bunpm publish

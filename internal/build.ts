@@ -11,7 +11,10 @@ import { renderToString } from "react-dom/server";
 import type { ssrElement } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
-import { router } from "./router";
+
+import { fetchCaching } from "./caching/fetch";
+
+fetchCaching.reset();
 
 type BuildOuts = {
   ssrElement: ssrElement[];
@@ -130,7 +133,7 @@ class Builder {
       entrypoints: entrypoints,
       sourcemap,
       outdir: join(baseDir, buildDir as string),
-      minify: false,
+      minify,
     });
     for await (const file of this.glob(
       this.options.buildDir as string,
