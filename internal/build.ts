@@ -194,6 +194,7 @@ class Builder {
           showDefaultProps: true,
           useFragmentShortSyntax: true,
           sortProps: false,
+          useBooleanShorthandSyntax: false,
         });
       if (SSRelement) {
         SSRelement.reactElement = toJSX(element);

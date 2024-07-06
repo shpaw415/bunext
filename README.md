@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible: bun 1.1.13 & under
+compatible: bun 1.1.18 & under
 compatible OS: Linux, WSL
 
 **SOME MAJOR CHANGE HAS BEEN MADE PAY ATTENTION TO THE SESSION & API-ENDPOINT SECTION DUE TO**
