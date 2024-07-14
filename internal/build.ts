@@ -608,7 +608,7 @@ class Builder {
       },
     } as BunPlugin;
   }
-  private SvgPlugin() {
+  private SvgPlugin(): BunPlugin {
     return {
       name: "SvgIntegrationPlugin",
       target: "browser",
@@ -618,9 +618,39 @@ class Builder {
             filter: /\.svg$/,
           },
           async (props) => {
+            const svg = await Bun.file(props.path).text();
+
+            let svgProps = "";
+            let pathProps = "";
+
+            new HTMLRewriter()
+              .on("svg", {
+                element(e) {
+                  for (const i of e.attributes) {
+                    let reactKeyElement = i[0];
+                    if (reactKeyElement == "viewbox")
+                      reactKeyElement = "viewBox";
+                    svgProps += `${reactKeyElement}="${i[1]}"`;
+                  }
+                },
+              })
+              .on("path", {
+                element(e) {
+                  for (const i of e.attributes) {
+                    pathProps += `${i[0]}="${i[1]}"`;
+                  }
+                },
+              })
+              .transform(svg);
+
             return {
               contents: `
-              const Svg = () => ${await Bun.file(props.path).text()};
+              "use client";
+              function Svg(props = {}){ 
+                return (<svg ${svgProps} {...props}>${
+                pathProps.length > 0 && `<path ${pathProps} />`
+              }</svg>);
+              }
               export default Svg;
               `,
               loader: "jsx",
@@ -628,7 +658,7 @@ class Builder {
           }
         );
       },
-    } as BunPlugin;
+    };
   }
   private async ServerComponantsToTag(modulePath: string) {
     // ServerComponant
