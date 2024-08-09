@@ -69,6 +69,7 @@ class Builder {
     path: string;
     time: number;
   }[] = [];
+  private hasReactImported = false;
 
   constructor(baseDir: string) {
     this.options = {
@@ -482,6 +483,12 @@ class Builder {
 
     return fileContent;
   }
+  private isReactImported(fileContent: string) {
+    const imports = new Bun.Transpiler({
+      loader: "tsx",
+    }).scanImports(fileContent);
+    console.log(imports);
+  }
   private NextJsPlugin() {
     const self = this;
     return {
@@ -531,8 +538,10 @@ class Builder {
         build.onLoad(
           { namespace: "client", filter: /\.tsx$/ },
           async ({ path }) => {
-            const isProduction = process.env.NODE_ENV == "production";
             let fileContent = await Bun.file(path).text();
+
+            //self.isReactImported(fileContent);
+
             if (
               ["layout.tsx"]
                 .map((endswith) => path.endsWith(endswith))
