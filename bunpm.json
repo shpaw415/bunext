@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
   "version": "0.6.15",
-=======
-  "version": "0.6.10",
->>>>>>> 1184f38 (no import triming)
   "include": [
     ".bunext",
     "bin",
