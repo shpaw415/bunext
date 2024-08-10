@@ -12,9 +12,9 @@ import type { ssrElement } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 
-import { fetchCaching } from "./caching/fetch";
+import fetchCache from "./caching/fetch";
 
-fetchCaching.reset();
+fetchCache.reset();
 
 type BuildOuts = {
   ssrElement: ssrElement[];
@@ -287,6 +287,7 @@ class Builder {
    */
   async makeBuild(path?: string) {
     if (import.meta.main) return await this._makeBuild();
+    fetchCache.reset();
     let strRes: BuildOuts | undefined;
     const proc = Bun.spawn({
       cmd: ["bun", import.meta.filename],

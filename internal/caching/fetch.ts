@@ -13,6 +13,7 @@ export class BunextFetchCaching {
   }> = [];
 
   constructor() {
+    if (typeof window != "undefined") return;
     globalThis.__FETCH_BUNEXT__ ??= fetch;
     globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
       return this.fetch(input, init);
@@ -21,17 +22,13 @@ export class BunextFetchCaching {
 
   private async fetch(input: RequestInfo | URL, init?: RequestInit) {
     const result = this.compare(input, init);
-    if (result) {
-      console.log("old fetch");
-      return result;
-    }
+    if (result) return result;
     const response = await globalThis.__FETCH_BUNEXT__(input, init);
     this.pushToCache({
       response,
       input,
       init,
     });
-    console.log("new fetch");
     return response;
   }
 
@@ -65,4 +62,4 @@ export class BunextFetchCaching {
 
 const fetchCaching = new BunextFetchCaching();
 
-export { fetchCaching };
+export default fetchCaching;
