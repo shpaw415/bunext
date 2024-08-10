@@ -1,4 +1,4 @@
-import { Head } from "@bunpmjs/bunext/features/head";
+import { Head } from "../../../features/head";
 
 Head.setHead({
   data: {

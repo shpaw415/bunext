@@ -109,7 +109,9 @@ class Builder {
     process.env.__BUILD_MODE__ = "true";
     const { baseDir, hydrate, pageDir, sourcemap, buildDir, minify } =
       this.options;
+
     let entrypoints = [join(baseDir, hydrate)];
+
     if (!onlyPath) {
       const absPageDir = join(baseDir, pageDir as string);
       for await (const path of this.glob(absPageDir)) {
@@ -129,6 +131,7 @@ class Builder {
     } else {
       entrypoints.push(onlyPath);
     }
+
     this.buildOutput = await this.CreateBuild({
       entrypoints: entrypoints,
       sourcemap,
@@ -145,7 +148,6 @@ class Builder {
           unlinkSync(file);
         } catch {}
     }
-    //await this.afterBuild();
     process.env.__BUILD_MODE__ = "false";
     return this.buildOutput;
   }
@@ -157,7 +159,6 @@ class Builder {
     const { exports } = new Bun.Transpiler({ loader: "tsx" }).scan(
       moduleContent
     );
-
     if (!isServer) return;
     for await (const ex of exports) {
       const exported = _module[ex] as Function | unknown;
@@ -245,10 +246,12 @@ class Builder {
     );
     this.ssrElement = ssrElements;
     const BuildPath: string | undefined = process.env.BuildPath;
+
     try {
       BuildPath
         ? await this.preBuild(BuildPath)
         : await this.preBuildAll(ssrElements);
+
       const output = await builder.build(BuildPath);
       if (!output.success) throw new Error(JSON.stringify(output));
     } catch (e: any) {
@@ -296,6 +299,7 @@ class Builder {
         __BUILD_MODE__: "true",
       },
       stdout: "inherit",
+      stderr: "inherit",
       ipc(message) {
         const data = JSON.parse(message) as procIPCdata;
 
@@ -560,8 +564,7 @@ class Builder {
               loader: "tsx",
               jsxOptimizationInline: true,
               deadCodeElimination: true,
-              autoImportJSX: isProduction ? true : true,
-              trimUnusedImports: true,
+              autoImportJSX: true,
               treeShaking: true,
               exports: {
                 replace: {
@@ -713,6 +716,7 @@ class Builder {
 
   private async CreateBuild(options: _CreateBuild) {
     const { define } = this.options;
+    const cwd = process.cwd();
     const build = await Bun.build({
       ...options,
       publicPath: "./",
@@ -729,11 +733,15 @@ class Builder {
         "node",
         "bun:sqlite",
         "crypto",
+        "node:path",
         import.meta.filename,
+        "@bunpmjs/bunext/internal/build.ts",
         "@bunpmjs/bunext/features/router.ts",
         "@bunpmjs/bunext/features/request.ts",
         "@bunpmjs/bunext/internal/bunextRequest.ts",
         "@bunpmjs/json-webtoken",
+        cwd + "/node_modules/@bunpmjs/bunext/internal/build.ts",
+        cwd + "/internal/build.ts",
       ],
       splitting: true,
     });
@@ -754,7 +762,6 @@ class Builder {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
   }
 }
-
 const builder = await new Builder(process.cwd()).Init();
 
 if (import.meta.main) await builder.makeBuild();

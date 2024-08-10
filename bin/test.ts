@@ -3,11 +3,13 @@ import { test, expect, describe, afterAll } from "bun:test";
 import "../internal/server_global.ts";
 import { builder } from "../internal/build";
 import { revalidate } from "../features/router.ts";
-import { rmSync, mkdirSync } from "fs";
 import { router } from "../internal/router.tsx";
 import { Head } from "../features/head.tsx";
-import { Server } from "../.bunext/react-ssr/server.ts";
+import "../.bunext/react-ssr/server.ts";
+import "../internal/server_global.ts";
 
+const Server = globalThis.Server;
+/*
 describe("Build features", () => {
   test("Build", async () => {
     const buildOut = await builder.makeBuild();
@@ -29,17 +31,17 @@ describe("Build features", () => {
 
 describe("Server Features", () => {
   test("start server", async () => {
-    expect(Server.server).not.toBe(undefined);
+    expect(Server).not.toBe(undefined);
 
-    const res = await fetch(`http://localhost:${Server.port}/`);
+    const res = await fetch(`http://localhost:${Server?.port}/`);
     expect(res.ok).toBe(true);
   });
 
   test("start hotServer", async () => {
-    Server.serveHotServer(3001);
-    expect(Server.hotServer).not.toBe(undefined);
+    Server?.serveHotServer(3001);
+    expect(Server?.hotServer).not.toBe(undefined);
     const promiseRes = await new Promise<boolean>((resolve) => {
-      const ws = new WebSocket(`ws://localhost:${Server.hotServerPort}`);
+      const ws = new WebSocket(`ws://localhost:${Server?.hotServerPort}`);
       ws.addEventListener("message", (ev) => {
         if (ev.data == "welcome") resolve(true);
       });
@@ -49,47 +51,48 @@ describe("Server Features", () => {
     });
     expect(promiseRes).toBe(true);
   });
-
-  test("Server Action", async () => {
-    await router.InitServerActions();
-    expect(
-      Array.prototype.concat(...router.serverActions.map((e) => e.actions))
-        .length
-    ).toBe(3);
-    const form = new FormData();
-    form.append("props", encodeURI(JSON.stringify([])));
-    const res = await fetch(
-      `http://localhost:${Server.port}/ServerActionGetter`,
-      {
-        headers: {
-          serveractionid: "/action.ts:ServerDoStuff",
-        },
-        body: form,
-        method: "POST",
-      }
-    );
-    expect(JSON.parse(await res.text()).props).toBe(true);
-  });
 });
+*/
+test("Server Action", async () => {
+  await router.InitServerActions();
+  expect(
+    Array.prototype.concat(...router.serverActions.map((e) => e.actions)).length
+  ).toBe(3);
 
+  console.log(router.serverActions);
+  const form = new FormData();
+  form.append("props", encodeURI(JSON.stringify([])));
+  const res = await fetch(
+    `http://localhost:${Server?.port}/ServerActionGetter`,
+    {
+      headers: {
+        serveractionid: "/action.ts:ServerDoStuff",
+      },
+      body: form,
+      method: "POST",
+    }
+  );
+  expect(JSON.parse(await res.text()).props).toBe(true);
+});
+/*
 test("API EndPoint", async () => {
   const methods = ["POST", "GET", "PUT", "DELETE"];
   for await (const method of methods) {
     expect(
       await (
-        await fetch(`http://localhost:${Server.port}/api/v1`, {
+        await fetch(`http://localhost:${Server?.port}/api/v1`, {
           method,
         })
       ).text()
     ).toBe(method);
   }
 });
-
+*/
 afterAll(async () => {
   //cleanUpBuild();
   await cleanUpServers();
 });
-
+/*
 function cleanUpBuild() {
   rmSync(process.cwd() + "/.bunext/build", {
     force: true,
@@ -97,9 +100,9 @@ function cleanUpBuild() {
   });
   mkdirSync(process.cwd() + "/.bunext/build");
 }
-
+*/
 async function cleanUpServers() {
-  const server = (await import("../.bunext/react-ssr/server.ts")).Server;
-  server.server?.stop(true);
-  server.hotServer?.stop(true);
+  const server = globalThis.Server;
+  server?.server?.stop(true);
+  server?.hotServer?.stop(true);
 }

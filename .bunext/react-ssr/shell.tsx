@@ -2,6 +2,7 @@ import "@bunpmjs/bunext/internal/globals";
 import { HeadElement } from "@bunpmjs/bunext/features/head";
 import { Dev } from "@bunpmjs/bunext/dev/dev";
 import React from "react";
+
 export const Shell = ({
   children,
   route,
@@ -13,12 +14,7 @@ export const Shell = ({
     <html>
       <HeadElement currentPath={route} />
       <body>{children}</body>
-      {process.env.NODE_ENV == "development" ||
-      globalThis.__NODE_ENV__ == "development" ? (
-        <Dev />
-      ) : (
-        <></>
-      )}
+      <Dev />
     </html>
   );
 };
