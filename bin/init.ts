@@ -6,21 +6,13 @@ import { $ } from "bun";
 import { generateUuid } from "../features/utils";
 import readline from "readline";
 
+/*
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
-
-await (async () => {
-  try {
-    throw new Error();
-    lstatSync(paths.bunextDirName).isDirectory();
-  } catch {
-    try {
-      await install(false);
-    } catch {}
-  }
-})();
+*/
+await install(false);
 
 interface packageJson {
   scripts: { [key: string]: string };
@@ -99,11 +91,12 @@ async function install(total: boolean) {
 
     await Bun.write("tsconfig.json", beautify(tsConfig(), null, 2, 50));
   }
-  cpSync;
-  await $`bun i`;
+  Bun.spawnSync({
+    cmd: ["bun", "i"],
+  });
 }
 
-function AskForTailwind() {
+function AskForTailwind(rl: readline.Interface) {
   rl.question("install tailwind y/n", async (res) => {
     if (res != "y") return;
     await $`bun i -D tailwindcss`;

@@ -127,37 +127,49 @@ class BunextServer {
     console.log(toLog.join("\n"));
   }
 
+  private async checkBuildOnDevMode({
+    url,
+    header,
+    filePath,
+  }: {
+    url: string;
+    header: Record<string, string>;
+    filePath?: string;
+  }) {
+    const isDev = process.env.NODE_ENV == "development";
+    const urlData = new URL(url);
+    const acceptedPathNames = ["index.js", "].js"];
+
+    if (!isDev) return;
+    if (filePath) builder.resetPath(filePath);
+    else if (
+      acceptedPathNames.filter((pathName) =>
+        urlData.pathname.endsWith(pathName)
+      ).length == 0
+    )
+      return;
+    else if (header.accept == "application/vnd.server-side-props") {
+    }
+    await builder.makeBuild();
+  }
+
   async serve(request: Request) {
     let serverActionData: FormData = new FormData();
+    const JSONHeader = request.headers.toJSON();
     if (request.url.endsWith("/ServerActionGetter")) {
       serverActionData = await request.formData();
     }
 
     try {
-      const isDev = process.env.NODE_ENV == "development";
-      const filepath = router.server?.match(request)?.filePath;
-      const urlData = new URL(request.url);
-
-      if (isDev) {
-        if (filepath) {
-          builder.resetPath(filepath);
-          await builder.preBuild(filepath);
-          await builder.makeBuild();
-        } else if (
-          !urlData.pathname.endsWith("index.js") &&
-          !urlData.pathname.endsWith("].js")
-        ) {
-          ("pass");
-        } else if (!urlData.search.startsWith("?")) {
-          ("pass");
-        } else {
-          await builder.makeBuild();
-        }
-      }
+      await this.checkBuildOnDevMode({
+        url: request.url,
+        filePath: router.server?.match(request)?.filePath,
+        header: JSONHeader,
+      });
 
       let response: BunextRequest | null = await router.serve(
         request,
-        request.headers.toJSON(),
+        JSONHeader,
         serverActionData,
         {
           Shell: Shell as any,
@@ -177,7 +189,6 @@ class BunextServer {
     }
   }
 }
-
-const Server = await new BunextServer().init();
-
-export { Server, BunextServer };
+if (!globalThis.Server) globalThis.Server = await new BunextServer().init();
+else await globalThis.Server.init();
+export { BunextServer };
