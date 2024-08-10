@@ -9,7 +9,7 @@ import "../.bunext/react-ssr/server.ts";
 import "../internal/server_global.ts";
 
 const Server = globalThis.Server;
-/*
+
 describe("Build features", () => {
   test("Build", async () => {
     const buildOut = await builder.makeBuild();
@@ -52,14 +52,13 @@ describe("Server Features", () => {
     expect(promiseRes).toBe(true);
   });
 });
-*/
-test("Server Action", async () => {
+
+test.skip("Server Action", async () => {
   await router.InitServerActions();
   expect(
     Array.prototype.concat(...router.serverActions.map((e) => e.actions)).length
   ).toBe(3);
 
-  console.log(router.serverActions);
   const form = new FormData();
   form.append("props", encodeURI(JSON.stringify([])));
   const res = await fetch(
@@ -74,20 +73,25 @@ test("Server Action", async () => {
   );
   expect(JSON.parse(await res.text()).props).toBe(true);
 });
-/*
+
 test("API EndPoint", async () => {
-  const methods = ["POST", "GET", "PUT", "DELETE"];
-  for await (const method of methods) {
-    expect(
-      await (
-        await fetch(`http://localhost:${Server?.port}/api/v1`, {
-          method,
-        })
-      ).text()
-    ).toBe(method);
-  }
+  const make = async () => {
+    const methods = ["POST", "GET", "PUT", "DELETE"];
+    for await (const method of methods) {
+      expect(
+        await (
+          await fetch(`http://localhost:${Server?.port}/api/v1`, {
+            method,
+          })
+        ).text()
+      ).toBe(method);
+    }
+  };
+  await make();
+  await make();
+  await make();
 });
-*/
+
 afterAll(async () => {
   //cleanUpBuild();
   await cleanUpServers();

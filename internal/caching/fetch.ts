@@ -53,7 +53,7 @@ export class BunextFetchCaching {
         Bun.deepEquals(input, cached.input) &&
         Bun.deepEquals(init, cached.init)
       ) {
-        return cached.result;
+        return cached.result.clone();
       }
     }
     return null;
