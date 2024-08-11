@@ -184,11 +184,12 @@ class BunextServer {
           },
           status: 500,
         });
-      console.log(e);
+      if ((e as Error).name == "TypeError") process.exit(1);
       return res(e as Error);
     }
   }
 }
-if (!globalThis.Server) globalThis.Server = await new BunextServer().init();
+if (!globalThis.Server)
+  (globalThis as any).Server = await new BunextServer().init();
 else await globalThis.Server.init();
 export { BunextServer };
