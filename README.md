@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible: bun 1.1.20 & under
+compatible: bun 1.1.22 & under
 compatible OS: Linux, WSL
 
 **SOME MAJOR CHANGE HAS BEEN MADE PAY ATTENTION TO THE SESSION & API-ENDPOINT SECTION DUE TO**
@@ -506,6 +506,12 @@ Head.setHead({
         content: "bar",
       },
     ],
+    link: [
+      {
+        rel: "stylesheet",
+        href: "main.css"
+      }
+    ]
   },
   path: "/otherPath",
 });
