@@ -1,4 +1,4 @@
-import { Head } from "../../features/head";
+import { Head } from "@bunpmjs/bunext/features/head";
 import { revalidateEvery } from "../../features/router";
 import { navigate } from "../../features/router";
 import { TestElement } from "./test";
@@ -7,21 +7,28 @@ import { Database } from "../../database";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement } from "./serverElement";
 
+Head.setHead({
+  data: {
+    author: "John Doe",
+    title: "my Hompage",
+    publisher: "Bunext",
+    meta: [
+      {
+        name: "foo",
+        content: "bar",
+      },
+    ],
+    link: [
+      {
+        rel: "stylesheet",
+        href: "index.css",
+      },
+    ],
+  },
+  path: "/",
+});
+
 export default async function Page() {
-  Head.setHead({
-    data: {
-      author: "John Doe",
-      title: "my Hompage",
-      publisher: "Bunext",
-      meta: [
-        {
-          name: "foo",
-          content: "bar",
-        },
-      ],
-    },
-    path: "/",
-  });
   revalidateEvery("/", 5);
   return (
     <div>

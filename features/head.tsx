@@ -4,10 +4,14 @@ export type _Head = {
   title?: string;
   author?: string;
   publisher?: string;
-  meta?: {
-    name: string;
-    content: string;
-  }[];
+  meta?: React.DetailedHTMLProps<
+    React.MetaHTMLAttributes<HTMLMetaElement>,
+    HTMLMetaElement
+  >[];
+  link?: React.DetailedHTMLProps<
+    React.LinkHTMLAttributes<HTMLLinkElement>,
+    HTMLLinkElement
+  >[];
 };
 
 class HeadDataClass {
@@ -57,22 +61,15 @@ function HeadElement({ currentPath }: { currentPath: string }) {
       ? globalX.__HEAD_DATA__[currentPath]
       : Head.head[currentPath];
 
-  if (!data) return <head></head>;
-  const res = (
+  return (
     <head>
-      {data?.meta?.map((e) => (
-        <meta name={e.name} content={e.content} key={e.name} />
-      )) ?? undefined}
-      {Object.keys(data ?? {})
-        .filter((n) => n != "meta")
-        .map((e) => {
-          const val = data[e as keyof _Head] as string;
-          if (e === "title") return <title key={e}>{val}</title>;
-          return <meta name={e} content={val} key={e} />;
-        })}
+      {data?.title && <title>{data.title}</title>}
+      {data?.author && <meta name="author" content={data.author} />}
+      {data?.publisher && <meta name="publisher" content={data.publisher} />}
+      {data?.meta && data.meta.map((e, index) => <meta key={index} {...e} />)}
+      {data?.link && data.link.map((e, index) => <link key={index} {...e} />)}
     </head>
   );
-  return res;
 }
 
 export { Head, HeadElement };
