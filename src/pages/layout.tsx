@@ -17,5 +17,10 @@ export default function MainLayout({ children }: LayoutProps) {
 function Element() {
   const [state, setState] = useState(true);
 
-  return <div>{state}</div>;
+  return (
+    <div>
+      {state ? "a" : "b"}
+      <button onClick={() => setState(!state)}>update</button>
+    </div>
+  );
 }

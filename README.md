@@ -42,7 +42,7 @@ bun run databaseCreate # only create the types
 
 - Hot reload
 
-- Revalidate ( beta version )
+- Revalidate ( Beta )
 
 - Server action ( File can be uploaded )
 
@@ -50,11 +50,13 @@ bun run databaseCreate # only create the types
 
 - SQlite Management ( Beta )
 
-- Server componants
+- Server componants ( Beta )
 
 - Devloppement mode with Hot Reload ( beta version )
 
 - Production mode ( Beta )
+
+- Links
 
 ## What is planed
 
@@ -63,8 +65,6 @@ bun run databaseCreate # only create the types
 - SQlite performance & features
 
 - FormData support for Server Action
-
-- Links
 
 - Windows compatibility
 
@@ -474,13 +474,18 @@ export async function ReactElement() {
 
 ### Navigate
 
-this method is temporary a new version will be avalable in a new release
+two methods to navigate to another page
 
 ```Javascript XML
 // index.tsx
-import { navigate } from "@bunpmjs/bunext/internal/router";
+import { navigate, Link } from "@bunpmjs/bunext/internal/router";
 function NextPage() {
-  return <button onClick={() => navigate("/new/location")}>Next page</button>;
+  return <>
+    <button onClick={() => navigate("/new/location")}>Next page</button>
+    <Link href="/new/location">
+      <button>Next Page</button>
+    </Link>
+  </>;
 }
 
 ```

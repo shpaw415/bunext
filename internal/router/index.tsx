@@ -96,6 +96,17 @@ export function useRouteState<T extends {}>(key: string, initial: T) {
   }, (globalThis.history?.state?.[key] ?? initial) as unknown as T);
 }
 
+class RouteLinkControl {
+  currentRoute: string = "/";
+
+  getLayoutDiffFromCurrentRoute(nextRoute: string) {
+    const ex_current = "/";
+    const ex_next = "/other";
+  }
+}
+
+export const routeDataContext = createContext(new RouteLinkControl());
+
 export const RouterHost = ({
   children,
   normalizeUrl = (url: string) => url,
@@ -159,7 +170,6 @@ export const RouterHost = ({
         }
       } catch (e) {
         console.log(e);
-        //window.location.reload();
       }
     },
     []

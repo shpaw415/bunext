@@ -1,6 +1,5 @@
 import { Head } from "@bunpmjs/bunext/features/head";
-import { revalidateEvery } from "../../features/router";
-import { navigate } from "../../features/router";
+import { Link, revalidateEvery } from "../../features/router";
 import { TestElement } from "./test";
 import { useSession, GetSession, Session } from "../../features/session";
 import { Database } from "../../database";
@@ -34,7 +33,9 @@ export default async function Page() {
     <div>
       <TestElement />
       {TestServerElement()}
-      <button onClick={() => navigate("/other")}>Other page</button>
+      <Link href="/other">
+        <button>Other page</button>
+      </Link>
       <button
         onClick={async () => {
           await ServerSetSession();

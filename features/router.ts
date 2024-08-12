@@ -1,4 +1,8 @@
-export { navigate } from "../internal/router/index.tsx";
+"use client";
+
+import { cloneElement } from "react";
+
+import { navigate } from "../internal/router/index.tsx";
 
 // only use this module in a server context
 
@@ -24,7 +28,7 @@ const builderModule = isServer
   ? await import("../internal/build.ts")
   : undefined;
 
-export async function revalidate(path: string) {
+async function revalidate(path: string) {
   if (!isServer) publicThrow();
   if (!builderModule?.builder) throw noBuilderThrow();
 
@@ -39,7 +43,7 @@ export async function revalidate(path: string) {
  * @param seconde every x seconde to revalide
  */
 
-export function revalidateEvery(path: string, seconde: number) {
+function revalidateEvery(path: string, seconde: number) {
   if (!isServer) return;
   if (!builderModule?.builder) throw noBuilderThrow();
 
@@ -54,3 +58,14 @@ export function revalidateEvery(path: string, seconde: number) {
     return;
   }
 }
+
+function Link({ href, children }: { href: string; children: JSX.Element }) {
+  return cloneElement<React.HTMLAttributes<HTMLElement>>(children, {
+    onClick: (e) => {
+      children.props.onClick && children.props.onClick(e);
+      navigate(href);
+    },
+  });
+}
+
+export { navigate, Link, revalidate, revalidateEvery };
