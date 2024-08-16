@@ -6,9 +6,12 @@ type LayoutProps = {
 
 export default function MainLayout({ children }: LayoutProps) {
   return (
-    <div>
-      Layout
-      <Element />
+    <div
+      style={{
+        width: "100%",
+        minHeight: "100%",
+      }}
+    >
       {children}
     </div>
   );

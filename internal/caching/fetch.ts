@@ -24,6 +24,9 @@ export class BunextFetchCaching {
     const result = this.compare(input, init);
     if (result) return result;
     const response = await globalThis.__FETCH_BUNEXT__(input, init);
+
+    if (init?.cache == "no-store") return response;
+
     this.pushToCache({
       response,
       input,

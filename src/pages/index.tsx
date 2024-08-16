@@ -17,12 +17,6 @@ Head.setHead({
         content: "bar",
       },
     ],
-    link: [
-      {
-        rel: "stylesheet",
-        href: "index.css",
-      },
-    ],
   },
   path: "/",
 });
