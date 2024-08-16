@@ -571,3 +571,9 @@ await fetch("my.site.com/api/v1", {
   body: JSON.stringify({ foo: "bar" })
 }); // return the post data
 ```
+
+# Change Log
+
+### 0.1.17
+
+- Fix Fetch cache no store now works
