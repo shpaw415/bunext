@@ -22,7 +22,7 @@ export class BunextFetchCaching {
 
   private async fetch(input: RequestInfo | URL, init?: RequestInit) {
     const result = this.compare(input, init);
-    if (result) return result;
+    if (result) return result.clone();
     const response = await globalThis.__FETCH_BUNEXT__(input, init);
 
     if (init?.cache == "no-store") return response;
@@ -32,7 +32,7 @@ export class BunextFetchCaching {
       input,
       init,
     });
-    return response;
+    return response.clone();
   }
 
   private pushToCache(props: {
@@ -53,7 +53,7 @@ export class BunextFetchCaching {
         Bun.deepEquals(input, cached.input) &&
         Bun.deepEquals(init, cached.init)
       ) {
-        return cached.result.clone();
+        return cached.result;
       }
     }
     return null;
