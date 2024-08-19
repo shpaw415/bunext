@@ -58,6 +58,8 @@ bun run databaseCreate # only create the types
 
 - Links
 
+- SVG support ( Beta )
+
 ## What is planed
 
 - Documentation
@@ -577,3 +579,7 @@ await fetch("my.site.com/api/v1", {
 ### 0.1.17
 
 - Fix Fetch cache no store now works
+
+### 0.1.18
+
+- Fix SVG not showing completely
