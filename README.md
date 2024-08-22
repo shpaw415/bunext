@@ -586,4 +586,4 @@ await fetch("my.site.com/api/v1", {
 
 ### 0.1.19
 
-- Fix async Layout error on SSR rendering
+- Fix async Layout error on SSR & CSR rendering

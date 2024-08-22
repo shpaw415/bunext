@@ -141,7 +141,7 @@ export const RouterHost = ({
           ),
         ]);
 
-        let JsxToDisplay = module.default({
+        let JsxToDisplay = await module.default({
           props,
           params: matched.params,
         });
@@ -201,7 +201,11 @@ async function NextJsLayoutStacker(
   currentVersion: number
 ) {
   let currentPath = "/";
-  type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
+  type _layout = ({
+    children,
+  }: {
+    children: JSX.Element;
+  }) => JSX.Element | Promise<JSX.Element>;
   let layoutStack: Array<_layout> = [];
   const formatedPath = path == "/" ? [""] : path.split("/");
   for await (const p of formatedPath) {
@@ -224,8 +228,10 @@ async function NextJsLayoutStacker(
   layoutStack.push(() => page);
   layoutStack = layoutStack.reverse();
   let currentJsx = <></>;
-  for (const Element of layoutStack) {
-    currentJsx = <Element children={currentJsx} />;
+  for await (const Element of layoutStack) {
+    currentJsx = await Element({
+      children: currentJsx,
+    });
   }
   return currentJsx;
 }
