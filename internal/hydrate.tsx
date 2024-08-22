@@ -3,6 +3,7 @@ import { hydrateRoot, type ErrorInfo } from "react-dom/client";
 import { RouterHost } from "./router/index";
 import { getRouteMatcher } from "./router/utils/get-route-matcher";
 import type { ServerSideProps, _DisplayMode, _GlobalData } from "./types";
+import React from "react";
 
 const globalX = globalThis as unknown as _GlobalData;
 
@@ -25,20 +26,12 @@ export async function hydrate(
   const matched = match(globalX.__INITIAL_ROUTE__.split("?")[0])!;
   const Initial = await import(matched.value);
 
-  let JsxToDisplay: JSX.Element = Initial.default({
-    props: globalX.__SERVERSIDE_PROPS__,
-    params: matched.params,
+  let JsxToDisplay: JSX.Element = await NextJsLayoutStacker({
+    PageJsx: Initial.default,
+    global: globalX,
+    matched: matched,
   });
 
-  switch (globalX.__DISPLAY_MODE__) {
-    case "nextjs":
-      JsxToDisplay = await NextJsLayoutStacker({
-        pageJsx: JsxToDisplay,
-        global: globalX,
-        matched: matched,
-      });
-      break;
-  }
   return hydrateRoot(
     document,
     <RouterHost Shell={Shell} {...options}>
@@ -62,28 +55,35 @@ type _MatchedStruct = {
 };
 
 async function NextJsLayoutStacker({
-  pageJsx,
+  PageJsx,
   global,
   matched,
 }: {
-  pageJsx: JSX.Element;
+  PageJsx: ({
+    props,
+    params,
+  }: {
+    props: any;
+    params: any;
+  }) => JSX.Element | Promise<JSX.Element>;
   global: _GlobalData;
   matched: _MatchedStruct;
 }) {
   type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
-  type _layoutPromise = ({
-    children,
-  }: {
-    children: JSX.Element;
-  }) => Promise<JSX.Element>;
+
   const layoutPath = global.__ROUTES__["/" + global.__LAYOUT_NAME__];
   if (matched.path === "/" && typeof layoutPath !== "undefined") {
     const Layout__ = await import(layoutPath);
-    return await Layout__.default({ children: pageJsx });
+    return await Layout__.default({
+      children: await PageJsx({
+        props: globalX.__SERVERSIDE_PROPS__,
+        params: matched.params,
+      }),
+    });
   }
   const splitedRoute = matched.path.split("/");
   let index = 1;
-  let defaultImports: Array<_layout | _layoutPromise> = [];
+  let defaultImports: Array<_layout> = [];
   const formatedRoutes = Object.keys(global.__ROUTES__)
     .map((e) => `/${global.__PAGES_DIR__}${e}`)
     .filter((e) => e.includes(global.__LAYOUT_NAME__));
@@ -97,10 +97,17 @@ async function NextJsLayoutStacker({
   }
 
   let currentJsx: JSX.Element = <></>;
-  defaultImports.push(() => pageJsx);
   defaultImports = defaultImports.reverse();
-  for await (const Layout of defaultImports) {
-    currentJsx = await Layout({ children: currentJsx });
+  for (let i = 0; i < defaultImports.length; i++) {
+    currentJsx = defaultImports[i]({
+      children:
+        i == 0
+          ? await PageJsx({
+              props: globalX.__SERVERSIDE_PROPS__,
+              params: matched.params,
+            })
+          : currentJsx,
+    });
   }
   return currentJsx;
 }

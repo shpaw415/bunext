@@ -583,3 +583,7 @@ await fetch("my.site.com/api/v1", {
 ### 0.1.18
 
 - Fix SVG not showing completely
+
+### 0.1.19
+
+- Fix async Layout error on SSR rendering

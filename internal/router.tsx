@@ -178,6 +178,7 @@ class StaticRouters {
         })
       );
     }
+
     const stream = this.makeStream(
       await this.makeJSXPage({
         Shell,
@@ -352,6 +353,7 @@ class StaticRouters {
         element.removeAndKeepContent();
       },
     });
+
     const page = rewriter.transform(renderToString(jsx));
     return new Response(page, {
       headers: {
@@ -428,7 +430,11 @@ class StaticRouters {
    */
   async stackLayouts(route: MatchedRoute, pageElement: JSX.Element) {
     const layouts = route.pathname == "/" ? [""] : route.pathname.split("/");
-    type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
+    type _layout = ({
+      children,
+    }: {
+      children: JSX.Element;
+    }) => JSX.Element | Promise<JSX.Element>;
     let layoutsJsxList: Array<_layout | string> = [];
     let index = 0;
     for await (const i of layouts) {
@@ -449,7 +455,11 @@ class StaticRouters {
     layoutsJsxList = layoutsJsxList.reverse();
     let currentJsx: JSX.Element = <></>;
     for await (const Layout of layoutsJsxList) {
-      currentJsx = <Layout children={currentJsx} />;
+      if (typeof Layout == "string") continue;
+      else
+        currentJsx = await Layout({
+          children: currentJsx,
+        });
     }
     return currentJsx;
   }

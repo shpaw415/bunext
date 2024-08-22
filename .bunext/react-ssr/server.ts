@@ -166,7 +166,6 @@ class BunextServer {
         filePath: router.server?.match(request)?.filePath,
         header: JSONHeader,
       });
-
       let response: BunextRequest | null = await router.serve(
         request,
         JSONHeader,
@@ -175,6 +174,7 @@ class BunextServer {
           Shell: Shell as any,
         }
       );
+
       return response;
     } catch (e) {
       const res = async (error: Error) =>
