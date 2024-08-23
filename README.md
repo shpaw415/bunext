@@ -587,3 +587,7 @@ await fetch("my.site.com/api/v1", {
 - Fix SVG not showing completely
 - Fix async Layout error on SSR & CSR rendering
 - Fix ServerComponant style prop not showing correcly causing hydration error
+
+## 0.6.19
+
+- Fix Regression build crash introduced in 0.6.18

@@ -1,7 +1,5 @@
 'use strict';
 
-Object.defineProperty(exports, '__esModule', { value: true });
-
 var isPlainObject = require('is-plain-object');
 var React = require('react');
 var prettyPrintObject = require('@base2/pretty-print-object');
@@ -304,7 +302,6 @@ var formatFunction = (function (fn, options) {
 
 var formatComplexDataStructure = (function (value, inline, lvl, options) {
   var normalizedValue = sortObject(value);
-  console.log(normalizedValue);
   var stringifiedValue = prettyPrintObject.prettyPrint(normalizedValue, {
     transform: function transform(currentObj, prop, originalResult) {
       var currentValue = currentObj[prop];
@@ -742,7 +739,5 @@ var reactElementToJsxString = function reactElementToJsxString(element) {
   return formatTree(parseReactElement(element, options), options);
 };
 
-exports["default"] = reactElementToJsxString;
-exports.inlineFunction = inlineFunction;
-exports.preserveFunctionLineBreak = preserveFunctionLineBreak;
-//# sourceMappingURL=index.js.map
+export default reactElementToJsxString;
+export { inlineFunction, preserveFunctionLineBreak };
