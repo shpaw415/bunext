@@ -2,7 +2,7 @@ import { join, basename } from "node:path";
 import type { BuildOutput, BunPlugin } from "bun";
 import { normalize } from "path";
 import { isValidElement } from "react";
-import reactElementToJSXString from "react-element-to-jsx-string";
+import reactElementToJSXString from "./jsxToString/index";
 import { URLpaths } from "./types";
 import { unlinkSync } from "node:fs";
 import "./server_global";

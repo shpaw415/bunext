@@ -28,6 +28,18 @@ bun run init
 bun run databaseCreate # only create the types
 ```
 
+## What is planed
+
+- Documentation
+
+- SQlite performance & features
+
+- FormData support for Server Action
+
+- Windows compatibility
+
+- Multi-Thred Http Worker ( bun 1.1.25 & over )
+
 ## What is ready
 
 - SSR and CSR
@@ -59,16 +71,6 @@ bun run databaseCreate # only create the types
 - Links
 
 - SVG support ( Beta )
-
-## What is planed
-
-- Documentation
-
-- SQlite performance & features
-
-- FormData support for Server Action
-
-- Windows compatibility
 
 ### To install and run
 
@@ -576,14 +578,12 @@ await fetch("my.site.com/api/v1", {
 
 # Change Log
 
-### 0.1.17
+### 0.6.17
 
 - Fix Fetch cache no store now works
 
-### 0.1.18
+### 0.6.18
 
 - Fix SVG not showing completely
-
-### 0.1.19
-
 - Fix async Layout error on SSR & CSR rendering
+- Fix ServerComponant style prop not showing correcly causing hydration error
