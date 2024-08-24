@@ -596,3 +596,7 @@ await fetch("my.site.com/api/v1", {
 
 - Fix production mode not initializing ServerAction (sorry for the that)
 - Multi-threading on production mode when ServerConfig HTTPServer.threads is set to more then 1 or all_cpu_core (default: 1)
+
+## 0.7.1
+
+- Fix Missing Type for ServerConfig thread
