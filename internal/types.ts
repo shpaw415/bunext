@@ -36,6 +36,8 @@ export type _globalThis = _GlobalData & {
 /**
  * HTTPServer
  *  - port: HTTP server port
+ *  - threads: Http worker (multi-threading)
+ *    - **only avalable on Linux with Bun ^1.1.25**
  *
  * Dev
  *  - hotServerPort: Hot reload Server port
@@ -49,6 +51,7 @@ export type _globalThis = _GlobalData & {
 export type ServerConfig = {
   HTTPServer: {
     port: number;
+    threads?: number | "all_cpu_core";
   };
   Dev: {
     hotServerPort: number;
