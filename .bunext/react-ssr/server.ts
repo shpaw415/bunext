@@ -14,8 +14,54 @@ import {
 } from "@bunpmjs/bunext/internal/server-features";
 
 import ServerConfig from "../../config/server"; // must be relative
+import Bypassrequest from "../../config/onRequest";
 import type { Server as _Server } from "bun";
 import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
+
+import { cpus, type as OSType } from "node:os";
+import cluster from "node:cluster";
+
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      bun_worker?: string;
+    }
+  }
+}
+
+function MakeCluster() {
+  if (
+    process.env.NODE_ENV != "production" ||
+    !cluster.isPrimary ||
+    typeof ServerConfig.HTTPServer.threads == "undefined" ||
+    OSType() != "Linux" ||
+    !Bun.semver.satisfies(Bun.version, "^1.1.25")
+  )
+    return false;
+
+  const cpuCoreCount = cpus().length;
+
+  let count =
+    ServerConfig.HTTPServer.threads == "all_cpu_core"
+      ? cpuCoreCount
+      : (ServerConfig.HTTPServer?.threads as number);
+
+  if (count <= 1) return false;
+
+  if (count > cpuCoreCount) {
+    console.error(
+      `Server Config\nAvalable Core: ${cpuCoreCount}\nServerConfig: ${count}`
+    );
+    count = cpuCoreCount;
+  }
+
+  for (let i = 0; i < count; i++)
+    cluster.fork({
+      bun_worker: i.toString(),
+    });
+
+  return true;
+}
 
 class BunextServer {
   port = ServerConfig.HTTPServer.port || 3000;
@@ -31,9 +77,7 @@ class BunextServer {
       async fetch(request) {
         request.headers.toJSON();
 
-        const OnRequestResponse = await (
-          await import("../../config/onRequest")
-        ).default(request);
+        const OnRequestResponse = await Bypassrequest(request);
         if (OnRequestResponse) return OnRequestResponse;
 
         try {
@@ -94,21 +138,19 @@ class BunextServer {
 
   async init() {
     const isDev = process.env.NODE_ENV == "development";
+    const isMainCluster = cluster.isPrimary || process.env.bun_worker == "1";
     if (globalThis.dryRun) {
       globalThis.serverConfig = ServerConfig;
-      await require("../../config/preload.ts");
+      if (isMainCluster) await require("../../config/preload.ts");
       this.RunServer();
-      this.logDevConsole();
+      if (isMainCluster) this.logDevConsole();
     }
-    if (isDev) {
-      await router.InitServerActions();
-    }
+    await router.InitServerActions();
 
-    if (isDev && globalThis.dryRun) {
+    if (isDev && globalThis.dryRun && isMainCluster) {
       this.serveHotServer(ServerConfig.Dev.hotServerPort);
-      await builder.preBuildAll();
       await builder.makeBuild();
-    } else if (process.env.NODE_ENV == "production") {
+    } else if (process.env.NODE_ENV == "production" && isMainCluster) {
       const buildoutput = await builder.makeBuild();
       if (!buildoutput) throw new Error("Production build failed");
       setRevalidate(buildoutput.revalidates);
@@ -124,6 +166,7 @@ class BunextServer {
 
   logDevConsole() {
     const toLog = [`Serving: http://${this.hostName}:${this.port}`];
+
     console.log(toLog.join("\n"));
   }
 
@@ -189,7 +232,9 @@ class BunextServer {
     }
   }
 }
-if (!globalThis.Server)
-  (globalThis as any).Server = await new BunextServer().init();
-else await globalThis.Server.init();
+
+if (!globalThis.Server || process.env.NODE_ENV == "production") {
+  if (!MakeCluster())
+    (globalThis as any).Server = await new BunextServer().init();
+} else await globalThis.Server.init();
 export { BunextServer };

@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible: bun 1.1.24 & under
+compatible: bun 1.1.0 - 1.1.26
 compatible OS: Linux, WSL
 
 **SOME MAJOR CHANGE HAS BEEN MADE PAY ATTENTION TO THE SESSION & API-ENDPOINT SECTION DUE TO**
@@ -38,9 +38,9 @@ bun run databaseCreate # only create the types
 
 - Windows compatibility
 
-- Multi-Thred Http Worker ( bun 1.1.25 & over )
-
 ## What is ready
+
+- Multi-Thread Http Worker ( bun ^1.1.25 )
 
 - SSR and CSR
 
@@ -591,3 +591,8 @@ await fetch("my.site.com/api/v1", {
 ## 0.6.19
 
 - Fix Regression build crash introduced in 0.6.18
+
+## 0.7.1
+
+- Fix production mode not initializing ServerAction (sorry for the that)
+- Multi-threading on production mode when ServerConfig HTTPServer.threads is set to more then 1 or all_cpu_core (default: 1)
