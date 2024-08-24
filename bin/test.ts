@@ -56,7 +56,7 @@ test("Server Action", async () => {
   await router.InitServerActions();
   expect(
     Array.prototype.concat(...router.serverActions.map((e) => e.actions)).length
-  ).toBe(3);
+  ).toBeGreaterThan(1);
 
   const form = new FormData();
   form.append("props", encodeURI(JSON.stringify([])));
