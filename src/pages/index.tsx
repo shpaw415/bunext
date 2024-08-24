@@ -1,5 +1,5 @@
 import { Head } from "@bunpmjs/bunext/features/head";
-import { Link, revalidateEvery } from "../../features/router";
+import { Link, revalidateEvery } from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
 import { useSession, GetSession, Session } from "../../features/session";
 import { Database } from "../../database";
@@ -23,6 +23,7 @@ Head.setHead({
 
 export default async function Page() {
   revalidateEvery("/", 5);
+
   return (
     <div>
       <TestElement />

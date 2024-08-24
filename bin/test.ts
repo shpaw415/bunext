@@ -1,12 +1,11 @@
 import { test, expect, describe, afterAll } from "bun:test";
 
-import "../internal/server_global.ts";
-import { builder } from "../internal/build";
-import { revalidate } from "../features/router.ts";
-import { router } from "../internal/router.tsx";
-import { Head } from "../features/head.tsx";
+import "@bunpmjs/bunext/internal/server_global.ts";
+import { builder } from "@bunpmjs/bunext/internal/build";
+import { revalidate } from "@bunpmjs/bunext/features/router.ts";
+import { router } from "@bunpmjs/bunext/internal/router";
+import { Head } from "@bunpmjs/bunext/features/head";
 import "../.bunext/react-ssr/server.ts";
-import "../internal/server_global.ts";
 
 const Server = globalThis.Server;
 
@@ -53,7 +52,7 @@ describe("Server Features", () => {
   });
 });
 
-test.skip("Server Action", async () => {
+test("Server Action", async () => {
   await router.InitServerActions();
   expect(
     Array.prototype.concat(...router.serverActions.map((e) => e.actions)).length
@@ -93,18 +92,8 @@ test("API EndPoint", async () => {
 });
 
 afterAll(async () => {
-  //cleanUpBuild();
   await cleanUpServers();
 });
-/*
-function cleanUpBuild() {
-  rmSync(process.cwd() + "/.bunext/build", {
-    force: true,
-    recursive: true,
-  });
-  mkdirSync(process.cwd() + "/.bunext/build");
-}
-*/
 async function cleanUpServers() {
   const server = globalThis.Server;
   server?.server?.stop(true);

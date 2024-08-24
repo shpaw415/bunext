@@ -13,7 +13,7 @@
     "typescript": "^5.0.0",
     "react": "*",
     "react-dom": "*",
-    "@bunpmjs/bunext": "^0.6.18"
+    "@bunpmjs/bunext": "^0.6.19"
   },
   "dependencies": {
     "json-beautify": "1.1.1",
