@@ -55,6 +55,7 @@ export default async function Page() {
 function IsLogged() {
   const session = useSession();
   const data = session.getData();
+
   return <div>{data?.test ? "logged" : "not logged"}</div>;
 }
 

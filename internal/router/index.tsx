@@ -130,13 +130,11 @@ export const RouterHost = ({
           ),
         ]);
 
-        let JsxToDisplay = await module.default({
-          props,
-          params: matched.params,
-        });
-
-        JsxToDisplay = await NextJsLayoutStacker(
-          JsxToDisplay,
+        const JsxToDisplay = await NextJsLayoutStacker(
+          await module.default({
+            props,
+            params: matched.params,
+          }),
           target,
           currentVersion
         );
@@ -195,7 +193,7 @@ async function NextJsLayoutStacker(
   }: {
     children: JSX.Element;
   }) => JSX.Element | Promise<JSX.Element>;
-  let layoutStack: Array<_layout> = [];
+  let layoutStack: Array<_layout> = [FakeLayout];
   const formatedPath = path == "/" ? [""] : path.split("/");
   for await (const p of formatedPath) {
     currentPath += p.length > 0 ? p : "";
@@ -214,15 +212,19 @@ async function NextJsLayoutStacker(
     }
     if (p.length > 0) currentPath += "/";
   }
-  layoutStack.push(() => page);
+
   layoutStack = layoutStack.reverse();
-  let currentJsx = <></>;
-  for await (const Element of layoutStack) {
-    currentJsx = await Element({
+  let currentJsx = page;
+  for await (const Layout of layoutStack) {
+    currentJsx = await Layout({
       children: currentJsx,
     });
   }
   return currentJsx;
+}
+function FakeLayout({ children }: { children: JSX.Element }) {
+  console.log("test");
+  return <div>{children}</div>;
 }
 
 function normalize(path: string) {

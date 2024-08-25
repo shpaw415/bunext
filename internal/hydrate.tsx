@@ -72,7 +72,7 @@ async function NextJsLayoutStacker({
   type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
 
   const layoutPath = global.__ROUTES__["/" + global.__LAYOUT_NAME__];
-  if (matched.path === "/" && typeof layoutPath !== "undefined") {
+  if (matched.path == "/" && typeof layoutPath != "undefined") {
     const Layout__ = await import(layoutPath);
     return await Layout__.default({
       children: await PageJsx({
@@ -96,17 +96,14 @@ async function NextJsLayoutStacker({
     index++;
   }
 
-  let currentJsx: JSX.Element = <></>;
+  let currentJsx: JSX.Element = await PageJsx({
+    props: globalX.__SERVERSIDE_PROPS__,
+    params: matched.params,
+  });
   defaultImports = defaultImports.reverse();
   for (let i = 0; i < defaultImports.length; i++) {
     currentJsx = defaultImports[i]({
-      children:
-        i == 0
-          ? await PageJsx({
-              props: globalX.__SERVERSIDE_PROPS__,
-              params: matched.params,
-            })
-          : currentJsx,
+      children: currentJsx,
     });
   }
   return currentJsx;

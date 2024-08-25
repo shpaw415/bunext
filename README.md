@@ -600,3 +600,7 @@ await fetch("my.site.com/api/v1", {
 ## 0.7.1
 
 - Fix Missing Type for ServerConfig thread
+
+## 0.7.2
+
+- Fix dev-mode page not loading correcly when there is no layout
