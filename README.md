@@ -607,3 +607,8 @@ await fetch("my.site.com/api/v1", {
 - Fix async layout in the hydration step
 - Improve compatibility with the multi-thread feature (will skip multi-thread on windows or mac) and now the main thread is making build and send the builded info to the workers
 - Other small improvement
+
+## 0.7.3
+
+- Fix server not waiting for the build to finish before sending the response causing hydration error
+- Other small improvement

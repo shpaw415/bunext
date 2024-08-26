@@ -38,6 +38,10 @@ class BunextServer {
   hotServer?: _Server;
   hostName = "localhost";
   isClustered = false;
+  waittingBuildFinish: Promise<boolean> | undefined;
+  WaitingBuildFinishResolver:
+    | ((value: boolean | PromiseLike<boolean>) => void)
+    | undefined;
 
   constantLog = [`Serving: http://${this.hostName}:${this.port}`];
 
@@ -194,7 +198,9 @@ class BunextServer {
       return;
     else if (header.accept == "application/vnd.server-side-props") {
     }
-    this.updateWorkerData();
+    await this.updateWorkerData({
+      path: filePath,
+    });
   }
 
   async serve(request: Request) {
@@ -240,6 +246,8 @@ class BunextServer {
     if (!cluster.isPrimary) {
       process.on("message", (data) => {
         builder.ssrElement = data as ssrElement[];
+        if (this.WaitingBuildFinishResolver)
+          this.WaitingBuildFinishResolver(true);
       });
     }
 
@@ -273,6 +281,7 @@ class BunextServer {
           revalidate(message.data.path);
           break;
         case "udpate_build":
+          if (message.data.path) builder.resetPath(message.data.path);
           await builder.makeBuild();
           this.updateWorkerData();
           break;
@@ -282,9 +291,18 @@ class BunextServer {
     this.isClustered = true;
     return true;
   }
-  updateWorkerData() {
+  async updateWorkerData(data?: { path?: string }) {
     if (!cluster.isPrimary) {
-      process.send?.({ task: "udpate_build", data: {} } as ClusterMessageType);
+      this.waittingBuildFinish = new Promise((res) => {
+        this.WaitingBuildFinishResolver = res;
+      });
+      process.send?.({
+        task: "udpate_build",
+        data: {
+          path: data?.path,
+        },
+      } as ClusterMessageType);
+      await this.waittingBuildFinish;
     } else
       for (const worker of Object.values(cluster.workers || [])) {
         worker?.send(builder.ssrElement);
@@ -301,7 +319,9 @@ type ClusterMessageType =
     }
   | {
       task: "udpate_build";
-      data: {};
+      data: {
+        path?: string;
+      };
     };
 
 if (!globalThis.Server || process.env.NODE_ENV == "production") {

@@ -329,6 +329,7 @@ class Builder {
     this.ssrElement = strRes?.ssrElement || [];
     this.revalidates = strRes?.revalidates || [];
     Head.head = strRes?.head || {};
+    globalThis.Server?.updateWorkerData();
     return strRes as BuildOuts;
   }
 
@@ -482,12 +483,6 @@ class Builder {
     }
 
     return fileContent;
-  }
-  private isReactImported(fileContent: string) {
-    const imports = new Bun.Transpiler({
-      loader: "tsx",
-    }).scanImports(fileContent);
-    console.log(imports);
   }
   private NextJsPlugin() {
     const self = this;
