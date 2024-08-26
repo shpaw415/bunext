@@ -193,7 +193,7 @@ async function NextJsLayoutStacker(
   }: {
     children: JSX.Element;
   }) => JSX.Element | Promise<JSX.Element>;
-  let layoutStack: Array<_layout> = [FakeLayout];
+  let layoutStack: Array<_layout> = [];
   const formatedPath = path == "/" ? [""] : path.split("/");
   for await (const p of formatedPath) {
     currentPath += p.length > 0 ? p : "";
@@ -221,10 +221,6 @@ async function NextJsLayoutStacker(
     });
   }
   return currentJsx;
-}
-function FakeLayout({ children }: { children: JSX.Element }) {
-  console.log("test");
-  return <div>{children}</div>;
 }
 
 function normalize(path: string) {
