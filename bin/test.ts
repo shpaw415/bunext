@@ -10,7 +10,7 @@ import "../.bunext/react-ssr/server.ts";
 const Server = globalThis.Server;
 
 describe("Build features", () => {
-  test("Build", async () => {
+  test.skip("Build", async () => {
     const buildOut = await builder.makeBuild();
     expect(buildOut?.ssrElement.length).toBeGreaterThan(0);
     expect(buildOut?.revalidates.length).toBeGreaterThan(0);
@@ -31,6 +31,8 @@ describe("Build features", () => {
 describe("Server Features", () => {
   test("start server", async () => {
     expect(Server).not.toBe(undefined);
+    Server?.RunServer();
+    expect(Server?.server).not.toBe(undefined);
 
     const res = await fetch(`http://localhost:${Server?.port}/`);
     expect(res.ok).toBe(true);

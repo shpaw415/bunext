@@ -3,10 +3,13 @@
 import { cloneElement } from "react";
 
 import { navigate } from "../internal/router/index.tsx";
-
+import type { Builder } from "../internal/build.ts";
 // only use this module in a server context
 
 const isServer = typeof window == "undefined";
+const builder = (
+  isServer ? (await import("../internal/build.ts")).builder : undefined
+) as Builder;
 const publicThrow = () => {
   throw new Error("you cannot call revalidate in a client context");
 };
@@ -22,18 +25,12 @@ const findRouteOrThrow = (path: string) => {
   if (!matched) throw noRouteThrow(path);
   return matched;
 };
-const noBuilderThrow = () => new Error("Builder could't be loaded");
-
-const builderModule = isServer
-  ? await import("../internal/build.ts")
-  : undefined;
 
 async function revalidate(path: string) {
   if (!isServer) publicThrow();
-  if (!builderModule?.builder) throw noBuilderThrow();
 
   const route = findRouteOrThrow(path);
-  if (builderModule.builder.findPathIndex(route.filePath) == -1) return;
+  if (builder.findPathIndex(route.filePath) == -1) return;
 
   if ((await import("node:cluster")).default.isWorker) {
     process.send?.({
@@ -45,8 +42,8 @@ async function revalidate(path: string) {
     return;
   }
 
-  builderModule.builder.resetPath(route.filePath);
-  await builderModule.builder.makeBuild();
+  builder.resetPath(route.filePath);
+  await builder.makeBuild();
 }
 /**
  *
@@ -56,13 +53,10 @@ async function revalidate(path: string) {
 
 function revalidateEvery(path: string, seconde: number) {
   if (!isServer) return;
-  if (!builderModule?.builder) throw noBuilderThrow();
 
-  const _revalidate = builderModule.builder.revalidates.find(
-    (r: any) => r.path === path
-  );
+  const _revalidate = builder.revalidates.find((r: any) => r.path === path);
   if (!_revalidate) {
-    builderModule.builder.revalidates.push({
+    builder.revalidates.push({
       path: path,
       time: seconde * 1000,
     });
