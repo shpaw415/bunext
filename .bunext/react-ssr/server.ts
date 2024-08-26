@@ -141,9 +141,9 @@ class BunextServer {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) throw new Error("Production build failed");
           setRevalidate(buildoutput.revalidates);
-          this.updateWorkerData();
         }
       }
+      this.updateWorkerData();
     } else {
       if (isDryRun) this.RunServer();
       await router.InitServerActions();
