@@ -141,8 +141,8 @@ class BunextServer {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) throw new Error("Production build failed");
           setRevalidate(buildoutput.revalidates);
+          this.updateWorkerData();
         }
-        this.updateWorkerData();
       }
     } else {
       if (isDryRun) this.RunServer();
@@ -161,7 +161,7 @@ class BunextServer {
   }
 
   logDevConsole(log?: any) {
-    console.clear();
+    //console.clear();
     if (
       typeof process.env.bun_worker != "undefined" &&
       process.env.bun_worker != "1"
@@ -194,7 +194,7 @@ class BunextServer {
       return;
     else if (header.accept == "application/vnd.server-side-props") {
     }
-    await builder.makeBuild();
+    this.updateWorkerData();
   }
 
   async serve(request: Request) {
@@ -265,12 +265,16 @@ class BunextServer {
         bun_worker: i.toString(),
       });
 
-    cluster.on("message", (w, _message) => {
+    cluster.on("message", async (w, _message) => {
       const message = _message as ClusterMessageType;
 
       switch (message.task) {
         case "revalidate":
           revalidate(message.data.path);
+          break;
+        case "udpate_build":
+          await builder.makeBuild();
+          this.updateWorkerData();
           break;
       }
     });
@@ -279,20 +283,26 @@ class BunextServer {
     return true;
   }
   updateWorkerData() {
-    if (!cluster.isPrimary) return;
-
-    for (const worker of Object.values(cluster.workers || [])) {
-      worker?.send(builder.ssrElement);
-    }
+    if (!cluster.isPrimary) {
+      process.send?.({ task: "udpate_build", data: {} } as ClusterMessageType);
+    } else
+      for (const worker of Object.values(cluster.workers || [])) {
+        worker?.send(builder.ssrElement);
+      }
   }
 }
 
-type ClusterMessageType = {
-  task: "revalidate";
-  data: {
-    path: string;
-  };
-};
+type ClusterMessageType =
+  | {
+      task: "revalidate";
+      data: {
+        path: string;
+      };
+    }
+  | {
+      task: "udpate_build";
+      data: {};
+    };
 
 if (!globalThis.Server || process.env.NODE_ENV == "production") {
   (globalThis as any).Server = await new BunextServer().init();
