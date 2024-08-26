@@ -40,7 +40,7 @@ bun run databaseCreate # only create the types
 
 ## What is ready
 
-- Multi-Thread Http Worker ( bun ^1.1.25 )
+- Multi-Thread Http Worker ( bun ^1.1.25 & Linux )
 
 - SSR and CSR
 
@@ -603,4 +603,6 @@ await fetch("my.site.com/api/v1", {
 
 ## 0.7.2
 
-- Fix dev-mode page not loading correcly when there is no layout
+- Fix page not loading correcly when there is no layout
+- Fix async layout in the hydration step
+- Improve compatibility with the multi-thread feature (will skip multi-thread on windows or mac) and now the main thread is making build and send the builded info to the workers

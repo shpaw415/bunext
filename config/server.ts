@@ -2,7 +2,7 @@ import type { ServerConfig } from "@bunpmjs/bunext/internal/types";
 const Config: ServerConfig = {
   HTTPServer: {
     port: 3000,
-    threads: 4,
+    threads: 2,
   },
   Dev: {
     hotServerPort: 3001,

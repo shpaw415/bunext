@@ -69,16 +69,23 @@ async function NextJsLayoutStacker({
   global: _GlobalData;
   matched: _MatchedStruct;
 }) {
-  type _layout = ({ children }: { children: JSX.Element }) => JSX.Element;
+  type _layout = ({
+    children,
+  }: {
+    children: JSX.Element;
+  }) => Promise<JSX.Element>;
 
   const layoutPath = global.__ROUTES__["/" + global.__LAYOUT_NAME__];
+
+  let pageJSX = await PageJsx({
+    props: globalX.__SERVERSIDE_PROPS__,
+    params: matched.params,
+  });
+
   if (matched.path == "/" && typeof layoutPath != "undefined") {
     const Layout__ = await import(layoutPath);
     return await Layout__.default({
-      children: await PageJsx({
-        props: globalX.__SERVERSIDE_PROPS__,
-        params: matched.params,
-      }),
+      children: pageJSX,
     });
   }
   const splitedRoute = matched.path.split("/");
@@ -96,15 +103,10 @@ async function NextJsLayoutStacker({
     index++;
   }
 
-  let currentJsx: JSX.Element = await PageJsx({
-    props: globalX.__SERVERSIDE_PROPS__,
-    params: matched.params,
-  });
-  defaultImports = defaultImports.reverse();
-  for (let i = 0; i < defaultImports.length; i++) {
-    currentJsx = defaultImports[i]({
-      children: currentJsx,
+  for (const layout of defaultImports.reverse()) {
+    pageJSX = await layout({
+      children: pageJSX,
     });
   }
-  return currentJsx;
+  return pageJSX;
 }

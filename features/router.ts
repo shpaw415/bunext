@@ -34,6 +34,17 @@ async function revalidate(path: string) {
 
   const route = findRouteOrThrow(path);
   if (builderModule.builder.findPathIndex(route.filePath) == -1) return;
+
+  if ((await import("node:cluster")).default.isWorker) {
+    process.send?.({
+      task: "revalidate",
+      data: {
+        path,
+      },
+    });
+    return;
+  }
+
   builderModule.builder.resetPath(route.filePath);
   await builderModule.builder.makeBuild();
 }

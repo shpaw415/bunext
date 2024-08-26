@@ -20,6 +20,8 @@ import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
 
 import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
+import type { ssrElement } from "@bunpmjs/bunext/internal/types";
+import { revalidate } from "@bunpmjs/bunext/features/router";
 
 declare global {
   namespace NodeJS {
@@ -106,34 +108,51 @@ class BunextServer {
   }
 
   async init() {
-    if (this.MakeCluster()) return;
-
     const isDev = process.env.NODE_ENV == "development";
-    const isMainCluster = cluster.isPrimary || process.env.bun_worker == "1";
-    if (globalThis.dryRun) {
-      globalThis.serverConfig = ServerConfig;
-      if (isMainCluster) await require("../../config/preload.ts");
-      this.RunServer();
-    }
-    await router.InitServerActions();
+    const isDryRun = globalThis.dryRun;
+    const isMainThread = cluster.isPrimary;
+    globalThis.serverConfig = ServerConfig;
 
-    if (isDev && globalThis.dryRun && isMainCluster) {
-      this.serveHotServer(ServerConfig.Dev.hotServerPort);
-      await builder.makeBuild();
-    } else if (process.env.NODE_ENV == "production" && isMainCluster) {
-      const buildoutput = await builder.makeBuild();
-      if (!buildoutput) throw new Error("Production build failed");
-      setRevalidate(buildoutput.revalidates);
+    if (!this.MakeCluster() && isMainThread) {
+      if (isDryRun) {
+        if (isDev) {
+          doWatchBuild();
+          this.serveHotServer(ServerConfig.Dev.hotServerPort);
+          await builder.makeBuild();
+        } else {
+          const buildoutput = await builder.makeBuild();
+          if (!buildoutput) throw new Error("Production build failed");
+          setRevalidate(buildoutput.revalidates);
+        }
+        this.RunServer();
+      }
+      await router.InitServerActions();
+      return this;
+    }
+
+    if (isMainThread) {
+      if (isDryRun) {
+        await require("../../config/preload.ts");
+        if (isDev) {
+          doWatchBuild();
+          this.serveHotServer(ServerConfig.Dev.hotServerPort);
+          await builder.makeBuild();
+        } else {
+          const buildoutput = await builder.makeBuild();
+          if (!buildoutput) throw new Error("Production build failed");
+          setRevalidate(buildoutput.revalidates);
+        }
+        this.updateWorkerData();
+      }
+    } else {
+      if (isDryRun) this.RunServer();
       await router.InitServerActions();
     }
 
-    if (globalThis.dryRun) {
-      globalThis.dryRun = false;
-      if (isDev) doWatchBuild();
-    }
+    if (isDryRun) globalThis.dryRun = false;
 
     this.logDevConsole(
-      process.env.bun_worker == "1"
+      this.isClustered && !isDev
         ? "Starting Bunext in Multi-threaded mode"
         : undefined
     );
@@ -215,25 +234,24 @@ class BunextServer {
   }
 
   MakeCluster() {
-    if (
-      process.env.NODE_ENV != "production" ||
-      !cluster.isPrimary ||
-      typeof ServerConfig.HTTPServer.threads == "undefined" ||
-      OSType() != "Linux" ||
-      !Bun.semver.satisfies(Bun.version, "^1.1.25")
-    )
+    if (OSType() != "Linux" || !Bun.semver.satisfies(Bun.version, "^1.1.25"))
       return false;
 
-    this.isClustered = true;
+    if (!cluster.isPrimary) {
+      process.on("message", (data) => {
+        builder.ssrElement = data as ssrElement[];
+      });
+    }
 
+    if (!cluster.isPrimary) return false;
     const cpuCoreCount = cpus().length;
 
     let count =
       ServerConfig.HTTPServer.threads == "all_cpu_core"
         ? cpuCoreCount
-        : (ServerConfig.HTTPServer?.threads as number);
+        : ServerConfig.HTTPServer.threads || 1;
 
-    if (count <= 1) return false;
+    if (count <= 1 || process.env.NODE_ENV == "development") count = 1;
 
     if (count > cpuCoreCount) {
       console.error(
@@ -247,9 +265,34 @@ class BunextServer {
         bun_worker: i.toString(),
       });
 
+    cluster.on("message", (w, _message) => {
+      const message = _message as ClusterMessageType;
+
+      switch (message.task) {
+        case "revalidate":
+          revalidate(message.data.path);
+          break;
+      }
+    });
+
+    this.isClustered = true;
     return true;
   }
+  updateWorkerData() {
+    if (!cluster.isPrimary) return;
+
+    for (const worker of Object.values(cluster.workers || [])) {
+      worker?.send(builder.ssrElement);
+    }
+  }
 }
+
+type ClusterMessageType = {
+  task: "revalidate";
+  data: {
+    path: string;
+  };
+};
 
 if (!globalThis.Server || process.env.NODE_ENV == "production") {
   (globalThis as any).Server = await new BunextServer().init();

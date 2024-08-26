@@ -1,5 +1,9 @@
 import { Head } from "@bunpmjs/bunext/features/head";
-import { Link, revalidateEvery } from "@bunpmjs/bunext/features/router";
+import {
+  Link,
+  revalidate,
+  revalidateEvery,
+} from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
 import { useSession, GetSession, Session } from "../../features/session";
 import { Database } from "../../database";
@@ -47,6 +51,9 @@ export default async function Page() {
       >
         Delete Session
       </button>
+      <button onClick={async () => await ServerRevalidateNow()}>
+        Revalidate now
+      </button>
       <IsLogged />
     </div>
   );
@@ -72,4 +79,8 @@ export async function ServerSetSession() {
 
 export async function ServerDeleteSession() {
   GetSession(arguments).delete();
+}
+
+export async function ServerRevalidateNow() {
+  await revalidate("/");
 }
