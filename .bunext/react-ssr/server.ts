@@ -118,7 +118,6 @@ class BunextServer {
     globalThis.serverConfig = ServerConfig;
 
     if (dryRun) globalThis.clusterStatus = this.MakeCluster();
-
     if (!globalThis.clusterStatus) {
       if (isDryRun) {
         if (isDev) {
@@ -190,9 +189,15 @@ class BunextServer {
       header.accept == "application/vnd.server-side-props" ||
       header.accept.startsWith("text/html")
     ) {
-      await this.updateWorkerData({
-        path: filePath,
-      });
+      if (this.isClustered)
+        await this.updateWorkerData({
+          path: filePath,
+        });
+      else {
+        this.makeBuildAwaiter();
+        if (filePath) builder.resetPath(filePath);
+        await builder.makeBuild();
+      }
     } else if (url.pathname.endsWith(".js") && url.search.startsWith("?"))
       await this.waittingBuildFinish;
   }
@@ -285,11 +290,19 @@ class BunextServer {
 
     return true;
   }
+  private makeBuildAwaiter() {
+    this.waittingBuildFinish = new Promise((res) => {
+      this.WaitingBuildFinishResolver = res;
+    });
+  }
   async updateWorkerData(data?: { path?: string }) {
+    if (!this.isClustered) {
+      this.WaitingBuildFinishResolver?.(true);
+      return;
+    }
+
     if (!cluster.isPrimary) {
-      this.waittingBuildFinish = new Promise((res) => {
-        this.WaitingBuildFinishResolver = res;
-      });
+      this.makeBuildAwaiter();
       process.send?.({
         task: "udpate_build",
         data: {
