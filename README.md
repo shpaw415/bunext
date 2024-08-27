@@ -612,3 +612,8 @@ await fetch("my.site.com/api/v1", {
 
 - Fix server not waiting for the build to finish before sending the response causing hydration error
 - Other small improvement
+
+## 0.7.4
+
+- Fix getServersideProps taking time before responding
+- Performance improvement

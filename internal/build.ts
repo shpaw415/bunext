@@ -568,9 +568,8 @@ class Builder {
             const transpiler = new Bun.Transpiler({
               loader: "tsx",
               jsxOptimizationInline: true,
-              deadCodeElimination: true,
-              autoImportJSX: true,
               treeShaking: true,
+              autoImportJSX: true,
               exports: {
                 replace: {
                   ...serverActionsTags,

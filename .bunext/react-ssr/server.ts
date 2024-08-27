@@ -117,7 +117,9 @@ class BunextServer {
     const isMainThread = cluster.isPrimary;
     globalThis.serverConfig = ServerConfig;
 
-    if (!this.MakeCluster() && isMainThread) {
+    if (dryRun) globalThis.clusterStatus = this.MakeCluster();
+
+    if (isMainThread && !globalThis.clusterStatus) {
       if (isDryRun) {
         if (isDev) {
           doWatchBuild();
@@ -144,11 +146,11 @@ class BunextServer {
         } else {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) throw new Error("Production build failed");
+          this.updateWorkerData();
           setRevalidate(buildoutput.revalidates);
         }
       }
-      this.updateWorkerData();
-    } else {
+    } else if (!isMainThread) {
       if (isDryRun) this.RunServer();
       await router.InitServerActions();
     }
@@ -180,27 +182,23 @@ class BunextServer {
     header,
     filePath,
   }: {
-    url: string;
+    url: URL;
     header: Record<string, string>;
     filePath?: string;
   }) {
     const isDev = process.env.NODE_ENV == "development";
-    const urlData = new URL(url);
-    const acceptedPathNames = ["index.js", "].js"];
 
     if (!isDev) return;
-    if (filePath) builder.resetPath(filePath);
-    else if (
-      acceptedPathNames.filter((pathName) =>
-        urlData.pathname.endsWith(pathName)
-      ).length == 0
-    )
-      return;
-    else if (header.accept == "application/vnd.server-side-props") {
-    }
-    await this.updateWorkerData({
-      path: filePath,
-    });
+
+    if (
+      header.accept == "application/vnd.server-side-props" ||
+      header.accept.startsWith("text/html")
+    ) {
+      await this.updateWorkerData({
+        path: filePath,
+      });
+    } else if (url.pathname.endsWith(".js") && url.search.startsWith("?"))
+      await this.waittingBuildFinish;
   }
 
   async serve(request: Request) {
@@ -209,10 +207,9 @@ class BunextServer {
     if (request.url.endsWith("/ServerActionGetter")) {
       serverActionData = await request.formData();
     }
-
     try {
       await this.checkBuildOnDevMode({
-        url: request.url,
+        url: new URL(request.url),
         filePath: router.server?.match(request)?.filePath,
         header: JSONHeader,
       });
@@ -283,7 +280,7 @@ class BunextServer {
         case "udpate_build":
           if (message.data.path) builder.resetPath(message.data.path);
           await builder.makeBuild();
-          this.updateWorkerData();
+          await this.updateWorkerData();
           break;
       }
     });
@@ -303,10 +300,11 @@ class BunextServer {
         },
       } as ClusterMessageType);
       await this.waittingBuildFinish;
-    } else
+    } else {
       for (const worker of Object.values(cluster.workers || [])) {
         worker?.send(builder.ssrElement);
       }
+    }
   }
 }
 
