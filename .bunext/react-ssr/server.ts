@@ -119,7 +119,7 @@ class BunextServer {
 
     if (dryRun) globalThis.clusterStatus = this.MakeCluster();
 
-    if (isMainThread && !globalThis.clusterStatus) {
+    if (!globalThis.clusterStatus) {
       if (isDryRun) {
         if (isDev) {
           doWatchBuild();
@@ -133,10 +133,7 @@ class BunextServer {
         this.RunServer();
       }
       await router.InitServerActions();
-      return this;
-    }
-
-    if (isMainThread) {
+    } else if (isMainThread) {
       if (isDryRun) {
         await require("../../config/preload.ts");
         if (isDev) {
@@ -167,7 +164,6 @@ class BunextServer {
   }
 
   logDevConsole(log?: any) {
-    //console.clear();
     if (
       typeof process.env.bun_worker != "undefined" &&
       process.env.bun_worker != "1"
@@ -240,15 +236,17 @@ class BunextServer {
     if (OSType() != "Linux" || !Bun.semver.satisfies(Bun.version, "^1.1.25"))
       return false;
 
+    this.isClustered = true;
+
     if (!cluster.isPrimary) {
       process.on("message", (data) => {
         builder.ssrElement = data as ssrElement[];
         if (this.WaitingBuildFinishResolver)
           this.WaitingBuildFinishResolver(true);
       });
+      return true;
     }
 
-    if (!cluster.isPrimary) return false;
     const cpuCoreCount = cpus().length;
 
     let count =
@@ -285,7 +283,6 @@ class BunextServer {
       }
     });
 
-    this.isClustered = true;
     return true;
   }
   async updateWorkerData(data?: { path?: string }) {
