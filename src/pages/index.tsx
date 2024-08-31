@@ -22,7 +22,7 @@ Head.setHead({
       },
     ],
   },
-  path: "/",
+  path: "*",
 });
 
 export default async function Page() {

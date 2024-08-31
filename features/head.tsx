@@ -33,8 +33,9 @@ class HeadDataClass {
    * @param path not mandatory but can be used to set head data for a page Ex: /users
    * @param data to be set
    */
-  public setHead({ data, path }: { data: _Head; path?: string }) {
-    if (path) this.head[path] = data;
+  public setHead({ data, path }: { data: _Head; path: string }) {
+    if (!this.head[path]) this.head[path] = data;
+    else if (this.head[path]) this.head[path] = { ...this.head[path], ...data };
     else if (this.currentPath) this.head[this.currentPath] = data;
   }
   /**
@@ -58,8 +59,11 @@ function HeadElement({ currentPath }: { currentPath: string }) {
 
   const data =
     typeof window != "undefined"
-      ? globalX.__HEAD_DATA__[currentPath]
-      : Head.head[currentPath];
+      ? {
+          ...globalX.__HEAD_DATA__[currentPath],
+          ...(globalX.__HEAD_DATA__["*"] || {}),
+        }
+      : { ...Head.head[currentPath], ...(Head.head["*"] || {}) };
 
   return (
     <head>

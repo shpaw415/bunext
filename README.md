@@ -617,3 +617,8 @@ await fetch("my.site.com/api/v1", {
 
 - Fix getServersideProps taking time before responding
 - Performance improvement
+
+## 0.7.5
+
+- Head path param is now required
+- Head path param can be \* and apply to every page
