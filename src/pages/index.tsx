@@ -5,16 +5,18 @@ import {
   revalidateEvery,
 } from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
-import { useSession, GetSession, Session } from "../../features/session";
-import { Database } from "../../database";
+import {
+  useSession,
+  GetSession,
+  Session,
+} from "@bunpmjs/bunext/features/session";
+import { Database } from "@bunpmjs/bunext/database";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement } from "./serverElement";
 
 Head.setHead({
   data: {
-    author: "John Doe",
     title: "my Hompage",
-    publisher: "Bunext",
     meta: [
       {
         name: "foo",
@@ -22,7 +24,7 @@ Head.setHead({
       },
     ],
   },
-  path: "*",
+  path: "/",
 });
 
 export default async function Page() {

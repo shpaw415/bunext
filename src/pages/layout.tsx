@@ -1,8 +1,23 @@
+import { Head } from "@bunpmjs/bunext/features/head";
 import { useState } from "react";
 
 type LayoutProps = {
   children: JSX.Element;
 };
+
+Head.setHead({
+  path: "*",
+  data: {
+    author: "shpaw415",
+    publisher: "Bunext",
+    meta: [
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1.0",
+      },
+    ],
+  },
+});
 
 export default async function MainLayout({ children }: LayoutProps) {
   return (

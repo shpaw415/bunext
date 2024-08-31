@@ -35,7 +35,8 @@ class HeadDataClass {
    */
   public setHead({ data, path }: { data: _Head; path: string }) {
     if (!this.head[path]) this.head[path] = data;
-    else if (this.head[path]) this.head[path] = { ...this.head[path], ...data };
+    else if (this.head[path])
+      this.head[path] = deepMerge(this.head[path], data);
     else if (this.currentPath) this.head[this.currentPath] = data;
   }
   /**
@@ -54,16 +55,35 @@ class HeadDataClass {
 
 const Head = new HeadDataClass();
 
+function deepMerge(obj: _Head, assign: _Head): _Head {
+  const copy = structuredClone(obj);
+  for (const key of Object.keys(assign) as Array<keyof _Head>) {
+    switch (key) {
+      case "author":
+      case "publisher":
+      case "title":
+        copy[key] = assign[key];
+        break;
+      case "link":
+      case "meta":
+        if (copy[key]) copy[key].push(...(assign[key] as any));
+        else copy[key] = assign[key] as any;
+        break;
+    }
+  }
+  return copy;
+}
+
 function HeadElement({ currentPath }: { currentPath: string }) {
   const globalX = globalThis as unknown as _globalThis;
 
   const data =
     typeof window != "undefined"
-      ? {
-          ...globalX.__HEAD_DATA__[currentPath],
-          ...(globalX.__HEAD_DATA__["*"] || {}),
-        }
-      : { ...Head.head[currentPath], ...(Head.head["*"] || {}) };
+      ? deepMerge(
+          globalX.__HEAD_DATA__["*"] || {},
+          globalX.__HEAD_DATA__[currentPath]
+        )
+      : deepMerge(Head.head["*"] || {}, Head.head[currentPath]);
 
   return (
     <head>

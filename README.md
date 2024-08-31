@@ -594,7 +594,7 @@ await fetch("my.site.com/api/v1", {
 
 ## 0.7.0
 
-- Fix production mode not initializing ServerAction (sorry for the that)
+- Fix production mode not initializing ServerAction (sorry for that)
 - Multi-threading on production mode when ServerConfig HTTPServer.threads is set to more then 1 or all_cpu_core (default: 1)
 
 ## 0.7.1
@@ -622,3 +622,8 @@ await fetch("my.site.com/api/v1", {
 
 - Head path param is now required
 - Head path param can be \* and apply to every page
+
+## 0.7.7
+
+- Head display order modified path \* is overwriten by the current path
+- Head data is now deep merged now meta and links are stacked
