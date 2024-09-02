@@ -14,6 +14,8 @@ import { Database } from "@bunpmjs/bunext/database";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement } from "./serverElement";
 
+import Test from "../../static/index.css";
+
 Head.setHead({
   data: {
     title: "my Hompage",
@@ -21,6 +23,12 @@ Head.setHead({
       {
         name: "foo",
         content: "bar",
+      },
+    ],
+    link: [
+      {
+        rel: "stylesheet",
+        href: Test,
       },
     ],
   },

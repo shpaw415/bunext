@@ -1,1 +1,1 @@
-preload = ["./.bunext/plugins/svg.ts"]
+preload = ["./.bunext/plugins/svg.ts", "./.bunext/plugins/css.ts"]

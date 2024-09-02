@@ -56,8 +56,8 @@ class HeadDataClass {
 const Head = new HeadDataClass();
 
 function deepMerge(obj: _Head, assign: _Head): _Head {
-  const copy = structuredClone(obj);
-  for (const key of Object.keys(assign) as Array<keyof _Head>) {
+  const copy = structuredClone(obj || {});
+  for (const key of Object.keys(assign || {}) as Array<keyof _Head>) {
     switch (key) {
       case "author":
       case "publisher":

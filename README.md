@@ -627,3 +627,13 @@ await fetch("my.site.com/api/v1", {
 
 - Head display order modified path \* is overwriten by the current path
 - Head data is now deep merged now meta and links are stacked
+
+## 0.7.8
+
+- env variables can be made public by adding PULIC keyword.
+  Ex:
+  PUBLIC_API_KEY="abcdefghijklmnop12345678" // can be accessed from client and server
+  API_KEY="abcdefghijklmnop12345678" // only accessed from server side
+
+- css can now be loaded direcly in the page as a link in /static path
+- @static path is now accessible to direcly access /static path

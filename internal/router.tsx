@@ -228,11 +228,24 @@ class StaticRouters {
       __HEAD_DATA__: JSON.stringify(Head.head),
       __PUBLIC_SESSION_DATA__: "undefined",
       __NODE_ENV__: `"${process.env.NODE_ENV}"`,
+      __PROCESS_ENV__: JSON.stringify(
+        Object.assign(
+          {},
+          ...Object.keys(process.env)
+            .filter((k) => k.startsWith("PUBLIC"))
+            .map((k) => {
+              return { [k]: process.env[k] };
+            })
+        )
+      ),
     } as const;
 
-    const preloadSriptsStrList = Object.keys(preloadScriptObj)
-      .map((i) => `${i}=${(preloadScriptObj as any)[i]}`)
-      .filter(Boolean);
+    const preloadSriptsStrList = [
+      ...Object.keys(preloadScriptObj)
+        .map((i) => `${i}=${(preloadScriptObj as any)[i]}`)
+        .filter(Boolean),
+      "process={env: __PROCESS_ENV__};",
+    ];
 
     const renderOptionData = {
       signal: request.signal,

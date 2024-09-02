@@ -96,14 +96,6 @@ async function install(total: boolean) {
   });
 }
 
-function AskForTailwind(rl: readline.Interface) {
-  rl.question("install tailwind y/n", async (res) => {
-    if (res != "y") return;
-    await $`bun i -D tailwindcss`;
-    await $`bunx tailwindcss init`;
-  });
-}
-
 function tsConfig() {
   return {
     compilerOptions: {
@@ -130,6 +122,7 @@ function tsConfig() {
 
       paths: {
         "@/*": ["./src/*"],
+        "@static/*": ["./static/*"],
       },
     },
     exclude: ["node_modules"],
