@@ -1,16 +1,13 @@
 ﻿# Compatibility
 
-compatible: bun 1.1.0 - 1.1.26
+compatible Runtime: bun 1.1.0 - 1.1.29
 compatible OS: Linux, WSL
-
-**SOME MAJOR CHANGE HAS BEEN MADE PAY ATTENTION TO THE SESSION & API-ENDPOINT SECTION DUE TO**
-**A RACE CONDITION THAT COULD LEAD TO A SECURITY ISSUE AND OTHER UNDEFINED BEHAVIOURS**
 
 N.B : Bun is in continuous changement and compatibility between version is a
 
-huge problem for Bunext there is possible crash over some new version i will
+huge problem for Bunext there is possible crash over some new version of Bun.
 
-keep up to date the framework for what it needs
+I will keep up to date the framework for what it needs
 
 # bunext
 
@@ -34,13 +31,11 @@ bun run databaseCreate # only create the types
 
 - SQlite performance & features
 
-- FormData support for Server Action
-
 - Windows compatibility
 
 ## What is ready
 
-- Multi-Thread Http Worker ( bun ^1.1.25 & Linux )
+- Multi-Thread Http Worker ( bun ^1.1.25 & Linux only )
 
 - SSR and CSR
 
@@ -56,7 +51,7 @@ bun run databaseCreate # only create the types
 
 - Revalidate ( Beta )
 
-- Server action ( File can be uploaded )
+- Server action ( File, File[] and FormData can be uploaded )
 
 - Session Management ( public & private )
 
@@ -637,3 +632,9 @@ await fetch("my.site.com/api/v1", {
 
 - css can now be loaded direcly in the page as a link in /static path
 - @static path is now accessible to direcly access /static path
+
+## 0.7.9
+
+- Fix missing global
+- file[] as prop in Server Action is supported
+- FormData as single prop in Server Action is supported

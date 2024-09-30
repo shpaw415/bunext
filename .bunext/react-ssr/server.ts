@@ -29,7 +29,10 @@ declare global {
       bun_worker?: string;
     }
   }
+  var clusterStatus: boolean;
 }
+
+globalThis.clusterStatus ??= false;
 
 class BunextServer {
   port = ServerConfig.HTTPServer.port || 3000;
@@ -225,6 +228,7 @@ class BunextServer {
 
       return response;
     } catch (e) {
+      console.log(e);
       const res = async (error: Error) =>
         new Response(renderToString(ErrorFallback(error)), {
           headers: {

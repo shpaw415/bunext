@@ -69,7 +69,6 @@ class Builder {
     path: string;
     time: number;
   }[] = [];
-  private hasReactImported = false;
 
   constructor(baseDir: string) {
     this.options = {
@@ -340,29 +339,39 @@ class Builder {
 
     const ServerActionClient = (ModulePath: string, funcName: string) => {
       return async function (...props: Array<any>) {
-        function generateRandomString(length: number) {
-          let result = "";
-          const characters =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-          const charactersLength = characters.length;
+        let currentPropsIndex = 0;
+        let currentFileBatch = 0;
+        const formatToFile = () => {
+          currentPropsIndex++;
+          return `BUNEXT_FILE_${currentPropsIndex}`;
+        };
+        const formatToBatchedFile = () => {
+          return `BUNEXT_BATCH_FILES_${currentPropsIndex}`;
+        };
 
-          for (let i = 0; i < length; i++) {
-            result += characters.charAt(
-              Math.floor(Math.random() * charactersLength)
-            );
-          }
-
-          return result;
-        }
-        const formatToFile = () => `BUNEXT_FILE_${generateRandomString(10)}`;
-
-        const formData = new FormData();
+        let formData = new FormData();
 
         let _props: Array<any> = props.map((prop) => {
           if (prop instanceof File) {
             const id = formatToFile();
             formData.append(id, prop);
             return id;
+          } else if (Array.isArray(prop) && prop.length > 0) {
+            currentPropsIndex++;
+            const id = formatToBatchedFile();
+            return prop.map((p) => {
+              if (p instanceof File) {
+                formData.append(id, p);
+                return id;
+              } else return p;
+            });
+          } else if (prop instanceof FormData) {
+            if (props.length > 1)
+              throw new Error(
+                "only one prop is permited with a FormData in a ServerAction"
+              );
+            formData = prop;
+            return "BUNEXT_FORMDATA";
           } else return prop;
         });
         formData.append("props", encodeURI(JSON.stringify(_props)));

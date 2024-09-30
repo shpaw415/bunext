@@ -43,7 +43,7 @@ export default async function Page() {
       <TestElement />
       {TestServerElement()}
       <Link href="/other">
-        <button>Other page</button>
+        <button>Other pages</button>
       </Link>
       <button
         onClick={async () => {

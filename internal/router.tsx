@@ -433,8 +433,16 @@ class StaticRouters {
     ).map((prop) => {
       if (typeof prop == "string" && prop.startsWith("BUNEXT_FILE_")) {
         return data.get(prop) as File;
-      }
-      return prop;
+      } else if (
+        Array.isArray(prop) &&
+        prop.length > 0 &&
+        typeof prop[0] == "string" &&
+        prop[0].startsWith("BUNEXT_BATCH_FILES_")
+      ) {
+        return data.getAll(prop[0]);
+      } else if (typeof prop == "string" && prop == "BUNEXT_FORMDATA") {
+        return data;
+      } else return prop;
     });
   }
 
