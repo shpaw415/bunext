@@ -24,7 +24,7 @@ describe("Build features", () => {
   });
 
   test("Header data", () => {
-    expect(Object.keys(Head.head).length).toBe(2);
+    expect(Object.keys(Head.head).length).toBe(3);
   });
 });
 

@@ -1,6 +1,6 @@
 import type { FileSystemRouter, MatchedRoute } from "bun";
 import { NJSON } from "next-json";
-import { join, relative } from "node:path";
+import { extname, join, relative } from "node:path";
 import {
   renderToString,
   type RenderToReadableStreamOptions,
@@ -9,11 +9,12 @@ import type { _DisplayMode, _SsrMode } from "./types";
 import { normalize } from "path";
 import React from "react";
 import "./server_global";
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync, existsSync, rmdirSync } from "node:fs";
 import { builder } from "./build";
 import { Head } from "../features/head";
 import { BunextRequest } from "./bunextRequest";
 import "./server_global";
+import { rm } from "node:fs/promises";
 class ClientOnlyError extends Error {
   constructor() {
     super("client only");
@@ -21,6 +22,12 @@ class ClientOnlyError extends Error {
 }
 
 type pathNames = "/bunextgetSessionData" | "/ServerActionGetter" | string;
+
+let LoadedNodeModule: Array<{
+  path: string;
+  mimeType: string;
+  content: string;
+}> = [];
 
 class StaticRouters {
   server?: FileSystemRouter;
@@ -131,6 +138,19 @@ class StaticRouters {
             })
           );
         }
+        const nodeModuleFile = await this.serveFromDir({
+          directory: "node_modules",
+          path: normalize(pathname.replace("node_modules", "")),
+          suffixes: ["", ".js", ".jsx", ".ts", ".tsx"],
+        });
+        if (nodeModuleFile) {
+          return await this.serveFileFromNodeModule(
+            pathname,
+            nodeModuleFile,
+            bunextReq
+          );
+        }
+
         break;
     }
 
@@ -193,6 +213,100 @@ class StaticRouters {
     );
 
     return bunextReq.__SET_RESPONSE__(stream);
+  }
+
+  private async serveFileFromNodeModule(
+    _path: string,
+    content: string,
+    req: BunextRequest
+  ) {
+    let mimeType = "";
+    let parsedContent = content;
+
+    const MakeTextRes = () =>
+      req.__SET_RESPONSE__(
+        new Response(parsedContent, {
+          headers: {
+            "Content-Type": "text/" + mimeType,
+          },
+        })
+      );
+    const MakeCustomRes = (contentType: string) =>
+      req.__SET_RESPONSE__(
+        new Response(parsedContent, {
+          headers: {
+            "Content-Type": contentType,
+          },
+        })
+      );
+
+    const foundedModule = LoadedNodeModule.find((e) => e.path == path);
+    if (foundedModule) {
+      mimeType = foundedModule.mimeType;
+      parsedContent = foundedModule.content;
+      return MakeTextRes();
+    }
+
+    const path = Bun.fileURLToPath(import.meta.resolve(_path));
+    const ext = extname(path).replace(".", "");
+
+    const buildedFile = Bun.file(
+      normalize(
+        `.bunext/build/node_modules/${path.split("node_modules").at(-1)}`
+      )
+    );
+
+    if (await buildedFile.exists()) {
+      mimeType = "javascript";
+      parsedContent = await buildedFile.text();
+      return MakeTextRes();
+    }
+
+    switch (ext) {
+      case "css":
+      case "csv":
+      case "html":
+      case "xml":
+        mimeType = ext;
+        break;
+      case "ts":
+        mimeType = "javascript";
+        parsedContent = await new Bun.Transpiler({
+          target: "browser",
+          loader: "ts",
+        }).transform(parsedContent);
+        await Bun.write(buildedFile, parsedContent);
+        break;
+      case "tsx":
+        mimeType = "javascript";
+        parsedContent = await new Bun.Transpiler({
+          target: "browser",
+          loader: "tsx",
+        }).transform(parsedContent);
+        await Bun.write(buildedFile, parsedContent);
+        break;
+      case "jsx":
+        mimeType = "javascript";
+        parsedContent = await new Bun.Transpiler({
+          target: "browser",
+          loader: "jsx",
+        }).transform(parsedContent);
+        await Bun.write(buildedFile, parsedContent);
+        break;
+      case "js":
+        mimeType = "javascript";
+        break;
+      case "json":
+        return MakeCustomRes("application/json");
+      default:
+        return req.__SET_RESPONSE__(
+          new Response(null, {
+            status: 404,
+          })
+        );
+    }
+
+    return MakeTextRes();
   }
 
   private async makeJSXPage({
@@ -542,6 +656,7 @@ class StaticRouters {
       "index.html",
       ".js",
       "/index.js",
+      ".css",
     ];
     for await (const suffix of suffixes) {
       const pathWithSuffix = basePath + suffix;
@@ -551,6 +666,13 @@ class StaticRouters {
 
     return null;
   }
+}
+
+async function Init() {
+  await rm(".bunext/build/node_modules", {
+    recursive: true,
+    force: true,
+  });
 }
 
 if (!existsSync(".bunext/build/src/pages"))
@@ -577,5 +699,5 @@ if (import.meta.main) {
       break;
   }
 }
-
+await Init();
 export { router, StaticRouters };

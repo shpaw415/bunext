@@ -149,12 +149,12 @@ function dataTypeObjectToType(dataTypeObject: {
       const dType = dataTypeObject[d as keyof _DataType];
       if (Array.isArray(dType)) {
         const parsed = dataTypeArrayToType(dType);
-        return `${d}${parsed.optional ? "?" : ""}: ${parsed.text}`;
+        return `"${d}"${parsed.optional ? "?" : ""}: ${parsed.text}`;
       } else if (typeof dType === "string") {
-        return `${d}: ${dType}`;
+        return `"${d}": ${dType}`;
       } else {
         const parsed = dataTypeObjectToType(dType as _DataTypeObject);
-        return `${d}: ${parsed.text}`;
+        return `"${d}": ${parsed.text}`;
       }
     })
     .join(", ");

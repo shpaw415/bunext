@@ -72,7 +72,7 @@ class Builder {
 
   constructor(baseDir: string) {
     this.options = {
-      minify: Bun.env.NODE_ENV === "production",
+      //minify: Bun.env.NODE_ENV === "production",
       pageDir: "src/pages",
       buildDir: ".bunext/build",
       hydrate: ".bunext/react-ssr/hydrate.ts",
@@ -408,7 +408,6 @@ class Builder {
     const transpiler = new Bun.Transpiler({
       loader: "tsx",
       autoImportJSX: true,
-      trimUnusedImports: true,
       deadCodeElimination: true,
       jsxOptimizationInline: true,
       exports: {

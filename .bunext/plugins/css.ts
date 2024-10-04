@@ -19,7 +19,7 @@ const CssPlugin: BunPlugin = {
               suppress:
                 'to suppress this message set env varaible __SUPPRESS_CSS_LOADER_WARNING__="true"',
             });
-          return path.replace(cwd + "/static", "");
+          return path.replace(cwd, "").replace("/static", "");
         };
 
         return {

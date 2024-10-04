@@ -3,9 +3,9 @@
 compatible Runtime: bun 1.1.0 - 1.1.29
 compatible OS: Linux, WSL
 
-N.B : Bun is in continuous changement and compatibility between version is a
+N.B : Bun is in continuous change and compatibility between version is a
 
-huge problem for Bunext there is possible crash over some new version of Bun.
+problem for Bunext there is possible crash over some new version of Bun.
 
 I will keep up to date the framework for what it needs
 
@@ -21,8 +21,8 @@ When an update of Bunext is made you must run:
 
 ```Bash
 #!/usr/bin/env bash
-bun run init
-bun run databaseCreate # only create the types
+bun bunext init
+bun run db:create # only create the types
 ```
 
 ## What is planed
@@ -32,6 +32,8 @@ bun run databaseCreate # only create the types
 - SQlite performance & features
 
 - Windows compatibility
+
+- Database call not async
 
 ## What is ready
 
@@ -46,8 +48,6 @@ bun run databaseCreate # only create the types
 - Static assets
 
 - Server componants ("use server" & "use client")
-
-- Hot reload
 
 - Revalidate ( Beta )
 
@@ -76,7 +76,19 @@ bun bunext init
 bun run dev
 ```
 
+### Run in Production mode
+
+```Bash
+#!/bin/env bash
+bun run build # this just make sure your build folder is created and ready to start
+bun run start # Enjoy!!!
+```
+
 ## Documentation
+
+Here is the summary of the framework docs.
+I will soon make a website making it more simple, clear and fun to read.
+Thanks to all people how are following my work!
 
 ## Router
 
@@ -217,6 +229,13 @@ export async function ServerDeleteSesion() {
 	GetSession(arguments).delete();
 	return "Session has been deleted by the server"
 }
+
+// using an API endpoint
+export function GET(request: BunextRequest) {
+  GetSession(arguments).delete();
+  request.response = new Response("Session Deleted");
+  return request;
+}
 ```
 
 ## Server Action
@@ -229,6 +248,7 @@ Key informations:
 - Server Action must be **exported async function**
 - It can be called like a normal async function from the client side
 - File must be on the **first level of params** you cannot put a file in an object
+- File Array is supported
 
 ```Javascript XML
 // index.tsx
@@ -299,7 +319,7 @@ export default async function Page() {
 }
 // valid Server Componant
 export async function Componants() {
-  const res = (await fetch("https://some-api.com/api")).json();
+  const res = await (await fetch("https://some-api.com/api")).json();
   return <div>{JSON.stringify(res)}</div>;
 }
 
@@ -332,7 +352,7 @@ export async function ServerRevalidate(path: string) {
 
 ## GetServerSideProps
 
-Loading dynamic data directly into the main React Element.
+Load dynamic data directly into the main React Element.
 
 ```Javascript XML
 // Request URL /informationID
@@ -419,7 +439,7 @@ run this script
 
 ```bash
 #!/bin/bash
-bun run databaseCreate
+bun run db:create
 ```
 
 ### Query the Database
@@ -535,7 +555,7 @@ To make a custom Response in _config/onRequest.ts_,
 return (Response or async Response) to bypass the default behaviour, or
 return undefined to use the default behaviour.
 
-## Api Endpoint
+## API Endpoint
 
 - access the Endpoint via src/pages as root
 
@@ -638,3 +658,10 @@ await fetch("my.site.com/api/v1", {
 - Fix missing global
 - file[] as prop in Server Action is supported
 - FormData as single prop in Server Action is supported
+
+## 0.7.10
+
+- Fix Database key with special char would break the types
+- node_modules files can be imported as link ts and tsx files is compiled to js files ( beta ) ( css works )
+- Fix import not working in Server Componants
+- Fix import problem in production mode ( bun changed something in the minifing feature that broke the build for some reason )

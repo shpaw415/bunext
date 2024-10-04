@@ -61,7 +61,7 @@ async function install(total: boolean) {
     bunext: "bunext",
     build: "bunext build",
     dev: "bunext dev",
-    databaseCreate: "bunext database_create",
+    "db:create": "bunext database_create",
     start: "bunext production",
     test: "bunext test",
   };
