@@ -663,7 +663,7 @@ await fetch("my.site.com/api/v1", {
 - Fix import not working in Server Componants
 - Fix import problem in production mode ( bun changed something in the minifing feature that broke the build for some reason )
 
-## 0.7.12
+## 0.7.13
 
 - Database is no longer async
 - File and Blob can be returned from a Server Action

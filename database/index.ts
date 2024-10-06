@@ -1,8 +1,9 @@
 "use client";
 ("<Bunext_TypeImposts>");
 import type { _Users, _purchase } from "./database_types.ts";
-import { Table } from "./class";
 ("<Bunext_TypeImposts>");
+
+import { Table } from "./class";
 
 export function Database() {
   if (typeof window !== "undefined")
