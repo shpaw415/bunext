@@ -1,4 +1,6 @@
+import { match } from "@bunpmjs/bunext/internal/router/index";
 import type { _globalThis } from "../internal/types";
+import { router } from "@bunpmjs/bunext/internal/router";
 
 export type _Head = {
   title?: string;
@@ -76,14 +78,19 @@ function deepMerge(obj: _Head, assign: _Head): _Head {
 
 function HeadElement({ currentPath }: { currentPath: string }) {
   const globalX = globalThis as unknown as _globalThis;
+  let path: string | undefined = "";
+  if (typeof window != "undefined") {
+    path = match(currentPath)?.path;
+  } else {
+    path = router.server?.match(currentPath)?.name;
+  }
+
+  if (!path) throw new Error(currentPath + " not found");
 
   const data =
     typeof window != "undefined"
-      ? deepMerge(
-          globalX.__HEAD_DATA__["*"] || {},
-          globalX.__HEAD_DATA__[currentPath]
-        )
-      : deepMerge(Head.head["*"] || {}, Head.head[currentPath]);
+      ? deepMerge(globalX.__HEAD_DATA__["*"] || {}, globalX.__HEAD_DATA__[path])
+      : deepMerge(Head.head["*"] || {}, Head.head[path]);
 
   return (
     <head>

@@ -1,15 +1,20 @@
-import type { FileSystemRouter, MatchedRoute } from "bun";
+import type { BunFile, FileSystemRouter, MatchedRoute } from "bun";
 import { NJSON } from "next-json";
 import { extname, join, relative } from "node:path";
 import {
   renderToString,
   type RenderToReadableStreamOptions,
 } from "react-dom/server";
-import type { _DisplayMode, _SsrMode } from "./types";
+import type {
+  _DisplayMode,
+  _SsrMode,
+  ServerActionDataType,
+  ServerActionDataTypeHeader,
+} from "./types";
 import { normalize } from "path";
 import React from "react";
 import "./server_global";
-import { mkdirSync, existsSync, rmdirSync } from "node:fs";
+import { mkdirSync, existsSync } from "node:fs";
 import { builder } from "./build";
 import { Head } from "../features/head";
 import { BunextRequest } from "./bunextRequest";
@@ -129,7 +134,7 @@ class StaticRouters {
           directory: this.buildDir,
           path: pathname,
         });
-        if (staticResponse) {
+        if (staticResponse !== null) {
           return bunextReq.__SET_RESPONSE__(
             new Response(staticResponse, {
               headers: {
@@ -143,7 +148,7 @@ class StaticRouters {
           path: normalize(pathname.replace("node_modules", "")),
           suffixes: ["", ".js", ".jsx", ".ts", ".tsx"],
         });
-        if (nodeModuleFile) {
+        if (nodeModuleFile !== null) {
           return await this.serveFileFromNodeModule(
             pathname,
             nodeModuleFile,
@@ -519,15 +524,33 @@ class StaticRouters {
       agrsNbr > 0
         ? (Array.apply(null, Array(agrsNbr)) as Array<undefined>)
         : [];
-    const res = await call(...[...props, ...fillUndefinedParams, bunextReq]);
+    let result: ServerActionDataType = await call(
+      ...[...props, ...fillUndefinedParams, bunextReq]
+    );
 
-    const result = JSON.stringify({
-      props: typeof res == "undefined" ? undefined : res,
-      session: bunextReq.session.__DATA__.public,
-    });
+    let dataType: ServerActionDataTypeHeader = "json";
+    if (result instanceof Blob) {
+      dataType = "blob";
+    } else if (result instanceof File) {
+      dataType = "file";
+    } else {
+      result = JSON.stringify({ props: result });
+    }
+
     return bunextReq.setCookie(
-      new Response(result, {
-        headers: bunextReq.response.headers,
+      new Response(result as Exclude<ServerActionDataType, object>, {
+        headers: {
+          ...bunextReq.response.headers,
+          dataType,
+          session: JSON.stringify(bunextReq.session.__DATA__.public || {}),
+          fileData:
+            result instanceof File
+              ? JSON.stringify({
+                  name: result.name,
+                  lastModified: result.lastModified,
+                })
+              : undefined,
+        },
       })
     );
   }

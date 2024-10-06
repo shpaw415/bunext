@@ -1,4 +1,4 @@
-import type { BunPlugin } from "bun";
+import type { BunFile, BunPlugin } from "bun";
 import type { _Head } from "../features/head";
 
 export interface ServerSideProps {
@@ -76,3 +76,7 @@ export type ssrElement = {
     htmlElement: string;
   }>;
 };
+
+export type ServerActionDataType = File | string | Blob | Object | BunFile;
+
+export type ServerActionDataTypeHeader = "json" | "file" | "blob";

@@ -16,7 +16,7 @@ import type { _GlobalData } from "../types";
 
 const globalX = globalThis as unknown as _GlobalData;
 
-const match = globalX.__ROUTES__
+export const match = globalX.__ROUTES__
   ? getRouteMatcher(globalX.__ROUTES__)
   : () => null;
 

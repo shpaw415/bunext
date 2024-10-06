@@ -8,7 +8,7 @@ import { unlinkSync } from "node:fs";
 import "./server_global";
 import { type JsxElement } from "typescript";
 import { renderToString } from "react-dom/server";
-import type { ssrElement } from "./types";
+import type { ServerActionDataTypeHeader, ssrElement } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 
@@ -69,6 +69,14 @@ class Builder {
     path: string;
     time: number;
   }[] = [];
+
+  public remove_node_modules_files_path = [
+    "@bunpmjs/bunext/database/index.ts",
+    "@bunpmjs/bunext/internal/build.ts",
+    "@bunpmjs/bunext/internal/router.tsx",
+    "@bunpmjs/bunext/internal/bunextRequest.ts",
+    "@bunpmjs/json-webtoken/index.ts",
+  ];
 
   constructor(baseDir: string) {
     this.options = {
@@ -340,7 +348,6 @@ class Builder {
     const ServerActionClient = (ModulePath: string, funcName: string) => {
       return async function (...props: Array<any>) {
         let currentPropsIndex = 0;
-        let currentFileBatch = 0;
         const formatToFile = () => {
           currentPropsIndex++;
           return `BUNEXT_FILE_${currentPropsIndex}`;
@@ -387,10 +394,27 @@ class Builder {
           throw new Error(
             "error when Calling server action <!ModulePath!>:<!FuncName!>"
           );
-        const resObject = await response.json();
-        globalThis.__PUBLIC_SESSION_DATA__ = resObject.session;
+        globalThis.__PUBLIC_SESSION_DATA__ = JSON.parse(
+          response.headers.get("session") || ""
+        );
 
-        return resObject.props;
+        switch (
+          response.headers.get("dataType") as ServerActionDataTypeHeader
+        ) {
+          case "json":
+            return ((await response.json()) as { props: any }).props;
+          case "blob":
+            return await response.blob();
+          case "file":
+            const blob = await response.blob();
+            const { name, lastModified } = JSON.parse(
+              response.headers.get("fileData") || ""
+            ) as { name: string; lastModified: number };
+            return new File([blob], name, {
+              type: blob.type,
+              lastModified: lastModified,
+            });
+        }
       }
         .toString()
         .replace("async function", "")
@@ -504,7 +528,7 @@ class Builder {
               "^" +
                 self.escapeRegExp(
                   normalize(
-                    [self.options.baseDir, self.options.pageDir].join("/")
+                    join(self.options.baseDir, self.options.pageDir as string)
                   )
                 ) +
                 "/.*" +
@@ -617,6 +641,61 @@ class Builder {
                 path
               ),
               loader: "js",
+            };
+          }
+        );
+        build.onLoad(
+          {
+            filter: new RegExp(
+              "^" +
+                self.escapeRegExp(
+                  normalize(join(self.options.baseDir, "node_modules"))
+                ) +
+                "/.*" +
+                "\\.(ts|tsx|jsx)$"
+            ),
+          },
+          async ({ path, loader }) => {
+            const fileText = await Bun.file(path).text();
+            const exports = new Bun.Transpiler({
+              loader: loader as "tsx" | "ts",
+            }).scan(fileText).exports;
+
+            return {
+              contents: `export { ${exports.join(", ")} } from 
+              ${JSON.stringify("./" + basename(path) + "?module")}`,
+              loader: "ts",
+            };
+          }
+        );
+        build.onResolve(
+          { filter: /\.(ts|tsx)\?module$/ },
+          async ({ importer, path }) => {
+            const url = Bun.pathToFileURL(importer);
+            const filePath = Bun.fileURLToPath(new URL(path, url));
+            return {
+              path: filePath,
+              namespace: "module",
+            };
+          }
+        );
+        build.onLoad(
+          { filter: /\.(ts|tsx)$/, namespace: "module" },
+          async ({ path, loader }) => {
+            if (
+              self.remove_node_modules_files_path.includes(
+                path.replace(self.options.baseDir + "/node_modules/", "")
+              )
+            ) {
+              return {
+                contents: "",
+                loader,
+              };
+            }
+
+            return {
+              contents: await Bun.file(path).text(),
+              loader,
             };
           }
         );
@@ -740,13 +819,8 @@ class Builder {
         "crypto",
         "node:path",
         import.meta.filename,
-        "@bunpmjs/bunext/internal/build.ts",
         "@bunpmjs/bunext/features/router.ts",
         "@bunpmjs/bunext/features/request.ts",
-        "@bunpmjs/bunext/internal/bunextRequest.ts",
-        "@bunpmjs/json-webtoken",
-        cwd + "/node_modules/@bunpmjs/bunext/internal/build.ts",
-        cwd + "/internal/build.ts",
       ],
       splitting: true,
     });

@@ -33,8 +33,6 @@ bun run db:create # only create the types
 
 - Windows compatibility
 
-- Database call not async
-
 ## What is ready
 
 - Multi-Thread Http Worker ( bun ^1.1.25 & Linux only )
@@ -457,7 +455,7 @@ import { Database } from "@bunpmjs/bunext/database";
 
 //in a Server Componant
 export async function ReactElement() {
-  const db = await Database();
+  const db = Database();
 
   return (
     <div>
@@ -511,8 +509,7 @@ function NextPage() {
 
 ## Set Head meta data
 
-- Head will be set for the current page
-- set _path_ to set data for another path
+- set _path_ to the wanted route or \* for every routes
 - will be revalidate on build time ( can be dynamic )
 
 ```Javascript XML
@@ -665,3 +662,9 @@ await fetch("my.site.com/api/v1", {
 - node_modules files can be imported as link ts and tsx files is compiled to js files ( beta ) ( css works )
 - Fix import not working in Server Componants
 - Fix import problem in production mode ( bun changed something in the minifing feature that broke the build for some reason )
+
+## 0.7.11
+
+- Database is no longer async
+- File and Blob can be returned from a Server Action
+- Fix Head data not loading with dynamic routes

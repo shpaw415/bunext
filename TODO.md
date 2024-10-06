@@ -1,2 +1,9 @@
-Multithreding (bun 1.1.25 blog)
-fix dev render layout with hooks on hard reload ( may affect production as well )
+Priority 1
+
+- Server action client make global set request and parse response
+- Dev mode update ServerAction on file save
+
+Priority 2
+
+- bootstrap session data
+- Max body size in config
