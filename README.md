@@ -668,3 +668,7 @@ await fetch("my.site.com/api/v1", {
 - Database is no longer async
 - File and Blob can be returned from a Server Action
 - Fix Head data not loading with dynamic routes
+
+## 0.7.12
+
+- Database async ( no changes )
