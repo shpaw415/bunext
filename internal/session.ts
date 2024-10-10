@@ -1,6 +1,7 @@
 import { _Database, Table } from "../database/class";
 import { generateRandomString } from "../features/utils";
 import { Database } from "bun:sqlite";
+import type { ServerConfig } from "./types";
 let db: Database | undefined = undefined;
 
 export export async function InitDatabase(serverConfig: ServerConfig) {
