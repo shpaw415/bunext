@@ -1,22 +1,26 @@
 import type Database from "bun:sqlite";
 import { _Database, Table } from "../database/class";
 import { generateRandomString } from "../features/utils";
+import type { ServerConfig } from "./types";
 
-async function MakeDatabase() {
+export let db: Database | undefined = undefined;
+
+export async function MakeDatabase(serverConfig: ServerConfig) {
   const { Database } = await import("bun:sqlite");
-  const type = globalThis.serverConfig.session?.type;
+  console.log(serverConfig, globalThis.serverConfig);
+  const type = serverConfig.session?.type;
   if (type == "cookie") return undefined;
   else if (type == "database:hard") {
     if (!(await Bun.file("./config/session.sqlite").exists())) {
-      return new Database("./config/session.sqlite");
+      db = new Database("./config/session.sqlite");
     }
-    return CreateDatabaseTable(
+    db = CreateDatabaseTable(
       new Database("./config/session.sqlite", {
         create: true,
       })
     );
   } else if (type == "database:memory") {
-    return CreateDatabaseTable(
+    db = CreateDatabaseTable(
       new Database(":memory:", {
         create: true,
       })
@@ -46,8 +50,6 @@ function CreateDatabaseTable(db: Database) {
   });
   return db;
 }
-
-const db = await MakeDatabase();
 
 type sessionTableType = {
   data: {

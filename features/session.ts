@@ -153,7 +153,8 @@ export class _Session {
 }
 
 export const Session = new _Session(undefined, undefined);
-globalThis.__BUNEXT_SESSION__ ??= Session;
+//globalThis.__BUNEXT_SESSION__ ??= Session;
+
 class SessionUpdateClass {
   public states: React.Dispatch<React.SetStateAction<boolean>>[] = [];
   public update() {
