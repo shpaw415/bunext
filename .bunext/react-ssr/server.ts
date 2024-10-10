@@ -22,6 +22,7 @@ import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
 import type { ServerConfig, ssrElement } from "@bunpmjs/bunext/internal/types";
 import { revalidate } from "@bunpmjs/bunext/features/router";
+import { InitDatabase } from "@bunpmjs/bunext/internal/session";
 
 declare global {
   namespace NodeJS {
