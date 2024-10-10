@@ -8,8 +8,8 @@ type _cmd =
   | "init"
   | "build"
   | "dev"
-  | "database_create"
-  | "database_merge"
+  | "database:create"
+  | "database:merge"
   | "production";
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
@@ -38,7 +38,7 @@ if (import.meta.main)
     case "production":
       production();
       break;
-    case "database_create":
+    case "database:create":
       await databaseSchemaMaker();
       await databaseCreator();
       break;

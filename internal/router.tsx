@@ -1,4 +1,4 @@
-import type { BunFile, FileSystemRouter, MatchedRoute } from "bun";
+import type { FileSystemRouter, MatchedRoute } from "bun";
 import { NJSON } from "next-json";
 import { extname, join, relative } from "node:path";
 import {

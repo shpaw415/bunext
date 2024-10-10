@@ -1,12 +1,17 @@
 import { _Session, type _SessionData } from "../features/session";
 import { webToken } from "@bunpmjs/json-webtoken";
 import "./server_global";
+import { GetSessionByID, SetSessionByID } from "./session";
 
 export class BunextRequest {
   public request: Request;
   public response: Response;
   public session: _Session;
   public webtoken: webToken<any>;
+  /**
+   * only avalable when serverConfig.session.type == "database:hard" | "database:memory"
+   */
+  private SessionID?: string;
 
   constructor(props: { request: Request; response: Response }) {
     this.request = props.request;
@@ -14,17 +19,43 @@ export class BunextRequest {
     this.webtoken = new webToken<any>(this.request, {
       cookieName: "bunext_session_token",
     });
-    this.session = new _Session(
-      this.webtoken.session() as _SessionData<any>,
-      globalThis.serverConfig.session?.timeout
-    );
+    switch (globalThis.serverConfig.session?.type) {
+      case "database:hard":
+      case "database:memory":
+        this.SessionID =
+          (this.webtoken.session() as undefined | string) || SetSessionByID();
+        this.session = new _Session(
+          GetSessionByID(this.SessionID) as _SessionData<any>,
+          globalThis.serverConfig.session?.timeout
+        );
+        break;
+      case "cookie":
+      case undefined:
+        this.session = new _Session(
+          this.webtoken.session() as _SessionData<any>,
+          globalThis.serverConfig.session?.timeout
+        );
+        break;
+    }
   }
   public __SET_RESPONSE__(response: Response) {
     this.response = response;
     return this;
   }
   public setCookie(response: Response) {
-    this.webtoken.setData(this.session.__DATA__);
+    switch (globalThis.serverConfig.session?.type) {
+      case "database:hard":
+      case "database:memory":
+        this.webtoken.setData(this.webtoken.session());
+        if (this.session.__DELETE__ || this.session.isUpdated) {
+          SetSessionByID(this.SessionID, this.session.__DATA__);
+        }
+        break;
+      case "cookie":
+      case undefined:
+        this.webtoken.setData(this.session.__DATA__);
+        break;
+    }
     if (this.session.__DELETE__) {
       this.webtoken.setData({});
       this.session.reset();

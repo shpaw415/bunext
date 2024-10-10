@@ -10,11 +10,17 @@ globalThis.dbShema ??= (
   await import(`${process.cwd()}/config/database.ts`)
 ).default;
 
-const BunDB = new _BunDB("./config/bunext.sqlite", {
+const MainDatabase = new _BunDB("./config/bunext.sqlite", {
   create: true,
 });
 
 export class _Database {
+  databaseInstence: _BunDB;
+
+  constructor(db?: _BunDB) {
+    this.databaseInstence = db || MainDatabase;
+  }
+
   create(data: _Create) {
     let hasPrimary = false;
     let queryString = `CREATE TABLE IF NOT EXISTS ${data.name} `;
@@ -55,8 +61,8 @@ export class _Database {
       throw new Error(`Table ${data.name} do not have any Primary key.`, {
         cause: "PRIMARY KEY",
       });
-    const db = BunDB.query(queryString);
-    db.run();
+    const prepare = this.databaseInstence.query(queryString);
+    prepare.run();
   }
 }
 type OptionsFlags<Type> = {
@@ -92,8 +98,10 @@ type _FormatString<T> = _Select<T> | _Update<T> | _Delete<T>;
 
 export class Table<T> {
   private name: string;
-  constructor({ name }: { name: string }) {
+  databaseInstence: _BunDB;
+  constructor({ name, db }: { name: string; db?: _BunDB }) {
     this.name = name;
+    this.databaseInstence = db || MainDatabase;
   }
   private extractParams(key: string, where: any) {
     return Array.prototype.concat(
@@ -190,7 +198,7 @@ export class Table<T> {
 
     if (data.skip) queyString += ` OFFSET ${data.skip}`;
 
-    const query = BunDB.prepare(queyString);
+    const query = this.databaseInstence.prepare(queyString);
     let res = query.all(...this.extractAndOrParams(data)) as Partial<T>[];
     query.finalize();
 
@@ -202,9 +210,9 @@ export class Table<T> {
     ).join(", ")}) VALUES (${Object.keys((data as any)[0]).map(
       (v) => `$${v}`
     )})`;
-    const db = BunDB.prepare(queryString);
+    const db = this.databaseInstence.prepare(queryString);
 
-    const inserter = BunDB.transaction((entries) => {
+    const inserter = this.databaseInstence.transaction((entries) => {
       for (const entry of entries) db.run(entry);
     });
     const entries = data.map((entry) =>
@@ -231,14 +239,14 @@ export class Table<T> {
     if (this.hasOR(data)) params.push(...this.extractParams("OR", data.where));
     else params.push(...Object.values(data.where));
 
-    const db = BunDB.prepare(queryString);
+    const db = this.databaseInstence.prepare(queryString);
     const res = db.all(...this.parseParams(params)) as T[];
     return res;
   }
   delete(data: _Delete<T>) {
     let queyString = `DELETE FROM ${this.name} ${this.formatQueryString(data)}`;
 
-    const query = BunDB.prepare(queyString);
+    const query = this.databaseInstence.prepare(queyString);
     query.all(...this.extractAndOrParams(data));
     query.finalize();
   }

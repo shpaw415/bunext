@@ -47,6 +47,10 @@ export type _globalThis = _GlobalData & {
  *
  * session
  *  - timeout: Invalidate session after X seconds of Idle
+ *  - type:
+ *      - cookie  : max of 4096 chars ( good for small session data )
+ *      - database:hard : session keept on a database on the hard drive ( good for big session data but slower then memory)
+ *      - database:memory : session keept on a database in memory ( good for big session data but must have enough RAM )
  */
 export type ServerConfig = {
   HTTPServer: {
@@ -61,6 +65,7 @@ export type ServerConfig = {
   };
   session?: {
     timeout: number;
+    type: "cookie" | "database:hard" | "database:memory";
   };
 };
 

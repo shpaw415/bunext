@@ -1,17 +1,10 @@
 #!/bin/env bun
 
-import { lstatSync, cpSync, existsSync, mkdirSync } from "fs";
+import { cpSync } from "fs";
 import { paths } from "../internal/globals";
-import { $ } from "bun";
 import { generateUuid } from "../features/utils";
-import readline from "readline";
+import { _Database } from "../database/class";
 
-/*
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-*/
 await install(false);
 
 interface packageJson {
@@ -51,17 +44,14 @@ async function install(total: boolean) {
       recursive: true,
     });
   }
-  if (!existsSync(".bunext/tmp"))
-    mkdirSync(".bunext/tmp", {
-      recursive: true,
-    });
+
   const packageJson = (await Bun.file("package.json").json()) as packageJson;
   packageJson.scripts = {
     ...packageJson.scripts,
     bunext: "bunext",
     build: "bunext build",
     dev: "bunext dev",
-    "db:create": "bunext database_create",
+    "db:create": "bunext database:create",
     start: "bunext production",
     test: "bunext test",
   };

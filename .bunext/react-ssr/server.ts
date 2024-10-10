@@ -13,14 +13,14 @@ import {
   serveStatic,
 } from "@bunpmjs/bunext/internal/server-features";
 
-import ServerConfig from "../../config/server"; // must be relative
+import _ServerConfig from "../../config/server"; // must be relative
 import Bypassrequest from "../../config/onRequest";
 import type { Server as _Server } from "bun";
 import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
 
 import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
-import type { ssrElement } from "@bunpmjs/bunext/internal/types";
+import type { ServerConfig, ssrElement } from "@bunpmjs/bunext/internal/types";
 import { revalidate } from "@bunpmjs/bunext/features/router";
 
 declare global {
@@ -30,14 +30,15 @@ declare global {
     }
   }
   var clusterStatus: boolean;
+  var serverConfig: ServerConfig;
 }
-
+globalThis.serverConfig ??= _ServerConfig;
 globalThis.clusterStatus ??= false;
 
 class BunextServer {
-  port = ServerConfig.HTTPServer.port || 3000;
+  port = globalThis.serverConfig.HTTPServer.port || 3000;
   server?: _Server;
-  hotServerPort = ServerConfig.Dev.hotServerPort || 3001;
+  hotServerPort = globalThis.serverConfig.Dev.hotServerPort || 3001;
   hotServer?: _Server;
   hostName = "localhost";
   isClustered = false;
@@ -118,14 +119,13 @@ class BunextServer {
     const isDev = process.env.NODE_ENV == "development";
     const isDryRun = globalThis.dryRun;
     const isMainThread = cluster.isPrimary;
-    globalThis.serverConfig = ServerConfig;
 
     if (dryRun) globalThis.clusterStatus = this.MakeCluster();
     if (!globalThis.clusterStatus) {
       if (isDryRun) {
         if (isDev) {
           doWatchBuild();
-          this.serveHotServer(ServerConfig.Dev.hotServerPort);
+          this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
           await builder.makeBuild();
         } else {
           const buildoutput = await builder.makeBuild();
@@ -140,7 +140,7 @@ class BunextServer {
         await require("../../config/preload.ts");
         if (isDev) {
           doWatchBuild();
-          this.serveHotServer(ServerConfig.Dev.hotServerPort);
+          this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
           await builder.makeBuild();
         } else {
           const buildoutput = await builder.makeBuild();
@@ -259,9 +259,9 @@ class BunextServer {
     const cpuCoreCount = cpus().length;
 
     let count =
-      ServerConfig.HTTPServer.threads == "all_cpu_core"
+      globalThis.serverConfig.HTTPServer.threads == "all_cpu_core"
         ? cpuCoreCount
-        : ServerConfig.HTTPServer.threads || 1;
+        : globalThis.serverConfig.HTTPServer.threads || 1;
 
     if (count <= 1 || process.env.NODE_ENV == "development") count = 1;
 
