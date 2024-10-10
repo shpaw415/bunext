@@ -8,6 +8,7 @@ declare global {
   var __BUNEXT_DEV_INIT: boolean;
   var webSocket: undefined | WebSocket;
   var Server: undefined | BunextServer;
+  var clusterStatus: boolean;
   var serverConfig: ServerConfig;
 }
 globalThis.socketList ??= [];

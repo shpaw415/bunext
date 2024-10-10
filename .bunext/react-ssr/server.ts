@@ -20,8 +20,9 @@ import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
 
 import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
-import type { ServerConfig, ssrElement } from "@bunpmjs/bunext/internal/types";
+import type { ssrElement } from "@bunpmjs/bunext/internal/types";
 import { revalidate } from "@bunpmjs/bunext/features/router";
+import { MakeDatabase } from "@bunpmjs/bunext/internal/session";
 
 declare global {
   namespace NodeJS {
@@ -29,8 +30,6 @@ declare global {
       bun_worker?: string;
     }
   }
-  var clusterStatus: boolean;
-  var serverConfig: ServerConfig;
 }
 globalThis.serverConfig ??= _ServerConfig;
 globalThis.clusterStatus ??= false;
@@ -152,6 +151,7 @@ class BunextServer {
     } else if (!isMainThread) {
       if (isDryRun) this.RunServer();
       await router.InitServerActions();
+      await MakeDatabase(globalThis.serverConfig);
     }
 
     if (isDryRun) globalThis.dryRun = false;
