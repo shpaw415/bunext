@@ -3,8 +3,9 @@ import { generateRandomString } from "../features/utils";
 import { Database } from "bun:sqlite";
 let db: Database | undefined = undefined;
 
-export async function InitDatabase() {
-  const type = globalThis.serverConfig.session?.type;
+export export async function InitDatabase(serverConfig: ServerConfig) {
+  console.log(serverConfig, globalThis.serverConfig);
+  const type = serverConfig.session?.type;
   if (type == "cookie") return undefined;
   else if (type == "database:hard") {
     if (!(await Bun.file("./config/session.sqlite").exists())) {
@@ -14,6 +15,7 @@ export async function InitDatabase() {
       return;
     } else db = CreateDatabaseTable(new Database("./config/session.sqlite"));
   } else if (type == "database:memory") {
+    db = CreateDatabaseTable(
     db = CreateDatabaseTable(
       new Database(":memory:", {
         create: true,
