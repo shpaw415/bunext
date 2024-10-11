@@ -1,22 +1,23 @@
+import type { ClusterMessageType } from "./types";
 import { _Database, Table } from "../database/class";
 import { generateRandomString } from "../features/utils";
-import { Database } from "bun:sqlite";
-import type { ServerConfig } from "./types";
+import type { Database } from "bun:sqlite";
+import cluster from "node:cluster";
+
 let db: Database | undefined = undefined;
 
-export export async function InitDatabase(serverConfig: ServerConfig) {
-  console.log(serverConfig, globalThis.serverConfig);
-  const type = serverConfig.session?.type;
-  if (type == "cookie") return undefined;
+export async function InitDatabase() {
+  const { Database } = await import("bun:sqlite");
+  const type = globalThis.serverConfig.session?.type;
+  console.log(type);
+  if (type == "cookie") return;
   else if (type == "database:hard") {
     if (!(await Bun.file("./config/session.sqlite").exists())) {
       db = new Database("./config/session.sqlite", {
         create: true,
       });
-      return;
     } else db = CreateDatabaseTable(new Database("./config/session.sqlite"));
   } else if (type == "database:memory") {
-    db = CreateDatabaseTable(
     db = CreateDatabaseTable(
       new Database(":memory:", {
         create: true,
@@ -63,8 +64,66 @@ function GetTable() {
   });
 }
 
-export function GetSessionByID(id?: string): undefined | object {
-  if (!db || !id) return;
+class IPCManager {
+  awaiter: Array<{
+    id: string;
+    resolve: (value: undefined | sessionTableType["data"]) => void;
+  }> = [];
+
+  constructor() {
+    process.on("message", (_message) => {
+      const message = _message as ClusterMessageType;
+
+      if (message.task == "getSession") {
+        for (const waiter of this.awaiter) {
+          if (waiter.id == message.data.id) {
+            waiter.resolve(
+              message.data.data == false ? undefined : message.data.data
+            );
+            this.awaiter.splice(
+              this.awaiter.findIndex((e) => e.id == waiter.id),
+              1
+            );
+          }
+        }
+      }
+    });
+  }
+  awaitSessionData(id: string) {
+    return new Promise<undefined | sessionTableType["data"]>((resolve) => {
+      this.awaiter.push({
+        id,
+        resolve,
+      });
+    });
+  }
+}
+
+const IPCManagerInstance = new IPCManager();
+
+export function GetSessionByID(
+  id?: string
+):
+  | Promise<undefined | sessionTableType["data"]>
+  | undefined
+  | sessionTableType["data"] {
+  if (!id) return;
+
+  if (
+    cluster.isWorker &&
+    globalThis.serverConfig.session?.type == "database:memory"
+  ) {
+    process.send?.({
+      task: "getSession",
+      data: {
+        id,
+      },
+    } as ClusterMessageType);
+
+    return IPCManagerInstance.awaitSessionData(id);
+  }
+
+  if (!db) return;
   const table = GetTable();
 
   const res = table.select({
@@ -86,6 +145,18 @@ export function GetSessionByID(id?: string): undefined | object {
  * @returns newley created session id or undefined
  */
 export function SetSessionByID(id?: string, data?: any) {
+  if (
+    cluster.isWorker &&
+    globalThis.serverConfig.session?.type == "database:memory"
+  ) {
+    process.send?.({
+      task: "setSession",
+      data: {
+        id,
+        sessionData: data,
+      },
+    } as ClusterMessageType);
+  }
   if (!db) return;
   const table = GetTable();
 

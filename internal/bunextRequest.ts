@@ -24,10 +24,7 @@ export class BunextRequest {
       case "database:memory":
         this.SessionID =
           (this.webtoken.session() as undefined | string) || SetSessionByID();
-        this.session = new _Session(
-          GetSessionByID(this.SessionID) as _SessionData<any>,
-          globalThis.serverConfig.session?.timeout
-        );
+        this.session = undefined as any;
         break;
       case "cookie":
       case undefined:
@@ -37,6 +34,14 @@ export class BunextRequest {
         );
         break;
     }
+  }
+  public async __INIT__() {
+    if (globalThis.serverConfig.session?.type != "database:memory") return this;
+    this.session = new _Session(
+      (await GetSessionByID(this.SessionID)) as _SessionData<any>,
+      globalThis.serverConfig.session?.timeout
+    );
+    return this;
   }
   public __SET_RESPONSE__(response: Response) {
     this.response = response;

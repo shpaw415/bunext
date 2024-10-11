@@ -61,6 +61,9 @@ export default async function Page() {
       >
         Delete Session
       </button>
+      <button onClick={() => ServerPrintSession()}>
+        Print session to server console
+      </button>
       <button onClick={async () => await ServerRevalidateNow()}>
         Revalidate now
       </button>
@@ -77,7 +80,7 @@ function IsLogged() {
 }
 
 export async function ServerSetSession() {
-  const db = await Database();
+  const db = Database();
 
   GetSession(arguments).setData(
     {
@@ -85,6 +88,10 @@ export async function ServerSetSession() {
     },
     true
   );
+}
+
+export async function ServerPrintSession() {
+  console.log(GetSession(arguments).getData());
 }
 
 export async function ServerDeleteSession() {

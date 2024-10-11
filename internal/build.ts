@@ -261,19 +261,20 @@ class Builder {
         : await this.preBuildAll(ssrElements);
 
       const output = await builder.build(BuildPath);
-      if (!output.success) throw new Error(JSON.stringify(output));
+      if (!output.success) {
+        console.log(output);
+        throw new Error("Build Error");
+      }
     } catch (e: any) {
       console.log("Build Error");
       console.log(e);
       process.exitCode = exitCodes.build;
 
       if (process.send)
-        process.send(
-          JSON.stringify({
-            type: "error",
-            error: e,
-          })
-        );
+        process.send({
+          type: "error",
+          error: e,
+        });
 
       process.exit(exitCodes.build);
     }
@@ -285,7 +286,7 @@ class Builder {
       type: "build",
     };
 
-    if (process.send) process.send(JSON.stringify(data));
+    if (process.send) process.send(data);
 
     return data as BuildOuts;
   }
@@ -310,8 +311,7 @@ class Builder {
       stdout: "inherit",
       stderr: "inherit",
       ipc(message) {
-        const data = JSON.parse(message) as procIPCdata;
-
+        const data = message as procIPCdata;
         switch (data.type) {
           case "build":
             strRes = {
@@ -843,6 +843,9 @@ class Builder {
 }
 const builder = await new Builder(process.cwd()).Init();
 
-if (import.meta.main) await builder.makeBuild();
+if (import.meta.main) {
+  await builder.makeBuild();
+  process.exit(0);
+}
 
 export { builder, Builder };

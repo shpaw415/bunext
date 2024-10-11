@@ -1,11 +1,12 @@
-import type { BunextRequest as _BunextRequest } from "../internal/bunextRequest";
-import { Session } from "./session";
-export type BunextRequest = _BunextRequest;
+import { BunextRequest } from "../internal/bunextRequest";
+import { Session } from "@bunpmjs/bunext/features/session";
 
 const isClient = typeof window != "undefined";
 
 function GetBunextRequest(args: IArguments) {
-  return Array.from(args).at(-1) as BunextRequest;
+  return Array.from(args).find(
+    (arg) => arg instanceof BunextRequest
+  ) as BunextRequest;
 }
 
 /**

@@ -115,10 +115,10 @@ class StaticRouters {
     const serverSide = this.server?.match(request);
     const clientSide = this.client?.match(request);
 
-    const bunextReq = new BunextRequest({
+    const bunextReq = await new BunextRequest({
       request,
       response: new Response(),
-    });
+    }).__INIT__();
 
     switch (pathname as pathNames) {
       case "/ServerActionGetter":

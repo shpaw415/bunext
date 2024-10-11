@@ -22,7 +22,12 @@ import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
 import type { ssrElement } from "@bunpmjs/bunext/internal/types";
 import { revalidate } from "@bunpmjs/bunext/features/router";
-import { InitDatabase } from "@bunpmjs/bunext/internal/session";
+import {
+  GetSessionByID,
+  InitDatabase,
+  SetSessionByID,
+} from "@bunpmjs/bunext/internal/session";
+import type { ClusterMessageType } from "../../internal/types";
 
 declare global {
   namespace NodeJS {
@@ -114,12 +119,28 @@ class BunextServer {
     }, 10000);
   }
 
+  async DatabaseIniter() {
+    const sessionConfigType = globalThis.serverConfig.session?.type;
+    switch (sessionConfigType) {
+      case "database:hard":
+        await InitDatabase();
+        break;
+      case "database:memory":
+        if (cluster.isPrimary) await InitDatabase();
+        break;
+    }
+  }
+
   async init() {
     const isDev = process.env.NODE_ENV == "development";
     const isDryRun = globalThis.dryRun;
     const isMainThread = cluster.isPrimary;
 
-    if (dryRun) globalThis.clusterStatus = this.MakeCluster();
+    if (dryRun) {
+      globalThis.clusterStatus = this.MakeCluster();
+      await this.DatabaseIniter();
+    }
+
     if (!globalThis.clusterStatus) {
       if (isDryRun) {
         if (isDev) {
@@ -151,7 +172,6 @@ class BunextServer {
     } else if (!isMainThread) {
       if (isDryRun) this.RunServer();
       await router.InitServerActions();
-      await MakeDatabase(globalThis.serverConfig);
     }
 
     if (isDryRun) globalThis.dryRun = false;
@@ -289,6 +309,18 @@ class BunextServer {
           await builder.makeBuild();
           await this.updateWorkerData();
           break;
+        case "getSession":
+          w.send({
+            data: {
+              data: GetSessionByID(message.data.id) || false,
+              id: message.data.id,
+            },
+            task: "getSession",
+          } as ClusterMessageType);
+          break;
+        case "setSession":
+          SetSessionByID(message.data.id, message.data.sessionData);
+          break;
       }
     });
 
@@ -321,20 +353,6 @@ class BunextServer {
     }
   }
 }
-
-type ClusterMessageType =
-  | {
-      task: "revalidate";
-      data: {
-        path: string;
-      };
-    }
-  | {
-      task: "udpate_build";
-      data: {
-        path?: string;
-      };
-    };
 
 if (!globalThis.Server || process.env.NODE_ENV == "production") {
   (globalThis as any).Server = await new BunextServer().init();

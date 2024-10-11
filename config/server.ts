@@ -12,7 +12,7 @@ const Config: ServerConfig = {
   },
   session: {
     timeout: 3600,
-    type: "database:hard",
+    type: "database:memory",
   },
 };
 
