@@ -23,6 +23,8 @@ import cluster from "node:cluster";
 import type { ssrElement } from "@bunpmjs/bunext/internal/types";
 import { revalidate } from "@bunpmjs/bunext/features/router";
 import {
+  CleanExpiredSession,
+  DeleteSessionByID,
   GetSessionByID,
   InitDatabase,
   SetSessionByID,
@@ -119,14 +121,20 @@ class BunextServer {
     }, 10000);
   }
 
-  async DatabaseIniter() {
+  async SessionDatabaseIniter() {
     const sessionConfigType = globalThis.serverConfig.session?.type;
+    const setClearSessionInterval = () =>
+      setInterval(() => CleanExpiredSession(), 1800 * 1000);
+
     switch (sessionConfigType) {
       case "database:hard":
         await InitDatabase();
+        setClearSessionInterval();
         break;
       case "database:memory":
-        if (cluster.isPrimary) await InitDatabase();
+        if (cluster.isWorker) break;
+        await InitDatabase();
+        setClearSessionInterval();
         break;
     }
   }
@@ -136,9 +144,9 @@ class BunextServer {
     const isDryRun = globalThis.dryRun;
     const isMainThread = cluster.isPrimary;
 
-    if (dryRun) {
+    if (isDryRun) {
       globalThis.clusterStatus = this.MakeCluster();
-      await this.DatabaseIniter();
+      await this.SessionDatabaseIniter();
     }
 
     if (!globalThis.clusterStatus) {
@@ -267,8 +275,9 @@ class BunextServer {
 
     this.isClustered = true;
 
-    if (!cluster.isPrimary) {
+    if (cluster.isWorker) {
       process.on("message", (data) => {
+        if (typeof (data as any).task != "undefined") return;
         builder.ssrElement = data as ssrElement[];
         if (this.WaitingBuildFinishResolver)
           this.WaitingBuildFinishResolver(true);
@@ -299,7 +308,6 @@ class BunextServer {
 
     cluster.on("message", async (w, _message) => {
       const message = _message as ClusterMessageType;
-
       switch (message.task) {
         case "revalidate":
           revalidate(message.data.path);
@@ -319,7 +327,14 @@ class BunextServer {
           } as ClusterMessageType);
           break;
         case "setSession":
-          SetSessionByID(message.data.id, message.data.sessionData);
+          SetSessionByID(
+            message.data.type,
+            message.data.id,
+            message.data.sessionData
+          );
+          break;
+        case "deleteSession":
+          DeleteSessionByID(message.data.id);
           break;
       }
     });

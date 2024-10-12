@@ -1,7 +1,8 @@
 import { _Session, type _SessionData } from "../features/session";
 import { webToken } from "@bunpmjs/json-webtoken";
 import "./server_global";
-import { GetSessionByID, SetSessionByID } from "./session";
+import { DeleteSessionByID, SetSessionByID } from "./session";
+import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 
 export class BunextRequest {
   public request: Request;
@@ -11,7 +12,7 @@ export class BunextRequest {
   /**
    * only avalable when serverConfig.session.type == "database:hard" | "database:memory"
    */
-  private SessionID?: string;
+  public SessionID?: string;
 
   constructor(props: { request: Request; response: Response }) {
     this.request = props.request;
@@ -19,29 +20,14 @@ export class BunextRequest {
     this.webtoken = new webToken<any>(this.request, {
       cookieName: "bunext_session_token",
     });
-    switch (globalThis.serverConfig.session?.type) {
-      case "database:hard":
-      case "database:memory":
-        this.SessionID =
-          (this.webtoken.session() as undefined | string) || SetSessionByID();
-        this.session = undefined as any;
-        break;
-      case "cookie":
-      case undefined:
-        this.session = new _Session(
-          this.webtoken.session() as _SessionData<any>,
-          globalThis.serverConfig.session?.timeout
-        );
-        break;
-    }
-  }
-  public async __INIT__() {
-    if (globalThis.serverConfig.session?.type != "database:memory") return this;
     this.session = new _Session(
-      (await GetSessionByID(this.SessionID)) as _SessionData<any>,
-      globalThis.serverConfig.session?.timeout
+      undefined,
+      globalThis.serverConfig.session?.timeout,
+      this
     );
-    return this;
+    this.SessionID = (
+      this.webtoken.session() as undefined | { id: string }
+    )?.id;
   }
   public __SET_RESPONSE__(response: Response) {
     this.response = response;
@@ -51,9 +37,19 @@ export class BunextRequest {
     switch (globalThis.serverConfig.session?.type) {
       case "database:hard":
       case "database:memory":
-        this.webtoken.setData(this.webtoken.session());
-        if (this.session.__DELETE__ || this.session.isUpdated) {
-          SetSessionByID(this.SessionID, this.session.__DATA__);
+        const correctID = this.SessionID || generateRandomString(32);
+        this.webtoken.setData({
+          id: correctID,
+        });
+        if (this.session.isUpdated) {
+          SetSessionByID(
+            this.SessionID ? "update" : "insert",
+            correctID,
+            this.session.__DATA__
+          );
+        }
+        if (this.session.__DELETE__) {
+          DeleteSessionByID(correctID);
         }
         break;
       case "cookie":

@@ -76,6 +76,8 @@ class Builder {
     "@bunpmjs/bunext/internal/router.tsx",
     "@bunpmjs/bunext/internal/bunextRequest.ts",
     "@bunpmjs/json-webtoken/index.ts",
+    "@bunpmjs/bunext/database/class.ts",
+    "@bunpmjs/bunext/internal/session.ts",
   ];
 
   constructor(baseDir: string) {

@@ -98,9 +98,19 @@ type _FormatString<T> = _Select<T> | _Update<T> | _Delete<T>;
 export class Table<T> {
   private name: string;
   databaseInstence: _BunDB;
-  constructor({ name, db }: { name: string; db?: _BunDB }) {
+  shema: DBSchema;
+  constructor({
+    name,
+    db,
+    shema,
+  }: {
+    name: string;
+    db?: _BunDB;
+    shema?: DBSchema;
+  }) {
     this.name = name;
     this.databaseInstence = db || MainDatabase;
+    this.shema = shema || globalThis.dbShema;
   }
   private extractParams(key: string, where: any) {
     return Array.prototype.concat(
@@ -121,7 +131,7 @@ export class Table<T> {
     return Object.assign(
       {},
       ...Object.keys(params).map((key) => {
-        const column = globalThis.dbShema
+        const column = this.shema
           .find((schema) => schema.name === this.name)
           ?.columns.find((c) => c.name === key);
         switch (column?.type) {

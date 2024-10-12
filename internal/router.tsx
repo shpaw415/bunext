@@ -20,6 +20,7 @@ import { Head } from "../features/head";
 import { BunextRequest } from "./bunextRequest";
 import "./server_global";
 import { rm } from "node:fs/promises";
+
 class ClientOnlyError extends Error {
   constructor() {
     super("client only");
@@ -115,17 +116,19 @@ class StaticRouters {
     const serverSide = this.server?.match(request);
     const clientSide = this.client?.match(request);
 
-    const bunextReq = await new BunextRequest({
+    const bunextReq = new BunextRequest({
       request,
       response: new Response(),
-    }).__INIT__();
+    });
 
     switch (pathname as pathNames) {
       case "/ServerActionGetter":
+        await bunextReq.session.initData();
         return bunextReq.__SET_RESPONSE__(
           await this.serverActionGetter(request_header, data, bunextReq)
         );
       case "/bunextgetSessionData":
+        await bunextReq.session.initData();
         return bunextReq.__SET_RESPONSE__(
           new Response(JSON.stringify(bunextReq.session.__DATA__.public))
         );
@@ -467,6 +470,7 @@ class StaticRouters {
     const ApiModule = await import(route.filePath);
     if (typeof ApiModule[bunextreq.request.method.toUpperCase()] == "undefined")
       return;
+    await bunextreq.session.initData();
     const res = (await ApiModule[bunextreq.request.method](bunextreq)) as
       | BunextRequest
       | undefined;

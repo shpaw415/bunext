@@ -1,4 +1,6 @@
 "use client";
+import type { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
+import { GetSessionByID } from "@bunpmjs/bunext/internal/session";
 import { createContext, useContext, useEffect, useState } from "react";
 export { GetSession } from "./bunextRequest";
 
@@ -23,12 +25,30 @@ export class _Session {
   public isUpdated = false;
   private sessionTimeout = 3600;
   private inited = false;
+  private request?: BunextRequest;
 
-  constructor(data?: _SessionData<any>, sessionTimeout?: number) {
+  constructor(
+    data?: _SessionData<any>,
+    sessionTimeout?: number,
+    request?: BunextRequest
+  ) {
     if (data) this.__DATA__ = data;
     if (sessionTimeout) this.sessionTimeout = sessionTimeout;
+    if (request) this.request = request;
   }
-
+  public setPublicData(data: Record<string, any>) {
+    this.__DATA__.public = {
+      ...this.__DATA__.public,
+      ...data,
+    };
+  }
+  public setPrivateData(data: Record<string, any>) {
+    this.__DATA__.private = {
+      ...this.__DATA__.private,
+      __BUNEXT_SESSION_CREATED_AT__: this.makeCreatedTime(),
+      ...data,
+    };
+  }
   /**
    * Server side only
    * @param data data to set in the token
@@ -37,28 +57,15 @@ export class _Session {
    */
   setData(data: Record<string, any>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
-    const setPrivate = () => {
-      this.__DATA__.private = {
-        ...this.__DATA__.private,
-        __BUNEXT_SESSION_CREATED_AT__: this.makeCreatedTime(),
-        ...data,
-      };
-    };
-
-    const setPublic = () => {
-      this.__DATA__.public = {
-        ...this.__DATA__.public,
-        ...data,
-      };
-    };
+    if (!this.request) return;
 
     this.isUpdated = true;
 
     if (Public) {
-      setPublic();
-      setPrivate();
+      this.setPublicData(data);
+      this.setPrivateData(data);
     } else {
-      setPrivate();
+      this.setPrivateData(data);
     }
   }
   /**
@@ -73,6 +80,20 @@ export class _Session {
       private: {},
     };
     return this;
+  }
+  async initData() {
+    if (!this.request) return;
+    switch (globalThis.serverConfig.session?.type) {
+      case "cookie":
+        const sessionData = this.request.webtoken.session();
+        if (sessionData) this.__DATA__ = sessionData;
+        break;
+      case "database:memory":
+      case "database:hard":
+        const RecData = await GetSessionByID(this.request.SessionID);
+        if (RecData) this.__DATA__ = RecData;
+        break;
+    }
   }
   /**
    * Server & Client
@@ -101,6 +122,10 @@ export class _Session {
       return this.__DATA__.public;
     }
 
+    if (!this.SessionExists()) {
+      return undefined;
+    }
+
     if (this.isExpired()) {
       this.delete();
       return undefined;
@@ -117,6 +142,7 @@ export class _Session {
       document.cookie =
         this.cookieName + "=; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
       this.__DATA__.public = {};
+      this.update();
     } else {
       this.__DELETE__ = true;
       this.__DATA__ = {
@@ -140,6 +166,11 @@ export class _Session {
   private isClient() {
     return typeof window != "undefined";
   }
+  private SessionExists() {
+    return (
+      typeof this.__DATA__.private.__BUNEXT_SESSION_CREATED_AT__ != "undefined"
+    );
+  }
   private isExpired() {
     const createdAt = this.__DATA__.private.__BUNEXT_SESSION_CREATED_AT__ as
       | number
@@ -148,7 +179,7 @@ export class _Session {
     return this.makeCreatedTime() > createdAt + this.sessionTimeout * 1000;
   }
   private makeCreatedTime() {
-    return Math.floor(new Date().getTime() / 1000);
+    return new Date().getTime();
   }
 }
 
@@ -172,6 +203,12 @@ export function useSession(props?: { PreventRenderOnUpdate: boolean }) {
   useEffect(() => {
     if (!props?.PreventRenderOnUpdate) _SessionContext.states.push(setState);
     Session.__UPDATE__ = _SessionContext;
+    return () => {
+      _SessionContext.states.splice(
+        _SessionContext.states.indexOf(setState),
+        1
+      );
+    };
   }, []);
   return Session;
 }

@@ -1,15 +1,48 @@
 import type { ClusterMessageType } from "./types";
 import { _Database, Table } from "../database/class";
-import { generateRandomString } from "../features/utils";
+import type { TableSchema } from "@bunpmjs/bunext/database/schema";
 import type { Database } from "bun:sqlite";
 import cluster from "node:cluster";
 
 let db: Database | undefined = undefined;
 
+const throwOnDBNotInited = () => {
+  throw new Error("session database not initialized");
+};
+const SendWhenOptionMemory = (msg: ClusterMessageType) => {
+  if (
+    cluster.isWorker &&
+    globalThis.serverConfig.session?.type == "database:memory"
+  ) {
+    process.send?.(msg);
+    return true;
+  }
+  return false;
+};
+
+const Shema: TableSchema = {
+  name: "bunextSession",
+  columns: [
+    {
+      name: "id",
+      unique: true,
+      primary: true,
+      type: "string",
+    },
+    {
+      name: "data",
+      type: "json",
+      DataType: {
+        public: {},
+        private: {},
+      },
+    },
+  ],
+};
+
 export async function InitDatabase() {
   const { Database } = await import("bun:sqlite");
   const type = globalThis.serverConfig.session?.type;
-  console.log(type);
   if (type == "cookie") return;
   else if (type == "database:hard") {
     if (!(await Bun.file("./config/session.sqlite").exists())) {
@@ -27,25 +60,7 @@ export async function InitDatabase() {
 }
 
 function CreateDatabaseTable(db: Database) {
-  new _Database(db).create({
-    name: "bunextSession",
-    columns: [
-      {
-        name: "id",
-        unique: true,
-        primary: true,
-        type: "string",
-      },
-      {
-        name: "data",
-        type: "json",
-        DataType: {
-          public: {},
-          private: {},
-        },
-      },
-    ],
-  });
+  new _Database(db).create(Shema);
   return db;
 }
 
@@ -61,6 +76,7 @@ function GetTable() {
   return new Table<sessionTableType>({
     name: "bunextSession",
     db,
+    shema: [Shema],
   });
 }
 
@@ -108,20 +124,15 @@ export function GetSessionByID(
   | undefined
   | sessionTableType["data"] {
   if (!id) return;
-
   if (
-    cluster.isWorker &&
-    globalThis.serverConfig.session?.type == "database:memory"
-  ) {
-    process.send?.({
+    SendWhenOptionMemory({
       task: "getSession",
       data: {
         id,
       },
-    } as ClusterMessageType);
-
+    })
+  )
     return IPCManagerInstance.awaitSessionData(id);
-  }
 
   if (!db) return;
   const table = GetTable();
@@ -136,7 +147,6 @@ export function GetSessionByID(
   });
 
   if (res.length == 0) return undefined;
-
   return res[0].data;
 }
 /**
@@ -144,45 +154,89 @@ export function GetSessionByID(
  * @param id the session id or undefined
  * @returns newley created session id or undefined
  */
-export function SetSessionByID(id?: string, data?: any) {
+export function SetSessionByID(
+  type: "insert" | "update",
+  id: string,
+  data?: any
+) {
   if (
-    cluster.isWorker &&
-    globalThis.serverConfig.session?.type == "database:memory"
-  ) {
-    process.send?.({
+    SendWhenOptionMemory({
       task: "setSession",
       data: {
-        id,
+        id: id,
         sessionData: data,
+        type,
       },
-    } as ClusterMessageType);
-  }
-  if (!db) return;
+    })
+  )
+    return;
+
+  if (!db) throwOnDBNotInited();
   const table = GetTable();
 
-  if (!id) {
-    const newID = generateRandomString(32);
+  if (type == "insert") {
     table.insert([
       {
-        id: newID,
+        id: id,
         data: data || {
           public: {},
           private: {},
         },
       },
     ]);
-    return newID;
-  }
-
-  table.update({
-    where: {
-      id,
-    },
-    values: {
-      data: data || {
-        public: {},
-        private: {},
+  } else if (type == "update") {
+    table.update({
+      where: {
+        id,
       },
+      values: {
+        data: data || {
+          public: {},
+          private: {},
+        },
+      },
+    });
+  }
+}
+
+export function DeleteSessionByID(id: string) {
+  console.log(id);
+
+  if (
+    SendWhenOptionMemory({
+      task: "deleteSession",
+      data: {
+        id: id,
+      },
+    })
+  )
+    return;
+
+  if (!db) throwOnDBNotInited();
+
+  GetTable().delete({
+    where: { id },
+  });
+}
+
+export function CleanExpiredSession() {
+  if (!globalThis.serverConfig.session?.timeout) return;
+  const Tab = GetTable();
+  const toDelete = Tab.select({}).filter(({ data }) => {
+    const createdTime = data?.private.__BUNEXT_SESSION_CREATED_AT__;
+    const Timeout = globalThis.serverConfig.session?.timeout as number;
+    return new Date().getTime() > createdTime + Timeout * 1000;
+  });
+
+  if (toDelete.length == 0) return;
+
+  Tab.delete({
+    where: {
+      OR: toDelete.map(({ id }) => {
+        return {
+          id,
+        };
+      }),
     },
   });
 }

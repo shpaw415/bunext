@@ -109,7 +109,14 @@ export type ClusterMessageType =
   | {
       task: "setSession";
       data: {
-        id?: string;
+        id: string;
         sessionData: any;
+        type: "insert" | "update";
+      };
+    }
+  | {
+      task: "deleteSession";
+      data: {
+        id: string;
       };
     };
