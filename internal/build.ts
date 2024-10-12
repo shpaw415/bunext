@@ -175,6 +175,7 @@ class Builder {
       if (
         typeof exported != "function" ||
         exported.name.startsWith("Server") ||
+        exported.name == "getServerSideProps" ||
         exported.length > 0
       )
         continue;

@@ -676,4 +676,4 @@ await fetch("my.site.com/api/v1", {
 
 ## 0.7.16
 
-- getServerSideProps can access session with getSession;
+- getServerSideProps can access session with getSession
