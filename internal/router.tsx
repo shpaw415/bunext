@@ -177,11 +177,14 @@ class StaticRouters {
     }
 
     const module = await import(serverSide.filePath);
-    const result = await module?.getServerSideProps?.({
-      params: serverSide.params,
-      req: request,
-      query: serverSide.query,
-    });
+    const result = await module?.getServerSideProps?.(
+      {
+        params: serverSide.params,
+        req: request,
+        query: serverSide.query,
+      },
+      bunextReq
+    );
     const stringified = NJSON.stringify(result, { omitStack: true });
     if (
       typeof request_header.accept != "undefined" &&
