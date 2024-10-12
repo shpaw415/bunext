@@ -177,6 +177,8 @@ class StaticRouters {
     }
 
     const module = await import(serverSide.filePath);
+    if (typeof module.getServerSideProps != "undefined")
+      await bunextReq.session.initData();
     const result = await module?.getServerSideProps?.(
       {
         params: serverSide.params,
