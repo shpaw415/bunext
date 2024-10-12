@@ -668,3 +668,8 @@ await fetch("my.site.com/api/v1", {
 - Database is no longer async
 - File and Blob can be returned from a Server Action
 - Fix Head data not loading with dynamic routes
+
+## 0.7.14
+
+- Session can be hosted on the server as a token and remove the limit of the standard 4000 char, when serverConfig.session.type = "database:memory" | "database:hard"
+  and "cookie" will set as JSON-Webtoken but is limited with 4000 encoded char ( database:hard is the most stable for performance )

@@ -5,5 +5,6 @@ Priority 1
 
 Priority 2
 
-- bootstrap session data
 - Max body size in config
+- set static assets via the new bun.serve api param
+- use of multiple database
