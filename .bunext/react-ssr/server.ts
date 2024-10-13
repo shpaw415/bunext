@@ -29,7 +29,7 @@ import {
   InitDatabase,
   SetSessionByID,
 } from "@bunpmjs/bunext/internal/session";
-import type { ClusterMessageType } from "../../internal/types";
+import type { ClusterMessageType } from "@bunpmjs/bunext/internal/types";
 
 declare global {
   namespace NodeJS {
@@ -270,7 +270,11 @@ class BunextServer {
   }
 
   MakeCluster() {
-    if (OSType() != "Linux" || !Bun.semver.satisfies(Bun.version, "^1.1.25"))
+    if (
+      OSType() != "Linux" ||
+      !Bun.semver.satisfies(Bun.version, "^1.1.25") ||
+      process.env.NODE_ENV == "development"
+    )
       return false;
 
     this.isClustered = true;

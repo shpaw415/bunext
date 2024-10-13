@@ -677,3 +677,4 @@ await fetch("my.site.com/api/v1", {
 ## 0.7.16
 
 - getServerSideProps can access session with getSession
+- fix ServerAction and getServersideProps not hot reloading
