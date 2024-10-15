@@ -185,6 +185,8 @@ export function SetSessionByID(
       },
     ]);
   } else if (type == "update") {
+    const exists = table.select({ where: { id }, select: { id: true } }).at(0);
+    if (!exists) return SetSessionByID("insert", id, data);
     table.update({
       where: {
         id,
@@ -200,8 +202,6 @@ export function SetSessionByID(
 }
 
 export function DeleteSessionByID(id: string) {
-  console.log(id);
-
   if (
     SendWhenOptionMemory({
       task: "deleteSession",

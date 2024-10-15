@@ -23,7 +23,7 @@ export class BunextRequest {
     this.session = new _Session(
       undefined,
       globalThis.serverConfig.session?.timeout,
-      this
+      this as any
     );
     this.SessionID = (
       this.webtoken.session() as undefined | { id: string }

@@ -677,4 +677,5 @@ await fetch("my.site.com/api/v1", {
 ## 0.7.16
 
 - getServerSideProps can access session with getSession
-- fix ServerAction and getServersideProps not hot reloading
+- fix getServersideProps not hot reloading
+- fix session not loading correcly when a token is valid but not present in the session database
