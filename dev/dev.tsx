@@ -12,7 +12,7 @@ export function Dev() {
   const [retry, setRetry] = useState(false);
   const [_ws, setWs] = useState<WebSocket>();
   useEffect(() => {
-    if (globalThis.__NODE_ENV__ != "development" || opened) return;
+    if (process.env.NODE_ENV != "development" || opened) return;
     if (_ws) _ws.close();
     const p = window.location;
     const ws = new WebSocket(

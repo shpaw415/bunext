@@ -125,7 +125,7 @@ export const RouterHost = ({
           fetchServerSideProps(target),
           import(
             `${matched.value}${
-              globalX.__DEV_MODE__ ? `?${currentVersion}` : ""
+              process.env.NODE_ENV == "development" ? `?${currentVersion}` : ""
             }`
           ),
         ]);

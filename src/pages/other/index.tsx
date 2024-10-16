@@ -4,6 +4,7 @@ Head.setHead({
   data: {
     title: "some other",
   },
+  path: "/other",
 });
 
 export default function Page() {

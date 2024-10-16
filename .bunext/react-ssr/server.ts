@@ -66,10 +66,7 @@ class BunextServer {
         if (OnRequestResponse) return OnRequestResponse;
 
         try {
-          const response =
-            (await self.serve(request)) ||
-            (await serveStatic(request)) ||
-            serveScript(request);
+          const response = await self.serve(request);
           if (response instanceof Response) return response;
           else if (response instanceof BunextRequest) return response.response;
         } catch (e) {

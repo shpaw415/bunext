@@ -44,18 +44,12 @@ class StaticRouters {
     path: string;
     actions: Array<Function>;
   }[] = [];
+  layoutPaths: string[];
 
   baseDir = process.cwd();
   buildDir = ".bunext/build";
   pageDir = "src/pages";
-  optionst = {
-    displayMode: {
-      nextjs: {
-        layout: "layout.tsx",
-      },
-      ssrMode: "nextjs",
-    },
-  };
+  staticDir = "static";
 
   constructor() {
     this.server = new Bun.FileSystemRouter({
@@ -75,6 +69,7 @@ class StaticRouters {
       ),
       { omitStack: true }
     );
+    this.layoutPaths = this.getlayoutPaths();
   }
   public setRoutes() {
     this.server = new Bun.FileSystemRouter({
@@ -132,7 +127,18 @@ class StaticRouters {
         return bunextReq.__SET_RESPONSE__(
           new Response(JSON.stringify(bunextReq.session.__DATA__.public))
         );
+      case "/bunextDeleteSession":
+        await bunextReq.session.initData();
+        bunextReq.session.delete();
+        return bunextReq.__SET_RESPONSE__(bunextReq.setCookie(new Response()));
       default:
+        const staticAssets = await this.serveFromDir({
+          directory: this.staticDir,
+          path: pathname,
+        });
+        if (staticAssets !== null)
+          return bunextReq.__SET_RESPONSE__(new Response(staticAssets));
+
         const staticResponse = await this.serveFromDir({
           directory: this.buildDir,
           path: pathname,
@@ -154,11 +160,10 @@ class StaticRouters {
         if (nodeModuleFile !== null) {
           return await this.serveFileFromNodeModule(
             pathname,
-            nodeModuleFile,
+            await nodeModuleFile.text(),
             bunextReq
           );
         }
-
         break;
     }
 
@@ -350,19 +355,22 @@ class StaticRouters {
       __SERVERSIDE_PROPS__: serverSidePropsString,
       __DISPLAY_MODE__: JSON.stringify("nextjs"),
       __LAYOUT_NAME__: JSON.stringify("layout"),
-      __LAYOUT_ROUTE__: JSON.stringify(await this.getlayoutPaths()),
-      __DEV_MODE__: Boolean(process.env.NODE_ENV == "development"),
+      __LAYOUT_ROUTE__: JSON.stringify(this.layoutPaths),
       __HEAD_DATA__: JSON.stringify(Head.head),
       __PUBLIC_SESSION_DATA__: "undefined",
-      __NODE_ENV__: `"${process.env.NODE_ENV}"`,
       __PROCESS_ENV__: JSON.stringify(
         Object.assign(
           {},
-          ...Object.keys(process.env)
-            .filter((k) => k.startsWith("PUBLIC"))
-            .map((k) => {
-              return { [k]: process.env[k] };
-            })
+          ...[
+            ...Object.keys(process.env)
+              .filter((k) => k.startsWith("PUBLIC"))
+              .map((k) => {
+                return { [k]: process.env[k] };
+              }),
+            {
+              NODE_ENV: process.env.NODE_ENV,
+            },
+          ]
         )
       ),
     } as const;
@@ -503,7 +511,7 @@ class StaticRouters {
       },
     });
   }
-  private async getlayoutPaths() {
+  private getlayoutPaths() {
     return this.getFilesFromPageDir()
       .filter((f) => f.split("/").at(-1)?.includes("layout."))
       .map((l) => normalize(`//${l}`.split("/").slice(0, -1).join("/")));
@@ -693,7 +701,7 @@ class StaticRouters {
     for await (const suffix of suffixes) {
       const pathWithSuffix = basePath + suffix;
       let file = Bun.file(pathWithSuffix);
-      if (await file.exists()) return await file.text();
+      if (await file.exists()) return file;
     }
 
     return null;

@@ -14,6 +14,10 @@ declare global {
   var __BUNEXT_SESSION__: _Session;
 }
 
+export type InAppSession = Omit<
+  _Session,
+  "__UPDATE__" | "__DATA__" | "__DELETE__" | "isUpdated" | "initData"
+>;
 export class _Session {
   private cookieName = "bunext_session_token";
   public __UPDATE__?: SessionUpdateClass;
@@ -36,18 +40,19 @@ export class _Session {
     if (sessionTimeout) this.sessionTimeout = sessionTimeout;
     if (request) this.request = request;
   }
-  public setPublicData(data: Record<string, any>) {
+  private setPublicData(data: Record<string, any>) {
     this.__DATA__.public = {
       ...this.__DATA__.public,
       ...data,
     };
   }
-  public setPrivateData(data: Record<string, any>) {
+  private setPrivateData(data: Record<string, any>) {
     this.__DATA__.private = {
       ...this.__DATA__.private,
       __BUNEXT_SESSION_CREATED_AT__: this.makeCreatedTime(),
       ...data,
     };
+    this.isUpdated = true;
   }
   /**
    * Server side only
@@ -139,8 +144,7 @@ export class _Session {
    */
   delete() {
     if (this.isClient()) {
-      document.cookie =
-        this.cookieName + "=; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+      fetch("/bunextDeleteSession");
       this.__DATA__.public = {};
       this.update();
     } else {
@@ -210,5 +214,5 @@ export function useSession(props?: { PreventRenderOnUpdate: boolean }) {
       );
     };
   }, []);
-  return Session;
+  return Session as InAppSession;
 }

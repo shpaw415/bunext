@@ -76,6 +76,8 @@ function IsLogged() {
   const session = useSession();
   const data = session.getData();
 
+  console.log("render");
+
   return <div>{data?.test ? "logged" : "not logged"}</div>;
 }
 

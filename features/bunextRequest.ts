@@ -1,5 +1,6 @@
 import type { BunextRequest } from "../internal/bunextRequest";
 import { Session } from "@bunpmjs/bunext/features/session";
+import type { InAppSession } from "./session";
 
 const isClient = typeof window != "undefined";
 
@@ -14,7 +15,7 @@ function GetBunextRequest(args: IArguments) {
  */
 export function GetSession(args?: IArguments) {
   if (isClient && !args) return Session;
-  else if (args) return GetBunextRequest(args).session;
+  else if (args) return GetBunextRequest(args).session as InAppSession;
   else throw new Error("you must set arguments from a server context");
 }
 /**
