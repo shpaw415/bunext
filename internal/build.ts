@@ -559,13 +559,15 @@ class Builder {
             fileContent = new Bun.Transpiler({
               loader: "jsx",
               jsxOptimizationInline: true,
+              trimUnusedImports: true,
               treeShaking: true,
               autoImportJSX: process.env.NODE_ENV == "development",
             }).transformSync(fileContent);
 
             if (process.env.NODE_ENV == "production") {
               fileContent =
-                'import {jsx, jsxs} from "react/jsx-runtime";\n' + fileContent;
+                'import {jsx, jsxs, Fragment} from "react/jsx-runtime";\n' +
+                fileContent;
             }
             return {
               contents: fileContent,
