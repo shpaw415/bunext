@@ -7,11 +7,7 @@ import { Shell } from "./shell";
 import { renderToString } from "react-dom/server";
 import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
-import {
-  setRevalidate,
-  serveScript,
-  serveStatic,
-} from "@bunpmjs/bunext/internal/server-features";
+import { setRevalidate } from "@bunpmjs/bunext/internal/server-features";
 
 import _ServerConfig from "../../config/server"; // must be relative
 import Bypassrequest from "../../config/onRequest";
