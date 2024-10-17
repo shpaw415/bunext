@@ -1,14 +1,13 @@
 import { join, basename } from "node:path";
-import { Transpiler, type BuildOutput, type BunPlugin } from "bun";
+import { type BuildOutput, type BunPlugin } from "bun";
 import { normalize } from "path";
 import { isValidElement } from "react";
 import reactElementToJSXString from "./jsxToString/index";
-import { URLpaths } from "./types";
 import { unlinkSync } from "node:fs";
 import "./server_global";
 import { type JsxElement } from "typescript";
 import { renderToString } from "react-dom/server";
-import type { ServerActionDataTypeHeader, ssrElement } from "./types";
+import type { ssrElement } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 
@@ -419,16 +418,17 @@ class Builder {
         tag: string;
         reactElement: string;
       };
-      const TranspiledElement = new Transpiler({
-        loader: "jsx",
-        autoImportJSX: true,
-      }).transformSync(componant.reactElement);
 
       fileContent = fileContent.replace(
         `"${componant.tag}"`,
         `() => (${componant.reactElement});`
       );
     }
+
+    fileContent = fileContent.replace(
+      '"<!Bunext_Element_fakeTag!>"',
+      "() => <></>"
+    );
 
     return fileContent;
   }
@@ -505,7 +505,6 @@ class Builder {
           { namespace: "client", filter: /\.tsx$/ },
           async ({ path }) => {
             let fileContent = await Bun.file(path).text();
-
             if (
               ["layout.tsx"]
                 .map((endswith) => path.endsWith(endswith))
@@ -527,17 +526,22 @@ class Builder {
 
             const serverCompotantsForTranspiler = Object.assign(
               {},
-              ...Object.keys(serverComponants).map((componant) => ({
-                [componant]: serverComponants[componant].tag,
-              }))
-            );
+              ...[
+                ...Object.keys(serverComponants).map((componant) => ({
+                  [componant]: serverComponants[componant].tag,
+                })),
+              ]
+            ) as Record<string, string>;
+
+            // this is a hack for forcing the
+            fileContent =
+              fileContent +
+              '\nexport const fakeTag = "<!Bunext_Element_fakeTag!>"; fakeTag == fakeTag';
 
             const serverActionsTags = self.ServerActionToTag(fileContent);
 
             const transpiler = new Bun.Transpiler({
               loader: "tsx",
-              jsxOptimizationInline: true,
-              treeShaking: true,
               exports: {
                 replace: {
                   ...serverActionsTags,
@@ -547,23 +551,18 @@ class Builder {
             });
             fileContent = transpiler.transformSync(fileContent);
 
-            if (
-              Object.keys(serverComponants).length > 0 ||
-              Object.keys(serverActionsTags).length > 0
-            ) {
-              fileContent = await self.ServerSideFeatures({
-                modulePath: path,
-                fileContent: fileContent,
-                serverComponants: serverComponants,
-              });
+            fileContent = await self.ServerSideFeatures({
+              modulePath: path,
+              fileContent: fileContent,
+              serverComponants: serverComponants,
+            });
 
-              fileContent = new Bun.Transpiler({
-                loader: "jsx",
-                autoImportJSX: true,
-                jsxOptimizationInline: true,
-              }).transformSync(fileContent);
-            }
-
+            fileContent = new Bun.Transpiler({
+              loader: "jsx",
+              jsxOptimizationInline: true,
+              autoImportJSX: true,
+              treeShaking: true,
+            }).transformSync(fileContent);
             fileContent = fileContent.replace("return jsxs(", "return jsx(");
 
             return {
