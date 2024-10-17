@@ -1,6 +1,6 @@
 {
   "name": "bunext",
-  "version": "0.7.20",
+  "version": "0.7.21",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
@@ -13,7 +13,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "typescript": "^5.3.3",
-    "@bunpmjs/bunext": "^0.7.17"
+    "@bunpmjs/bunext": "^0.7.20"
   },
   "dependencies": {
     "@base2/pretty-print-object": "1.0.2",

@@ -550,7 +550,6 @@ class Builder {
               },
             });
             fileContent = transpiler.transformSync(fileContent);
-
             fileContent = await self.ServerSideFeatures({
               modulePath: path,
               fileContent: fileContent,
@@ -560,12 +559,14 @@ class Builder {
             fileContent = new Bun.Transpiler({
               loader: "jsx",
               jsxOptimizationInline: true,
-              autoImportJSX: true,
               treeShaking: true,
+              autoImportJSX: process.env.NODE_ENV == "development",
             }).transformSync(fileContent);
-            if (process.env.NODE_ENV == "production")
-              fileContent = fileContent.replaceAll("jsxs(", "jsx(");
 
+            if (process.env.NODE_ENV == "production") {
+              fileContent =
+                'import {jsx, jsxs} from "react/jsx-runtime";\n' + fileContent;
+            }
             return {
               contents: fileContent,
               loader: "js",
