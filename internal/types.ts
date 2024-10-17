@@ -23,10 +23,7 @@ export type _GlobalData = {
   __INITIAL_ROUTE__: string;
   __ROUTES__: Record<string, string>;
   __SERVERSIDE_PROPS__?: any;
-  __DISPLAY_MODE__: keyof _DisplayMode;
-  __LAYOUT_NAME__: string;
   __LAYOUT_ROUTE__: string[];
-  __DEV_MODE__: boolean;
 };
 
 export type _globalThis = _GlobalData & {

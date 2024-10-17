@@ -372,6 +372,9 @@ export default function Page(data: {
 
 export async function getServerSideProps() {
   // go get some api data, database, etc...
+
+  // return { redirect: "/path/to/another/location" };
+  // will redirect to a diferent location
   return {
     foo: "bar",
     name: {
@@ -679,3 +682,8 @@ await fetch("my.site.com/api/v1", {
 - getServerSideProps can access session with getSession
 - fix getServersideProps not hot reloading
 - fix session not loading correcly when a token is valid but not present in the session database
+- minify is working on production
+- fit jsx import for some tsx files that was not on the index but imported by it.
+- fix session delete client side
+- fix hot reload server can be set to a different number then 3001
+- ServerActions are 95% smaller in bundle size

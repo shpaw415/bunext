@@ -5,7 +5,7 @@ const Config: ServerConfig = {
     threads: 1,
   },
   Dev: {
-    hotServerPort: 3001,
+    hotServerPort: 3005,
   },
   build: {
     plugins: [],

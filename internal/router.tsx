@@ -10,6 +10,7 @@ import type {
   _SsrMode,
   ServerActionDataType,
   ServerActionDataTypeHeader,
+  ServerConfig,
 } from "./types";
 import { normalize } from "path";
 import React from "react";
@@ -353,11 +354,13 @@ class StaticRouters {
       __INITIAL_ROUTE__: JSON.stringify(serverSide.pathname + search),
       __ROUTES__: this.#routes_dump,
       __SERVERSIDE_PROPS__: serverSidePropsString,
-      __DISPLAY_MODE__: JSON.stringify("nextjs"),
-      __LAYOUT_NAME__: JSON.stringify("layout"),
       __LAYOUT_ROUTE__: JSON.stringify(this.layoutPaths),
       __HEAD_DATA__: JSON.stringify(Head.head),
       __PUBLIC_SESSION_DATA__: "undefined",
+      serverConfig: JSON.stringify({
+        Dev: globalThis.serverConfig.Dev,
+        HTTPServer: globalThis.serverConfig.HTTPServer,
+      } as Partial<ServerConfig>),
       __PROCESS_ENV__: JSON.stringify(
         Object.assign(
           {},

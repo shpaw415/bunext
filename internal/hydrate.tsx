@@ -75,7 +75,7 @@ async function NextJsLayoutStacker({
     children: JSX.Element;
   }) => Promise<JSX.Element>;
 
-  const layoutPath = global.__ROUTES__["/" + global.__LAYOUT_NAME__];
+  const layoutPath = global.__ROUTES__["/layout"];
 
   let pageJSX = await PageJsx({
     props: globalX.__SERVERSIDE_PROPS__,
@@ -93,11 +93,11 @@ async function NextJsLayoutStacker({
   let defaultImports: Array<_layout> = [];
   const formatedRoutes = Object.keys(global.__ROUTES__)
     .map((e) => `/${global.__PAGES_DIR__}${e}`)
-    .filter((e) => e.includes(global.__LAYOUT_NAME__));
+    .filter((e) => e.includes("layout"));
   for await (const i of splitedRoute) {
     const request = `/${global.__PAGES_DIR__}${splitedRoute
       .slice(0, index)
-      .join("/")}/${global.__LAYOUT_NAME__}`;
+      .join("/")}/layout`;
     if (!formatedRoutes.includes(request)) continue;
     defaultImports.push((await import(request + ".js")).default);
     index++;

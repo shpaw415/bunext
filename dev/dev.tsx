@@ -16,7 +16,9 @@ export function Dev() {
     if (_ws) _ws.close();
     const p = window.location;
     const ws = new WebSocket(
-      `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${3001}`
+      `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${
+        globalThis.serverConfig.Dev.hotServerPort
+      }`
     );
     ws.addEventListener("message", (ev) => {
       if (ev.data != "reload") return;

@@ -12,8 +12,7 @@ import {
 } from "@bunpmjs/bunext/features/session";
 import { Database } from "@bunpmjs/bunext/database";
 import { generateRandomString } from "../../features/utils";
-import { TestServerElement } from "./serverElement";
-
+import { TestServerElement2 } from "./serverElement";
 import Test from "../../static/index.css";
 
 Head.setHead({
@@ -35,13 +34,19 @@ Head.setHead({
   path: "/",
 });
 
-export default async function Page() {
+export function TestServerElement1() {
+  return <div>{Bun.password.hashSync("allo")}</div>;
+}
+
+export default async function Page({ params }: { params: any }) {
   revalidateEvery("/", 5);
 
   return (
     <div>
       <TestElement />
-      {TestServerElement()}
+      <TestServerElement1 />
+      <TestServerElement2 />
+      <TestElement3 />
       <Link href="/other">
         <button>Other pages</button>
       </Link>
@@ -55,8 +60,7 @@ export default async function Page() {
       </button>
       <button
         onClick={async () => {
-          await ServerDeleteSession();
-          Session.update();
+          GetSession().delete();
         }}
       >
         Delete Session
@@ -72,13 +76,19 @@ export default async function Page() {
   );
 }
 
+export function TestElement3({ params }: { params?: any }) {
+  return (
+    <div>
+      <div>test</div>
+    </div>
+  );
+}
+
 function IsLogged() {
   const session = useSession();
   const data = session.getData();
-
-  console.log("render");
-
-  return <div>{data?.test ? "logged" : "not logged"}</div>;
+  const isLogged = Boolean(data?.test);
+  return <div>{isLogged ? "logged" : "not logged"}</div>;
 }
 
 export async function ServerSetSession() {

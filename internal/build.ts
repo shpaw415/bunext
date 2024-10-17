@@ -1,5 +1,5 @@
 import { join, basename } from "node:path";
-import type { BuildOutput, BunPlugin } from "bun";
+import { Transpiler, type BuildOutput, type BunPlugin } from "bun";
 import { normalize } from "path";
 import { isValidElement } from "react";
 import reactElementToJSXString from "./jsxToString/index";
@@ -82,7 +82,7 @@ class Builder {
 
   constructor(baseDir: string) {
     this.options = {
-      //minify: Bun.env.NODE_ENV === "production",
+      minify: Bun.env.NODE_ENV === "production",
       pageDir: "src/pages",
       buildDir: ".bunext/build",
       hydrate: ".bunext/react-ssr/hydrate.ts",
@@ -350,80 +350,11 @@ class Builder {
 
     const ServerActionClient = (ModulePath: string, funcName: string) => {
       return async function (...props: Array<any>) {
-        let currentPropsIndex = 0;
-        const formatToFile = () => {
-          currentPropsIndex++;
-          return `BUNEXT_FILE_${currentPropsIndex}`;
-        };
-        const formatToBatchedFile = () => {
-          return `BUNEXT_BATCH_FILES_${currentPropsIndex}`;
-        };
-
-        let formData = new FormData();
-
-        let _props: Array<any> = props.map((prop) => {
-          if (prop instanceof File) {
-            const id = formatToFile();
-            formData.append(id, prop);
-            return id;
-          } else if (Array.isArray(prop) && prop.length > 0) {
-            currentPropsIndex++;
-            const id = formatToBatchedFile();
-            return prop.map((p) => {
-              if (p instanceof File) {
-                formData.append(id, p);
-                return id;
-              } else return p;
-            });
-          } else if (prop instanceof FormData) {
-            if (props.length > 1)
-              throw new Error(
-                "only one prop is permited with a FormData in a ServerAction"
-              );
-            formData = prop;
-            return "BUNEXT_FORMDATA";
-          } else return prop;
-        });
-        formData.append("props", encodeURI(JSON.stringify(_props)));
-
-        const response = await fetch("<!URLPATH!>", {
-          headers: {
-            serverActionID: "<!ModulePath!>:<!FuncName!>",
-          },
-          method: "POST",
-          body: formData,
-        });
-        if (!response.ok)
-          throw new Error(
-            "error when Calling server action <!ModulePath!>:<!FuncName!>"
-          );
-        globalThis.__PUBLIC_SESSION_DATA__ = JSON.parse(
-          response.headers.get("session") || ""
-        );
-
-        switch (
-          response.headers.get("dataType") as ServerActionDataTypeHeader
-        ) {
-          case "json":
-            return ((await response.json()) as { props: any }).props;
-          case "blob":
-            return await response.blob();
-          case "file":
-            const blob = await response.blob();
-            const { name, lastModified } = JSON.parse(
-              response.headers.get("fileData") || ""
-            ) as { name: string; lastModified: number };
-            return new File([blob], name, {
-              type: blob.type,
-              lastModified: lastModified,
-            });
-        }
+        return await globalThis.MakeServerActionRequest(props, "TARGET");
       }
         .toString()
         .replace("async function", "")
-        .replaceAll("<!FuncName!>", funcName)
-        .replaceAll("<!ModulePath!>", ModulePath)
-        .replaceAll("<!URLPATH!>", URLpaths.serverAction);
+        .replace("TARGET", ModulePath + ":" + funcName);
     };
 
     return `async function ${func.name}${ServerActionClient(
@@ -488,9 +419,14 @@ class Builder {
         tag: string;
         reactElement: string;
       };
+      const TranspiledElement = new Transpiler({
+        loader: "jsx",
+        autoImportJSX: true,
+      }).transformSync(componant.reactElement);
+
       fileContent = fileContent.replace(
         `"${componant.tag}"`,
-        `() => ${componant.reactElement}`
+        `() => (${componant.reactElement});`
       );
     }
 
@@ -570,8 +506,6 @@ class Builder {
           async ({ path }) => {
             let fileContent = await Bun.file(path).text();
 
-            //self.isReactImported(fileContent);
-
             if (
               ["layout.tsx"]
                 .map((endswith) => path.endsWith(endswith))
@@ -604,7 +538,6 @@ class Builder {
               loader: "tsx",
               jsxOptimizationInline: true,
               treeShaking: true,
-              autoImportJSX: true,
               exports: {
                 replace: {
                   ...serverActionsTags,
@@ -626,9 +559,13 @@ class Builder {
 
               fileContent = new Bun.Transpiler({
                 loader: "jsx",
+                autoImportJSX: true,
                 jsxOptimizationInline: true,
               }).transformSync(fileContent);
             }
+
+            fileContent = fileContent.replace("return jsxs(", "return jsx(");
+
             return {
               contents: fileContent,
               loader: "js",
@@ -803,7 +740,6 @@ class Builder {
 
   private async CreateBuild(options: _CreateBuild) {
     const { define } = this.options;
-    const cwd = process.cwd();
     const build = await Bun.build({
       ...options,
       publicPath: "./",
