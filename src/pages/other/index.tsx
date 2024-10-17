@@ -1,4 +1,4 @@
-import { Head } from "../../../features/head";
+import { Head } from "@bunpmjs/bunext/features/head";
 
 Head.setHead({
   data: {
@@ -7,6 +7,27 @@ Head.setHead({
   path: "/other",
 });
 
-export default function Page() {
-  return <div>Page2</div>;
+export function getServerSideProps() {
+  return {
+    test: "test",
+  };
+}
+
+export default function Page({ params, props }: { params: any; props: any }) {
+  return (
+    <div>
+      <div>{JSON.stringify(props)}</div>
+      <div
+        onClick={() => {
+          ServerGet();
+        }}
+      >
+        {JSON.stringify(params || {})}
+      </div>
+    </div>
+  );
+}
+
+export async function ServerGet() {
+  return "";
 }
