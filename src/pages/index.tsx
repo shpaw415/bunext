@@ -60,7 +60,7 @@ export default async function Page({ params }: { params: any }) {
       </button>
       <button
         onClick={async () => {
-          GetSession().delete();
+          Session.delete();
         }}
       >
         Delete Session
@@ -88,6 +88,7 @@ function IsLogged() {
   const session = useSession();
   const data = session.getData();
   const isLogged = Boolean(data?.test);
+  console.log(session.getData());
   return <div>{isLogged ? "logged" : "not logged"}</div>;
 }
 

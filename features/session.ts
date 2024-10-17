@@ -144,9 +144,11 @@ export class _Session {
    */
   delete() {
     if (this.isClient()) {
-      fetch("/bunextDeleteSession");
-      this.__DATA__.public = {};
-      this.update();
+      fetch("/bunextDeleteSession").then(() => {
+        this.__DATA__.public = {};
+        globalThis.__PUBLIC_SESSION_DATA__ = {};
+        this.update();
+      });
     } else {
       this.__DELETE__ = true;
       this.__DATA__ = {
