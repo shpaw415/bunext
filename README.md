@@ -692,3 +692,4 @@ await fetch("my.site.com/api/v1", {
 ## 0.7.18
 
 - fix session not updating data after Session.delete(), client side
+- head data is no longer merged

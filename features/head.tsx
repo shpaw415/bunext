@@ -36,10 +36,7 @@ class HeadDataClass {
    * @param data to be set
    */
   public setHead({ data, path }: { data: _Head; path: string }) {
-    if (!this.head[path]) this.head[path] = data;
-    else if (this.head[path])
-      this.head[path] = deepMerge(this.head[path], data);
-    else if (this.currentPath) this.head[this.currentPath] = data;
+    this.head[path] = data;
   }
   /**
    * DO NOT USE THIS FUNCTION
