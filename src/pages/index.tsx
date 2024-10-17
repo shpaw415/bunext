@@ -38,7 +38,7 @@ export function TestServerElement1() {
   return <div>{Bun.password.hashSync("allo")}</div>;
 }
 
-export default async function Page({ params }: { params: any }) {
+export default async function Page() {
   revalidateEvery("/", 5);
 
   return (
