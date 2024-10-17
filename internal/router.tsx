@@ -661,7 +661,7 @@ class StaticRouters {
   }
   async InitServerActions() {
     const files = this.getFilesFromPageDir();
-
+    this.serverActions = [];
     for await (const f of files) {
       const filePath = normalize(`${this.pageDir}/${f}`);
       const _module = await import(normalize(`${process.cwd()}/${filePath}`));

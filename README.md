@@ -687,3 +687,4 @@ await fetch("my.site.com/api/v1", {
 - fix session delete client side
 - fix hot reload server can be set to a different number then 3001
 - ServerActions are 95% smaller in bundle size
+- fix hot reload on dev mode for ServerActions
