@@ -563,7 +563,8 @@ class Builder {
               autoImportJSX: true,
               treeShaking: true,
             }).transformSync(fileContent);
-            fileContent = fileContent.replace("return jsxs(", "return jsx(");
+            if (process.env.NODE_ENV == "production")
+              fileContent = fileContent.replaceAll("jsxs(", "jsx(");
 
             return {
               contents: fileContent,
