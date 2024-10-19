@@ -677,7 +677,7 @@ await fetch("my.site.com/api/v1", {
 - Session can be hosted on the server as a token and remove the limit of the standard 4000 char, when serverConfig.session.type = "database:memory" | "database:hard"
   and "cookie" will set as JSON-Webtoken but is limited with 4000 encoded char ( database:hard is the most stable for performance )
 
-## 0.7.21
+## 0.7.22
 
 - getServerSideProps can access session with getSession
 - fix getServersideProps not hot reloading
@@ -691,7 +691,7 @@ await fetch("my.site.com/api/v1", {
 - head data is no longer merged
 - hope it's the final fix for the compiler!
 
-## 0.7.22
+## 0.7.23
 
 - fix serverAction not sending multiple props
 - fix database select where with key that value was undefined break the request
