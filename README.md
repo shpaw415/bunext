@@ -690,3 +690,8 @@ await fetch("my.site.com/api/v1", {
 - fix hot reload on dev mode for ServerActions
 - head data is no longer merged
 - hope it's the final fix for the compiler!
+
+## 0.7.22
+
+- fix serverAction not sending multiple props
+- fix database select where with key that value was undefined break the request

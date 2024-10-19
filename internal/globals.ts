@@ -73,7 +73,7 @@ export async function MakeServerActionRequest(
       serverActionID: serverActionID,
     },
     method: "POST",
-    body: InitServerActionData(props),
+    body: InitServerActionData(...props),
   });
   return await ParseServerActionResponse(res);
 }

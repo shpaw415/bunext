@@ -1,6 +1,6 @@
 Priority 1
 
-- fix jsxDEV
+- database count method
 
 Priority 2
 

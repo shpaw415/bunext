@@ -173,6 +173,7 @@ export class Table<T> {
       queyString +=
         "WHERE " +
         (Object.keys(data.where) as Array<keyof _Select<T>["where"]>)
+          .filter((k) => (data.where as any)[k] != undefined)
           .map((where) => {
             return `${where} = ?`;
           })
@@ -193,6 +194,20 @@ export class Table<T> {
   }
 
   select(data: _Select<T>) {
+    if (data.where) {
+      data.where = Object.assign(
+        {},
+        ...(Object.keys(data.where) as Array<keyof _Where<T>>)
+          .filter((k) => (data.where as _Where<T>)[k] != undefined)
+          .map((k) => {
+            return {
+              [k]: (data.where as _Where<T>)[k],
+            };
+          })
+      );
+      if (Object.values(data.where as any).length == 0) data.where = undefined;
+    }
+
     let queyString = "SELECT ";
     if (typeof data.select !== "undefined" && data.select != "*") {
       queyString += Object.keys(data.select)
@@ -201,7 +216,6 @@ export class Table<T> {
     } else queyString += "*";
 
     queyString += ` FROM ${this.name} ${this.formatQueryString(data)}`;
-
     if (data.limit) queyString += ` LIMIT ${data.limit}`;
     else if (data.skip) queyString += ` LIMIT -1`;
 
