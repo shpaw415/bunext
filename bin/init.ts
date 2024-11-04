@@ -93,7 +93,7 @@ function tsConfig() {
       target: "ESNext",
       module: "ESNext",
       moduleDetection: "force",
-      jsx: "react-jsxdev",
+      jsx: "react-jsx",
       allowJs: true,
 
       /* Bundler mode */

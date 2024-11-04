@@ -265,7 +265,6 @@ class StaticRouters {
       parsedContent = foundedModule.content;
       return MakeTextRes();
     }
-
     const path = Bun.fileURLToPath(import.meta.resolve(_path));
     const ext = extname(path).replace(".", "");
 
@@ -440,11 +439,24 @@ class StaticRouters {
     props: { props: any; params: Record<string, string> },
     serverSide: MatchedRoute
   ): Promise<JSX.Element> {
-    if (process.env.NODE_ENV == "production") {
-      const jsxToServe = (await import(module)).default({
+    if (
+      process.env.NODE_ENV == "production" &&
+      Bun.semver.satisfies(Bun.version, "1.1.0 - 1.1.32")
+    ) {
+      const jsxToServe = (
+        (await import(module)) as {
+          default: ({
+            props,
+            params,
+          }: {
+            props: any;
+            params: any;
+          }) => Promise<JSX.Element>;
+        }
+      ).default({
         props: props.props,
         params: props.params,
-      }) as Promise<JSX.Element>;
+      });
 
       return await this.stackLayouts(serverSide, await jsxToServe);
     } else {

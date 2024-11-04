@@ -4,7 +4,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
-    "jsx": "react-jsxdev",
+    "jsx": "react",
     "allowJs": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

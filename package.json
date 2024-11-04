@@ -1,11 +1,11 @@
 {
   "name": "bunext",
-  "version": "0.7.23",
+  "version": "0.8.0",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/react": "^18.3.11",
+    "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/web": "latest"
   },

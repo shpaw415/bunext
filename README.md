@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible Runtime: bun 1.1.0 - 1.1.29
+compatible Runtime: bun 1.1.0 - 1.1.34
 compatible OS: Linux, WSL
 
 N.B : Bun is in continuous change and compatibility between version is a
@@ -695,3 +695,9 @@ await fetch("my.site.com/api/v1", {
 
 - fix serverAction not sending multiple props
 - fix database select where with key that value was undefined break the request
+
+## 0.8.0
+
+- Production mode compatible with Bun v-1.1.34
+- Performance enhancement!
+- fix layout re import when NODE_ENV is in production

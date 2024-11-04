@@ -10,8 +10,9 @@ import { renderToString } from "react-dom/server";
 import type { ssrElement } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
-
 import fetchCache from "./caching/fetch";
+
+globalThis.React = await import("react");
 
 fetchCache.reset();
 
@@ -189,7 +190,7 @@ class Builder {
       let moduleSSR = this.ssrElement.find(findModule);
       if (!moduleSSR) {
         this.ssrElement.push({
-          path: import.meta.resolve(modulePath).replace("file://", ""),
+          path: Bun.fileURLToPath(import.meta.resolve?.(modulePath) || ""),
           elements: [],
         });
         moduleSSR = this.ssrElement.find(findModule);
@@ -364,7 +365,6 @@ class Builder {
   private async ClientSideFeatures(fileContent: string, filePath: string) {
     const transpiler = new Bun.Transpiler({
       loader: "tsx",
-      autoImportJSX: true,
       deadCodeElimination: true,
       jsxOptimizationInline: true,
       exports: {
@@ -424,11 +424,6 @@ class Builder {
         `() => (${componant.reactElement});`
       );
     }
-
-    fileContent = fileContent.replace(
-      '"<!Bunext_Element_fakeTag!>"',
-      "() => <></>"
-    );
 
     return fileContent;
   }
@@ -533,11 +528,6 @@ class Builder {
               ]
             ) as Record<string, string>;
 
-            // this is a hack for forcing the
-            fileContent =
-              fileContent +
-              '\nexport const fakeTag = "<!Bunext_Element_fakeTag!>"; fakeTag == fakeTag';
-
             const serverActionsTags = self.ServerActionToTag(fileContent);
 
             const transpiler = new Bun.Transpiler({
@@ -561,14 +551,8 @@ class Builder {
               jsxOptimizationInline: true,
               trimUnusedImports: true,
               treeShaking: true,
-              autoImportJSX: process.env.NODE_ENV == "development",
             }).transformSync(fileContent);
 
-            if (process.env.NODE_ENV == "production") {
-              fileContent =
-                'import {jsx, jsxs, Fragment} from "react/jsx-runtime";\n' +
-                fileContent;
-            }
             return {
               contents: fileContent,
               loader: "js",

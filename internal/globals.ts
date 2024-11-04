@@ -1,4 +1,7 @@
 import type { _Head } from "../features/head";
+import { jsxDEV, Fragment, type JSXSource } from "react/jsx-dev-runtime";
+import { jsxs, jsx } from "react/jsx-runtime";
+import React from "react";
 
 declare global {
   var head: { [key: string]: _Head };
@@ -6,7 +9,35 @@ declare global {
     props: Array<any>,
     serverActionID: string
   ) => Promise<any>;
+
+  var jsx_w77yafs4: (
+    type: React.ElementType,
+    props: unknown,
+    key?: React.Key
+  ) => React.ReactElement;
+  var jsxDEV_7x81h0kn: (
+    type: React.ElementType,
+    props: unknown,
+    key: React.Key | undefined,
+    isStatic: boolean,
+    source?: JSXSource,
+    self?: unknown
+  ) => React.ReactElement;
+  var jsxs_eh6c78nj: (
+    type: React.ElementType,
+    props: unknown,
+    key?: React.Key
+  ) => React.ReactElement;
+  var Fragment_8vg9x3sq: React.ExoticComponent<{
+    children?: React.ReactNode | undefined;
+  }>;
 }
+
+globalThis.React = React;
+globalThis.jsx_w77yafs4 = jsx;
+globalThis.jsxDEV_7x81h0kn = jsxDEV;
+globalThis.jsxs_eh6c78nj = jsxs;
+globalThis.Fragment_8vg9x3sq = Fragment;
 
 export const paths = {
   bunextDirName: ".bunext",

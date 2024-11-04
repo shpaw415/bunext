@@ -203,7 +203,9 @@ async function NextJsLayoutStacker(
           await import(
             normalize(
               `${globalX.__PAGES_DIR__}${currentPath}/layout.js${
-                process.env.NODE_ENV ? "?" + currentVersion : ""
+                process.env.NODE_ENV == "development"
+                  ? "?" + currentVersion
+                  : ""
               }`
             )
           )
