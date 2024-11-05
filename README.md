@@ -701,3 +701,7 @@ await fetch("my.site.com/api/v1", {
 - Production mode compatible with Bun v-1.1.34
 - Performance enhancement!
 - fix layout re import when NODE_ENV is in production
+
+## 0.8.1
+
+- Prevent future compatibility issue
