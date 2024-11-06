@@ -702,7 +702,7 @@ await fetch("my.site.com/api/v1", {
 - Performance enhancement!
 - fix layout re import when NODE_ENV is in production
 
-## 0.8.2
+## 0.8.3
 
 - Prevent future compatibility issue
 - Performance enhancement in production mode for Dynamic page like \[id\].tsx
