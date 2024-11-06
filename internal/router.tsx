@@ -21,6 +21,13 @@ import { Head } from "../features/head";
 import { BunextRequest } from "./bunextRequest";
 import "./server_global";
 import { rm } from "node:fs/promises";
+import { jsxDEV, Fragment } from "react/jsx-dev-runtime";
+import { jsx, jsxs } from "react/jsx-runtime";
+
+global.jsxDEV_7x81h0kn = jsxDEV;
+global.jsx_w77yafs4 = jsx;
+global.jsxs_eh6c78nj = jsxs;
+global.Fragment_8vg9x3sq = Fragment;
 
 class ClientOnlyError extends Error {
   constructor() {
