@@ -45,7 +45,7 @@ export default async function Page() {
     <div>
       <TestElement />
       <TestServerElement1 />
-      <TestServerElement2 />
+      {TestServerElement2()}
       <TestElement3 />
       <Link href="/other">
         <button>Other pages</button>
@@ -88,7 +88,7 @@ function IsLogged() {
   const session = useSession();
   const data = session.getData();
   const isLogged = Boolean(data?.test);
-  console.log(session.getData());
+  //console.log(session.getData());
   return <div>{isLogged ? "logged" : "not logged"}</div>;
 }
 

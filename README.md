@@ -705,3 +705,4 @@ await fetch("my.site.com/api/v1", {
 ## 0.8.1
 
 - Prevent future compatibility issue
+- Performance enhancement in production mode for Dynamic page like \[id\].tsx

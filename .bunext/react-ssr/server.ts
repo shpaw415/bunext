@@ -266,7 +266,10 @@ class BunextServer {
     if (
       OSType() != "Linux" ||
       !Bun.semver.satisfies(Bun.version, "^1.1.25") ||
-      process.env.NODE_ENV == "development"
+      process.env.NODE_ENV == "development" ||
+      !serverConfig.HTTPServer?.threads ||
+      (typeof serverConfig.HTTPServer?.threads == "number" &&
+        serverConfig.HTTPServer?.threads <= 1)
     )
       return false;
 

@@ -439,56 +439,22 @@ class StaticRouters {
     props: { props: any; params: Record<string, string> },
     serverSide: MatchedRoute
   ): Promise<JSX.Element> {
-    if (
-      process.env.NODE_ENV == "production" &&
-      Bun.semver.satisfies(Bun.version, "1.1.0 - 1.1.32")
-    ) {
-      const jsxToServe = (
-        (await import(module)) as {
-          default: ({
-            props,
-            params,
-          }: {
-            props: any;
-            params: any;
-          }) => Promise<JSX.Element>;
-        }
-      ).default({
-        props: props.props,
-        params: props.params,
-      });
-
-      return await this.stackLayouts(serverSide, await jsxToServe);
-    } else {
-      if (!import.meta.main) {
-        const processResponse = Bun.spawnSync({
-          cmd: ["bun", import.meta.filename, "--makeJSX"],
-          env: {
-            ...process.env,
-            __PROPS__: JSON.stringify(props),
-            __MODULE_PATTH__: module,
-            __MATCHED_ROUTE__: serverSide.pathname,
-          },
-        });
-        const responseText = (
-          await new Response(processResponse.stdout).text()
-        ).split("<!BUNEXT_RESPONSE>")[1];
-        return (
-          <div
-            id="BUNEXT_INNER_PAGE_INSERTER"
-            dangerouslySetInnerHTML={{ __html: responseText }}
-          />
-        );
-      } else {
-        const jsxToServe = (await import(module)).default({
-          props: props.props,
-          params: props.params,
-        }) as Promise<JSX.Element>;
-
-        const stacked = await this.stackLayouts(serverSide, await jsxToServe);
-        return stacked;
+    const jsxToServe = (
+      (await import(module)) as {
+        default: ({
+          props,
+          params,
+        }: {
+          props: any;
+          params: any;
+        }) => Promise<JSX.Element>;
       }
-    }
+    ).default({
+      props: props.props,
+      params: props.params,
+    });
+
+    return await this.stackLayouts(serverSide, await jsxToServe);
   }
 
   private async VerifyApiEndpoint(
@@ -734,25 +700,5 @@ if (!existsSync(".bunext/build/src/pages"))
   mkdirSync(".bunext/build/src/pages", { recursive: true });
 const router = new StaticRouters();
 
-if (import.meta.main) {
-  const taskID = process.argv[2] as "--makeJSX";
-  switch (taskID) {
-    case "--makeJSX":
-      const jsxElement = await router.CreateDynamicPage(
-        process.env.__MODULE_PATTH__ as string,
-        JSON.parse(process.env.__PROPS__ as string) as {
-          props: any;
-          params: Record<string, string>;
-        },
-        router.server?.match(
-          process.env.__MATCHED_ROUTE__ as string
-        ) as MatchedRoute
-      );
-      process.stdout.write(
-        "<!BUNEXT_RESPONSE>" + renderToString(jsxElement) + "<!BUNEXT_RESPONSE>"
-      );
-      break;
-  }
-}
 await Init();
 export { router, StaticRouters };

@@ -1,6 +1,6 @@
 #!/bin/env bun
 
-import { cpSync } from "fs";
+import { cpSync, rmSync } from "fs";
 import { paths } from "../internal/globals";
 import { generateUuid } from "../features/utils";
 import { _Database } from "../database/class";
@@ -38,7 +38,7 @@ async function install(total: boolean) {
       force: true,
     });
   }
-  if (total || !(await Bun.file(`bunfig.toml`).exists())) {
+  if (true || total || !(await Bun.file(`bunfig.toml`).exists())) {
     cpSync(`${paths.bunextModulePath}/bin/bunfig.toml`, "./bunfig.toml", {
       force: true,
       recursive: true,
