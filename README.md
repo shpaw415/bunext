@@ -706,3 +706,7 @@ await fetch("my.site.com/api/v1", {
 
 - Prevent future compatibility issue
 - Performance enhancement in production mode for Dynamic page like \[id\].tsx
+
+## 0.8.5 (tmp fix for bun import problem in production mode)
+
+- add a plugin to fix Bun import some time breaking the request
