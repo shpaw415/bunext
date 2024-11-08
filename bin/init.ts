@@ -39,7 +39,7 @@ async function install(total: boolean) {
     });
   }
   if (true || total || !(await Bun.file(`bunfig.toml`).exists())) {
-    cpSync(`${paths.bunextModulePath}/bin/bunfig.toml`, "./bunfig.toml", {
+    cpSync(`${paths.bunextModulePath}/bin/bunfig.toml`, "bunfig.toml", {
       force: true,
       recursive: true,
     });
