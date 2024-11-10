@@ -9,6 +9,7 @@ const reactFix: BunPlugin = {
       },
       async (props) => {
         const file = await Bun.file(props.path).text();
+
         return {
           contents:
             `
@@ -21,5 +22,4 @@ const reactFix: BunPlugin = {
     );
   },
 };
-
-plugin(reactFix);
+if (process.env.NODE_ENV == "production") plugin(reactFix);
