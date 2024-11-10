@@ -9,12 +9,14 @@ const reactFix: BunPlugin = {
       },
       async (props) => {
         const file = await Bun.file(props.path).text();
-
+        console.log("test");
         return {
           contents:
             `
             import { jsxDEV as jsxDEV_7x81h0kn } from "react/jsx-dev-runtime";
-          ` + file,
+          ` +
+            file +
+            "\n global.jsxDEV_7x81h0kn = jsxDEV_7x81h0kn;",
         };
       }
     );
