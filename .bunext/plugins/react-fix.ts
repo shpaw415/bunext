@@ -9,7 +9,6 @@ const reactFix: BunPlugin = {
       },
       async (props) => {
         const file = await Bun.file(props.path).text();
-        console.log("test");
         return {
           contents:
             `
