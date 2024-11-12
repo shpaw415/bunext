@@ -48,14 +48,30 @@ export class _Database {
               break;
           }
 
-          return `${column.name} ${dataType}${
+          if (
+            Array.isArray(column.default) ||
+            typeof column.default == "object"
+          ) {
+            column.default = JSON.stringify(column.default);
+          } else if (typeof column.default == "string") {
+            column.default = `'${column.default}'`;
+          }
+
+          const StrQuery = `${column.name} ${dataType}${
             column.primary ? " PRIMARY KEY " : ""
           }${autoIncrement}${column.nullable ? "" : " NOT NULL"}${
             column.unique ? " UNIQUE" : ""
-          }${column.default ? ` DEFAULT ${column.default}` : ""}`;
+          }${
+            column.default != undefined
+              ? ` DEFAULT ${column.default as string}`
+              : ""
+          }`;
+
+          return StrQuery;
         })
         .join(", ") +
       ")";
+
     if (!hasPrimary)
       throw new Error(`Table ${data.name} do not have any Primary key.`, {
         cause: "PRIMARY KEY",

@@ -390,16 +390,54 @@ class StaticRouters {
       bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
       onError,
     } as RenderToReadableStreamOptions;
-    const jsxToServe: JSX.Element =
-      (await this.serverPrebuiltPage(serverSide, await import(module))) ||
-      (await this.CreateDynamicPage(
-        module,
-        {
-          props: serverSidePropsResult,
-          params: serverSide.params,
-        },
-        serverSide
-      ));
+
+    const makeJsx = async () => {
+      if (process.env.NODE_ENV == "development") {
+        const { stdout } = Bun.spawnSync({
+          env: {
+            module_path: serverSide.filePath,
+            props: JSON.stringify({
+              props: serverSidePropsResult,
+              params: serverSide.params,
+            }),
+            url: request.url,
+          },
+          cwd: process.cwd(),
+          cmd: ["bun", `${import.meta.dirname}/dev/jsxToString.tsx`],
+        });
+        const decoder = new TextDecoder();
+        const decodedString = decoder.decode(stdout);
+        const splited = decodedString.split("<!BUNEXT_SEPARATOR!>");
+        const secondSplit = splited.at(-1)?.split("</!BUNEXT_SEPARATOR!>");
+        const pageString = secondSplit?.at(0) as string;
+
+        const toLog = (splited?.at(0) as string)
+          .split("<!CONSOLE!>")
+          .filter((e) => e.length > 0)
+          .map((e) => JSON.parse(e));
+        console.log(toLog); // keep this for dev DO NOT DELETE
+
+        return (
+          <div
+            id="BUNEXT_INNER_PAGE_INSERTER"
+            dangerouslySetInnerHTML={{ __html: pageString }}
+          />
+        );
+      } else
+        return (
+          (await this.serverPrebuiltPage(serverSide, await import(module))) ||
+          (await this.CreateDynamicPage(
+            module,
+            {
+              props: serverSidePropsResult,
+              params: serverSide.params,
+            },
+            serverSide
+          ))
+        );
+    };
+
+    const jsxToServe: JSX.Element = await makeJsx();
     return (
       <Shell route={serverSide.pathname + search} {...serverSidePropsResult}>
         {jsxToServe}

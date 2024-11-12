@@ -1,6 +1,6 @@
 {
   "name": "bunext",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
@@ -29,6 +29,6 @@
   "scripts": {
     "test": "bun test ./bin/main.test.ts",
     "clear-build": "rm -rf .bunext/build/* .bunext/build/.bunext",
-    "to-module": "bun bin/to_node_module.ts"
+    "to:module": "bun bin/to_node_module.ts"
   }
 }
