@@ -52,7 +52,7 @@ export class _Database {
             Array.isArray(column.default) ||
             typeof column.default == "object"
           ) {
-            column.default = JSON.stringify(column.default);
+            column.default = `'${JSON.stringify(column.default)}'`;
           } else if (typeof column.default == "string") {
             column.default = `'${column.default}'`;
           } else if (typeof column.default == "boolean") {
@@ -61,15 +61,12 @@ export class _Database {
             column.default = column.default.getTime();
           }
 
-          const StrQuery = `${column.name} ${dataType}${
-            column.primary ? " PRIMARY KEY " : ""
-          }${autoIncrement}${column.nullable ? "" : " NOT NULL"}${
-            column.unique ? " UNIQUE" : ""
-          }${
-            column.default != undefined
+          const StrQuery = `${column.name} ${dataType}${column.primary ? " PRIMARY KEY " : ""
+            }${autoIncrement}${column.nullable ? "" : " NOT NULL"}${column.unique ? " UNIQUE" : ""
+            }${column.default != undefined
               ? ` DEFAULT ${column.default as string}`
               : ""
-          }`;
+            }`;
 
           return StrQuery;
         })
@@ -99,8 +96,8 @@ type _Insert<Table> = Table;
 type _Where<Table> =
   | Partial<Table>
   | {
-      OR: Partial<Table>[];
-    };
+    OR: Partial<Table>[];
+  };
 
 type _Update<Table> = {
   where: _Where<Table>;
