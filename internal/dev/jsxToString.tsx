@@ -12,7 +12,9 @@ const match = router.server?.match(url);
 
 if (!match) process.exit(1);
 global.console.log = (...props) =>
-  process.stdout.write(props.map((e) => JSON.stringify(e)).join("<!CONSOLE!>"));
+  process.stdout.write(
+    props.map((e) => JSON.stringify(e)).join("<!CONSOLE!>") + "<!CONSOLE!>"
+  );
 
 const jsx = await router.CreateDynamicPage(modulePath, props, match);
 

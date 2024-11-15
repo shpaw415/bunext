@@ -414,7 +414,13 @@ class StaticRouters {
         const toLog = (splited?.at(0) as string)
           .split("<!CONSOLE!>")
           .filter((e) => e.length > 0)
-          .map((e) => JSON.parse(e));
+          .map((e) => {
+            try {
+              return JSON.parse(e);
+            } catch {
+              return e;
+            }
+          });
         console.log(toLog); // keep this for dev DO NOT DELETE
 
         return (

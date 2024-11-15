@@ -55,6 +55,10 @@ export class _Database {
             column.default = JSON.stringify(column.default);
           } else if (typeof column.default == "string") {
             column.default = `'${column.default}'`;
+          } else if (typeof column.default == "boolean") {
+            column.default = column.default == true ? 1 : 0;
+          } else if (column.default instanceof Date) {
+            column.default = column.default.getTime();
           }
 
           const StrQuery = `${column.name} ${dataType}${
