@@ -31,11 +31,19 @@ bun run db:create # only create the types
 
 - SQlite performance & features
 
+- Database shema with union type and other useful type
+
+- Database merging ( bun db:merge )
+
+- SVG plugin stable
+
 - Windows compatibility
 
 ## What is ready
 
 - Multi-Thread Http Worker ( bun ^1.1.25 & Linux only )
+
+- process.env ( Client + Server & Only Server )
 
 - SSR and CSR
 
@@ -591,13 +599,22 @@ await fetch("my.site.com/api/v1", {
 }); // return the post data
 ```
 
+# Process.env
+
+An environement variable can be set as public and accessed in a client context if the key starts with PUBLIC
+
+```
+PUBLIC_API_KEY="some-public-api-key"
+API_KEY="private-api-key"
+```
+
 # Change Log
 
-### 0.6.17
+## 0.6.17
 
 - Fix Fetch cache no store now works
 
-### 0.6.18
+## 0.6.18
 
 - Fix SVG not showing completely
 - Fix async Layout error on SSR & CSR rendering
@@ -710,3 +727,10 @@ await fetch("my.site.com/api/v1", {
 ## 0.8.9 (tmp fix for bun import problem in production mode)
 
 - add a plugin to fix Bun import some time breaking the request
+
+## 0.9.0
+
+- Fix crash on dev mode when a cold refresh is made
+- Add some tweek to the database shemas
+- little performance enhancement
+- Update Documentation process.env
