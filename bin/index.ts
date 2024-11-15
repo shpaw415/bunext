@@ -14,8 +14,8 @@ type _cmd =
 const cmd = (process.argv[2] as _cmd) ?? "bypass";
 const args = process.argv[3] as undefined | string;
 
+const DBPath = (process.env.DATABASE_NAME || "bunext") + ".sqlite";
 const DBShemaPath = "database.ts";
-const DBPath = (process.env.DATABASE_NAME || "database") + ".sqlite";
 
 declare global {
   var processes: Subprocess[];
@@ -48,13 +48,13 @@ if (import.meta.main)
   }
 
 function CheckDbExists() {
-  return Bun.file(`config/${DBPath}`).exists();
+  return Bun.file(`${process.cwd()}/config/${DBPath}`).exists();
 }
 
 async function databaseSchemaMaker() {
   if (await CheckDbExists()) {
     console.log(
-      `config/${DBShemaPath} already exists the new Database Schema may not fit\n`,
+      `config/${DBPath} already exists the new Database Schema may not fit\n`,
       "Database Merging will be in a next release"
     );
   }

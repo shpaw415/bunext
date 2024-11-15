@@ -7,31 +7,31 @@ export interface TableSchema {
 
 export type ColumnsSchema =
   | ({
-      type: "number";
-      autoIncrement?: true;
-      default?: number;
-    } & common)
+    type: "number";
+    autoIncrement?: true;
+    default?: number;
+  } & common)
   | ({
-      type: "string";
-      default?: string;
-    } & common)
+    type: "string";
+    default?: string;
+  } & common)
   | ({
-      type: "Date";
-      default?: Date;
-    } & common)
+    type: "Date";
+    default?: Date;
+  } & common)
   | ({
-      type: "json";
-      default?: any;
-      DataType: _DataType;
-    } & common)
+    type: "json";
+    default?: any;
+    DataType: _DataType;
+  } & common)
   | ({
-      type: "float";
-      default?: number;
-    } & common)
+    type: "float";
+    default?: number;
+  } & common)
   | ({
-      type: "boolean";
-      default?: boolean;
-    } & common);
+    type: "boolean";
+    default?: boolean;
+  } & common);
 
 type _TypeJson = "number" | "string" | "undefined" | "float" | "boolean";
 
@@ -77,9 +77,8 @@ export async function ConvertShemaToType(filePath: string) {
             dataType = dataTypeToType(column.DataType);
             break;
         }
-        return `${column.name}${
-          column.nullable || autoIncrement ? "?" : ""
-        }: ${dataType};`;
+        return `${column.name}${column.nullable || autoIncrement ? "?" : ""
+          }: ${dataType};`;
       })
       .join("\n")}\n};`;
   });
@@ -131,7 +130,7 @@ function dataTypeArrayToType(
       optional = true;
       return false;
     })
-    .join(" | ");
+    .join(" & ");
   returnString += ">";
   return {
     text: returnString,
