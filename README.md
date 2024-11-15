@@ -728,7 +728,7 @@ API_KEY="private-api-key"
 
 - add a plugin to fix Bun import some time breaking the request
 
-## 0.9.0
+## 0.8.10
 
 - Fix crash on dev mode when a cold refresh is made
 - Add some tweek to the database shemas
