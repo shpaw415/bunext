@@ -56,6 +56,7 @@ const MyDatabaseShema: DBSchema = [
       {
         name: "quantity",
         type: "number",
+        default: 10
       },
     ],
   },

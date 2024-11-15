@@ -65,21 +65,21 @@ async function databaseSchemaMaker() {
   );
   await Bun.write(
     `${paths.bunextModulePath}/database/database_types.ts`,
-    types.types.map((type) => `export ${type}`).join("\n")
+    [...types.types, ...types.typesWithDefaultAsRequired].map((type) => `export ${type}`).join("\n")
   );
   const dbFile = Bun.file(`${paths.bunextModulePath}/database/index.ts`);
   let dbFileContent: string | string[] = await dbFile.text();
 
   dbFileContent = dbFileContent.split(Importseparator);
   dbFileContent[1] = `\nimport type { ${types.tables
-    .map((t) => `_${t}`)
+    .map((t) => `_${t}, SELECT_${t}`)
     .join(", ")} } from "./database_types.ts";\n`;
   dbFileContent = dbFileContent.join(Importseparator);
 
   dbFileContent = dbFileContent.split(ExportSeparator);
 
   dbFileContent[1] = `\nreturn {\n ${types.tables
-    .map((t) => `${t}: new Table<_${t}>({ name: "${t}" })`)
+    .map((t) => `${t}: new Table<_${t}, SELECT_${t}>({ name: "${t}" })`)
     .join(",\n ")} \n} as const;\n`;
   dbFileContent = dbFileContent.join(ExportSeparator);
   await Bun.write(dbFile, dbFileContent);

@@ -57,36 +57,42 @@ export async function ConvertShemaToType(filePath: string) {
       });
     else tables.push(table.name);
     return `type _${table.name} = {\n${table.columns
-      .map((column) => {
-        let autoIncrement = false;
-        let dataType = "";
-        if (column.type === "number") {
-          autoIncrement = column.autoIncrement ? true : false;
-        }
-        switch (column.type) {
-          case "string":
-          case "number":
-          case "Date":
-          case "boolean":
-            dataType = column.type;
-            break;
-          case "float":
-            dataType = "number";
-            break;
-          case "json":
-            dataType = dataTypeToType(column.DataType);
-            break;
-        }
-        return `${column.name}${column.nullable || autoIncrement ? "?" : ""
-          }: ${dataType};`;
-      })
+      .map((column) => ColumnsSchemaToType(column, true))
       .join("\n")}\n};`;
   });
+  const typesWithDefaultAsRequired = Schema.map((table) => `type SELECT_${table.name} = {\n${table.columns
+    .map((column) => ColumnsSchemaToType(column, false))
+    .join("\n")}\n};`);
 
   return {
-    tables: tables,
-    types: types,
+    tables,
+    types,
+    typesWithDefaultAsRequired
   };
+}
+
+function ColumnsSchemaToType(column: ColumnsSchema, defaultAsOptional: boolean) {
+  let autoIncrement = false;
+  let dataType = "";
+  if (column.type === "number") {
+    autoIncrement = column.autoIncrement ? true : false;
+  }
+  switch (column.type) {
+    case "string":
+    case "number":
+    case "Date":
+    case "boolean":
+      dataType = column.type;
+      break;
+    case "float":
+      dataType = "number";
+      break;
+    case "json":
+      dataType = dataTypeToType(column.DataType);
+      break;
+  }
+  return `${column.name}${column.nullable || autoIncrement || (column?.default && defaultAsOptional) ? "?" : ""
+    }: ${dataType};`;
 }
 
 function sqliteTypeToTypeScript(type: _TypeJson): _TypeJson | undefined {

@@ -110,9 +110,9 @@ type _Delete<Table> = {
 
 type _Create = TableSchema;
 
-type _FormatString<T> = _Select<T> | _Update<T> | _Delete<T>;
+type _FormatString<T, SELECT_FORMAT> = _Select<SELECT_FORMAT> | _Update<T> | _Delete<T>;
 
-export class Table<T> {
+export class Table<T, SELECT_FORMAT> {
   private name: string;
   databaseInstence: _BunDB;
   shema: DBSchema;
@@ -166,12 +166,12 @@ export class Table<T> {
       })
     );
   }
-  private hasOR(data: _FormatString<T>) {
+  private hasOR(data: _FormatString<T, SELECT_FORMAT>) {
     return data.where && Object.keys(data.where).find((e) => e == "OR")
       ? true
       : false;
   }
-  private extractAndOrParams(data: _FormatString<T>) {
+  private extractAndOrParams(data: _FormatString<T, SELECT_FORMAT>) {
     let params: string[] = [];
     if (data.where && !this.hasOR(data)) params = Object.values(data.where);
     else if (data.where && typeof (data.where as any)["OR"] !== "undefined")
@@ -181,7 +181,7 @@ export class Table<T> {
 
     return params;
   }
-  private formatQueryString(data: _FormatString<T>) {
+  private formatQueryString(data: _FormatString<T, SELECT_FORMAT>) {
     let queyString = "";
 
     const hasOR = this.hasOR(data);
@@ -210,15 +210,15 @@ export class Table<T> {
     return queyString;
   }
 
-  select(data: _Select<T>) {
+  select(data: _Select<SELECT_FORMAT>) {
     if (data.where) {
       data.where = Object.assign(
         {},
-        ...(Object.keys(data.where) as Array<keyof _Where<T>>)
-          .filter((k) => (data.where as _Where<T>)[k] != undefined)
+        ...(Object.keys(data.where) as Array<keyof _Where<SELECT_FORMAT>>)
+          .filter((k) => (data.where as _Where<SELECT_FORMAT>)[k] != undefined)
           .map((k) => {
             return {
-              [k]: (data.where as _Where<T>)[k],
+              [k]: (data.where as _Where<SELECT_FORMAT>)[k],
             };
           })
       );
@@ -239,10 +239,10 @@ export class Table<T> {
     if (data.skip) queyString += ` OFFSET ${data.skip}`;
 
     const query = this.databaseInstence.prepare(queyString);
-    let res = query.all(...this.extractAndOrParams(data)) as Partial<T>[];
+    let res = query.all(...this.extractAndOrParams(data)) as Partial<SELECT_FORMAT>[];
     query.finalize();
 
-    return res.map((row) => this.restoreParams(row)) as Partial<T>[];
+    return res.map((row) => this.restoreParams(row)) as Partial<SELECT_FORMAT>[];
   }
   insert(data: _Insert<T>[]) {
     let queryString = `INSERT INTO ${this.name} (${Object.keys(
