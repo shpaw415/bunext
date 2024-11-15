@@ -100,7 +100,7 @@ type _Where<Table> =
   };
 
 type _Update<Table> = {
-  where: _Where<Table>;
+  where?: _Where<Table>;
   values: Partial<Table>;
 };
 
@@ -277,7 +277,7 @@ export class Table<T> {
     queryString += ` ${this.formatQueryString(data)}`;
 
     if (this.hasOR(data)) params.push(...this.extractParams("OR", data.where));
-    else params.push(...Object.values(data.where));
+    else if (data.where) params.push(...Object.values(data.where));
 
     const db = this.databaseInstence.prepare(queryString);
     const res = db.all(...this.parseParams(params)) as T[];
