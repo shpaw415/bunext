@@ -61,7 +61,7 @@ export class _Session<DataType> {
    * @param Public the data can be accessed in the client context ( default: false )
    * @description update the data in the session. Current data will be keept
    */
-  setData(data: Record<string, any> & Partial<DataType>, Public: boolean = false) {
+  setData(data: Record<string, any> | Partial<DataType>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
     if (!this.request) return;
 
