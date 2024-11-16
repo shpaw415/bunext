@@ -13,9 +13,9 @@ function GetBunextRequest(args: IArguments) {
  * @param args **Required in a server context**
  * @example GetSession(arguments)
  */
-export function GetSession(args?: IArguments) {
+export function GetSession<DataType>(args?: IArguments) {
   if (isClient && !args) return Session;
-  else if (args) return GetBunextRequest(args).session as InAppSession;
+  else if (args) return GetBunextRequest(args).session as InAppSession<DataType>;
   else throw new Error("you must set arguments from a server context");
 }
 /**

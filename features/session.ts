@@ -11,14 +11,15 @@ export type _SessionData<_SessionData> = {
 
 declare global {
   var __PUBLIC_SESSION_DATA__: Record<string, any>;
-  var __BUNEXT_SESSION__: _Session;
+  // @ts-ignore
+  var __BUNEXT_SESSION__: _Session<any>;
 }
 
-export type InAppSession = Omit<
-  _Session,
+export type InAppSession<DataType> = Omit<
+  _Session<DataType>,
   "__UPDATE__" | "__DATA__" | "__DELETE__" | "isUpdated" | "initData"
 >;
-export class _Session {
+export class _Session<DataType> {
   private cookieName = "bunext_session_token";
   public __UPDATE__?: SessionUpdateClass;
   public __DATA__: _SessionData<any> = {
@@ -40,13 +41,13 @@ export class _Session {
     if (sessionTimeout) this.sessionTimeout = sessionTimeout;
     if (request) this.request = request;
   }
-  private setPublicData(data: Record<string, any>) {
+  private setPublicData(data: Record<string, any> | DataType) {
     this.__DATA__.public = {
       ...this.__DATA__.public,
       ...data,
     };
   }
-  private setPrivateData(data: Record<string, any>) {
+  private setPrivateData(data: Record<string, any> | DataType) {
     this.__DATA__.private = {
       ...this.__DATA__.private,
       __BUNEXT_SESSION_CREATED_AT__: this.makeCreatedTime(),
@@ -60,7 +61,7 @@ export class _Session {
    * @param Public the data can be accessed in the client context ( default: false )
    * @description update the data in the session. Current data will be keept
    */
-  setData(data: Record<string, any>, Public: boolean = false) {
+  setData(data: Record<string, any> & Partial<DataType>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
     if (!this.request) return;
 
@@ -110,7 +111,7 @@ export class _Session {
    * "use client";
    * await Session.getData(); // {data: "someData"} | undefined
    */
-  getData(): undefined | Record<string, any> {
+  getData(): DataType & Record<string, any> | undefined {
     if (typeof window != "undefined") {
       if (!this.inited) {
         const setter = async () => {
@@ -124,7 +125,7 @@ export class _Session {
         setter();
       }
       this.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
-      return this.__DATA__.public;
+      return this.__DATA__.public as DataType & Record<string, any> | undefined;
     }
 
     if (!this.SessionExists()) {
@@ -136,7 +137,7 @@ export class _Session {
       return undefined;
     }
 
-    return this.__DATA__.private;
+    return this.__DATA__.private as DataType & Record<string, any> | undefined;
   }
   /**
    * Server & Client
@@ -203,7 +204,7 @@ class SessionUpdateClass {
 
 export const SessionUpdate = createContext(new SessionUpdateClass());
 
-export function useSession(props?: { PreventRenderOnUpdate: boolean }) {
+export function useSession<DataType>(props?: { PreventRenderOnUpdate: boolean }) {
   const [state, setState] = useState(true);
   const _SessionContext = useContext(SessionUpdate);
   useEffect(() => {
@@ -216,5 +217,5 @@ export function useSession(props?: { PreventRenderOnUpdate: boolean }) {
       );
     };
   }, []);
-  return Session as InAppSession;
+  return Session as InAppSession<DataType>;
 }
