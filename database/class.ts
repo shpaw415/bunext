@@ -196,8 +196,12 @@ export class Table<T, SELECT_FORMAT> {
           })
           .join(" AND ");
     } else if (data.where && hasOR) {
-      const ORlist = (data.where as any).OR as Partial<T>[];
-      queyString +=
+      const ORlist = (data.where as _Where<T> & { OR: Array<Partial<T>> }).OR;
+      if (!Array.isArray(ORlist)) {
+        console.error("Database Error:\n", ORlist);
+        throw new Error("Database query failed: OR params need to be an array");
+      }
+      else queyString +=
         "WHERE " +
         ORlist.map((or) => {
           return Object.keys(or)
