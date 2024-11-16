@@ -61,7 +61,7 @@ export class _Session<DataType> {
    * @param Public the data can be accessed in the client context ( default: false )
    * @description update the data in the session. Current data will be keept
    */
-  setData(data: Record<string, any> | Partial<DataType>, Public: boolean = false) {
+  setData(data: Partial<DataType>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
     if (!this.request) return;
 
@@ -111,7 +111,7 @@ export class _Session<DataType> {
    * "use client";
    * await Session.getData(); // {data: "someData"} | undefined
    */
-  getData(): DataType & Record<string, any> | undefined {
+  getData(): DataType | undefined {
     if (typeof window != "undefined") {
       if (!this.inited) {
         const setter = async () => {
@@ -125,7 +125,7 @@ export class _Session<DataType> {
         setter();
       }
       this.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
-      return this.__DATA__.public as DataType & Record<string, any> | undefined;
+      return this.__DATA__.public as DataType | undefined;
     }
 
     if (!this.SessionExists()) {
@@ -137,7 +137,7 @@ export class _Session<DataType> {
       return undefined;
     }
 
-    return this.__DATA__.private as DataType & Record<string, any> | undefined;
+    return this.__DATA__.private as DataType | undefined;
   }
   /**
    * Server & Client
