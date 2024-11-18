@@ -12,17 +12,18 @@ const match = router.server?.match(url);
 
 if (!match) process.exit(1);
 
-let toLog: any[][] = [];
 let jsx: JSX.Element;
-global.console.log = (...props) => toLog.push(props);
 
-jsx = await router.CreateDynamicPage(modulePath, props, match);
-WriteToStdout(jsx, toLog);
+try {
+  jsx = await router.CreateDynamicPage(modulePath, props, match);
+  WriteToStdout(jsx);
+} catch (e) {
+  WriteToStdout(undefined);
+  throw e;
+}
 
-function WriteToStdout(jsx: JSX.Element, toLog: any[][]) {
+function WriteToStdout(jsx: JSX.Element | undefined) {
   process.stdout.write(
-    `${renderToString(jsx)}<!BUNEXT_SEPARATOR!>${toLog.map((...e) =>
-      console.log(...e)
-    )}`
+    `<!BUNEXT_SEPARATOR!>${jsx ? renderToString(jsx) : ""}<!BUNEXT_SEPARATOR!>`
   );
 }

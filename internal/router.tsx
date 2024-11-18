@@ -407,13 +407,13 @@ class StaticRouters {
         });
         const decoder = new TextDecoder();
         const decodedStdError = decoder.decode(stderr);
-        if (decodedStdError) throw Error(decodedStdError);
-
         const decodedStdOut = decoder.decode(stdout);
         const splited = decodedStdOut.split("<!BUNEXT_SEPARATOR!>");
-        const pageString = splited[0] as string;
+        const pageString = splited[1] as string;
+        splited.splice(1, 1);
 
-        splited[1] && console.log(splited[1]); // keep this for dev DO NOT DELETE
+        console.log(splited.join("\n"));
+        if (decodedStdError) throw Error(decodedStdError);
 
         return (
           <div
