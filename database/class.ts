@@ -140,7 +140,7 @@ export class Table<T, SELECT_FORMAT> {
       ...(where[key] as Array<Partial<T>>).map((data) =>
         Object.keys(data).map((v) => (data as any)[v])
       )
-    ) as string[];
+    ).filter((e) => e != undefined) as string[];
   }
   private parseParams(params: any[]) {
     return params.map((param) => {
@@ -179,7 +179,7 @@ export class Table<T, SELECT_FORMAT> {
   }
   private extractAndOrParams(data: _FormatString<T, SELECT_FORMAT>) {
     let params: string[] = [];
-    if (data.where && !this.hasOR(data)) params = Object.values(data.where);
+    if (data.where && !this.hasOR(data)) params = Object.values(data.where).filter((e) => e != undefined);
     else if (data.where && typeof (data.where as any)["OR"] !== "undefined")
       params = this.extractParams("OR", data.where);
     else if (data.where && typeof (data.where as any)["AND"] !== "undefined")
@@ -309,7 +309,8 @@ export class Table<T, SELECT_FORMAT> {
   count(data?: _Count<T>) {
     if (data && this.hasOR(data) && data.where && (data.where as _WhereOR<T>).OR.length == 0) return 0;
 
-    const queryString = `SELECT COUNT(*) FROM ${this.name} ${data ? this.formatQueryString(data) : ""}`.trimEnd();
+    const queryString = `SELECT COUNT(*) FROM ${this.name} ${data ? this.formatQueryString(data) : ""}`;
+
 
     const query = this.databaseInstence.prepare(queryString);
     const res = query.all(...(data ? this.extractAndOrParams(data) : []));
