@@ -11,13 +11,18 @@ const url = process.env.url as string;
 const match = router.server?.match(url);
 
 if (!match) process.exit(1);
-global.console.log = (...props) =>
+
+let toLog: any[][] = [];
+let jsx: JSX.Element;
+global.console.log = (...props) => toLog.push(props);
+
+jsx = await router.CreateDynamicPage(modulePath, props, match);
+WriteToStdout(jsx, toLog);
+
+function WriteToStdout(jsx: JSX.Element, toLog: any[][]) {
   process.stdout.write(
-    props.map((e) => JSON.stringify(e)).join("<!CONSOLE!>") + "<!CONSOLE!>"
+    `${renderToString(jsx)}<!BUNEXT_SEPARATOR!>${toLog.map((...e) =>
+      console.log(...e)
+    )}`
   );
-
-const jsx = await router.CreateDynamicPage(modulePath, props, match);
-
-process.stdout.write(
-  `<!BUNEXT_SEPARATOR!>${renderToString(jsx)}</!BUNEXT_SEPARATOR!>`
-);
+}

@@ -393,7 +393,7 @@ class StaticRouters {
 
     const makeJsx = async () => {
       if (process.env.NODE_ENV == "development") {
-        const { stdout } = Bun.spawnSync({
+        const { stdout, stderr } = Bun.spawnSync({
           env: {
             module_path: serverSide.filePath,
             props: JSON.stringify({
@@ -406,22 +406,14 @@ class StaticRouters {
           cmd: ["bun", `${import.meta.dirname}/dev/jsxToString.tsx`],
         });
         const decoder = new TextDecoder();
-        const decodedString = decoder.decode(stdout);
-        const splited = decodedString.split("<!BUNEXT_SEPARATOR!>");
-        const secondSplit = splited.at(-1)?.split("</!BUNEXT_SEPARATOR!>");
-        const pageString = secondSplit?.at(0) as string;
+        const decodedStdError = decoder.decode(stderr);
+        if (decodedStdError) throw Error(decodedStdError);
 
-        const toLog = (splited?.at(0) as string)
-          .split("<!CONSOLE!>")
-          .filter((e) => e.length > 0)
-          .map((e) => {
-            try {
-              return JSON.parse(e);
-            } catch {
-              return e;
-            }
-          });
-        console.log(toLog); // keep this for dev DO NOT DELETE
+        const decodedStdOut = decoder.decode(stdout);
+        const splited = decodedStdOut.split("<!BUNEXT_SEPARATOR!>");
+        const pageString = splited[0] as string;
+
+        splited[1] && console.log(splited[1]); // keep this for dev DO NOT DELETE
 
         return (
           <div
