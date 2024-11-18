@@ -734,3 +734,9 @@ API_KEY="private-api-key"
 - Add some tweek to the database shemas
 - little performance enhancement
 - Update Documentation process.env
+
+## 0.8.12
+
+- Upgrade Database logic and error handling
+- Added some useful type for extracting types from array
+- some other minor changes

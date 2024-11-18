@@ -63,7 +63,7 @@ export class _Session<DataType> {
    */
   setData(data: Partial<DataType>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
-    if (!this.request) return;
+    if (!this.request) throw new Error("no request found to set session");
 
     this.isUpdated = true;
 

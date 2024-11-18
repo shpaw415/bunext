@@ -95,9 +95,11 @@ type _Insert<Table> = Table;
 
 type _Where<Table> =
   | Partial<Table>
-  | {
-    OR: Partial<Table>[];
-  };
+  | _WhereOR<Table>;
+
+type _WhereOR<Table> = {
+  OR: Partial<Table>[];
+};
 
 type _Update<Table> = {
   where?: _Where<Table>;
@@ -215,6 +217,9 @@ export class Table<T, SELECT_FORMAT> {
   }
 
   select(data: _Select<SELECT_FORMAT>) {
+
+    if (this.hasOR(data) && data.where && (data.where as _WhereOR<SELECT_FORMAT>).OR.length == 0) return [];
+
     if (data.where) {
       data.where = Object.assign(
         {},
@@ -243,7 +248,7 @@ export class Table<T, SELECT_FORMAT> {
     if (data.skip) queyString += ` OFFSET ${data.skip}`;
 
     const query = this.databaseInstence.prepare(queyString);
-    let res = query.all(...this.extractAndOrParams(data)) as Partial<SELECT_FORMAT>[];
+    const res = query.all(...this.extractAndOrParams(data));
     query.finalize();
 
     return res.map((row) => this.restoreParams(row)) as Partial<SELECT_FORMAT>[];
