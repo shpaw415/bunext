@@ -110,9 +110,13 @@ type _Delete<Table> = {
   where: _Where<Table>;
 };
 
+type _Count<Table> = {
+  where?: _Where<Table>
+}
+
 type _Create = TableSchema;
 
-type _FormatString<T, SELECT_FORMAT> = _Select<SELECT_FORMAT> | _Update<T> | _Delete<T>;
+type _FormatString<T, SELECT_FORMAT> = _Select<SELECT_FORMAT> | _Update<T> | _Delete<T> | _Count<T>;
 
 export class Table<T, SELECT_FORMAT> {
   private name: string;
@@ -293,10 +297,24 @@ export class Table<T, SELECT_FORMAT> {
     return res;
   }
   delete(data: _Delete<T>) {
-    let queyString = `DELETE FROM ${this.name} ${this.formatQueryString(data)}`;
+
+    if (this.hasOR(data) && data.where && (data.where as _WhereOR<T>).OR.length == 0) return;
+
+    const queyString = `DELETE FROM ${this.name} ${this.formatQueryString(data)}`;
 
     const query = this.databaseInstence.prepare(queyString);
     query.all(...this.extractAndOrParams(data));
     query.finalize();
+  }
+  count(data?: _Count<T>) {
+    if (data && this.hasOR(data) && data.where && (data.where as _WhereOR<T>).OR.length == 0) return 0;
+
+    const queryString = `SELECT COUNT(*) FROM ${this.name} ${data ? this.formatQueryString(data) : ""}`.trimEnd();
+
+    const query = this.databaseInstence.prepare(queryString);
+    const res = query.all(...(data ? this.extractAndOrParams(data) : []));
+    query.finalize();
+
+    return (res as Array<{ "COUNT(*)": number }>)[0]["COUNT(*)"];
   }
 }

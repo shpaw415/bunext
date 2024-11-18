@@ -740,3 +740,4 @@ API_KEY="private-api-key"
 - Upgrade Database logic and error handling
 - Added some useful type for extracting types from array
 - some other minor changes
+- count method in database!
