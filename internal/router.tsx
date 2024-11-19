@@ -410,10 +410,13 @@ class StaticRouters {
         const decodedStdOut = decoder.decode(stdout);
         const splited = decodedStdOut.split("<!BUNEXT_SEPARATOR!>");
         const pageString = splited[1] as string;
-        splited.splice(1, 1);
 
+        splited.splice(1, 1);
         console.log(splited.join("\n"));
-        if (decodedStdError) throw Error(decodedStdError);
+
+        if (decodedStdError && pageString.length == 0)
+          throw Error(decodedStdError);
+        else if (decodedStdError) console.error(decodedStdError);
 
         return (
           <div
