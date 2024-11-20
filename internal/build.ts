@@ -27,12 +27,12 @@ type BuildOuts = {
 
 type procIPCdata =
   | ({
-      type: "build";
-    } & BuildOuts)
+    type: "build";
+  } & BuildOuts)
   | {
-      type: "error";
-      error: Error;
-    };
+    type: "error";
+    error: Error;
+  };
 
 type _Mainoptions = {
   baseDir: string;
@@ -94,7 +94,7 @@ class Builder {
     await this.InitGetCustomPluginsFromUser();
     try {
       await this.InitGetFixingPlugins();
-    } catch {}
+    } catch { }
     return this;
   }
 
@@ -156,7 +156,7 @@ class Builder {
       else
         try {
           unlinkSync(file);
-        } catch {}
+        } catch { }
     }
     process.env.__BUILD_MODE__ = "false";
     return this.buildOutput;
@@ -183,7 +183,10 @@ class Builder {
       try {
         element = await exported();
       } catch (e) {
-        console.log(e);
+        if (e instanceof Error) {
+          if (e.message.startsWith("Cannot call a class constructor")) continue;
+          else console.log(e)
+        }
       }
       if (!isValidElement(element)) continue;
       const findModule = (e: any) => e.path == modulePath;
@@ -460,13 +463,13 @@ class Builder {
           {
             filter: new RegExp(
               "^" +
-                self.escapeRegExp(
-                  normalize(
-                    join(self.options.baseDir, self.options.pageDir as string)
-                  )
-                ) +
-                "/.*" +
-                "\\.(ts|tsx|jsx)$"
+              self.escapeRegExp(
+                normalize(
+                  join(self.options.baseDir, self.options.pageDir as string)
+                )
+              ) +
+              "/.*" +
+              "\\.(ts|tsx|jsx)$"
             ),
           },
           async ({ path, loader, ...props }) => {
@@ -575,11 +578,11 @@ class Builder {
           {
             filter: new RegExp(
               "^" +
-                self.escapeRegExp(
-                  normalize(join(self.options.baseDir, "node_modules"))
-                ) +
-                "/.*" +
-                "\\.(ts|tsx|jsx)$"
+              self.escapeRegExp(
+                normalize(join(self.options.baseDir, "node_modules"))
+              ) +
+              "/.*" +
+              "\\.(ts|tsx|jsx)$"
             ),
           },
           async ({ path, loader }) => {
