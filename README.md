@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible Runtime: bun 1.1.0 - 1.1.34
+compatible Runtime: bun 1.1.0 - 1.1.36
 compatible OS: Linux, WSL
 
 N.B : Bun is in continuous change and compatibility between version is a
@@ -741,3 +741,4 @@ API_KEY="private-api-key"
 - Added some useful type for extracting types from array
 - some other minor changes
 - count method in database!
+- remove false positive error on build time
