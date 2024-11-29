@@ -1,11 +1,11 @@
 Priority 1
 
-- Fix build import default wont build correcly unless
+- Fix build import default componant in serverComponants
+  - temporary workaround: [DefaultName, OtherDefaultName]; when the default componant is only used in the ServerComponant
 
 Priority 2
 
 - Max body size in config
 - use of multiple database
 - add enum to the database type
-- typesafe revalidate path
 - Remove build overhead

@@ -543,7 +543,7 @@ class Builder {
                 replace: {
                   ...serverActionsTags,
                   ...serverCompotantsForTranspiler,
-                },
+                }
               },
             });
             fileContent = transpiler.transformSync(fileContent);
@@ -559,6 +559,8 @@ class Builder {
               trimUnusedImports: true,
               treeShaking: true,
             }).transformSync(fileContent);
+
+            for (const name of Object.keys(serverComponants)) fileContent = fileContent.replace(`function ${name}()`, `function _${name}()`);
 
             return {
               contents: fileContent,
