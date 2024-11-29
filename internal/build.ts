@@ -11,7 +11,7 @@ import type { ssrElement } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 import fetchCache from "./caching/fetch";
-
+import { BuildServerComponantWithHooksWarning } from "./logs";
 globalThis.React = await import("react");
 
 fetchCache.reset();
@@ -185,7 +185,10 @@ class Builder {
       } catch (e) {
         if (e instanceof Error) {
           if (e.message.startsWith("Cannot call a class constructor")) continue;
-          else console.log(e)
+          console.log(e)
+          if (e.message.startsWith("null is not an object (evaluating 'dispatcher.use")) {
+            console.log(BuildServerComponantWithHooksWarning);
+          }
         }
       }
       if (!isValidElement(element)) continue;
@@ -193,6 +196,7 @@ class Builder {
       let moduleSSR = this.ssrElement.find(findModule);
       if (!moduleSSR) {
         this.ssrElement.push({
+          //@ts-ignore
           path: Bun.fileURLToPath(import.meta.resolve?.(modulePath) || ""),
           elements: [],
         });

@@ -93,3 +93,12 @@ export async function urltoFile(
     .then((res) => res.arrayBuffer())
     .then((buf) => new File([buf], filename, { type: mimeType }));
 }
+
+export function emailIsValid(email: string) {
+  const patt = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return patt.test(email);
+}
+
+export function fileExtension(fileName: string) {
+  return fileName.split(".").pop();
+}
