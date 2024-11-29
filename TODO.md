@@ -1,5 +1,7 @@
 Priority 1
 
+- Add stable SVG plugin.
+
 - Fix build import default componant in serverComponants
   - temporary workaround: [DefaultName, OtherDefaultName]; when the default componant is only used in the ServerComponant
 
