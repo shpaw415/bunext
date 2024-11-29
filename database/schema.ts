@@ -74,7 +74,7 @@ export async function ConvertShemaToType(filePath: string) {
 function ColumnsSchemaToType(column: ColumnsSchema, defaultAsOptional: boolean) {
   let autoIncrement = false;
   let dataType = "";
-  if (column.type === "number") {
+  if (column.type == "number") {
     autoIncrement = column.autoIncrement ? true : false;
   }
   switch (column.type) {
@@ -125,7 +125,7 @@ function dataTypeArrayToType(
   returnString += "Array<";
   returnString += dataTypeArray
     .map((d) => {
-      if (typeof d === "string") return sqliteTypeToTypeScript(d);
+      if (typeof d == "string") return sqliteTypeToTypeScript(d);
       else {
         const data = dataTypeObjectToType(d);
         return data.text;
@@ -155,8 +155,8 @@ function dataTypeObjectToType(dataTypeObject: {
       if (Array.isArray(dType)) {
         const parsed = dataTypeArrayToType(dType);
         return `"${d}"${parsed.optional ? "?" : ""}: ${parsed.text}`;
-      } else if (typeof dType === "string") {
-        return `"${d}": ${dType}`;
+      } else if (typeof dType == "string") {
+        return `"${d}": ${sqliteTypeToTypeScript(dType)}`;
       } else {
         const parsed = dataTypeObjectToType(dType as _DataTypeObject);
         return `"${d}": ${parsed.text}`;
