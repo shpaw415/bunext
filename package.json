@@ -29,7 +29,7 @@
   },
   "scripts": {
     "test": "bun test ./bin/main.test.ts",
-    "clear-build": "rm -rf .bunext/build/* .bunext/build/.bunext",
+    "clear": "rm -rf .bunext/build/* .bunext/build/.bunext",
     "to:module": "bun bin/to_node_module.ts"
   }
 }
