@@ -1,6 +1,6 @@
 #!/bin/env bash
 
-bun clear-build
+bun clear
 git add .
 git commit -m "$*"
 git push
