@@ -31,8 +31,6 @@ bun run db:create # only create the types
 
 - SQlite performance & features
 
-- Database shema with union type and other useful type
-
 - Database merging ( bun db:merge )
 
 - SVG plugin stable
@@ -403,6 +401,8 @@ this is pretty much a basic structure that will make type safe your database cal
 Exemple:
 
 ```TypeScript
+import { Union } from "@bunpmjs/bunext/database/shema";
+
 const MyDatabaseShema: DBSchema = [
   {
     name: "Users",
@@ -420,18 +420,21 @@ const MyDatabaseShema: DBSchema = [
         type: "string",
       },
       {
-        name: "test",
-        type: "boolean",
+        name: "role",
+        type: "string",
+        union: ["admin", "user"]
       },
       {
-        name: "foo",
+        name: "info",
         type: "json",
-        DataType: [
+        DataType: {
+          cart: [
           {
-            foo: "string",
+            type: Union(),
             bar: ["number"],
           },
-        ],
+        ]
+        },
       },
     ],
   },
@@ -742,3 +745,4 @@ API_KEY="private-api-key"
 - some other minor changes
 - count method in database!
 - remove false positive error on build time
+- Database union type & documentation
