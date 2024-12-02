@@ -401,7 +401,7 @@ this is pretty much a basic structure that will make type safe your database cal
 Exemple:
 
 ```TypeScript
-import { Union } from "@bunpmjs/bunext/database/shema";
+import { Union } from "@bunpmjs/bunext/database/schema";
 
 const MyDatabaseShema: DBSchema = [
   {
