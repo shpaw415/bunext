@@ -428,12 +428,10 @@ const MyDatabaseShema: DBSchema = [
         name: "info",
         type: "json",
         DataType: {
-          cart: [
-          {
-            type: Union(),
-            bar: ["number"],
-          },
-        ]
+          cart: [{
+            type: Union("drink", "food", "other"),
+            quantity: "number",
+          }]
         },
       },
     ],
