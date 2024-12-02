@@ -136,8 +136,12 @@ export default function Page() {
   );
 }
 
+type SessionType = {
+  username: string
+};
+
 function SetSession() {
-  const session = useSession({
+  const session = useSession<SessionType>({
     PreventRenderOnUpdate: true,
   });
   return (
@@ -200,8 +204,12 @@ export default function Page() {
 	</div>
 }
 
+type SessionType = {
+  username: string
+};
+
 function ReactElement() {
-	const session = useSession();
+	const session = useSession<SessionType>();
 	return <span>{session.getData()?.username || "not logged"}</span>
 }
 ```
