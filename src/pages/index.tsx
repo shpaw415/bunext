@@ -15,6 +15,10 @@ import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import Test from "../../static/index.css";
 
+type SessionType = {
+  test: boolean;
+};
+
 Head.setHead({
   data: {
     title: "my Hompage",
@@ -85,7 +89,7 @@ export function TestElement3({ params }: { params?: any }) {
 }
 
 function IsLogged() {
-  const session = useSession();
+  const session = useSession<SessionType>();
   const data = session.getData();
   const isLogged = Boolean(data?.test);
   //console.log(session.getData());

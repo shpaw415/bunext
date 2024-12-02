@@ -222,9 +222,14 @@ export default function Page() {
 
 
 }
+
+type SessionType = {
+  username: string
+};
+
 // using a JS event from a React Element
 function ReactElement() {
-	const session = useSession();
+	const session = useSession<SessionType>();
 	return <button onClick={() => session.delete()}>Click to delete the session</button>
 }
 
