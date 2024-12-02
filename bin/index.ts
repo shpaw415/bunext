@@ -60,8 +60,8 @@ async function databaseSchemaMaker() {
   }
   const Importseparator = '("<Bunext_TypeImposts>");';
   const ExportSeparator = '("<Bunext_DBExport>");';
-  const types = await ConvertShemaToType(
-    `${process.cwd()}/config/${DBShemaPath}`
+  const types = ConvertShemaToType(
+    require(`${process.cwd()}/config/${DBShemaPath}`).default
   );
   await Bun.write(
     `${paths.bunextModulePath}/database/database_types.ts`,

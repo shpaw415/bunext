@@ -10,10 +10,14 @@ export type ColumnsSchema =
     type: "number";
     autoIncrement?: true;
     default?: number;
+    /**  */
+    union?: number[];
   } & common)
   | ({
     type: "string";
     default?: string;
+    /**  */
+    union?: string[];
   } & common)
   | ({
     type: "Date";
@@ -27,6 +31,8 @@ export type ColumnsSchema =
   | ({
     type: "float";
     default?: number;
+    /**  */
+    union?: number[];
   } & common)
   | ({
     type: "boolean";
@@ -43,12 +49,22 @@ export type _DataType =
   | _DataTypeObject
   | (_DataTypeObject & Array<_TypeJson>)
   | (_DataTypeObject & _TypeJson)
-  | Array<_DataTypeObject | _TypeJson>;
+  | Array<_DataTypeObject | _TypeJson>
+  | ReservedType;
+
+
+type ReservedType = {
+  "!union_type!": string[];
+  "!intersection_type!": string[];
+};
+const ReservedTypeKeys = ["!union_type!"];
+
 
 type common = { name: string; nullable?: true; unique?: true; primary?: true };
 
-export async function ConvertShemaToType(filePath: string) {
-  const Schema = (await import(filePath)).default as DBSchema;
+
+
+export function ConvertShemaToType(Schema: DBSchema) {
   let tables: string[] = [];
   const types = Schema.map((table) => {
     if (tables.includes(table.name))
@@ -70,6 +86,13 @@ export async function ConvertShemaToType(filePath: string) {
     typesWithDefaultAsRequired
   };
 }
+/** create a union  */
+export function Union(...type: string[]): ReservedType {
+  return { "!union_type!": type } as ReservedType;
+}
+export function Intersection(...type: string[]): ReservedType {
+  return { "!intersection_type!": type } as ReservedType;
+}
 
 function ColumnsSchemaToType(column: ColumnsSchema, defaultAsOptional: boolean) {
   let autoIncrement = false;
@@ -79,19 +102,26 @@ function ColumnsSchemaToType(column: ColumnsSchema, defaultAsOptional: boolean) 
   }
   switch (column.type) {
     case "string":
+      if (column?.union) dataType = column.union.map((e) => `"${e}"`).join(" | ");
+      else dataType = column.type;
+      break;
     case "number":
+      if (column?.union) dataType = column.union.map((e) => `"${e}"`).join(" | ");
+      else dataType = column.type;
+      break;
     case "Date":
     case "boolean":
       dataType = column.type;
       break;
     case "float":
-      dataType = "number";
+      if (column?.union) dataType = column.union.map((e) => `"${e}"`).join(" | ");
+      else dataType = "number";
       break;
     case "json":
       dataType = dataTypeToType(column.DataType);
       break;
   }
-  return `${column.name}${column.nullable || autoIncrement || (column?.default && defaultAsOptional) ? "?" : ""
+  return `"${column.name}"${column.nullable || autoIncrement || (column?.default && defaultAsOptional) ? "?" : ""
     }: ${dataType};`;
 }
 
@@ -108,15 +138,17 @@ function sqliteTypeToTypeScript(type: _TypeJson): _TypeJson | undefined {
   }
 }
 
+
 function dataTypeToType(dataType: _DataType) {
   let returnString = "";
   if (Array.isArray(dataType)) {
     returnString += dataTypeArrayToType(dataType).text;
   } else {
-    returnString += dataTypeObjectToType(dataType).text;
+    returnString += dataTypeObjectToType(dataType as _DataTypeObject).text;
   }
   return returnString;
 }
+
 function dataTypeArrayToType(
   dataTypeArray: _TypeJson[] | Array<_DataTypeObject | _TypeJson>
 ) {
@@ -143,17 +175,29 @@ function dataTypeArrayToType(
     optional,
   };
 }
-function dataTypeObjectToType(dataTypeObject: {
-  [key: string]: _DataType | _TypeJson | _TypeJson[];
-}) {
-  let returnString = "";
-  returnString += "{";
 
-  returnString += Object.keys(dataTypeObject)
+type DataTypeObjectTypeParams = {
+  [key: string]: _DataType | _TypeJson | _TypeJson[];
+};
+
+function dataTypeObjectToType(dataTypeObject: DataTypeObjectTypeParams) {
+
+  const isInReservedMode = ReservedTypeKeys.includes(Object.keys(dataTypeObject).at(0) || "");
+  let returnString = "";
+
+  returnString += (Object.keys(dataTypeObject) as Array<keyof _DataType>)
     .map((d) => {
-      const dType = dataTypeObject[d as keyof _DataType];
-      if (Array.isArray(dType)) {
-        const parsed = dataTypeArrayToType(dType);
+      const dType = dataTypeObject[d];
+
+      if (isInReservedMode) {
+        switch (d as keyof ReservedType) {
+          case "!union_type!":
+            return DatatypeToUnion(dType as string[]);
+          case "!intersection_type!":
+            return DataTypeToIntersection(dType as string[]);
+        }
+      } else if (Array.isArray(dType)) {
+        const parsed = dataTypeArrayToType(dType as _TypeJson[]);
         return `"${d}"${parsed.optional ? "?" : ""}: ${parsed.text}`;
       } else if (typeof dType == "string") {
         return `"${d}": ${sqliteTypeToTypeScript(dType)}`;
@@ -164,9 +208,16 @@ function dataTypeObjectToType(dataTypeObject: {
     })
     .join(", ");
 
-  returnString += "}";
+  if (!isInReservedMode) returnString = `{ ${returnString} }`;
   return {
     text: returnString,
     optional: false,
   };
+}
+
+function DatatypeToUnion(types: Array<string | number>) {
+  return `( ${types.map((type) => `"${type}"`).join(" | ")} )`;
+}
+function DataTypeToIntersection(types: Array<string | number>) {
+  return `( ${types.map((type) => `"${type}"`).join(" & ")} )`
 }

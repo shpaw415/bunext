@@ -176,3 +176,5 @@ dist
 bunext_project.code-workspace
 .bunext/build/**
 tests
+mui-and-bunext.code-workspace
+test.json

@@ -1,4 +1,5 @@
 import type { DBSchema } from "@bunpmjs/bunext/database/schema";
+import { Union } from "@bunpmjs/bunext/database/schema";
 
 const MyDatabaseShema: DBSchema = [
   {
@@ -21,6 +22,11 @@ const MyDatabaseShema: DBSchema = [
         type: "string",
       },
       {
+        name: "role",
+        type: "string",
+        union: ["admin", "user"]
+      },
+      {
         name: "data",
         type: "json",
         nullable: true,
@@ -34,32 +40,13 @@ const MyDatabaseShema: DBSchema = [
             "undefined",
             {
               id: "string",
+              type: Union("drink", "food", "other")
             },
           ],
         },
       },
     ],
-  },
-  {
-    name: "purchase",
-    columns: [
-      {
-        name: "id",
-        primary: true,
-        type: "number",
-        autoIncrement: true,
-      },
-      {
-        name: "price",
-        type: "float",
-      },
-      {
-        name: "quantity",
-        type: "number",
-        default: 10
-      },
-    ],
-  },
+  }
 ];
 
 export default MyDatabaseShema;
