@@ -1,6 +1,6 @@
 import { join, basename } from "node:path";
-import { type BuildOutput, type BunPlugin } from "bun";
-import { normalize } from "path";
+import { type BuildOutput, type BunPlugin, type JavaScriptLoader, type Loader } from "bun";
+import { normalize, resolve } from "path";
 import { isValidElement } from "react";
 import reactElementToJSXString from "./jsxToString/index";
 import { unlinkSync } from "node:fs";
@@ -12,6 +12,7 @@ import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 import fetchCache from "./caching/fetch";
 import { BuildServerComponantWithHooksWarning } from "./logs";
+import { router } from "@bunpmjs/bunext/internal/router";
 globalThis.React = await import("react");
 
 fetchCache.reset();
@@ -248,9 +249,29 @@ class Builder {
       return true;
     return false;
   }
-  resetPath(path: string) {
+  async resetPath(path: string) {
     const index = this.ssrElement.findIndex((p) => p.path == path);
     if (index == -1) return;
+    if (process.env.NODE_ENV == "production") {
+      const extentions = ["tsx", "jsx"];
+      for (const imp of new Bun.Transpiler({ loader: path.split(".").at(-1) as JavaScriptLoader }).scanImports(await Bun.file(path).text()).map((e) => e.path)) {
+        if (imp.startsWith(".")) {
+          const _path = path.split("/");
+          _path.pop();
+          const resolvedPath = resolve(normalize("/" + join(..._path)), imp);
+          for await (const ext of extentions) {
+            const i = this.ssrElement.findIndex((e) => e.path == `${resolvedPath}.${ext}`);
+            if (i != -1) this.ssrElement.splice(i, 1);
+          }
+          continue;
+        }
+        const absolutePath = Bun.fileURLToPath(await import.meta.resolve?.(imp) || "");
+        const i = this.ssrElement.findIndex((e) => e.path == absolutePath);
+        if (i == -1) continue;
+        this.ssrElement.splice(i, 1);
+      }
+    }
+
     this.ssrElement.splice(index, 1);
     return index;
   }

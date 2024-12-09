@@ -85,7 +85,7 @@ class BunextServer {
 
     this.hotServer = Bun.serve({
       websocket: {
-        message: (ws, message) => {},
+        message: (ws, message) => { },
         open(ws) {
           ws.send("welcome");
           socketList.push(ws);
@@ -136,7 +136,6 @@ class BunextServer {
     const isDev = process.env.NODE_ENV == "development";
     const isDryRun = globalThis.dryRun;
     const isMainThread = cluster.isPrimary;
-
     if (isDryRun) {
       globalThis.clusterStatus = this.MakeCluster();
       await this.SessionDatabaseIniter();
@@ -219,7 +218,7 @@ class BunextServer {
         });
       else {
         this.makeBuildAwaiter();
-        if (filePath) builder.resetPath(filePath);
+        if (filePath) await builder.resetPath(filePath);
         await builder.makeBuild();
       }
     } else if (url.pathname.endsWith(".js") && url.search.startsWith("?"))
@@ -313,7 +312,7 @@ class BunextServer {
           revalidate(message.data.path);
           break;
         case "udpate_build":
-          if (message.data.path) builder.resetPath(message.data.path);
+          if (message.data.path) await builder.resetPath(message.data.path);
           await builder.makeBuild();
           await this.updateWorkerData();
           break;

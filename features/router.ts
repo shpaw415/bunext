@@ -42,7 +42,7 @@ async function revalidate(path: string) {
     return;
   }
 
-  builder.resetPath(route.filePath);
+  await builder.resetPath(route.filePath);
   await builder.makeBuild();
 }
 /**

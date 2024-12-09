@@ -265,6 +265,7 @@ class StaticRouters {
       parsedContent = foundedModule.content;
       return MakeTextRes();
     }
+    //@ts-ignore
     const path = Bun.fileURLToPath(import.meta.resolve(_path));
     const ext = extname(path).replace(".", "");
 
