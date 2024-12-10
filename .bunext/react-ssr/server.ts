@@ -141,6 +141,8 @@ class BunextServer {
       await this.SessionDatabaseIniter();
     }
 
+    router.server?.reload();
+    router.client?.reload();
     if (!globalThis.clusterStatus) {
       if (isDryRun) {
         if (isDev) {

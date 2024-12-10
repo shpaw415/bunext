@@ -56,13 +56,13 @@ async function install(total: boolean) {
   };
   packageJson.dependencies = {
     ...packageJson.dependencies,
-    react: "latest",
-    "react-dom": "latest",
+    react: "18.3.1",
+    "react-dom": "18.3.1",
   };
   packageJson.devDependencies = {
     ...packageJson.devDependencies,
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
+    "@types/react": "18.3.1",
+    "@types/react-dom": "18.3.1",
   };
   const beautify = require("json-beautify");
   const beatifiedJson = beautify(packageJson, null, 2, 50);

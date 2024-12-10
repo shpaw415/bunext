@@ -141,9 +141,7 @@ async function ParseServerActionResponse(response: Response) {
     throw new Error(
       "error when Calling server action <!ModulePath!>:<!FuncName!>"
     );
-  globalThis.__PUBLIC_SESSION_DATA__ = JSON.parse(
-    response.headers.get("session") || ""
-  );
+  globalThis.__PUBLIC_SESSION_DATA__ = GetSessionFromResponse(response);
 
   switch (response.headers.get("dataType") as ServerActionDataTypeHeader) {
     case "json":
@@ -160,6 +158,12 @@ async function ParseServerActionResponse(response: Response) {
         lastModified: lastModified,
       });
   }
+}
+
+export function GetSessionFromResponse(response: Response) {
+  return JSON.parse(
+    decodeURI(response.headers.get("session") || ""
+    )) as Record<string, any>;
 }
 
 globalThis.MakeServerActionRequest ??= MakeServerActionRequest;

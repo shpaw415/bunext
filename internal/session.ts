@@ -73,7 +73,7 @@ type sessionTableType = {
 };
 
 function GetTable() {
-  return new Table<sessionTableType>({
+  return new Table<sessionTableType, sessionTableType>({
     name: "bunextSession",
     db,
     shema: [Shema],

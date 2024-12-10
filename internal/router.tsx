@@ -138,7 +138,13 @@ class StaticRouters {
           path: pathname,
         });
         if (staticAssets !== null)
-          return bunextReq.__SET_RESPONSE__(new Response(staticAssets));
+          return bunextReq.__SET_RESPONSE__(
+            new Response(staticAssets, {
+              headers: {
+                "Content-Type": staticAssets.type,
+              },
+            })
+          );
 
         const staticResponse = await this.serveFromDir({
           directory: this.buildDir,
@@ -508,7 +514,6 @@ class StaticRouters {
     const res = (await ApiModule[bunextreq.request.method](bunextreq)) as
       | BunextRequest
       | undefined;
-
     if (res instanceof BunextRequest) {
       return bunextreq.setCookie(res.response);
     }
@@ -580,7 +585,6 @@ class StaticRouters {
         headers: {
           ...bunextReq.response.headers,
           dataType,
-          session: JSON.stringify(bunextReq.session.__DATA__.public || {}),
           fileData:
             result instanceof File
               ? JSON.stringify({
@@ -592,6 +596,7 @@ class StaticRouters {
       })
     );
   }
+
   private extractServerActionHeader(header: Record<string, string>) {
     if (!header.serveractionid) return null;
     const serverActionData = header.serveractionid.split(":");

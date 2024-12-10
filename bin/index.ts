@@ -28,7 +28,9 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      const res = await (await import("../internal/build.ts")).builder.build();
+      const builder = (await import("../internal/build.ts")).builder;
+      await builder.preBuildAll();
+      const res = await builder.build();
       console.log(res);
       break;
     case "dev":

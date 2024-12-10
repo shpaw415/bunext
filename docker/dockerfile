@@ -1,0 +1,20 @@
+FROM oven/bun:latest
+
+# bunext configuration
+WORKDIR /usr/app
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
+COPY --chown=bun:bun .bunext .bunext
+COPY --chown=bun:bun src src
+COPY --chown=bun:bun static static
+COPY --chown=bun:bun config config
+COPY .env ./
+RUN bun node_modules/@bunpmjs/bunext/bin/index.ts init && bun node_modules/@bunpmjs/bunext/bin/index.ts database:create
+COPY tsconfig.json package.json ./
+RUN bun update
+
+# user specific configuration
+
+USER bun
+EXPOSE 3000/tcp
+ENTRYPOINT [ "bun", "node_modules/@bunpmjs/bunext/bin/index.ts" , "production"]

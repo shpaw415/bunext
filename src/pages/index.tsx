@@ -69,6 +69,7 @@ export default async function Page() {
       >
         Delete Session
       </button>
+      <button onClick={() => fetch("/api/v1", { method: "POST" })}>api</button>
       <button onClick={() => ServerPrintSession()}>
         Print session to server console
       </button>

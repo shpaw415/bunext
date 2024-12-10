@@ -1,1 +1,2 @@
-export { GetRequest, type BunextRequest } from "./bunextRequest";
+export { BunextRequest } from '../internal/bunextRequest';
+export { GetRequest } from "./bunextRequest";

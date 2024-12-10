@@ -1,6 +1,12 @@
-import type { BunextRequest } from "../../../../features/request";
+import { GetSession } from "@bunpmjs/bunext/features/bunextRequest";
+import type { BunextRequest } from "@bunpmjs/bunext/features/request";
 
 export function POST(request: BunextRequest) {
+
+  const session = GetSession(arguments);
+  console.log(session.getData());
+  session.setData({ api: "test" }, true);
+
   request.response = new Response("POST");
   return request;
 }

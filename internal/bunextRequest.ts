@@ -7,7 +7,7 @@ import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 export class BunextRequest {
   public request: Request;
   public response: Response;
-  public session: _Session;
+  public session: _Session<any>;
   public webtoken: webToken<any>;
   /**
    * only avalable when serverConfig.session.type == "database:hard" | "database:memory"
@@ -66,10 +66,15 @@ export class BunextRequest {
       return globalThis.serverConfig.session?.timeout || 3600;
     };
 
+    response.headers.append("session", this.encodeSessionData(this.session.__DATA__?.public || {}))
+
     return this.webtoken.setCookie(response, {
       expire: setExpire(),
       httpOnly: true,
       secure: false,
     });
+  }
+  encodeSessionData(data: any) {
+    return encodeURI(JSON.stringify(data));
   }
 }

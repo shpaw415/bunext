@@ -7,6 +7,7 @@ declare global {
   var dryRun: boolean;
   var __BUNEXT_DEV_INIT: boolean;
   var webSocket: undefined | WebSocket;
+  //@ts-ignore
   var Server: undefined | BunextServer;
   var clusterStatus: boolean;
   var serverConfig: ServerConfig;
