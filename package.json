@@ -20,7 +20,7 @@
     "@bunpmjs/json-webtoken": "0.0.22",
     "is-plain-object": "5.0.0",
     "json-beautify": "1.1.1",
-    "next-json": "0.3.2",
+    "next-json": "0.4.0",
     "react-is": "18.2.0",
     "svg-chunk-webpack-plugin": "^7.0.0"
   },
