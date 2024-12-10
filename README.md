@@ -757,3 +757,8 @@ API_KEY="private-api-key"
 - count method in database!
 - remove false positive error on build time
 - Database union type & documentation
+
+## 0.8.14
+
+- Fix session header when a special charactere is set in a public session key or value.
+- Fix session path not set correclty to the root of the page.
