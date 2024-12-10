@@ -1,5 +1,7 @@
 Priority 1
 
+- session data header must be url encoded to avoid special character error
+
 - Add stable SVG plugin.
 
 - Fix build import default componant in serverComponants
