@@ -1,0 +1,15 @@
+version: '3.4'
+services:
+  bun-server:
+    restart: always
+    image: oven/bun:latest
+    build: .
+    ports:
+      - 3000:3000/tcp
+      - 3001:3001/tcp
+    volumes:
+      - ./config/bunext.sqlite:/usr/app/config/bunext.sqlite
+      - ./config/session.sqlite:/usr/app/config/session.sqlite
+    entrypoint: bun node_modules/@bunpmjs/bunext/bin/index.ts production
+    
+    

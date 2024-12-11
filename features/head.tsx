@@ -76,6 +76,7 @@ function deepMerge(obj: _Head, assign: _Head): _Head {
 function HeadElement({ currentPath }: { currentPath: string }) {
   const globalX = globalThis as unknown as _globalThis;
   let path: string | undefined = "";
+  currentPath = currentPath.split("?")[0];
   if (typeof window != "undefined") {
     path = match(currentPath)?.path;
   } else {

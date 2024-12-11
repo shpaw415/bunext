@@ -762,3 +762,7 @@ API_KEY="private-api-key"
 
 - Fix session header when a special charactere is set in a public session key or value.
 - Fix session path not set correclty to the root of the page.
+
+## 0.8.15
+
+- Fix head data craching when a search param is set in the url
