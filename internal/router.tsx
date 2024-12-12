@@ -718,7 +718,7 @@ class StaticRouters {
     path: string;
     suffixes?: string[];
   }) {
-    const basePath = join(config.directory, normalize(config.path));
+    const basePath = join(config.directory, normalize(decodeURI(config.path)));
     const suffixes = config.suffixes ?? [
       "",
       ".html",

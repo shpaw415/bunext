@@ -767,3 +767,4 @@ API_KEY="private-api-key"
 
 - Fix head data craching when a search param is set in the url
 - Added docktype html for better SEO
+- Fix serving assets from static that has URI encoded charactere
