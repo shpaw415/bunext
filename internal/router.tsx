@@ -36,6 +36,8 @@ let LoadedNodeModule: Array<{
   content: string;
 }> = [];
 
+const HTMLDocType = "<!DOCTYPE html>";
+
 class StaticRouters {
   server?: FileSystemRouter;
   client?: FileSystemRouter;
@@ -529,7 +531,8 @@ class StaticRouters {
       },
     });
 
-    const page = rewriter.transform(renderToString(jsx));
+    const page = HTMLDocType + rewriter.transform(renderToString(jsx));
+
     return new Response(page, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",

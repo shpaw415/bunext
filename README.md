@@ -766,3 +766,4 @@ API_KEY="private-api-key"
 ## 0.8.15
 
 - Fix head data craching when a search param is set in the url
+- Added docktype html for better SEO
