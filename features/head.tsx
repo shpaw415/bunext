@@ -1,6 +1,7 @@
-import { match } from "@bunpmjs/bunext/internal/router/index";
+import { match, useReloadEffect } from "@bunpmjs/bunext/internal/router/index";
 import type { _globalThis } from "../internal/types";
 import { router } from "@bunpmjs/bunext/internal/router";
+import { useEffect, useState } from "react";
 
 export type _Head = {
   title?: string;
@@ -75,6 +76,14 @@ function deepMerge(obj: _Head, assign: _Head): _Head {
 
 function HeadElement({ currentPath }: { currentPath: string }) {
   const globalX = globalThis as unknown as _globalThis;
+
+  const [reload, setReload] = useState(false);
+  useReloadEffect(() => {
+    process.env.NODE_ENV == "development" && setReload(true);
+  }, []);
+  useEffect(() => {
+    setReload(false);
+  }, [reload]);
   let path: string | undefined = "";
   currentPath = currentPath.split("?")[0];
   if (typeof window != "undefined") {
@@ -91,13 +100,15 @@ function HeadElement({ currentPath }: { currentPath: string }) {
       : deepMerge(Head.head["*"] || {}, Head.head[path]);
 
   return (
-    <head>
-      {data?.title && <title>{data.title}</title>}
-      {data?.author && <meta name="author" content={data.author} />}
-      {data?.publisher && <meta name="publisher" content={data.publisher} />}
-      {data?.meta && data.meta.map((e, index) => <meta key={index} {...e} />)}
-      {data?.link && data.link.map((e, index) => <link key={index} {...e} />)}
-    </head>
+    !reload && (
+      <head>
+        {data?.title && <title>{data.title}</title>}
+        {data?.author && <meta name="author" content={data.author} />}
+        {data?.publisher && <meta name="publisher" content={data.publisher} />}
+        {data?.meta && data.meta.map((e, index) => <meta key={index} {...e} />)}
+        {data?.link && data.link.map((e, index) => <link key={index} {...e} />)}
+      </head>
+    )
   );
 }
 

@@ -772,3 +772,7 @@ API_KEY="private-api-key"
 ## 0.8.16
 
 - Add revalidate multiple route
+
+## 0.8.17
+
+- head data is reloaded in dev mode
