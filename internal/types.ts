@@ -85,35 +85,35 @@ export type ServerActionDataTypeHeader = "json" | "file" | "blob";
 
 export type ClusterMessageType =
   | {
-      task: "revalidate";
-      data: {
-        path: string;
-      };
-    }
-  | {
-      task: "udpate_build";
-      data: {
-        path?: string;
-      };
-    }
-  | {
-      task: "getSession";
-      data: {
-        id: string;
-        data?: any;
-      };
-    }
-  | {
-      task: "setSession";
-      data: {
-        id: string;
-        sessionData: any;
-        type: "insert" | "update";
-      };
-    }
-  | {
-      task: "deleteSession";
-      data: {
-        id: string;
-      };
+    task: "revalidate";
+    data: {
+      path: string[];
     };
+  }
+  | {
+    task: "udpate_build";
+    data: {
+      path?: string;
+    };
+  }
+  | {
+    task: "getSession";
+    data: {
+      id: string;
+      data?: any;
+    };
+  }
+  | {
+    task: "setSession";
+    data: {
+      id: string;
+      sessionData: any;
+      type: "insert" | "update";
+    };
+  }
+  | {
+    task: "deleteSession";
+    data: {
+      id: string;
+    };
+  };

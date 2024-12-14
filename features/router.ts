@@ -4,6 +4,7 @@ import { cloneElement } from "react";
 
 import { navigate } from "../internal/router/index.tsx";
 import type { Builder } from "../internal/build.ts";
+import type { ClusterMessageType } from "@bunpmjs/bunext/internal/types.ts";
 // only use this module in a server context
 
 const isServer = typeof window == "undefined";
@@ -26,23 +27,19 @@ const findRouteOrThrow = (path: string) => {
   return matched;
 };
 
-async function revalidate(path: string) {
+async function revalidate(...path: string[]) {
   if (!isServer) publicThrow();
-
-  const route = findRouteOrThrow(path);
-  if (builder.findPathIndex(route.filePath) == -1) return;
-
+  const route = path.map((path) => findRouteOrThrow(path)).filter((route) => builder.findPathIndex(route.filePath) != -1);
   if ((await import("node:cluster")).default.isWorker) {
     process.send?.({
       task: "revalidate",
       data: {
         path,
       },
-    });
+    } as ClusterMessageType);
     return;
   }
-
-  await builder.resetPath(route.filePath);
+  await Promise.all(route.map(({ filePath }) => builder.resetPath(filePath)))
   await builder.makeBuild();
 }
 /**
@@ -51,17 +48,18 @@ async function revalidate(path: string) {
  * @param seconde every x seconde to revalide
  */
 
-function revalidateEvery(path: string, seconde: number) {
+function revalidateEvery(path: string | string[], seconde: number) {
   if (!isServer) return;
+  if (!Array.isArray(path)) path = [path];
 
-  const _revalidate = builder.revalidates.find((r: any) => r.path === path);
-  if (!_revalidate) {
+  if (builder.revalidates.find((r: any) => r.path === path)) return;
+  for (const p of path) {
     builder.revalidates.push({
-      path: path,
+      path: p,
       time: seconde * 1000,
     });
-    return;
   }
+
 }
 
 function Link({ href, children }: { href: string; children: JSX.Element }) {

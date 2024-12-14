@@ -87,6 +87,12 @@ export const ReloadContext = createContext(async (): Promise<void> => {});
  * @param initial initial value
  * @returns value and setter
  */
+
+export function useReload() {
+  const reload = useContext(ReloadContext);
+  return reload;
+}
+
 export function useRouteState<T extends {}>(key: string, initial: T) {
   return useReducer((_old: T, newvalue: T) => {
     const routeState = history.state ?? {};

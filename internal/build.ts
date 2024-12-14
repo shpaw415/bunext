@@ -1,18 +1,16 @@
 import { join, basename } from "node:path";
 import { type BuildOutput, type BunPlugin, type JavaScriptLoader, type Loader } from "bun";
 import { normalize, resolve } from "path";
-import { isValidElement } from "react";
+import { isValidElement, type ReactPortal } from "react";
 import reactElementToJSXString from "./jsxToString/index";
 import { unlinkSync } from "node:fs";
 import "./server_global";
-import { type JsxElement } from "typescript";
 import { renderToString } from "react-dom/server";
 import type { ssrElement } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 import fetchCache from "./caching/fetch";
 import { BuildServerComponantWithHooksWarning } from "./logs";
-import { router } from "@bunpmjs/bunext/internal/router";
 globalThis.React = await import("react");
 
 fetchCache.reset();
@@ -180,7 +178,7 @@ class Builder {
         exported.length > 0
       )
         continue;
-      let element: JsxElement | any = undefined;
+      let element: ReactPortal | undefined = undefined;
       try {
         element = await exported();
       } catch (e) {
@@ -218,11 +216,13 @@ class Builder {
         });
       if (SSRelement) {
         SSRelement.reactElement = toJSX(element);
+        // @ts-ignore
         SSRelement.htmlElement = renderToString(element);
       } else {
         moduleSSR.elements.push({
           tag: `<!Bunext_Element_${exported.name}!>`,
           reactElement: toJSX(element),
+          // @ts-ignore
           htmlElement: renderToString(element),
         });
       }

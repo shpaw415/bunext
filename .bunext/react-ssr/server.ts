@@ -311,7 +311,7 @@ class BunextServer {
       const message = _message as ClusterMessageType;
       switch (message.task) {
         case "revalidate":
-          revalidate(message.data.path);
+          revalidate(...message.data.path);
           break;
         case "udpate_build":
           if (message.data.path) await builder.resetPath(message.data.path);
