@@ -778,5 +778,5 @@ API_KEY="private-api-key"
 ## 0.8.17
 
 - head data is reloaded in dev mode
-- env variable are now accessible in the build if it's prefix is PUBLIC\_
+- env variable are now accessible in the build if it's prefix is PUBLIC\_ (new bun feature of 1.1.39)
 - Fix ServerAction undefined variable not assign
