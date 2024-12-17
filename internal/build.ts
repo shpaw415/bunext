@@ -1,5 +1,5 @@
 import { join, basename } from "node:path";
-import { type BuildOutput, type BunPlugin, type JavaScriptLoader, type Loader } from "bun";
+import { semver, type BuildOutput, type BunPlugin, type JavaScriptLoader, type Loader } from "bun";
 import { normalize, resolve } from "path";
 import { isValidElement, type ReactPortal } from "react";
 import reactElementToJSXString from "./jsxToString/index";
@@ -757,6 +757,13 @@ class Builder {
 
   private async CreateBuild(options: _CreateBuild) {
     const { define } = this.options;
+
+    //@ts-ignore
+    if (Bun.semver.satisfies(Bun.version, "1.1.39 - x.x.x") && !options.env) {
+      //@ts-ignore
+      options.env = "PUBLIC_*";
+    }
+
     const build = await Bun.build({
       ...options,
       publicPath: "./",

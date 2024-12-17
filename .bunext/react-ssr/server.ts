@@ -266,7 +266,7 @@ class BunextServer {
   MakeCluster() {
     if (
       OSType() != "Linux" ||
-      !Bun.semver.satisfies(Bun.version, "^1.1.25") ||
+      !Bun.semver.satisfies(Bun.version, "1.1.25 - x.x.x") ||
       process.env.NODE_ENV == "development" ||
       !serverConfig.HTTPServer?.threads ||
       (typeof serverConfig.HTTPServer?.threads == "number" &&

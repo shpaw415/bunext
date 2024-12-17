@@ -31,7 +31,9 @@ bun run db:create # only create the types
 
 - SQlite performance & features
 
-- Database merging ( bun db:merge )
+  - LIKE operator with wildcard char
+  - Database merging ( bun db:merge )
+  - Transaction
 
 - SVG plugin stable
 
@@ -776,3 +778,7 @@ API_KEY="private-api-key"
 ## 0.8.17
 
 - head data is reloaded in dev mode
+
+## 0.8.18
+
+- env variable are now accessible in the build if it's prefix is PUBLIC\_

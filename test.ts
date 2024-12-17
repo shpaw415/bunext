@@ -1,0 +1,1 @@
+console.log(Bun.semver.satisfies(Bun.version, "1.1.30 - x.x.x"))
