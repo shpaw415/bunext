@@ -565,11 +565,9 @@ class StaticRouters {
       throw new Error(
         `no function founded for ServerAction ${reqData.path}/${reqData.call}`
       );
-    const agrsNbr = call.length - props.length - 1;
-    const fillUndefinedParams =
-      agrsNbr > 0
-        ? (Array.apply(null, Array(agrsNbr)) as Array<undefined>)
-        : [];
+    const fillUndefinedParams = (
+      Array.apply(null, Array(call.length)) as Array<null>
+    ).map(() => undefined);
     let result: ServerActionDataType = await call(
       ...[...props, ...fillUndefinedParams, bunextReq]
     );

@@ -782,3 +782,4 @@ API_KEY="private-api-key"
 ## 0.8.18
 
 - env variable are now accessible in the build if it's prefix is PUBLIC\_
+- Fix ServerAction undefined variable not assign
