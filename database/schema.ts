@@ -7,37 +7,37 @@ export interface TableSchema {
 
 export type ColumnsSchema =
   | ({
-    type: "number";
-    autoIncrement?: true;
-    default?: number;
-    /**  */
-    union?: number[];
-  } & common)
+      type: "number";
+      autoIncrement?: true;
+      default?: number;
+      /**  */
+      union?: number[];
+    } & common)
   | ({
-    type: "string";
-    default?: string;
-    /**  */
-    union?: string[];
-  } & common)
+      type: "string";
+      default?: string;
+      /**  */
+      union?: string[];
+    } & common)
   | ({
-    type: "Date";
-    default?: Date;
-  } & common)
+      type: "Date";
+      default?: Date;
+    } & common)
   | ({
-    type: "json";
-    default?: any;
-    DataType: _DataType;
-  } & common)
+      type: "json";
+      default?: any;
+      DataType: _DataType;
+    } & common)
   | ({
-    type: "float";
-    default?: number;
-    /**  */
-    union?: number[];
-  } & common)
+      type: "float";
+      default?: number;
+      /**  */
+      union?: number[];
+    } & common)
   | ({
-    type: "boolean";
-    default?: boolean;
-  } & common);
+      type: "boolean";
+      default?: boolean;
+    } & common);
 
 type _TypeJson = "number" | "string" | "undefined" | "float" | "boolean";
 
@@ -52,17 +52,13 @@ export type _DataType =
   | Array<_DataTypeObject | _TypeJson>
   | ReservedType;
 
-
 type ReservedType = {
   "!union_type!": string[];
   "!intersection_type!": string[];
 };
 const ReservedTypeKeys = ["!union_type!"];
 
-
 type common = { name: string; nullable?: true; unique?: true; primary?: true };
-
-
 
 export function ConvertShemaToType(Schema: DBSchema) {
   let tables: string[] = [];
@@ -76,14 +72,17 @@ export function ConvertShemaToType(Schema: DBSchema) {
       .map((column) => ColumnsSchemaToType(column, true))
       .join("\n")}\n};`;
   });
-  const typesWithDefaultAsRequired = Schema.map((table) => `type SELECT_${table.name} = {\n${table.columns
-    .map((column) => ColumnsSchemaToType(column, false))
-    .join("\n")}\n};`);
+  const typesWithDefaultAsRequired = Schema.map(
+    (table) =>
+      `type SELECT_${table.name} = {\n${table.columns
+        .map((column) => ColumnsSchemaToType(column, false))
+        .join("\n")}\n};`
+  );
 
   return {
     tables,
     types,
-    typesWithDefaultAsRequired
+    typesWithDefaultAsRequired,
   };
 }
 /** create a union  */
@@ -94,7 +93,10 @@ export function Intersection(...type: string[]): ReservedType {
   return { "!intersection_type!": type } as ReservedType;
 }
 
-function ColumnsSchemaToType(column: ColumnsSchema, defaultAsOptional: boolean) {
+function ColumnsSchemaToType(
+  column: ColumnsSchema,
+  defaultAsOptional: boolean
+) {
   let autoIncrement = false;
   let dataType = "";
   if (column.type == "number") {
@@ -102,11 +104,11 @@ function ColumnsSchemaToType(column: ColumnsSchema, defaultAsOptional: boolean) 
   }
   switch (column.type) {
     case "string":
-      if (column?.union) dataType = column.union.map((e) => `"${e}"`).join(" | ");
+      if (column?.union) dataType = DatatypeToUnion(column.union);
       else dataType = column.type;
       break;
     case "number":
-      if (column?.union) dataType = column.union.map((e) => `"${e}"`).join(" | ");
+      if (column?.union) dataType = DatatypeToUnion(column.union);
       else dataType = column.type;
       break;
     case "Date":
@@ -114,15 +116,19 @@ function ColumnsSchemaToType(column: ColumnsSchema, defaultAsOptional: boolean) 
       dataType = column.type;
       break;
     case "float":
-      if (column?.union) dataType = column.union.map((e) => `"${e}"`).join(" | ");
+      if (column?.union)
+        dataType = column.union.map((e) => `"${e}"`).join(" | ");
       else dataType = "number";
       break;
     case "json":
       dataType = dataTypeToType(column.DataType);
       break;
   }
-  return `"${column.name}"${column.nullable || autoIncrement || (column?.default && defaultAsOptional) ? "?" : ""
-    }: ${dataType};`;
+  return `"${column.name}"${
+    column.nullable || autoIncrement || (column?.default && defaultAsOptional)
+      ? "?"
+      : ""
+  }: ${dataType};`;
 }
 
 function sqliteTypeToTypeScript(type: _TypeJson): _TypeJson | undefined {
@@ -137,7 +143,6 @@ function sqliteTypeToTypeScript(type: _TypeJson): _TypeJson | undefined {
       return undefined;
   }
 }
-
 
 function dataTypeToType(dataType: _DataType) {
   let returnString = "";
@@ -157,6 +162,7 @@ function dataTypeArrayToType(
   returnString += "Array<";
   returnString += dataTypeArray
     .map((d) => {
+      //@ts-ignore
       if (typeof d == "string") return sqliteTypeToTypeScript(d);
       else {
         const data = dataTypeObjectToType(d);
@@ -168,7 +174,7 @@ function dataTypeArrayToType(
       optional = true;
       return false;
     })
-    .join(" & ");
+    .join(" | ");
   returnString += ">";
   return {
     text: returnString,
@@ -181,8 +187,9 @@ type DataTypeObjectTypeParams = {
 };
 
 function dataTypeObjectToType(dataTypeObject: DataTypeObjectTypeParams) {
-
-  const isInReservedMode = ReservedTypeKeys.includes(Object.keys(dataTypeObject).at(0) || "");
+  const isInReservedMode = ReservedTypeKeys.includes(
+    Object.keys(dataTypeObject).at(0) || ""
+  );
   let returnString = "";
 
   returnString += (Object.keys(dataTypeObject) as Array<keyof _DataType>)
@@ -216,8 +223,26 @@ function dataTypeObjectToType(dataTypeObject: DataTypeObjectTypeParams) {
 }
 
 function DatatypeToUnion(types: Array<string | number>) {
-  return `( ${types.map((type) => `"${type}"`).join(" | ")} )`;
+  return `( ${types
+    .map((type) => {
+      switch (typeof type) {
+        case "string":
+          return `"${type}"`;
+        case "number":
+          return type;
+      }
+    })
+    .join(" | ")} )`;
 }
 function DataTypeToIntersection(types: Array<string | number>) {
-  return `( ${types.map((type) => `"${type}"`).join(" & ")} )`
+  return `( ${types
+    .map((type) => {
+      switch (typeof type) {
+        case "string":
+          return `"${type}"`;
+        case "number":
+          return type;
+      }
+    })
+    .join(" & ")} )`;
 }

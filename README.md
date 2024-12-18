@@ -780,3 +780,5 @@ API_KEY="private-api-key"
 - head data is reloaded in dev mode
 - env variable are now accessible in the build if it's prefix is PUBLIC\_ (new bun feature of 1.1.39)
 - Fix ServerAction undefined variable not assign
+- Fix Database shema union type making number as string
+- Database shema in json object in array are concidered union
