@@ -86,7 +86,7 @@ export function ConvertShemaToType(Schema: DBSchema) {
   };
 }
 /** create a union  */
-export function Union(...type: string[]): ReservedType {
+export function Union(...type: Array<string | number>): ReservedType {
   return { "!union_type!": type } as ReservedType;
 }
 export function Intersection(...type: string[]): ReservedType {
