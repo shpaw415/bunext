@@ -23,7 +23,9 @@
     "next-json": "0.3.2",
     "react-is": "18.2.0",
     "svg-chunk-webpack-plugin": "^7.0.0",
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "cssjson": "2.1.3",
+    "typed-css-modules": "0.9.1"
   },
   "bin": {
     "bunext": "bin/index.ts"
