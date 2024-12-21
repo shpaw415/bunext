@@ -3,6 +3,8 @@ Priority 1
 - css module
 - Add stable SVG plugin.
 
+- make session as a top provider
+
 - Fix build import default component in serverComponents
   - temporary workaround: [DefaultName, OtherDefaultName]; when the default component is only used in the ServerComponent
 
