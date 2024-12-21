@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible Runtime: bun 1.1.0 - 1.1.38
+compatible Runtime: bun 1.1.0 - 1.1.41
 compatible OS: Linux, WSL
 
 N.B : Bun is in continuous change and compatibility between version is a
@@ -11,9 +11,9 @@ I will keep up to date the framework for what it needs
 
 # bunext
 
-- Nextjs Framwork compatible with Bun Runtime
+- Nextjs like Framework compatible with Bun Runtime
 
-- Facing problemes? [Open an issue ](https://github.com/shpaw415/bunext/issues)
+- Facing problems? [Open an issue ](https://github.com/shpaw415/bunext/issues)
 
 ## Updating to a new Version
 
@@ -53,7 +53,7 @@ bun run db:create # only create the types
 
 - Static assets
 
-- Server componants ("use server" & "use client")
+- Server components ("use server" & "use client")
 
 - Revalidate ( Beta )
 
@@ -63,9 +63,9 @@ bun run db:create # only create the types
 
 - SQlite Management ( Beta )
 
-- Server componants ( Beta )
+- Server components ( Beta )
 
-- Devloppement mode with Hot Reload ( beta version )
+- Développement mode with Hot Reload ( beta version )
 
 - Production mode ( Beta )
 
@@ -101,7 +101,7 @@ Thanks to all people how are following my work!
 Like NextJs the routes are in src/pages.
 
 - _index.tsx_ is the main page for the route
-- _[id].tsx_ is a dynamic page loading and is a good oportunity to use getServerSideProps
+- _[id].tsx_ is a dynamic page loading and is a good opportunity to use getServerSideProps
 - _layout.tsx_ is the layout for the current route and sub-directory routes
 
 ```Javascript XML
@@ -115,14 +115,14 @@ export default function Page() {
 ## Session
 
 Manage the session from your users by setting a
-session and optionaly make it accessible from the client side ( default to only Server Side ).
+session and optionally make it accessible from the client side ( default to only Server Side ).
 
 - SetData only from the Server Side is allowed.
 - Delete Session data can be Client or Server Side
 - GetData can be Client or Server Side ( but Client only have access to what is made public )
 
   - **useSession**
-  - will automaticaly update the element when the session is updated
+  - will automatically update the element when the session is updated
 
 ### Set Session data
 
@@ -176,7 +176,7 @@ export async function ServerSetSession({
   username,
   password,
 }: {
-  usename: string;
+  username: string;
   password: string;
 }) {
   const Session = GetSession(arguments);
@@ -244,7 +244,7 @@ function ReactElement() {
 }
 
 // using a serverAction
-export async function ServerDeleteSesion() {
+export async function ServerDeleteSession() {
 	GetSession(arguments).delete();
 	return "Session has been deleted by the server"
 }
@@ -309,21 +309,21 @@ export async function ServerUploadFile(
   await Bun.write("path/" + file.name, file);
   return {
     success: true,
-    message: "file saved successfuly",
+    message: "file saved successful",
   };
 }
 
 ```
 
-### Server Componants
+### Server Components
 
-Bunext offer a Server Componants ability that is managed with revalidate.
+Bunext offer a Server Components ability that is managed with revalidate.
 Will run only once at build time and when revalidate is ran.
 
-- unless **"use client"** directive is set, exported function will be verify as a server Componant.
+- unless **"use client"** directive is set, exported function will be verify as a server Component.
 - Must be empty props.
 - **Must be exported** and can be async as well.
-- revalidate will invalidate every componants that are in the page.
+- revalidate will invalidate every components that are in the page.
 
 ```Javascript XML
 // index.tsx
@@ -331,25 +331,25 @@ Will run only once at build time and when revalidate is ran.
 export default async function Page() {
   return (
     <div>
-      {await Componants()}
+      {await Components()}
       <NotValid />
     </div>
   );
 }
-// valid Server Componant
-export async function Componants() {
+// valid Server Component
+export async function Components() {
   const res = await (await fetch("https://some-api.com/api")).json();
   return <div>{JSON.stringify(res)}</div>;
 }
 
-// not valid Server Componant
+// not valid Server Component
 export function NotValid({ someProps }: { someProps: string }) {
   return <div></div>;
 }
 
 ```
 
-### Revalidate a Server Componant
+### Revalidate a Server Component
 
 ```Javascript XML
 // index.tsx
@@ -362,9 +362,9 @@ export default function Page() {
   </div>;
 }
 
-export async function ServerRevalidate(path: string) {
-  await revalidate(path);
-  // will revalidate the page right now
+export async function ServerRevalidate(paths: string[]) {
+  await revalidate(...paths);
+  // will revalidate all pages in paths right now
 }
 
 ```
@@ -395,7 +395,7 @@ export async function getServerSideProps() {
   // go get some api data, database, etc...
 
   // return { redirect: "/path/to/another/location" };
-  // will redirect to a diferent location
+  // will redirect to a different location
   return {
     foo: "bar",
     name: {
@@ -409,7 +409,7 @@ export async function getServerSideProps() {
 
 ### Configure the database
 
-In **/config/database.ts** is for the database Shema.
+In **/config/database.ts** is for the database Schema.
 
 this is pretty much a basic structure that will make type safe your database call.
 
@@ -480,7 +480,7 @@ Database is only allowed in Server Side
 // index.tsx
 import { Database } from "@bunpmjs/bunext/database";
 
-//in a Server Componant
+//in a Server Component
 export async function ReactElement() {
   const db = Database();
 
@@ -546,7 +546,7 @@ import { Head } from "@bunpmjs/bunext/features/head";
 Head.setHead({
   data: {
     author: "John Doe",
-    title: "my Hompage",
+    title: "my Home-page",
     publisher: "Bunext",
     meta: [
       {
@@ -576,8 +576,8 @@ config/server.ts contain server related configuration
 ## Bypass request
 
 To make a custom Response in _config/onRequest.ts_,
-return (Response or async Response) to bypass the default behaviour, or
-return undefined to use the default behaviour.
+return (Response or async Response) to bypass the default behavior, or
+return undefined to use the default behavior.
 
 ## API Endpoint
 
@@ -617,7 +617,7 @@ await fetch("my.site.com/api/v1", {
 
 # Process.env
 
-An environement variable can be set as public and accessed in a client context if the key starts with PUBLIC
+An environment variable can be set as public and accessed in a client context if the key starts with PUBLIC
 
 ```
 PUBLIC_API_KEY="some-public-api-key"
@@ -634,7 +634,7 @@ API_KEY="private-api-key"
 
 - Fix SVG not showing completely
 - Fix async Layout error on SSR & CSR rendering
-- Fix ServerComponant style prop not showing correcly causing hydration error
+- Fix ServerComponent style prop not showing correctly causing hydration error
 
 ## 0.6.19
 
@@ -651,7 +651,7 @@ API_KEY="private-api-key"
 
 ## 0.7.2
 
-- Fix page not loading correcly when there is no layout
+- Fix page not loading correctly when there is no layout
 - Fix async layout in the hydration step
 - Improve compatibility with the multi-thread feature (will skip multi-thread on windows or mac) and now the main thread is making build and send the builded info to the workers
 - Other small improvement
@@ -663,7 +663,7 @@ API_KEY="private-api-key"
 
 ## 0.7.4
 
-- Fix getServersideProps taking time before responding
+- Fix getServerSideProps taking time before responding
 - Performance improvement
 
 ## 0.7.5
@@ -673,18 +673,18 @@ API_KEY="private-api-key"
 
 ## 0.7.7
 
-- Head display order modified path \* is overwriten by the current path
+- Head display order modified path \* is overwritten by the current path
 - Head data is now deep merged now meta and links are stacked
 
 ## 0.7.8
 
-- env variables can be made public by adding PULIC keyword.
+- env variables can be made public by adding PUBLIC keyword.
   Ex:
   PUBLIC_API_KEY="abcdefghijklmnop12345678" // can be accessed from client and server
   API_KEY="abcdefghijklmnop12345678" // only accessed from server side
 
-- css can now be loaded direcly in the page as a link in /static path
-- @static path is now accessible to direcly access /static path
+- css can now be loaded directly in the page as a link in /static path
+- @static path is now accessible to directly access /static path
 
 ## 0.7.9
 
@@ -696,8 +696,8 @@ API_KEY="private-api-key"
 
 - Fix Database key with special char would break the types
 - node_modules files can be imported as link ts and tsx files is compiled to js files ( beta ) ( css works )
-- Fix import not working in Server Componants
-- Fix import problem in production mode ( bun changed something in the minifing feature that broke the build for some reason )
+- Fix import not working in Server Components
+- Fix import problem in production mode ( bun changed something in the minifying feature that broke the build for some reason )
 
 ## 0.7.13
 
@@ -713,8 +713,8 @@ API_KEY="private-api-key"
 ## 0.7.22
 
 - getServerSideProps can access session with getSession
-- fix getServersideProps not hot reloading
-- fix session not loading correcly when a token is valid but not present in the session database
+- fix getServerSideProps not hot reloading
+- fix session not loading correctly when a token is valid but not present in the session database
 - minify is working on production
 - fit jsx import for some tsx files that was not on the index but imported by it.
 - fix session delete client side
@@ -747,7 +747,7 @@ API_KEY="private-api-key"
 ## 0.8.11
 
 - Fix crash on dev mode when a cold refresh is made
-- Add some tweek to the database shemas
+- Add some tweak to the database schemas
 - little performance enhancement
 - Update Documentation process.env
 
@@ -762,14 +762,14 @@ API_KEY="private-api-key"
 
 ## 0.8.14
 
-- Fix session header when a special charactere is set in a public session key or value.
-- Fix session path not set correclty to the root of the page.
+- Fix session header when a special character is set in a public session key or value.
+- Fix session path not set correctly to the root of the page.
 
 ## 0.8.15
 
-- Fix head data craching when a search param is set in the url
-- Added docktype html for better SEO
-- Fix serving assets from static that has URI encoded charactere
+- Fix head data crache when a search param is set in the url
+- Added DOCTYPE html for better SEO
+- Fix serving assets from static that has URI encoded character
 
 ## 0.8.16
 
@@ -783,6 +783,6 @@ API_KEY="private-api-key"
 
 ## 0.8.18
 
-- Fix Database shema union type making number as string
-- Database shema in json object in array are concidered union
-- Database shema union in json column type can be string or/and number
+- Fix Database schema union type making number as string
+- Database schema in json object in array are considered union
+- Database schema union in json column type can be string or/and number

@@ -85,7 +85,7 @@ class BunextServer {
 
     this.hotServer = Bun.serve({
       websocket: {
-        message: (ws, message) => { },
+        message: (ws, message) => {},
         open(ws) {
           ws.send("welcome");
           socketList.push(ws);
@@ -144,6 +144,7 @@ class BunextServer {
     router.server?.reload();
     router.client?.reload();
     if (!globalThis.clusterStatus) {
+      if (isMainThread) await import("../../config/preload.ts");
       if (isDryRun) {
         if (isDev) {
           doWatchBuild();
@@ -159,7 +160,7 @@ class BunextServer {
       await router.InitServerActions();
     } else if (isMainThread) {
       if (isDryRun) {
-        await require("../../config/preload.ts");
+        await import("../../config/preload.ts");
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);

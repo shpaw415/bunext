@@ -1,6 +1,9 @@
 {
   "name": "bunext",
   "version": "0.8.17",
+  "repository": "shpaw415/bunext",
+  "bugs": "https://github.com/shpaw415/bunext",
+  "license": "MIT",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {

@@ -1,11 +1,10 @@
 Priority 1
 
-- session data header must be url encoded to avoid special character error
-
+- css module
 - Add stable SVG plugin.
 
-- Fix build import default componant in serverComponants
-  - temporary workaround: [DefaultName, OtherDefaultName]; when the default componant is only used in the ServerComponant
+- Fix build import default component in serverComponents
+  - temporary workaround: [DefaultName, OtherDefaultName]; when the default component is only used in the ServerComponent
 
 Priority 2
 
