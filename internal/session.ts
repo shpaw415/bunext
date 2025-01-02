@@ -150,9 +150,9 @@ export function GetSessionByID(
   return res[0].data;
 }
 /**
- * create or udate session
+ * create or update session
  * @param id the session id or undefined
- * @returns newley created session id or undefined
+ * @returns newly created session id or undefined
  */
 export function SetSessionByID(
   type: "insert" | "update",

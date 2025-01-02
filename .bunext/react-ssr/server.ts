@@ -5,7 +5,7 @@ import { builder } from "@bunpmjs/bunext/internal/build";
 import { router } from "@bunpmjs/bunext/internal/router";
 import { Shell } from "./shell";
 import { renderToString } from "react-dom/server";
-import { ErrorFallback } from "@bunpmjs/bunext/componants/fallback";
+import { ErrorFallback } from "@bunpmjs/bunext/components/fallback";
 import { doWatchBuild } from "@bunpmjs/bunext/internal/build-watch";
 import { setRevalidate } from "@bunpmjs/bunext/internal/server-features";
 
@@ -298,7 +298,7 @@ class BunextServer {
 
     if (count > cpuCoreCount) {
       console.error(
-        `Server Config\nAvalable Core: ${cpuCoreCount}\nServerConfig: ${count}`
+        `Server Config\nAvailable Core: ${cpuCoreCount}\nServerConfig: ${count}`
       );
       count = cpuCoreCount;
     }
@@ -314,7 +314,7 @@ class BunextServer {
         case "revalidate":
           revalidate(...message.data.path);
           break;
-        case "udpate_build":
+        case "update_build":
           if (message.data.path) await builder.resetPath(message.data.path);
           await builder.makeBuild();
           await this.updateWorkerData();
@@ -357,7 +357,7 @@ class BunextServer {
     if (!cluster.isPrimary) {
       this.makeBuildAwaiter();
       process.send?.({
-        task: "udpate_build",
+        task: "update_build",
         data: {
           path: data?.path,
         },

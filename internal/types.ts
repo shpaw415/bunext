@@ -34,7 +34,7 @@ export type _globalThis = _GlobalData & {
  * HTTPServer
  *  - port: HTTP server port
  *  - threads: Http worker (multi-threading)
- *    - **only avalable on Linux with Bun ^1.1.25**
+ *    - **only available on Linux with Bun ^1.1.25**
  *
  * Dev
  *  - hotServerPort: Hot reload Server port
@@ -46,8 +46,8 @@ export type _globalThis = _GlobalData & {
  *  - timeout: Invalidate session after X seconds of Idle
  *  - type:
  *      - cookie  : max of 4096 chars ( good for small session data )
- *      - database:hard : session keept on a database on the hard drive ( good for big session data but slower then memory)
- *      - database:memory : session keept on a database in memory ( good for big session data but must have enough RAM )
+ *      - database:hard : session kept on a database on the hard drive ( good for big session data but slower then memory)
+ *      - database:memory : session kept on a database in memory ( good for big session data but must have enough RAM )
  */
 export type ServerConfig = {
   HTTPServer: {
@@ -85,35 +85,35 @@ export type ServerActionDataTypeHeader = "json" | "file" | "blob";
 
 export type ClusterMessageType =
   | {
-    task: "revalidate";
-    data: {
-      path: string[];
-    };
-  }
+      task: "revalidate";
+      data: {
+        path: string[];
+      };
+    }
   | {
-    task: "udpate_build";
-    data: {
-      path?: string;
-    };
-  }
+      task: "update_build";
+      data: {
+        path?: string;
+      };
+    }
   | {
-    task: "getSession";
-    data: {
-      id: string;
-      data?: any;
-    };
-  }
+      task: "getSession";
+      data: {
+        id: string;
+        data?: any;
+      };
+    }
   | {
-    task: "setSession";
-    data: {
-      id: string;
-      sessionData: any;
-      type: "insert" | "update";
-    };
-  }
+      task: "setSession";
+      data: {
+        id: string;
+        sessionData: any;
+        type: "insert" | "update";
+      };
+    }
   | {
-    task: "deleteSession";
-    data: {
-      id: string;
+      task: "deleteSession";
+      data: {
+        id: string;
+      };
     };
-  };

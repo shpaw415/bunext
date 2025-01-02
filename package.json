@@ -36,6 +36,8 @@
   "scripts": {
     "test": "bun test ./bin/main.test.ts",
     "clear": "rm -rf .bunext/build/* .bunext/build/.bunext",
-    "to:module": "bun bin/to_node_module.ts"
+    "to:module": "bun bin/to_node_module.ts",
+    "dev": "bun bunext dev",
+    "start": "bun bunext production"
   }
 }

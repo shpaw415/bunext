@@ -786,3 +786,4 @@ API_KEY="private-api-key"
 - Fix Database schema union type making number as string
 - Database schema in json object in array are considered union
 - Database schema union in json column type can be string or/and number
+- Session strategy has changed and session timeout is automatically updated

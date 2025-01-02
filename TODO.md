@@ -4,6 +4,7 @@ Priority 1
 - Add stable SVG plugin.
 
 - make session as a top provider
+- session timeout client side
 
 - Fix build import default component in serverComponents
   - temporary workaround: [DefaultName, OtherDefaultName]; when the default component is only used in the ServerComponent

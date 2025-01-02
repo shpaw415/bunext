@@ -236,6 +236,7 @@ class StaticRouters {
         search,
         serverSide,
         serverSidePropsResult: result,
+        bunextReq: bunextReq,
       })
     );
 
@@ -345,6 +346,7 @@ class StaticRouters {
     serverSidePropsResult,
     search,
     Shell,
+    bunextReq,
   }: {
     request: Request;
     serverSidePropsString: string;
@@ -356,7 +358,19 @@ class StaticRouters {
     Shell: React.ComponentType<{
       children: React.ReactElement;
     }>;
+    bunextReq: BunextRequest;
   }) {
+    await bunextReq.session.initData();
+    const CreatedAt =
+      bunextReq.session.__DATA__.private?.__BUNEXT_SESSION_CREATED_AT__ || 0;
+
+    const sessionTimeout =
+      CreatedAt == 0
+        ? 0
+        : CreatedAt +
+          bunextReq.session.sessionTimeoutFromNow * 1000 -
+          (new Date().getTime() - CreatedAt);
+
     const preloadScriptObj = {
       __PAGES_DIR__: JSON.stringify(this.pageDir),
       __INITIAL_ROUTE__: JSON.stringify(serverSide.pathname + search),
@@ -364,7 +378,8 @@ class StaticRouters {
       __SERVERSIDE_PROPS__: serverSidePropsString,
       __LAYOUT_ROUTE__: JSON.stringify(this.layoutPaths),
       __HEAD_DATA__: JSON.stringify(Head.head),
-      __PUBLIC_SESSION_DATA__: "undefined",
+      __PUBLIC_SESSION_DATA__: JSON.stringify(bunextReq.session.getData(true)),
+      __SESSION_TIMEOUT__: JSON.stringify(sessionTimeout),
       serverConfig: JSON.stringify({
         Dev: globalThis.serverConfig.Dev,
         HTTPServer: globalThis.serverConfig.HTTPServer,

@@ -1,4 +1,5 @@
 "use client";
+import { generateRandomString } from "@bunpmjs/bunext/features/utils";
 import type { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
 import { GetSessionByID } from "@bunpmjs/bunext/internal/session";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -6,45 +7,66 @@ export { GetSession } from "./bunextRequest";
 
 export type _SessionData<_SessionData> = {
   public: Record<string, _SessionData>;
-  private: Record<string, _SessionData>;
+  private: Record<string, _SessionData> & {
+    __BUNEXT_SESSION_CREATED_AT__?: number;
+  };
 };
 
 declare global {
   var __PUBLIC_SESSION_DATA__: Record<string, any>;
+  var __SESSION_TIMEOUT__: number;
   // @ts-ignore
   var __BUNEXT_SESSION__: _Session<any>;
 }
 
 export type InAppSession<DataType> = Omit<
   _Session<DataType>,
-  "__UPDATE__" | "__DATA__" | "__DELETE__" | "isUpdated" | "initData"
+  | "__UPDATE__"
+  | "__DATA__"
+  | "__DELETE__"
+  | "isUpdated"
+  | "initData"
+  | "updated_id"
 >;
 export class _Session<DataType> {
-  private cookieName = "bunext_session_token";
-  public __UPDATE__?: SessionUpdateClass;
   public __DATA__: _SessionData<any> = {
     public: {},
     private: {},
   };
   public __DELETE__: boolean = false;
   public isUpdated = false;
-  private sessionTimeout = 3600;
-  private inited = false;
+  public sessionTimeoutFromNow = 3600;
   private request?: BunextRequest;
+  private update_function?: React.Dispatch<React.SetStateAction<boolean>>;
+  public updated_id = generateRandomString(5);
 
-  constructor(
-    data?: _SessionData<any>,
-    sessionTimeout?: number,
-    request?: BunextRequest
-  ) {
+  constructor({
+    data,
+    sessionTimeout,
+    request,
+    update_function,
+  }: {
+    data?: _SessionData<any>;
+    sessionTimeout?: number;
+    request?: BunextRequest;
+    update_function?: _Session<any>["update_function"];
+  }) {
     if (data) this.__DATA__ = data;
-    if (sessionTimeout) this.sessionTimeout = sessionTimeout;
+    if (sessionTimeout) this.sessionTimeoutFromNow = sessionTimeout;
     if (request) this.request = request;
+    if (update_function) this.update_function = update_function;
+  }
+  public getSessionTimeout() {
+    return globalThis.__SESSION_TIMEOUT__;
+  }
+  public setSessionTimeout(value: number) {
+    globalThis.__SESSION_TIMEOUT__ = value;
   }
   private setPublicData(data: Record<string, any> | DataType) {
     this.__DATA__.public = {
       ...this.__DATA__.public,
       ...data,
+      __SESSION_TIMEOUT__: this.getSessionTimeout(),
     };
   }
   private setPrivateData(data: Record<string, any> | DataType) {
@@ -59,7 +81,7 @@ export class _Session<DataType> {
    * Server side only
    * @param data data to set in the token
    * @param Public the data can be accessed in the client context ( default: false )
-   * @description update the data in the session. Current data will be keept
+   * @description update the data in the session. Current data will be kept
    */
   setData(data: Partial<DataType>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
@@ -68,8 +90,8 @@ export class _Session<DataType> {
     this.isUpdated = true;
 
     if (Public) {
-      this.setPublicData(data);
       this.setPrivateData(data);
+      this.setPublicData(data);
     } else {
       this.setPrivateData(data);
     }
@@ -111,21 +133,10 @@ export class _Session<DataType> {
    * "use client";
    * await Session.getData(); // {data: "someData"} | undefined
    */
-  getData(): DataType | undefined {
+  getData(getPublic: boolean = false): DataType | undefined {
     if (typeof window != "undefined") {
-      if (!this.inited) {
-        const setter = async () => {
-          const res = await (await fetch("/bunextgetSessionData")).json();
-          this.__DATA__.public = res;
-          if (typeof window != "undefined")
-            globalThis.__PUBLIC_SESSION_DATA__ = res;
-          this.update();
-        };
-        this.inited = true;
-        setter();
-      }
-      this.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
-      return this.__DATA__.public as DataType | undefined;
+      if (this.isExpired()) return undefined;
+      else return this.__DATA__.public as DataType | undefined;
     }
 
     if (!this.SessionExists()) {
@@ -137,7 +148,9 @@ export class _Session<DataType> {
       return undefined;
     }
 
-    return this.__DATA__.private as DataType | undefined;
+    return getPublic
+      ? (this.__DATA__.public as DataType | undefined)
+      : (this.__DATA__.private as DataType | undefined);
   }
   /**
    * Server & Client
@@ -159,9 +172,8 @@ export class _Session<DataType> {
     }
   }
   update() {
-    if (typeof globalThis.__PUBLIC_SESSION_DATA__ != "undefined")
-      this.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
-    this.__UPDATE__?.update();
+    this.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
+    this.update_function?.((c) => !c);
   }
   /**
    * Error if client side
@@ -179,43 +191,41 @@ export class _Session<DataType> {
     );
   }
   private isExpired() {
+    if (typeof window != "undefined") {
+      if (globalThis.__SESSION_TIMEOUT__ - new Date().getTime() > 0)
+        return false;
+      else return true;
+    }
+
     const createdAt = this.__DATA__.private.__BUNEXT_SESSION_CREATED_AT__ as
       | number
       | undefined;
     if (!createdAt) return true;
-    return this.makeCreatedTime() > createdAt + this.sessionTimeout * 1000;
+    return (
+      this.makeCreatedTime() > createdAt + this.sessionTimeoutFromNow * 1000
+    );
   }
   private makeCreatedTime() {
     return new Date().getTime();
   }
 }
 
-export const Session = new _Session(undefined, undefined);
-//globalThis.__BUNEXT_SESSION__ ??= Session;
+export const SessionContext = createContext<_Session<any>>(new _Session({}));
+export const SessionDidUpdateContext = createContext(false);
 
-class SessionUpdateClass {
-  public states: React.Dispatch<React.SetStateAction<boolean>>[] = [];
-  public update() {
-    for (const i of this.states) {
-      i((c) => !c);
-    }
-  }
-}
+/**
+ * return the session object
+ */
+export function useSession<DataType>(props?: {
+  PreventRenderOnUpdate: boolean;
+}) {
+  const session = useContext(SessionContext);
+  const did_update = useContext(SessionDidUpdateContext);
+  const [, setState] = useState(false);
 
-export const SessionUpdate = createContext(new SessionUpdateClass());
-
-export function useSession<DataType>(props?: { PreventRenderOnUpdate: boolean }) {
-  const [state, setState] = useState(true);
-  const _SessionContext = useContext(SessionUpdate);
   useEffect(() => {
-    if (!props?.PreventRenderOnUpdate) _SessionContext.states.push(setState);
-    Session.__UPDATE__ = _SessionContext;
-    return () => {
-      _SessionContext.states.splice(
-        _SessionContext.states.indexOf(setState),
-        1
-      );
-    };
-  }, []);
-  return Session as InAppSession<DataType>;
+    if (props?.PreventRenderOnUpdate) setState(did_update);
+  }, [did_update]);
+
+  return session as InAppSession<DataType>;
 }

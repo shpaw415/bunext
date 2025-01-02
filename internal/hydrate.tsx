@@ -3,11 +3,18 @@ import { hydrateRoot, type ErrorInfo } from "react-dom/client";
 import { RouterHost } from "./router/index";
 import { getRouteMatcher } from "./router/utils/get-route-matcher";
 import type { ServerSideProps, _DisplayMode, _GlobalData } from "./types";
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  _Session,
+  SessionContext,
+  SessionDidUpdateContext,
+} from "../features/session";
+import { AddServerActionCallback } from "./globals";
 
 const globalX = globalThis as unknown as _GlobalData;
 
-const match = getRouteMatcher(globalX.__ROUTES__);
+const match =
+  typeof window == "undefined" ? () => {} : getRouteMatcher(globalX.__ROUTES__);
 
 export async function hydrate(
   Shell: React.ComponentType<
@@ -39,7 +46,7 @@ export async function hydrate(
         route={globalX.__INITIAL_ROUTE__}
         {...globalX.__SERVERSIDE_PROPS__}
       >
-        {JsxToDisplay}
+        <SessionProvider>{JsxToDisplay}</SessionProvider>
       </Shell>
     </RouterHost>,
     { onRecoverableError }
@@ -109,4 +116,47 @@ async function NextJsLayoutStacker({
     });
   }
   return pageJSX;
+}
+
+function SessionProvider({ children }: { children: any }) {
+  const [updater, setUpdater] = useState(false);
+  const session = useMemo(
+    () => new _Session({ update_function: setUpdater }),
+    []
+  );
+  const [sessionTimer, setSessionTimer] = useState<Timer>();
+
+  const timerSetter = useCallback(() => {
+    setSessionTimer((c) => {
+      clearTimeout(c);
+      return setTimeout(() => {
+        session.__DATA__.public = {};
+        session.setSessionTimeout(0);
+        session.update();
+      }, session.getSessionTimeout() - new Date().getTime());
+    });
+  }, []);
+
+  useEffect(() => {
+    AddServerActionCallback((res) => {
+      session.update();
+      session.setSessionTimeout(
+        JSON.parse(
+          res.headers.get("__bunext_session_timeout__") as string
+        ) as number
+      );
+      timerSetter();
+    }, "update_session_callback");
+
+    if (session.getSessionTimeout() > 0) timerSetter();
+    session.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
+    session.update();
+  }, []);
+  return (
+    <SessionContext.Provider value={session}>
+      <SessionDidUpdateContext.Provider value={updater}>
+        {children}
+      </SessionDidUpdateContext.Provider>
+    </SessionContext.Provider>
+  );
 }

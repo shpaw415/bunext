@@ -10,7 +10,7 @@ export class BunextRequest {
   public session: _Session<any>;
   public webtoken: webToken<any>;
   /**
-   * only avalable when serverConfig.session.type == "database:hard" | "database:memory"
+   * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
   public SessionID?: string;
 
@@ -20,11 +20,10 @@ export class BunextRequest {
     this.webtoken = new webToken<any>(this.request, {
       cookieName: "bunext_session_token",
     });
-    this.session = new _Session(
-      undefined,
-      globalThis.serverConfig.session?.timeout,
-      this as any
-    );
+    this.session = new _Session({
+      sessionTimeout: globalThis.serverConfig.session?.timeout,
+      request: this as any,
+    });
     this.SessionID = (
       this.webtoken.session() as undefined | { id: string }
     )?.id;
@@ -66,7 +65,16 @@ export class BunextRequest {
       return globalThis.serverConfig.session?.timeout || 3600;
     };
 
-    response.headers.append("session", this.encodeSessionData(this.session.__DATA__?.public || {}))
+    response.headers.append(
+      "session",
+      this.encodeSessionData(this.session.__DATA__?.public || {})
+    );
+    response.headers.append(
+      "__bunext_session_timeout__",
+      JSON.stringify(
+        this.session.sessionTimeoutFromNow * 1000 + new Date().getTime()
+      )
+    );
 
     return this.webtoken.setCookie(response, {
       expire: setExpire(),

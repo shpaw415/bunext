@@ -81,6 +81,19 @@ export const exitCodes = {
   runtime: 101,
 } as const;
 
+const serverActionsCallbacks: {
+  callback: (response: Response) => void;
+  id: string;
+}[] = [];
+
+export function AddServerActionCallback(
+  callback: (response: Response) => void,
+  id: string
+) {
+  if (serverActionsCallbacks.find((e) => e.id == id)) return;
+  serverActionsCallbacks.push({ callback, id });
+}
+
 function InitServerActionData(...props: Array<any>) {
   let currentPropsIndex = 0;
   const formatToFile = () => {
@@ -110,7 +123,7 @@ function InitServerActionData(...props: Array<any>) {
     } else if (prop instanceof FormData) {
       if (props.length > 1)
         throw new Error(
-          "only one prop is permited with a FormData in a ServerAction"
+          "only one prop is permitted with a FormData in a ServerAction"
         );
       formData = prop;
       return "BUNEXT_FORMDATA";
@@ -131,6 +144,7 @@ export async function MakeServerActionRequest(
     method: "POST",
     body: InitServerActionData(...props),
   });
+  for (const el of serverActionsCallbacks) el.callback(res.clone());
   return await ParseServerActionResponse(res);
 }
 
@@ -161,9 +175,10 @@ async function ParseServerActionResponse(response: Response) {
 }
 
 export function GetSessionFromResponse(response: Response) {
-  return JSON.parse(
-    decodeURI(response.headers.get("session") || ""
-    )) as Record<string, any>;
+  return JSON.parse(decodeURI(response.headers.get("session") || "")) as Record<
+    string,
+    any
+  >;
 }
 
 globalThis.MakeServerActionRequest ??= MakeServerActionRequest;

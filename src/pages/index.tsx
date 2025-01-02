@@ -5,15 +5,12 @@ import {
   revalidateEvery,
 } from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
-import {
-  useSession,
-  GetSession,
-  Session,
-} from "@bunpmjs/bunext/features/session";
+import { useSession, GetSession } from "@bunpmjs/bunext/features/session";
 import { Database } from "@bunpmjs/bunext/database";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import Test from "../../static/index.css";
+import { useMemo } from "react";
 
 type SessionType = {
   test: boolean;
@@ -54,21 +51,8 @@ export default async function Page() {
       <Link href="/other">
         <button>Other pages</button>
       </Link>
-      <button
-        onClick={async () => {
-          await ServerSetSession();
-          Session.update();
-        }}
-      >
-        {generateRandomString(5)}
-      </button>
-      <button
-        onClick={async () => {
-          Session.delete();
-        }}
-      >
-        Delete Session
-      </button>
+      <SetSessionButton />
+      <DeleteSessionButton />
       <button onClick={() => fetch("/api/v1", { method: "POST" })}>api</button>
       <button onClick={() => ServerPrintSession()}>
         Print session to server console
@@ -79,6 +63,27 @@ export default async function Page() {
       <IsLogged />
     </div>
   );
+}
+
+function SetSessionButton() {
+  const session = useSession();
+  const random = useMemo(() => generateRandomString(5), []);
+  return (
+    <button
+      onClick={async () => {
+        await ServerSetSession();
+        session.update();
+      }}
+    >
+      update session
+      {random}
+    </button>
+  );
+}
+
+function DeleteSessionButton() {
+  const session = useSession();
+  return <button onClick={async () => session.delete()}>Delete Session</button>;
 }
 
 export function TestElement3({ params }: { params?: any }) {
