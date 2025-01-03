@@ -1,7 +1,10 @@
 {
     "cSpell.words": [
+        "AUTOINCREMENT",
+        "ENDSWITH",
         "serveractionid",
         "shema",
+        "STARTSWITH",
         "yafs"
     ]
 }

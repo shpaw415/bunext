@@ -14,10 +14,10 @@ const MainDatabase = new _BunDB("./config/bunext.sqlite", {
 });
 
 export class _Database {
-  databaseInstence: _BunDB;
+  databaseInstance: _BunDB;
 
   constructor(db?: _BunDB) {
-    this.databaseInstence = db || MainDatabase;
+    this.databaseInstance = db || MainDatabase;
   }
 
   create(data: _Create) {
@@ -61,12 +61,15 @@ export class _Database {
             column.default = column.default.getTime();
           }
 
-          const StrQuery = `${column.name} ${dataType}${column.primary ? " PRIMARY KEY " : ""
-            }${autoIncrement}${column.nullable ? "" : " NOT NULL"}${column.unique ? " UNIQUE" : ""
-            }${column.default != undefined
+          const StrQuery = `${column.name} ${dataType}${
+            column.primary ? " PRIMARY KEY " : ""
+          }${autoIncrement}${column.nullable ? "" : " NOT NULL"}${
+            column.unique ? " UNIQUE" : ""
+          }${
+            column.default != undefined
               ? ` DEFAULT ${column.default as string}`
               : ""
-            }`;
+          }`;
 
           return StrQuery;
         })
@@ -77,7 +80,7 @@ export class _Database {
       throw new Error(`Table ${data.name} do not have any Primary key.`, {
         cause: "PRIMARY KEY",
       });
-    const prepare = this.databaseInstence.query(queryString);
+    const prepare = this.databaseInstance.query(queryString);
     prepare.run();
   }
 }
@@ -85,62 +88,121 @@ type OptionsFlags<Type> = {
   [Property in keyof Type]: boolean;
 };
 
-type _Select<Table> = {
+type ReservedKeyWords = "LIKE" | "OR";
+type TableExtends = Record<string | ReservedKeyWords, string | number>;
+
+type _Select<Table extends TableExtends> = {
   where?: _Where<Table>;
   select?: Partial<OptionsFlags<Table>> | "*";
   limit?: number;
   skip?: number;
 };
+
 type _Insert<Table> = Table;
 
-type _Where<Table> =
-  | Partial<Table>
-  | _WhereOR<Table>;
+type _Where<Table extends TableExtends> =
+  | (Partial<Table> & {
+      LIKE?: undefined;
+      OR?: undefined;
+    })
+  | (_WhereOR<Table> & {
+      LIKE?: undefined;
+    })
+  | (_WhereLike<Table> & { OR?: undefined });
 
-type _WhereOR<Table> = {
+type _WhereWOLike<Table extends TableExtends> =
+  | Partial<Table>
+  | _WhereORWOLike<Table>;
+type _WhereORWOLike<Table extends TableExtends> = {
   OR: Partial<Table>[];
 };
 
-type _Update<Table> = {
-  where?: _Where<Table>;
+type FilterStringValues<T extends TableExtends> = {
+  [K in keyof T]: T[K] extends string ? K : never;
+}[keyof T];
+
+type FilteredObject<T extends TableExtends> = {
+  [K in FilterStringValues<T>]: T[K];
+};
+
+type _WhereLike<Table extends TableExtends> =
+  | {
+      /**
+       * like operator use wild card
+       *  - **_** <-- single char
+       *  - **%** <-- multiple char
+       * @link https://www.sqlitetutorial.net/sqlite-like
+       * @example
+       * db.select({ where: { LIKE: { foo: "lo_" }  } }) // ["lor"]
+       * @example
+       * db.select({ where: { LIKE: { foo: "lo%" }  } }) // ["lor","lorem ipsum", "lorem ipsum dolor"]
+       */
+      LIKE: Partial<FilteredObject<Table>>;
+    } & { [K in Exclude<ReservedKeyWords, "LIKE">]?: undefined };
+
+type _WhereOR<Table extends TableExtends> = {
+  OR: Partial<Table | _WhereLike<Table>>[];
+};
+
+type _Update<Table extends TableExtends> = {
+  where?: _WhereWOLike<Table>;
   values: Partial<Table>;
 };
 
-type _Delete<Table> = {
-  where: _Where<Table>;
+type _Delete<Table extends TableExtends> = {
+  where: _WhereWOLike<Table>;
 };
 
-type _Count<Table> = {
-  where?: _Where<Table>
-}
+type _Count<Table extends TableExtends> = {
+  where?: _WhereWOLike<Table>;
+};
 
 type _Create = TableSchema;
 
-type _FormatString<T, SELECT_FORMAT> = _Select<SELECT_FORMAT> | _Update<T> | _Delete<T> | _Count<T>;
+type _FormatString<
+  T extends TableExtends,
+  SELECT_FORMAT extends TableExtends
+> = _Select<SELECT_FORMAT> | _Update<T> | _Delete<T> | _Count<T>;
 
-export class Table<T, SELECT_FORMAT> {
+export class Table<
+  T extends Omit<TableSchema, "name" | "columns">,
+  SELECT_FORMAT extends Omit<TableSchema, "name" | "columns">
+> {
   private name: string;
-  databaseInstence: _BunDB;
+  private debug: boolean;
+  /**
+   * direct access to the database instance
+   * @link https://bun.sh/docs/api/sqlite
+   */
+  databaseInstance: _BunDB;
   shema: DBSchema;
   constructor({
     name,
     db,
     shema,
+    debug,
   }: {
     name: string;
     db?: _BunDB;
     shema?: DBSchema;
+    debug?: boolean;
   }) {
     this.name = name;
-    this.databaseInstence = db || MainDatabase;
+    this.databaseInstance = db || MainDatabase;
     this.shema = shema || globalThis.dbShema;
+    this.debug = debug || false;
   }
-  private extractParams(key: string, where: any) {
-    return Array.prototype.concat(
-      ...(where[key] as Array<Partial<T>>).map((data) =>
-        Object.keys(data).map((v) => (data as any)[v])
+  private extractParams(
+    key: keyof _Where<T> | ReservedKeyWords,
+    where?: Partial<_Where<T>> & Partial<Record<ReservedKeyWords, any>>
+  ) {
+    if (!where) return [];
+    this.Log(() => console.log({ key, where }));
+    return Array.prototype
+      .concat(
+        ...(where[key] as Array<Partial<T>>).map((data) => Object.values(data))
       )
-    ).filter((e) => e != undefined) as string[];
+      .filter((e) => e != undefined) as string[];
   }
   private parseParams(params: any[]) {
     return params.map((param) => {
@@ -177,52 +239,107 @@ export class Table<T, SELECT_FORMAT> {
       ? true
       : false;
   }
-  private extractAndOrParams(data: _FormatString<T, SELECT_FORMAT>) {
-    let params: string[] = [];
-    if (data.where && !this.hasOR(data)) params = Object.values(data.where).filter((e) => e != undefined);
-    else if (data.where && typeof (data.where as any)["OR"] !== "undefined")
-      params = this.extractParams("OR", data.where);
-    else if (data.where && typeof (data.where as any)["AND"] !== "undefined")
-      params = this.extractParams("AND", data.where);
+  private hasLIKE(data: _FormatString<T, SELECT_FORMAT>) {
+    return data.where && Object.keys(data.where).find((e) => e == "LIKE")
+      ? true
+      : false;
+  }
+  private extractLikeOrParams(
+    data: _FormatString<T, SELECT_FORMAT> & {
+      where?: Partial<Record<ReservedKeyWords, any>>;
+    }
+  ): string[] {
+    const ReservedArray: Array<ReservedKeyWords> = ["LIKE"];
 
-    return params;
+    if (!data.where) return [];
+
+    if (!this.hasOR(data)) {
+      for (const param of ReservedArray as Array<ReservedKeyWords>) {
+        if (data.where[param])
+          return (
+            Object.values(data.where[param]) as Array<string | undefined>
+          ).filter((e) => e != undefined);
+      }
+      return Object.values(data.where).filter((e) => e != undefined);
+    } else {
+      const datas = (data.where?.OR as _WhereOR<T>["OR"])
+        .map((entry) => {
+          return (Object.keys(entry) as Array<keyof _WhereLike<T>>).map((k) => {
+            if (ReservedArray.includes(k))
+              return Object.values(entry[k as keyof typeof entry] || {});
+            return [entry[k as keyof typeof entry]];
+          });
+        })
+        .reduce((p, n) => [...p, ...n], [])
+        .reduce((p, n) => [...p, ...n], []) as string[];
+
+      this.Log(() => console.log({ whereOR: data.where?.OR, datas }));
+      return datas;
+    }
   }
   private formatQueryString(data: _FormatString<T, SELECT_FORMAT>) {
     let queyString = "";
 
     const hasOR = this.hasOR(data);
+    const hasLIKE = this.hasLIKE(data);
 
-    if (data.where && !hasOR) {
+    const whereKeys = () =>
+      (
+        Object.keys(data.where || {}) as Array<keyof _Select<T>["where"]>
+      ).filter(
+        (k) => (data.where as _Where<T>)[k as keyof _Where<T>] != undefined
+      ) as Array<string>;
+
+    const toLIKE = (keys: Array<string>) =>
+      ` ${keys.map((k) => `${k} LIKE ?`).join(" AND ")}`;
+
+    if (data.where && !hasOR && !hasLIKE) {
       queyString +=
         "WHERE " +
-        (Object.keys(data.where) as Array<keyof _Select<T>["where"]>)
-          .filter((k) => (data.where as any)[k] != undefined)
+        whereKeys()
           .map((where) => {
             return `${where} = ?`;
           })
           .join(" AND ");
     } else if (data.where && hasOR) {
-      const ORlist = (data.where as _Where<T> & { OR: Array<Partial<T>> }).OR;
-      if (!Array.isArray(ORlist)) {
-        console.error("Database Error:\n", ORlist);
-        throw new Error("Database query failed: OR params need to be an array");
-      }
-      else queyString +=
+      const ORlist = (data.where as _WhereOR<T>).OR;
+
+      queyString +=
         "WHERE " +
         ORlist.map((or) => {
-          return Object.keys(or)
+          return (Object.keys(or) as Array<keyof T & keyof _WhereLike<T>>)
             .map((key) => {
-              return `${key} = ?`;
+              if (key == "LIKE")
+                return toLIKE(
+                  Object.keys(
+                    (or as _WhereLike<T>).LIKE as Partial<FilteredObject<T>>
+                  )
+                );
+              else return `${key} = ?`;
             })
             .join(" AND ");
         }).join(" OR ");
+    } else if (data.where && hasLIKE) {
+      queyString += `WHERE ${toLIKE(
+        Object.keys((data.where as unknown as _WhereLike<T>).LIKE || {})
+      )}`;
     }
+
+    this.Log(() => console.log({ data, queyString }));
+
     return queyString;
+  }
+  private Log(callback: Function) {
+    this.debug && callback();
   }
 
   select(data: _Select<SELECT_FORMAT>) {
-
-    if (this.hasOR(data) && data.where && (data.where as _WhereOR<SELECT_FORMAT>).OR.length == 0) return [];
+    if (
+      this.hasOR(data) &&
+      data.where &&
+      (data.where as _WhereOR<SELECT_FORMAT>).OR?.length == 0
+    )
+      return [];
 
     if (data.where) {
       data.where = Object.assign(
@@ -251,11 +368,15 @@ export class Table<T, SELECT_FORMAT> {
 
     if (data.skip) queyString += ` OFFSET ${data.skip}`;
 
-    const query = this.databaseInstence.prepare(queyString);
-    const res = query.all(...this.extractAndOrParams(data));
+    this.Log(() => console.log({ full_queryString: queyString }));
+
+    const query = this.databaseInstance.prepare(queyString);
+    const res = query.all(...this.extractLikeOrParams(data));
     query.finalize();
 
-    return res.map((row) => this.restoreParams(row)) as Partial<SELECT_FORMAT>[];
+    return res.map((row) =>
+      this.restoreParams(row)
+    ) as Partial<SELECT_FORMAT>[];
   }
   insert(data: _Insert<T>[]) {
     let queryString = `INSERT INTO ${this.name} (${Object.keys(
@@ -263,9 +384,9 @@ export class Table<T, SELECT_FORMAT> {
     ).join(", ")}) VALUES (${Object.keys((data as any)[0]).map(
       (v) => `$${v}`
     )})`;
-    const db = this.databaseInstence.prepare(queryString);
+    const db = this.databaseInstance.prepare(queryString);
 
-    const inserter = this.databaseInstence.transaction((entries) => {
+    const inserter = this.databaseInstance.transaction((entries) => {
       for (const entry of entries) db.run(entry);
     });
     const entries = data.map((entry) =>
@@ -292,30 +413,48 @@ export class Table<T, SELECT_FORMAT> {
     if (this.hasOR(data)) params.push(...this.extractParams("OR", data.where));
     else if (data.where) params.push(...Object.values(data.where));
 
-    const db = this.databaseInstence.prepare(queryString);
+    const db = this.databaseInstance.prepare(queryString);
     const res = db.all(...this.parseParams(params)) as T[];
     return res;
   }
   delete(data: _Delete<T>) {
+    if (
+      this.hasOR(data) &&
+      data.where &&
+      (data.where as _WhereOR<T>).OR.length == 0
+    )
+      return;
 
-    if (this.hasOR(data) && data.where && (data.where as _WhereOR<T>).OR.length == 0) return;
+    const queyString = `DELETE FROM ${this.name} ${this.formatQueryString(
+      data
+    )}`;
 
-    const queyString = `DELETE FROM ${this.name} ${this.formatQueryString(data)}`;
-
-    const query = this.databaseInstence.prepare(queyString);
-    query.all(...this.extractAndOrParams(data));
+    const query = this.databaseInstance.prepare(queyString);
+    query.all(...this.extractLikeOrParams(data));
     query.finalize();
   }
   count(data?: _Count<T>) {
-    if (data && this.hasOR(data) && data.where && (data.where as _WhereOR<T>).OR.length == 0) return 0;
+    if (
+      data &&
+      this.hasOR(data) &&
+      data.where &&
+      (data.where as _WhereOR<T>).OR.length == 0
+    )
+      return 0;
 
-    const queryString = `SELECT COUNT(*) FROM ${this.name} ${data ? this.formatQueryString(data) : ""}`;
+    const queryString = `SELECT COUNT(*) FROM ${this.name} ${
+      data ? this.formatQueryString(data) : ""
+    }`;
 
-
-    const query = this.databaseInstence.prepare(queryString);
-    const res = query.all(...(data ? this.extractAndOrParams(data) : []));
+    const query = this.databaseInstance.prepare(queryString);
+    const res = query.all(...(data ? this.extractLikeOrParams(data) : []));
     query.finalize();
 
     return (res as Array<{ "COUNT(*)": number }>)[0]["COUNT(*)"];
   }
 }
+
+export const wild = {
+  single: "_",
+  multiple: "%",
+} as const;

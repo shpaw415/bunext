@@ -6,11 +6,9 @@ import {
 } from "@bunpmjs/bunext/features/router";
 import { TestElement } from "./test";
 import { useSession, GetSession } from "@bunpmjs/bunext/features/session";
-import { Database } from "@bunpmjs/bunext/database";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import Test from "../../static/index.css";
-import { useMemo } from "react";
 
 type SessionType = {
   test: boolean;
@@ -18,7 +16,7 @@ type SessionType = {
 
 Head.setHead({
   data: {
-    title: "my Hompage",
+    title: "my Homepage",
     meta: [
       {
         name: "foo",
@@ -67,7 +65,7 @@ export default async function Page() {
 
 function SetSessionButton() {
   const session = useSession();
-  const random = useMemo(() => generateRandomString(5), []);
+  const random = generateRandomString(5);
   return (
     <button
       onClick={async () => {
@@ -103,8 +101,6 @@ function IsLogged() {
 }
 
 export async function ServerSetSession() {
-  const db = Database();
-
   GetSession(arguments).setData(
     {
       test: true,

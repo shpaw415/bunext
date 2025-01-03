@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible Runtime: bun 1.1.0 - 1.1.41
+compatible Runtime: bun 1.1.0 - 1.1.42
 compatible OS: Linux, WSL
 
 N.B : Bun is in continuous change and compatibility between version is a
@@ -11,7 +11,7 @@ I will keep up to date the framework for what it needs
 
 # bunext
 
-- Nextjs like Framework compatible with Bun Runtime
+- Nextjs inspired Framework compatible with Bun Runtime
 
 - Facing problems? [Open an issue ](https://github.com/shpaw415/bunext/issues)
 
@@ -21,6 +21,7 @@ When an update of Bunext is made you must run:
 
 ```Bash
 #!/usr/bin/env bash
+# this is temporary and will change in future release
 bun bunext init
 bun run db:create # only create the types
 ```
@@ -29,9 +30,10 @@ bun run db:create # only create the types
 
 - Documentation
 
+- React 19 & React Compiler
+
 - SQlite performance & features
 
-  - LIKE operator with wildcard char
   - Database merging ( bun db:merge )
   - Transaction
 
@@ -787,3 +789,6 @@ API_KEY="private-api-key"
 - Database schema in json object in array are considered union
 - Database schema union in json column type can be string or/and number
 - Session strategy has changed and session timeout is automatically updated
+- Database LIKE operator for SELECT operation
+- direct access to the database for making custom request ( this method do not provide a secure way to make database call **you must make it secure** )
+- add tests for database 

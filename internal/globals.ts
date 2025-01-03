@@ -52,6 +52,10 @@ declare global {
   var Fragment: React.ExoticComponent<{
     children?: React.ReactNode | undefined;
   }>;
+  var ServerActionCallbacks: {
+    callback: (response: Response) => void;
+    id: string;
+  }[];
 }
 
 globalThis.React = React;
@@ -63,6 +67,7 @@ globalThis.jsxs_eh6c78nj = jsxs;
 globalThis.jsxs = jsxs;
 globalThis.Fragment_8vg9x3sq = Fragment;
 globalThis.Fragment = Fragment;
+globalThis.ServerActionCallbacks ??= [];
 
 export const paths = {
   bunextDirName: ".bunext",
@@ -81,17 +86,17 @@ export const exitCodes = {
   runtime: 101,
 } as const;
 
-const serverActionsCallbacks: {
-  callback: (response: Response) => void;
-  id: string;
-}[] = [];
-
 export function AddServerActionCallback(
   callback: (response: Response) => void,
   id: string
 ) {
-  if (serverActionsCallbacks.find((e) => e.id == id)) return;
-  serverActionsCallbacks.push({ callback, id });
+  if (globalThis.ServerActionCallbacks.find((e) => e.id == id)) {
+    globalThis.ServerActionCallbacks.splice(
+      globalThis.ServerActionCallbacks.findIndex((e) => e.id == id),
+      1
+    );
+  }
+  ServerActionCallbacks.push({ callback, id });
 }
 
 function InitServerActionData(...props: Array<any>) {
@@ -144,7 +149,7 @@ export async function MakeServerActionRequest(
     method: "POST",
     body: InitServerActionData(...props),
   });
-  for (const el of serverActionsCallbacks) el.callback(res.clone());
+  for (const el of globalThis.ServerActionCallbacks) el.callback(res.clone());
   return await ParseServerActionResponse(res);
 }
 

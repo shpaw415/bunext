@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -13,6 +14,12 @@ import React, {
 import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher } from "./utils/get-route-matcher";
 import type { _GlobalData } from "../types";
+import {
+  _Session,
+  SessionContext,
+  SessionDidUpdateContext,
+} from "../../features/session";
+import { AddServerActionCallback } from "../globals";
 
 const globalX = globalThis as unknown as _GlobalData;
 
@@ -182,11 +189,59 @@ export const RouterHost = ({
   return (
     <ReloadContext.Provider value={reload}>
       <VersionContext.Provider value={version}>
-        {current}
+        <SessionProvider>{current}</SessionProvider>
       </VersionContext.Provider>
     </ReloadContext.Provider>
   );
 };
+
+function SessionProvider({ children }: { children: any }) {
+  const [updater, setUpdater] = useState(false);
+  const session = useMemo(
+    () => new _Session({ update_function: setUpdater }),
+    []
+  );
+  const [sessionTimer, setSessionTimer] = useState<Timer>();
+
+  const timerSetter = useCallback(() => {
+    setSessionTimer((c) => {
+      clearTimeout(c);
+      return setTimeout(() => {
+        session.__DATA__.public = {};
+        session.setSessionTimeout(0);
+        session.update();
+      }, session.getSessionTimeout() - new Date().getTime());
+    });
+  }, []);
+
+  const addToServerActionCallback = useCallback(
+    () =>
+      AddServerActionCallback((res) => {
+        session.update();
+        session.setSessionTimeout(
+          JSON.parse(
+            res.headers.get("__bunext_session_timeout__") as string
+          ) as number
+        );
+        timerSetter();
+      }, "update_session_callback"),
+    []
+  );
+  useEffect(() => {
+    addToServerActionCallback();
+    if (session.getSessionTimeout() > 0) timerSetter();
+    session.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
+    session.update();
+  }, []);
+
+  return (
+    <SessionContext.Provider value={session}>
+      <SessionDidUpdateContext.Provider value={updater}>
+        {children}
+      </SessionDidUpdateContext.Provider>
+    </SessionContext.Provider>
+  );
+}
 
 async function NextJsLayoutStacker(
   page: JSX.Element,
