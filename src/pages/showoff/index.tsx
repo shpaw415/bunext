@@ -100,17 +100,7 @@ export default function Page() {
                 }}
               >
                 <h3>Docs</h3>
-                {Arrow({
-                  style: {
-                    fill: "none",
-                    stroke: "rgb(255,255,255)",
-                    strokeLinecap: "round",
-                    strokeLinejoin: "round",
-                    strokeWidth: 1.5,
-                    width: 60,
-                    height: 40,
-                  },
-                })}
+                <ArrowElement />
               </div>
               <p
                 style={{
@@ -124,5 +114,20 @@ export default function Page() {
         </footer>
       </div>
     </div>
+  );
+}
+
+function ArrowElement() {
+  return (
+    <Arrow
+      style={{
+        stroke: "rgb(255,255,255)",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        strokeWidth: 1.5,
+        width: 60,
+        height: 40,
+      }}
+    />
   );
 }

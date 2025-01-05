@@ -1,10 +1,7 @@
 Priority 1
 
 - Database Gt, Lt, NotEqual, GtEq, LtEq, Exists
-- build set entrypoint to a regex match for params like [id].tsx
 - css module
-- Add stable SVG plugin.
-
 - Fix build import default component in serverComponents
   - temporary workaround: [DefaultName, OtherDefaultName]; when the default component is only used in the ServerComponent
 

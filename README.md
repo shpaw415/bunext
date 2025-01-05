@@ -37,8 +37,6 @@ bun run db:create # only create the types
   - Database merging ( bun db:merge )
   - Transaction
 
-- SVG plugin stable
-
 - Windows compatibility
 
 ## What is ready
@@ -73,7 +71,7 @@ bun run db:create # only create the types
 
 - Links
 
-- SVG support ( Beta )
+- SVG support
 
 ### To install and run
 
@@ -127,6 +125,24 @@ export default function DynamicPage({params}:{params: Params}) {
     </div>
   );
 }
+```
+
+### Navigate
+
+two methods to navigate to another page
+
+```Javascript XML
+// index.tsx
+import { navigate, Link } from "@bunpmjs/bunext/internal/router";
+function NextPage() {
+  return <>
+    <button onClick={() => navigate("/new/location")}>Next page</button>
+    <Link href="/new/location">
+      <button>Next Page</button>
+    </Link>
+  </>;
+}
+
 ```
 
 ## Session
@@ -536,26 +552,6 @@ export async function ReactElement() {
 
 ```
 
-## Router
-
-### Navigate
-
-two methods to navigate to another page
-
-```Javascript XML
-// index.tsx
-import { navigate, Link } from "@bunpmjs/bunext/internal/router";
-function NextPage() {
-  return <>
-    <button onClick={() => navigate("/new/location")}>Next page</button>
-    <Link href="/new/location">
-      <button>Next Page</button>
-    </Link>
-  </>;
-}
-
-```
-
 ## Set Head meta data
 
 - set _path_ to the wanted route or \* for every routes
@@ -586,6 +582,31 @@ Head.setHead({
   path: "/otherPath",
 });
 ```
+
+## SVG
+use svg file as component you can import
+- must be called as a Function in a Server Component
+- can be called in a XML Version in Client Component
+
+```Javascript XML
+// index.tsx
+import SVGIcon from "./my-svg.svg";
+
+export default function Page() {
+  return (
+    <div>
+      {SVGIcon()}
+      <Element />
+    </div>
+  );
+}
+
+function Element() {
+  return <SVGIcon className="icon" />
+}
+
+```
+
 
 ## Run Script at Startup
 
@@ -822,3 +843,4 @@ API_KEY="private-api-key"
   - **previously**: only [id].tsx was supported
   - **now**:  any [segmentName] supported (ex: [foo].tsx or [bar].tsx)
 - update README
+- SVG loader use SVGR (now stable)

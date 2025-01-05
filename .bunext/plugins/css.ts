@@ -7,19 +7,13 @@ const CssPlugin: BunPlugin = {
       {
         filter: /\.css$/,
       },
-      ({ path }) => {
+      ({ path }: { path: string }) => {
         const cwd = process.cwd();
         const makePath = () => {
-          if (
-            !process.env?.__SUPPRESS_CSS_LOADER_WARNING__ &&
-            !path.startsWith(cwd + "/static")
-          )
-            console.error({
-              bunext_loader: "loading css is only supported in /static ",
-              suppress:
-                'to suppress this message set env varaible __SUPPRESS_CSS_LOADER_WARNING__="true"',
-            });
-          return path.replace(cwd, "").replace("/static", "");
+          const mainPath = path.replace(cwd, "");
+          if (mainPath && mainPath.startsWith("/static"))
+            return mainPath.replace("/static", "");
+          return mainPath;
         };
 
         return {

@@ -16,6 +16,15 @@
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@static/*": [
+        "./static/*"
+      ],
+      "@/*": [
+        "./src/*"
+      ],
+    }
   },
-  "exclude": [ "node_modules" ]
+  "exclude": [ "node_modules" ],
+  "include": [ ".bunext/custom.d.ts","src", "internal", "plugins", "static" ],
 }
