@@ -4,7 +4,15 @@
   "repository": "shpaw415/bunext",
   "bugs": "https://github.com/shpaw415/bunext",
   "license": "MIT",
-  "module": "index.ts",
+  "author": {
+    "name": "Justin Halle"
+  },
+  "engines": {
+    "bun": "1.1.x"
+  },
+  "os": [
+    "linux"
+  ],
   "type": "module",
   "devDependencies": {
     "@types/bun": "latest",
@@ -34,11 +42,21 @@
     "bunext": "bin/index.ts"
   },
   "scripts": {
-    "test": "bun test ./bin/main.test.ts",
+    "test": "bun run build && bun test ./bin/main.test.ts",
     "clear": "rm -rf .bunext/build/* .bunext/build/.bunext",
     "to:module": "bun bin/to_node_module.ts",
     "dev": "bun bunext dev",
     "start": "bun bunext production",
     "build": "bun to:module && bun bunext build"
-  }
+  },
+  "keywords": [
+    "react",
+    "framework",
+    "full-stack",
+    "front-end",
+    "backend",
+    "web",
+    "server",
+    "bun"
+  ]
 }
