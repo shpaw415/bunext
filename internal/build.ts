@@ -1,16 +1,23 @@
 import { join, basename } from "node:path";
-import { semver, type BuildOutput, type BunPlugin, type JavaScriptLoader, type Loader } from "bun";
+import {
+  semver,
+  type BuildOutput,
+  type BunPlugin,
+  type JavaScriptLoader,
+  type Loader,
+} from "bun";
 import { normalize, resolve } from "path";
 import { isValidElement, type ReactPortal } from "react";
 import reactElementToJSXString from "./jsxToString/index";
 import { unlinkSync } from "node:fs";
 import "./server_global";
 import { renderToString } from "react-dom/server";
-import type { ssrElement } from "./types";
+import type { ssrElement, ServerConfig } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 import fetchCache from "./caching/fetch";
 import { BuildServerComponantWithHooksWarning } from "./logs";
+import { mkdir, rm } from "node:fs/promises";
 globalThis.React = await import("react");
 
 fetchCache.reset();
@@ -26,20 +33,20 @@ type BuildOuts = {
 
 type procIPCdata =
   | ({
-    type: "build";
-  } & BuildOuts)
+      type: "build";
+    } & BuildOuts)
   | {
-    type: "error";
-    error: Error;
-  };
+      type: "error";
+      error: Error;
+    };
 
 type _Mainoptions = {
   baseDir: string;
-  buildDir?: string;
-  pageDir?: string;
+  buildDir: string;
+  pageDir: string;
   hydrate: string;
-  sourcemap?: "external" | "none" | "inline";
-  minify?: boolean;
+  sourcemap: "external" | "none" | "inline";
+  minify: boolean;
   define?: Record<string, string>;
 };
 
@@ -82,6 +89,7 @@ class Builder {
   constructor(baseDir: string) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
+      sourcemap: "inline",
       pageDir: "src/pages",
       buildDir: ".bunext/build",
       hydrate: ".bunext/react-ssr/hydrate.ts",
@@ -93,7 +101,7 @@ class Builder {
     await this.InitGetCustomPluginsFromUser();
     try {
       await this.InitGetFixingPlugins();
-    } catch { }
+    } catch {}
     return this;
   }
 
@@ -110,7 +118,7 @@ class Builder {
 
   private async InitGetCustomPluginsFromUser() {
     const serverConfig = (await import(process.cwd() + "/config/server"))
-      .default;
+      .default as ServerConfig;
     this.plugins.push(...serverConfig.build.plugins);
   }
 
@@ -126,39 +134,44 @@ class Builder {
       for await (const path of this.glob(absPageDir)) {
         entrypoints.push(path);
       }
+
+      const paramNameRegex = /\[[A-Za-z0-9]+\]\.tsx/;
+
       entrypoints = entrypoints.filter((e) => {
-        const allowedEndsWith = [
-          "hydrate.ts",
-          "layout.tsx",
-          "index.tsx",
-          "[id].tsx",
-        ];
-        if (allowedEndsWith.includes(e.split("/").at(-1) as string))
+        const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx"];
+        if (
+          allowedEndsWith.includes(e.split("/").at(-1) as string) ||
+          paramNameRegex.test(e)
+        )
           return true;
         return false;
       });
     } else {
       entrypoints.push(onlyPath);
     }
-
     this.buildOutput = await this.CreateBuild({
       entrypoints: entrypoints,
       sourcemap,
       outdir: join(baseDir, buildDir as string),
       minify,
     });
+    this.cleanBuildDir(this.buildOutput);
+    process.env.__BUILD_MODE__ = "false";
+    return this.buildOutput;
+  }
+  private async cleanBuildDir(buildOutput: BuildOutput) {
     for await (const file of this.glob(
       this.options.buildDir as string,
-      "**/*.js"
+      "**/*"
     )) {
-      if (this.buildOutput.outputs.find((e) => e.path == file)) continue;
+      if (buildOutput.outputs.find((e) => e.path == file)) continue;
       else
         try {
           unlinkSync(file);
-        } catch { }
+        } catch {
+          console.log(file, "not found for deletion");
+        }
     }
-    process.env.__BUILD_MODE__ = "false";
-    return this.buildOutput;
   }
   async preBuild(modulePath: string) {
     Head._setCurrentPath(modulePath);
@@ -184,8 +197,12 @@ class Builder {
       } catch (e) {
         if (e instanceof Error) {
           if (e.message.startsWith("Cannot call a class constructor")) continue;
-          console.log(e)
-          if (e.message.startsWith("null is not an object (evaluating 'dispatcher.use")) {
+          console.log(e);
+          if (
+            e.message.startsWith(
+              "null is not an object (evaluating 'dispatcher.use"
+            )
+          ) {
             console.log(BuildServerComponantWithHooksWarning);
           }
         }
@@ -254,18 +271,26 @@ class Builder {
     if (index == -1) return;
     if (process.env.NODE_ENV == "production") {
       const extentions = ["tsx", "jsx"];
-      for (const imp of new Bun.Transpiler({ loader: path.split(".").at(-1) as JavaScriptLoader }).scanImports(await Bun.file(path).text()).map((e) => e.path)) {
+      for (const imp of new Bun.Transpiler({
+        loader: path.split(".").at(-1) as JavaScriptLoader,
+      })
+        .scanImports(await Bun.file(path).text())
+        .map((e) => e.path)) {
         if (imp.startsWith(".")) {
           const _path = path.split("/");
           _path.pop();
           const resolvedPath = resolve(normalize("/" + join(..._path)), imp);
           for await (const ext of extentions) {
-            const i = this.ssrElement.findIndex((e) => e.path == `${resolvedPath}.${ext}`);
+            const i = this.ssrElement.findIndex(
+              (e) => e.path == `${resolvedPath}.${ext}`
+            );
             if (i != -1) this.ssrElement.splice(i, 1);
           }
           continue;
         }
-        const absolutePath = Bun.fileURLToPath(await import.meta.resolve?.(imp) || "");
+        const absolutePath = Bun.fileURLToPath(
+          (await import.meta.resolve?.(imp)) || ""
+        );
         const i = this.ssrElement.findIndex((e) => e.path == absolutePath);
         if (i == -1) continue;
         this.ssrElement.splice(i, 1);
@@ -277,6 +302,10 @@ class Builder {
   }
   findPathIndex(path: string) {
     return this.ssrElement.findIndex((p) => p.path === path);
+  }
+
+  testBuild() {
+    return this._makeBuild();
   }
 
   private async _makeBuild() {
@@ -488,13 +517,13 @@ class Builder {
           {
             filter: new RegExp(
               "^" +
-              self.escapeRegExp(
-                normalize(
-                  join(self.options.baseDir, self.options.pageDir as string)
-                )
-              ) +
-              "/.*" +
-              "\\.(ts|tsx|jsx)$"
+                self.escapeRegExp(
+                  normalize(
+                    join(self.options.baseDir, self.options.pageDir as string)
+                  )
+                ) +
+                "/.*" +
+                "\\.(ts|tsx|jsx)$"
             ),
           },
           async ({ path, loader, ...props }) => {
@@ -564,7 +593,7 @@ class Builder {
                 replace: {
                   ...serverActionsTags,
                   ...serverCompotantsForTranspiler,
-                }
+                },
               },
             });
             fileContent = transpiler.transformSync(fileContent);
@@ -581,7 +610,11 @@ class Builder {
               treeShaking: true,
             }).transformSync(fileContent);
 
-            for (const name of Object.keys(serverComponants)) fileContent = fileContent.replace(`function ${name}()`, `function _${name}()`);
+            for (const name of Object.keys(serverComponants))
+              fileContent = fileContent.replace(
+                `function ${name}()`,
+                `function _${name}()`
+              );
 
             return {
               contents: fileContent,
@@ -605,11 +638,11 @@ class Builder {
           {
             filter: new RegExp(
               "^" +
-              self.escapeRegExp(
-                normalize(join(self.options.baseDir, "node_modules"))
-              ) +
-              "/.*" +
-              "\\.(ts|tsx|jsx)$"
+                self.escapeRegExp(
+                  normalize(join(self.options.baseDir, "node_modules"))
+                ) +
+                "/.*" +
+                "\\.(ts|tsx|jsx)$"
             ),
           },
           async ({ path, loader }) => {

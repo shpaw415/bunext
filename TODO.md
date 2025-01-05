@@ -1,5 +1,7 @@
 Priority 1
 
+- Database Gt, Lt, NotEqual, GtEq, LtEq, Exists
+- build set entrypoint to a regex match for params like [id].tsx
 - css module
 - Add stable SVG plugin.
 

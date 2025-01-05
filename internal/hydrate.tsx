@@ -32,8 +32,6 @@ export async function hydrate(
     matched: matched,
   });
 
-  console.log("tester");
-
   return hydrateRoot(
     document,
     <RouterHost Shell={Shell} {...options}>

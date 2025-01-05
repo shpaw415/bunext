@@ -10,8 +10,8 @@ import "../.bunext/react-ssr/server.ts";
 const Server = globalThis.Server;
 
 describe("Build features", () => {
-  test.skip("Build", async () => {
-    const buildOut = await builder.makeBuild();
+  test("Build", async () => {
+    const buildOut = await builder.testBuild();
     expect(buildOut?.ssrElement.length).toBeGreaterThan(0);
     expect(buildOut?.revalidates.length).toBeGreaterThan(0);
     router.setRoutes();

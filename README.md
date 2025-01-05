@@ -103,7 +103,7 @@ Thanks to all people how are following my work!
 Like NextJs the routes are in src/pages.
 
 - _index.tsx_ is the main page for the route
-- _[id].tsx_ is a dynamic page loading and is a good opportunity to use getServerSideProps
+- _[id].tsx_ is a Dynamic Segment can be created by wrapping a file or folder name in square brackets: [segmentName]. For example, [id] or [slug].
 - _layout.tsx_ is the layout for the current route and sub-directory routes
 
 ```Javascript XML
@@ -112,6 +112,21 @@ export default function Page() {
   return <div>My page</div>
 }
 
+//[action]/[id].tsx
+
+type Params = {
+  action: string;
+  id: string;
+};
+
+export default function DynamicPage({params}:{params: Params}) {
+  return (
+    <div>
+      action: {params.action} 
+      id: {params.id}
+    </div>
+  );
+}
 ```
 
 ## Session
@@ -376,24 +391,29 @@ export async function ServerRevalidate(paths: string[]) {
 Load dynamic data directly into the main React Element.
 
 ```Javascript XML
-// Request URL /informationID
-// [id].tsx
-export default function Page(data: {
-  props: {
-    foo: string,
-    name: {
-      john: string
-      }
-    },
-  params: {
-    id: string
+
+type Props = {
+  foo: string;
+  name: {
+    john: string;
   }
+};
+
+type Params = {
+  action: string;
+  id: string;
+}
+
+// [action]/[id].tsx
+export default function Page({props, params}: {
+  props: Props
+  params: Params
   }) {
-    return <div>{data.props.foo + " - " + data.params.id}</div> // bar - informationID
+    return <div>{props.foo + " - " + params.id}</div>
   }
 
 
-export async function getServerSideProps() {
+export async function getServerSideProps(): Props {
   // go get some api data, database, etc...
 
   // return { redirect: "/path/to/another/location" };
@@ -791,4 +811,14 @@ API_KEY="private-api-key"
 - Session strategy has changed and session timeout is automatically updated
 - Database LIKE operator for SELECT operation
 - direct access to the database for making custom request ( this method do not provide a secure way to make database call **you must make it secure** )
-- add tests for database 
+- added tests for database
+- automatic session timeout update UI
+
+## 0.8.19
+
+- enforce tests
+- remove unused files in build after each builds
+- Router: any [segmentName].tsx is now supported 
+  - **previously**: only [id].tsx was supported
+  - **now**:  any [segmentName] supported (ex: [foo].tsx or [bar].tsx)
+- update README

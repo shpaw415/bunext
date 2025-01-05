@@ -38,6 +38,7 @@
     "clear": "rm -rf .bunext/build/* .bunext/build/.bunext",
     "to:module": "bun bin/to_node_module.ts",
     "dev": "bun bunext dev",
-    "start": "bun bunext production"
+    "start": "bun bunext production",
+    "build": "bun to:module && bun bunext build"
   }
 }

@@ -28,7 +28,10 @@ class ClientOnlyError extends Error {
   }
 }
 
-type pathNames = "/bunextgetSessionData" | "/ServerActionGetter" | string;
+type pathNames =
+  | "/bunextgetSessionData"
+  | "/ServerActionGetter"
+  | "/bunextDeleteSession";
 
 let LoadedNodeModule: Array<{
   path: string;
