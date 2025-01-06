@@ -102,6 +102,13 @@ class Builder {
     try {
       await this.InitGetFixingPlugins();
     } catch {}
+
+    const pluginsNames: string[] = [];
+    for (const plugin of this.plugins) {
+      if (pluginsNames.includes(plugin.name))
+        this.plugins.splice(this.plugins.indexOf(plugin), 1);
+      else pluginsNames.push(plugin.name);
+    }
     return this;
   }
 

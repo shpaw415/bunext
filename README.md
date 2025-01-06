@@ -844,3 +844,7 @@ API_KEY="private-api-key"
   - **now**:  any [segmentName] supported (ex: [foo].tsx or [bar].tsx)
 - update README
 - SVG loader use SVGR (now stable)
+
+## 0.8.20
+
+- caching SVG for more fluid dev experience
