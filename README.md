@@ -848,3 +848,7 @@ API_KEY="private-api-key"
 ## 0.8.20
 
 - caching SVG for more fluid dev experience
+
+## 0.8.21
+
+- update SVG caching strategy cold start improvement and cache validation based on the file hash
