@@ -7,7 +7,7 @@ import "../.bunext/react-ssr/server.ts";
 const Server = globalThis.Server;
 
 describe("Build features", () => {
-  test.skip("Build", async () => {
+  /*test.skip("Build", async () => {
     const { builder } = await import("@bunpmjs/bunext/internal/build");
     const buildOut = await builder.testBuild();
     expect(buildOut?.ssrElement.length).toBeGreaterThan(0);
@@ -15,7 +15,7 @@ describe("Build features", () => {
     router.setRoutes();
     const matched = router.client?.match("/");
     expect(matched).not.toBe(null);
-  });
+  });*/
 
   test("revalidate", async () => {
     const { revalidate } = await import("@bunpmjs/bunext/features/router.ts");
