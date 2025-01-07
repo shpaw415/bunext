@@ -29,7 +29,6 @@ export default function Page() {
           width: "80%",
           maxWidth: 1080,
         }}
-        suppressHydrationWarning
       >
         <div
           style={{
@@ -41,7 +40,6 @@ export default function Page() {
               style={{
                 marginRight: 5,
               }}
-              suppressHydrationWarning
             >
               Get started by editing
             </p>
@@ -73,7 +71,6 @@ export default function Page() {
                 border: "1px solid black",
                 borderRadius: "15px",
               }}
-              suppressHydrationWarning
             />
           </div>
         </div>

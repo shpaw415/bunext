@@ -7,12 +7,16 @@ ${bunextBlue} this can occur when you export a jsx element that is verify as a s
 ${solutionGreen} create a local function component and export a function component that return a reference to this local function component.
 Exemple at: ${ToColor(
   "rgb(0,100,255)",
-  "https://bunext.mate-team.com/workaround/server-componants#hook"
+  "https://bunext.mate-team.com/workaround/server-components#hook"
 )}
 ${separator}
 `;
 
 const clear = "\x1b[0m";
 function ToColor(color: string, value: string) {
-  return Bun.color(color, "ansi") + value + clear;
+  try {
+    return Bun.color(color, "ansi") + value + clear;
+  } catch {
+    return value;
+  }
 }
