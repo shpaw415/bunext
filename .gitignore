@@ -178,3 +178,5 @@ bunext_project.code-workspace
 tests
 mui-and-bunext.code-workspace
 test.json
+config/bunext.sqlite
+config/session.*

@@ -6,32 +6,9 @@ import "../.bunext/react-ssr/server.ts";
 
 const Server = globalThis.Server;
 
-describe("Build features", () => {
-  /*test.skip("Build", async () => {
-    const { builder } = await import("@bunpmjs/bunext/internal/build");
-    const buildOut = await builder.testBuild();
-    expect(buildOut?.ssrElement.length).toBeGreaterThan(0);
-    expect(buildOut?.revalidates.length).toBeGreaterThan(0);
-    router.setRoutes();
-    const matched = router.client?.match("/");
-    expect(matched).not.toBe(null);
-  });*/
-
-  test("revalidate", async () => {
-    const { revalidate } = await import("@bunpmjs/bunext/features/router.ts");
-    await revalidate("/");
-  });
-
-  test("Header data", async () => {
-    const { Head } = await import("@bunpmjs/bunext/features/head");
-    expect(Object.keys(Head.head).length).toBe(4);
-  });
-});
-
 describe("Server Features", () => {
   test("start server", async () => {
     expect(Server).not.toBe(undefined);
-    Server?.RunServer();
     expect(Server?.server).not.toBe(undefined);
 
     const res = await fetch(`http://localhost:${Server?.port}/`);
@@ -51,6 +28,28 @@ describe("Server Features", () => {
       }, 10000);
     });
     expect(promiseRes).toBe(true);
+  });
+});
+
+describe("Build features", () => {
+  /*test.skip("Build", async () => {
+    const { builder } = await import("@bunpmjs/bunext/internal/build");
+    const buildOut = await builder.testBuild();
+    expect(buildOut?.ssrElement.length).toBeGreaterThan(0);
+    expect(buildOut?.revalidates.length).toBeGreaterThan(0);
+    router.setRoutes();
+    const matched = router.client?.match("/");
+    expect(matched).not.toBe(null);
+  });*/
+
+  test("revalidate", async () => {
+    const { revalidate } = await import("@bunpmjs/bunext/features/router.ts");
+    await revalidate("/");
+  });
+
+  test("Header data", async () => {
+    const { Head } = await import("@bunpmjs/bunext/features/head");
+    expect(Object.keys(Head.head).length).toBe(4);
   });
 });
 
