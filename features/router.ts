@@ -15,7 +15,7 @@ const publicThrow = () => {
   throw new Error("you cannot call revalidate in a client context");
 };
 const noRouteThrow = (route: string) =>
-  new Error(`route ${route} does not exsits`);
+  new Error(`route ${route} does not exists`);
 
 const findRouteOrThrow = (path: string) => {
   const router = new Bun.FileSystemRouter({
@@ -29,7 +29,9 @@ const findRouteOrThrow = (path: string) => {
 
 async function revalidate(...path: string[]) {
   if (!isServer) publicThrow();
-  const route = path.map((path) => findRouteOrThrow(path)).filter((route) => builder.findPathIndex(route.filePath) != -1);
+  const route = path
+    .map((path) => findRouteOrThrow(path))
+    .filter((route) => builder.findPathIndex(route.filePath));
   if ((await import("node:cluster")).default.isWorker) {
     process.send?.({
       task: "revalidate",
@@ -39,7 +41,7 @@ async function revalidate(...path: string[]) {
     } as ClusterMessageType);
     return;
   }
-  await Promise.all(route.map(({ filePath }) => builder.resetPath(filePath)))
+  await Promise.all(route.map(({ filePath }) => builder.resetPath(filePath)));
   await builder.makeBuild();
 }
 /**
@@ -59,7 +61,6 @@ function revalidateEvery(path: string | string[], seconde: number) {
       time: seconde * 1000,
     });
   }
-
 }
 
 function Link({ href, children }: { href: string; children: JSX.Element }) {

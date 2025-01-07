@@ -34,7 +34,7 @@ Head.setHead({
 });
 
 export function TestServerElement1() {
-  return <div>{Bun.password.hashSync("allo")}</div>;
+  return <div>{Bun.password.hashSync("allô")}</div>;
 }
 
 export default async function Page() {

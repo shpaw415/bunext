@@ -1,10 +1,15 @@
 {
     "cSpell.words": [
+        "ansi",
         "AUTOINCREMENT",
+        "Buildoptions",
         "ENDSWITH",
+        "Mainoptions",
+        "outdir",
         "serveractionid",
         "shema",
         "STARTSWITH",
+        "viewbox",
         "yafs"
     ]
 }

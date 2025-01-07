@@ -16,7 +16,6 @@ import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
 
 import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
-import type { ssrElement } from "@bunpmjs/bunext/internal/types";
 import { revalidate } from "@bunpmjs/bunext/features/router";
 import {
   CleanExpiredSession,
@@ -284,8 +283,7 @@ class BunextServer {
 
     if (cluster.isWorker) {
       process.on("message", (data) => {
-        if (typeof (data as any).task != "undefined") return;
-        builder.ssrElement = data as ssrElement[];
+        if (data == "build_done") return;
         if (this.WaitingBuildFinishResolver)
           this.WaitingBuildFinishResolver(true);
       });
@@ -370,7 +368,7 @@ class BunextServer {
       await this.waittingBuildFinish;
     } else {
       for (const worker of Object.values(cluster.workers || [])) {
-        worker?.send(builder.ssrElement);
+        worker?.send("build_done");
       }
     }
   }

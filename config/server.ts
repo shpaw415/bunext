@@ -2,7 +2,7 @@ import type { ServerConfig } from "@bunpmjs/bunext/internal/types";
 const Config: ServerConfig = {
   HTTPServer: {
     port: 3010,
-    threads: 4,
+    threads: 1,
   },
   Dev: {
     hotServerPort: 3005,
@@ -12,7 +12,7 @@ const Config: ServerConfig = {
   },
   session: {
     timeout: 3600,
-    type: "cookie",
+    type: "database:hard",
   },
 };
 

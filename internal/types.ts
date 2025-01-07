@@ -79,6 +79,11 @@ export type ssrElement = {
   }>;
 };
 
+export type revalidate = {
+  path: string;
+  time: number;
+};
+
 export type ServerActionDataType = File | string | Blob | Object | BunFile;
 
 export type ServerActionDataTypeHeader = "json" | "file" | "blob";

@@ -45,11 +45,11 @@ export async function InitDatabase() {
   const type = globalThis.serverConfig.session?.type;
   if (type == "cookie") return;
   else if (type == "database:hard") {
-    if (!(await Bun.file("./config/session.sqlite").exists())) {
-      db = new Database("./config/session.sqlite", {
+    db = CreateDatabaseTable(
+      new Database("./config/session.sqlite", {
         create: true,
-      });
-    } else db = CreateDatabaseTable(new Database("./config/session.sqlite"));
+      })
+    );
   } else if (type == "database:memory") {
     db = CreateDatabaseTable(
       new Database(":memory:", {
@@ -57,6 +57,7 @@ export async function InitDatabase() {
       })
     );
   }
+  db?.exec("PRAGMA journal_mode = WAL;");
 }
 
 function CreateDatabaseTable(db: Database) {

@@ -1,3 +1,7 @@
 // this is called on server start
 
-export default function Make() {}
+import CacheManager from "./caching";
+
+export default function Make() {
+  CacheManager.clearSSR();
+}

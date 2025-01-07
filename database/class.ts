@@ -3,15 +3,18 @@ import type { _DataType, DBSchema, TableSchema } from "./schema";
 
 declare global {
   var dbShema: DBSchema;
+  var MainDatabase: _BunDB;
 }
 
 globalThis.dbShema ??= (
   await import(`${process.cwd()}/config/database.ts`)
 ).default;
 
-const MainDatabase = new _BunDB("./config/bunext.sqlite", {
+globalThis.MainDatabase ??= new _BunDB("./config/bunext.sqlite", {
   create: true,
 });
+const MainDatabase = globalThis.MainDatabase;
+MainDatabase.exec("PRAGMA journal_mode = WAL;");
 
 export class _Database {
   databaseInstance: _BunDB;
@@ -181,16 +184,19 @@ export class Table<
     db,
     shema,
     debug,
+    WAL = true,
   }: {
     name: string;
     db?: _BunDB;
     shema?: DBSchema;
     debug?: boolean;
+    WAL?: boolean;
   }) {
     this.name = name;
     this.databaseInstance = db || MainDatabase;
     this.shema = shema || globalThis.dbShema;
     this.debug = debug || false;
+    if (WAL && db) this.databaseInstance.exec("PRAGMA journal_mode = WAL;");
   }
   private extractParams(
     key: keyof _Where<T> | ReservedKeyWords,

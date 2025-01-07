@@ -852,3 +852,9 @@ API_KEY="private-api-key"
 ## 0.8.21
 
 - update SVG caching strategy cold start improvement and cache validation based on the file hash
+- new caching system for SSR Elements (improve build speed)
+- Benchmark ( Single-Threaded & Multi-Threaded ) with 
+  - Specs:
+    -  i7-9750H 6 cores - 12 threads 
+    -  32GB DDR4
+    -  SSD

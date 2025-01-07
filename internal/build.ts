@@ -1,13 +1,7 @@
 import { join, basename } from "node:path";
-import {
-  semver,
-  type BuildOutput,
-  type BunPlugin,
-  type JavaScriptLoader,
-  type Loader,
-} from "bun";
+import { type BuildOutput, type BunPlugin, type JavaScriptLoader } from "bun";
 import { normalize, resolve } from "path";
-import { isValidElement, type ReactPortal } from "react";
+import { isValidElement, type ReactNode, type ReactPortal } from "react";
 import reactElementToJSXString from "./jsxToString/index";
 import { unlinkSync } from "node:fs";
 import "./server_global";
@@ -16,14 +10,13 @@ import type { ssrElement, ServerConfig } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 import fetchCache from "./caching/fetch";
-import { BuildServerComponantWithHooksWarning } from "./logs";
+import { BuildServerComponentWithHooksWarning } from "./logs";
+import CacheManager from "./caching";
 
 globalThis.React = await import("react");
-
 fetchCache.reset();
 
 type BuildOuts = {
-  ssrElement: ssrElement[];
   revalidates: {
     path: string;
     time: number;
@@ -70,7 +63,6 @@ class Builder {
   /**
    * absolute path
    */
-  public ssrElement: ssrElement[] = [];
   public revalidates: {
     path: string;
     time: number;
@@ -89,7 +81,7 @@ class Builder {
   constructor(baseDir: string) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
-      sourcemap: "none",
+      sourcemap: "inline",
       pageDir: "src/pages",
       buildDir: ".bunext/build",
       hydrate: ".bunext/react-ssr/hydrate.ts",
@@ -102,13 +94,6 @@ class Builder {
     try {
       await this.InitGetFixingPlugins();
     } catch {}
-
-    const pluginsNames: string[] = [];
-    for (const plugin of this.plugins) {
-      if (pluginsNames.includes(plugin.name))
-        this.plugins.splice(this.plugins.indexOf(plugin), 1);
-      else pluginsNames.push(plugin.name);
-    }
     return this;
   }
 
@@ -141,15 +126,14 @@ class Builder {
       for await (const path of this.glob(absPageDir)) {
         entrypoints.push(path);
       }
-
-      const paramNameRegex = /\[[A-Za-z0-9]+\]\.tsx/;
-
       entrypoints = entrypoints.filter((e) => {
-        const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx"];
-        if (
-          allowedEndsWith.includes(e.split("/").at(-1) as string) ||
-          paramNameRegex.test(e)
-        )
+        const allowedEndsWith = [
+          "hydrate.ts",
+          "layout.tsx",
+          "index.tsx",
+          "[id].tsx",
+        ];
+        if (allowedEndsWith.includes(e.split("/").at(-1) as string))
           return true;
         return false;
       });
@@ -198,7 +182,7 @@ class Builder {
         exported.length > 0
       )
         continue;
-      let element: ReactPortal | undefined = undefined;
+      let element: ReactNode | undefined = undefined;
       try {
         element = await exported();
       } catch (e) {
@@ -210,47 +194,38 @@ class Builder {
               "null is not an object (evaluating 'dispatcher.use"
             )
           ) {
-            console.log(BuildServerComponantWithHooksWarning);
+            console.log(BuildServerComponentWithHooksWarning);
           }
         }
       }
       if (!isValidElement(element)) continue;
-      const findModule = (e: any) => e.path == modulePath;
-      let moduleSSR = this.ssrElement.find(findModule);
-      if (!moduleSSR) {
-        this.ssrElement.push({
-          //@ts-ignore
-          path: Bun.fileURLToPath(import.meta.resolve?.(modulePath) || ""),
-          elements: [],
-        });
-        moduleSSR = this.ssrElement.find(findModule);
-      }
-      if (!moduleSSR) throw new Error("SSR Module has not been created");
-      let SSRelement = moduleSSR.elements.find(
+      let moduleSSR =
+        CacheManager.getSSR(modulePath) || CacheManager.addSSR(modulePath, []);
+      const SSRelement = moduleSSR.elements.find(
         (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
       );
 
-      const toJSX = (el: React.ReactNode) =>
-        reactElementToJSXString(el, {
-          showFunctions: true,
-          showDefaultProps: true,
-          useFragmentShortSyntax: true,
-          sortProps: false,
-          useBooleanShorthandSyntax: false,
-        });
       if (SSRelement) {
-        SSRelement.reactElement = toJSX(element);
-        // @ts-ignore
-        SSRelement.htmlElement = renderToString(element);
+        SSRelement.reactElement = this.toJSX(element);
+        SSRelement.htmlElement = renderToString(element as JSX.Element);
       } else {
         moduleSSR.elements.push({
           tag: `<!Bunext_Element_${exported.name}!>`,
-          reactElement: toJSX(element),
-          // @ts-ignore
-          htmlElement: renderToString(element),
+          reactElement: this.toJSX(element),
+          htmlElement: renderToString(element as JSX.Element),
         });
       }
+      CacheManager.addSSR(modulePath, moduleSSR.elements);
     }
+  }
+  private toJSX(el: JSX.Element) {
+    return reactElementToJSXString(el, {
+      showFunctions: true,
+      showDefaultProps: true,
+      useFragmentShortSyntax: true,
+      sortProps: false,
+      useBooleanShorthandSyntax: false,
+    });
   }
   async preBuildAll(skip?: ssrElement[]) {
     const files = await Array.fromAsync(
@@ -274,10 +249,10 @@ class Builder {
     return false;
   }
   async resetPath(path: string) {
-    const index = this.ssrElement.findIndex((p) => p.path == path);
-    if (index == -1) return;
+    const ssr = CacheManager.getSSR(path);
+    if (!ssr) return false;
     if (process.env.NODE_ENV == "production") {
-      const extentions = ["tsx", "jsx"];
+      const extensions = ["tsx", "jsx"];
       for (const imp of new Bun.Transpiler({
         loader: path.split(".").at(-1) as JavaScriptLoader,
       })
@@ -287,45 +262,32 @@ class Builder {
           const _path = path.split("/");
           _path.pop();
           const resolvedPath = resolve(normalize("/" + join(..._path)), imp);
-          for await (const ext of extentions) {
-            const i = this.ssrElement.findIndex(
-              (e) => e.path == `${resolvedPath}.${ext}`
-            );
-            if (i != -1) this.ssrElement.splice(i, 1);
+          for await (const ext of extensions) {
+            const i = CacheManager.getSSR(`${resolvedPath}.${ext}`);
+            if (i) CacheManager.deleteSSR(i.path);
           }
           continue;
         }
         const absolutePath = Bun.fileURLToPath(
           (await import.meta.resolve?.(imp)) || ""
         );
-        const i = this.ssrElement.findIndex((e) => e.path == absolutePath);
-        if (i == -1) continue;
-        this.ssrElement.splice(i, 1);
+        CacheManager.deleteSSR(absolutePath);
       }
     }
-
-    this.ssrElement.splice(index, 1);
-    return index;
+    CacheManager.deleteSSR(ssr.path);
+    return true;
   }
-  findPathIndex(path: string) {
-    return this.ssrElement.findIndex((p) => p.path === path);
-  }
-
-  testBuild() {
-    return this._makeBuild();
+  findPathIndex(path: string): boolean {
+    return Boolean(CacheManager.getSSR(path));
   }
 
   private async _makeBuild() {
-    const ssrElements: ssrElement[] = JSON.parse(
-      process.env.ssrElement || "[]"
-    );
-    this.ssrElement = ssrElements;
-    const BuildPath: string | undefined = process.env.BuildPath;
+    const BuildPath = process.env.BuildPath;
 
     try {
       BuildPath
         ? await this.preBuild(BuildPath)
-        : await this.preBuildAll(ssrElements);
+        : await this.preBuildAll(CacheManager.getAllSSR());
 
       const output = await builder.build(BuildPath);
       if (!output.success) {
@@ -347,7 +309,6 @@ class Builder {
     }
 
     const data = {
-      ssrElement: this.ssrElement,
       revalidates: this.revalidates,
       head: Head.head,
       type: "build",
@@ -371,7 +332,6 @@ class Builder {
       env: {
         ...process.env,
         NODE_ENV: process.env.NODE_ENV,
-        ssrElement: JSON.stringify(this.ssrElement || []),
         BuildPath: path,
         __BUILD_MODE__: "true",
       },
@@ -382,7 +342,6 @@ class Builder {
         switch (data.type) {
           case "build":
             strRes = {
-              ssrElement: data.ssrElement,
               revalidates: data.revalidates,
               head: {
                 ...data.head,
@@ -400,7 +359,6 @@ class Builder {
       console.log("Build exited with code", code);
       return;
     }
-    this.ssrElement = strRes?.ssrElement || [];
     this.revalidates = strRes?.revalidates || [];
     Head.head = strRes?.head || {};
     globalThis.Server?.updateWorkerData();
@@ -448,11 +406,11 @@ class Builder {
   private async ServerSideFeatures({
     modulePath,
     fileContent,
-    serverComponants,
+    serverComponents,
   }: {
     modulePath: string;
     fileContent: string;
-    serverComponants: {
+    serverComponents: {
       [key: string]: {
         tag: string; // "<!Bunext_Element_FunctionName!>"
         reactElement: string;
@@ -464,12 +422,12 @@ class Builder {
       fileContent,
       modulePath
     );
-    fileContent = this.ServerComponantsCompiler(serverComponants, fileContent);
+    fileContent = this.ServerComponentsCompiler(serverComponents, fileContent);
 
     return fileContent;
   }
-  private ServerComponantsCompiler(
-    serverComponants: {
+  private ServerComponentsCompiler(
+    serverComponents: {
       [key: string]: {
         tag: string; // "<!Bunext_Element_FunctionName!>"
         reactElement: string;
@@ -477,15 +435,15 @@ class Builder {
     },
     fileContent: string
   ) {
-    for (const _componant of Object.keys(serverComponants)) {
-      const componant = (serverComponants as any)[_componant] as {
+    for (const _component of Object.keys(serverComponents)) {
+      const component = serverComponents[_component] as {
         tag: string;
         reactElement: string;
       };
 
       fileContent = fileContent.replace(
-        `"${componant.tag}"`,
-        `() => (${componant.reactElement});`
+        `"${component.tag}"`,
+        `() => (${component.reactElement});`
       );
     }
 
@@ -566,7 +524,7 @@ class Builder {
             let fileContent = await Bun.file(path).text();
             if (
               ["layout.tsx"]
-                .map((endswith) => path.endsWith(endswith))
+                .map((endsWith) => path.endsWith(endsWith))
                 .filter((t) => t == true).length > 0
             ) {
               return {
@@ -581,13 +539,13 @@ class Builder {
                 loader: "js",
               };
 
-            const serverComponants = await self.ServerComponantsToTag(path);
+            const serverComponents = await self.ServerComponentsToTag(path);
 
-            const serverCompotantsForTranspiler = Object.assign(
+            const serverComponentsForTranspiler = Object.assign(
               {},
               ...[
-                ...Object.keys(serverComponants).map((componant) => ({
-                  [componant]: serverComponants[componant].tag,
+                ...Object.keys(serverComponents).map((component) => ({
+                  [component]: serverComponents[component].tag,
                 })),
               ]
             ) as Record<string, string>;
@@ -599,7 +557,7 @@ class Builder {
               exports: {
                 replace: {
                   ...serverActionsTags,
-                  ...serverCompotantsForTranspiler,
+                  ...serverComponentsForTranspiler,
                 },
               },
             });
@@ -607,7 +565,7 @@ class Builder {
             fileContent = await self.ServerSideFeatures({
               modulePath: path,
               fileContent: fileContent,
-              serverComponants: serverComponants,
+              serverComponents: serverComponents,
             });
 
             fileContent = new Bun.Transpiler({
@@ -617,7 +575,7 @@ class Builder {
               treeShaking: true,
             }).transformSync(fileContent);
 
-            for (const name of Object.keys(serverComponants))
+            for (const name of Object.keys(serverComponents))
               fileContent = fileContent.replace(
                 `function ${name}()`,
                 `function _${name}()`
@@ -699,11 +657,54 @@ class Builder {
       },
     } as BunPlugin;
   }
+  private SvgPlugin(): BunPlugin {
+    return {
+      name: "SvgIntegrationPlugin",
+      target: "browser",
+      setup(build) {
+        build.onLoad(
+          {
+            filter: /\.svg$/,
+          },
+          async (props) => {
+            const svg = await Bun.file(props.path).text();
 
-  private async ServerComponantsToTag(modulePath: string) {
-    // ServerComponant
-    const ssrModule = this.ssrElement.find((e) => e.path == modulePath);
+            let svgProps = "";
 
+            const innerElement = new HTMLRewriter()
+              .on("svg", {
+                element(e) {
+                  for (const i of e.attributes) {
+                    let reactKeyElement = i[0];
+                    if (reactKeyElement == "viewbox")
+                      reactKeyElement = "viewBox";
+                    svgProps += `${reactKeyElement}="${i[1]}"`;
+                  }
+                  e.removeAndKeepContent();
+                },
+              })
+              .transform(svg)
+              .replaceAll('"', '\\"');
+
+            return {
+              contents: `
+          "use client";
+          function Svg(props = {}){ 
+            return (<svg ${svgProps} {...props} dangerouslySetInnerHTML={{__html: "${innerElement}"}} />);
+          }
+          export default Svg;
+          `,
+              loader: "jsx",
+            };
+          }
+        );
+      },
+    };
+  }
+
+  private async ServerComponentsToTag(modulePath: string) {
+    // ServerComponent
+    const ssrModule = CacheManager.getSSR(modulePath);
     const _module = await import(modulePath);
     const defaultName = _module.default?.name as undefined | string;
     let replaceServerElement: {
@@ -763,7 +764,7 @@ class Builder {
     const build = await Bun.build({
       ...options,
       publicPath: "./",
-      plugins: [...this.plugins, this.NextJsPlugin()],
+      plugins: [...this.plugins, this.NextJsPlugin(), this.SvgPlugin()],
       target: "browser",
       define: {
         "process.env.NODE_ENV": JSON.stringify(

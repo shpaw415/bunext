@@ -102,3 +102,17 @@ export function emailIsValid(email: string) {
 export function fileExtension(fileName: string) {
   return fileName.split(".").pop();
 }
+
+export function makeFakeData<DataType, ContextType extends Object>(
+  len: number,
+  makeData: (context: Partial<ContextType>) => DataType
+) {
+  const _context = {} as ContextType;
+  return Array(len)
+    .fill(null)
+    .map(() => makeData(_context)) as Array<DataType>;
+}
+
+export function randomIntFromInterval(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1) + min);
+}

@@ -16,11 +16,11 @@ import { normalize } from "path";
 import React from "react";
 import "./server_global";
 import { mkdirSync, existsSync } from "node:fs";
-import { builder } from "./build";
 import { Head } from "../features/head";
 import { BunextRequest } from "./bunextRequest";
 import "./server_global";
 import { rm } from "node:fs/promises";
+import CacheManager from "./caching";
 
 class ClientOnlyError extends Error {
   constructor() {
@@ -483,11 +483,11 @@ class StaticRouters {
     serverSide: MatchedRoute,
     module: Record<string, Function>
   ) {
-    const preBuiledPage = builder.ssrElement
-      .find((e) => e.path == serverSide.filePath)
-      ?.elements.find((e) =>
-        e.tag.endsWith(`${module.default.name}!>`)
-      )?.htmlElement;
+    const preBuiledPage = CacheManager.getSSR(
+      serverSide.filePath
+    )?.elements.find((e) =>
+      e.tag.endsWith(`${module.default.name}!>`)
+    )?.htmlElement;
 
     if (preBuiledPage) {
       return await this.stackLayouts(
