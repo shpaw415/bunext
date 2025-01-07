@@ -667,6 +667,21 @@ PUBLIC_API_KEY="some-public-api-key"
 API_KEY="private-api-key"
 ```
 
+
+## Benchmark
+
+Computer specs:
+  - CPU: i7-9750H - 6 cores / 12 Threads
+  - RAM: 32GB DDR4
+
+
+### Single Threaded
+![Single-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/wrk-benchmark-single-thread.png)
+
+### Multi-Threaded (12 Threads)
+
+![Multi-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/wrk-benchmark-multi-threaded.png)
+
 # Change Log
 
 ## 0.6.17
@@ -852,9 +867,7 @@ API_KEY="private-api-key"
 ## 0.8.21
 
 - update SVG caching strategy cold start improvement and cache validation based on the file hash
-- new caching system for SSR Elements (improve build speed)
-- Benchmark ( Single-Threaded & Multi-Threaded ) with 
-  - Specs:
-    -  i7-9750H 6 cores - 12 threads 
-    -  32GB DDR4
-    -  SSD
+- new caching system for SSR Elements
+  - Fix a long time bug build crash when ServerComponents List, total length, was too big
+  - improve build speed
+- Benchmark ( Single-Threaded & Multi-Threaded ) - README
