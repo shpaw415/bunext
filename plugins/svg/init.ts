@@ -2,13 +2,17 @@ import Database from "bun:sqlite";
 import { _Database, Table } from "../../database/class";
 import { transform } from "@svgr/core";
 
+declare global {
+  var SVGCache: Table<cacheType, cacheType>;
+}
+
 export type cacheType = {
   path: string;
   data: string;
   hash: number;
 };
 
-const table = new Table<cacheType, cacheType>({
+globalThis.SVGCache ??= new Table<cacheType, cacheType>({
   name: "svg_cache",
   db: new Database(import.meta.dirname + "/svg.sqlite", {
     readwrite: true,
@@ -41,9 +45,10 @@ function convert(svg: string) {
 }
 
 function getCached(path: string) {
-  return table
-    .select({ where: { path }, select: { data: true, hash: true } })
-    .at(0) as Omit<cacheType, "path"> | undefined;
+  return globalThis.SVGCache.select({
+    where: { path },
+    select: { data: true, hash: true },
+  }).at(0) as Omit<cacheType, "path"> | undefined;
 }
 
 function dataToHash(data: string) {
@@ -51,13 +56,13 @@ function dataToHash(data: string) {
 }
 
 function addToCache(path: string, data: string) {
-  if (table.select({ where: { path } }).at(0)) {
-    table.update({
+  if (globalThis.SVGCache.select({ where: { path } }).at(0)) {
+    globalThis.SVGCache.update({
       where: { path },
       values: { data, hash: dataToHash(data) },
     });
   } else
-    table.insert([
+    globalThis.SVGCache.insert([
       {
         data,
         path,
@@ -67,7 +72,7 @@ function addToCache(path: string, data: string) {
 }
 
 function clearCache() {
-  const db = new _Database(table.databaseInstance);
+  const db = new _Database(globalThis.SVGCache.databaseInstance);
   db.create({
     name: "svg_cache",
     columns: [
@@ -93,4 +98,4 @@ if (import.meta.main) {
   clearCache();
 }
 
-export { table, get };
+export { get };

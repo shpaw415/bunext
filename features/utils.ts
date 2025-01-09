@@ -103,16 +103,44 @@ export function fileExtension(fileName: string) {
   return fileName.split(".").pop();
 }
 
+const _utils = {
+  /**
+   * Random number between min-max
+   */
+  randomFrom,
+  /**
+   * return random value from given props
+   */
+  randomIntFromInterval,
+  randomString: generateRandomString,
+  randomDate,
+  randomBool,
+} as const;
+
+export function randomBool() {
+  return Boolean(randomIntFromInterval(0, 1));
+}
+
+export function randomDate(from: Date, to: Date) {
+  const retDate = new Date();
+  retDate.setTime(randomIntFromInterval(from.getTime(), to.getTime()));
+  return retDate;
+}
+
 export function makeFakeData<DataType, ContextType extends Object>(
   len: number,
-  makeData: (context: Partial<ContextType>) => DataType
+  makeData: (context: Partial<ContextType>, utils: typeof _utils) => DataType
 ) {
   const _context = {} as ContextType;
   return Array(len)
     .fill(null)
-    .map(() => makeData(_context)) as Array<DataType>;
+    .map(() => makeData(_context, _utils)) as Array<DataType>;
 }
 
 export function randomIntFromInterval(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
+export function randomFrom(...props: any[]) {
+  return props[randomIntFromInterval(0, props.length - 1)];
 }

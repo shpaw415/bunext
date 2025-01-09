@@ -338,6 +338,16 @@ export class Table<
   private Log(callback: Function) {
     this.debug && callback();
   }
+  private errorWrapper<T>(callback: () => T): T {
+    try {
+      return callback();
+    } catch (e) {
+      const err = e as Error;
+      if (err.name == "SQLiteError" && err.message == "database is locked") {
+        return this.errorWrapper(callback);
+      } else throw e;
+    }
+  }
 
   select(data: _Select<SELECT_FORMAT>) {
     if (
@@ -376,13 +386,12 @@ export class Table<
 
     this.Log(() => console.log({ full_queryString: queyString }));
 
-    const query = this.databaseInstance.prepare(queyString);
-    const res = query.all(...this.extractLikeOrParams(data));
-    query.finalize();
-
-    return res.map((row) =>
-      this.restoreParams(row)
-    ) as Partial<SELECT_FORMAT>[];
+    return this.errorWrapper(() => {
+      const query = this.databaseInstance.prepare(queyString);
+      const res = query.all(...this.extractLikeOrParams(data));
+      query.finalize();
+      return res;
+    }).map((row) => this.restoreParams(row)) as Partial<SELECT_FORMAT>[];
   }
   insert(data: _Insert<T>[]) {
     let queryString = `INSERT INTO ${this.name} (${Object.keys(
@@ -390,22 +399,28 @@ export class Table<
     ).join(", ")}) VALUES (${Object.keys((data as any)[0]).map(
       (v) => `$${v}`
     )})`;
-    const db = this.databaseInstance.prepare(queryString);
+    let entries: any[] = [];
 
-    const inserter = this.databaseInstance.transaction((entries) => {
-      for (const entry of entries) db.run(entry);
+    return this.errorWrapper(() => {
+      const db = this.databaseInstance.prepare(queryString);
+      const inserter = this.databaseInstance.transaction((entries) => {
+        for (const entry of entries) db.run(entry);
+      });
+      if (entries.length == 0)
+        entries = data.map((entry) =>
+          Object.assign(
+            {},
+            ...Object.keys(entry as any).map((e) => {
+              return {
+                [`$${e}`]: this.parseParams([(entry as any)[e]])[0],
+              };
+            })
+          )
+        );
+      const res = inserter(entries) as void;
+      db.finalize();
+      return res;
     });
-    const entries = data.map((entry) =>
-      Object.assign(
-        {},
-        ...Object.keys(entry as any).map((e) => {
-          return {
-            [`$${e}`]: this.parseParams([(entry as any)[e]])[0],
-          };
-        })
-      )
-    );
-    return inserter(entries) as void;
   }
   update(data: _Update<T>) {
     let queryString = `UPDATE ${this.name} SET `;
@@ -419,9 +434,12 @@ export class Table<
     if (this.hasOR(data)) params.push(...this.extractParams("OR", data.where));
     else if (data.where) params.push(...Object.values(data.where));
 
-    const db = this.databaseInstance.prepare(queryString);
-    const res = db.all(...this.parseParams(params)) as T[];
-    return res;
+    return this.errorWrapper(() => {
+      const db = this.databaseInstance.prepare(queryString);
+      const res = db.all(...this.parseParams(params)) as T[];
+      db.finalize();
+      return res;
+    });
   }
   delete(data: _Delete<T>) {
     if (
@@ -434,10 +452,12 @@ export class Table<
     const queyString = `DELETE FROM ${this.name} ${this.formatQueryString(
       data
     )}`;
-
-    const query = this.databaseInstance.prepare(queyString);
-    query.all(...this.extractLikeOrParams(data));
-    query.finalize();
+    return this.errorWrapper(() => {
+      const query = this.databaseInstance.prepare(queyString);
+      const res = query.all(...this.extractLikeOrParams(data));
+      query.finalize();
+      return res;
+    }) as unknown as void;
   }
   count(data?: _Count<T>) {
     if (
@@ -452,9 +472,12 @@ export class Table<
       data ? this.formatQueryString(data) : ""
     }`;
 
-    const query = this.databaseInstance.prepare(queryString);
-    const res = query.all(...(data ? this.extractLikeOrParams(data) : []));
-    query.finalize();
+    const res = this.errorWrapper(() => {
+      const query = this.databaseInstance.prepare(queryString);
+      const res = query.all(...(data ? this.extractLikeOrParams(data) : []));
+      query.finalize();
+      return res;
+    });
 
     return (res as Array<{ "COUNT(*)": number }>)[0]["COUNT(*)"];
   }

@@ -24,7 +24,7 @@
     "react": "18.3.0",
     "react-dom": "18.3.0",
     "typescript": "^5.3.3",
-    "@bunpmjs/bunext": "^0.8.18"
+    "@bunpmjs/bunext": "^0.8.21"
   },
   "dependencies": {
     "@base2/pretty-print-object": "1.0.2",

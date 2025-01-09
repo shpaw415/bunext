@@ -81,7 +81,7 @@ class Builder {
   constructor(baseDir: string) {
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
-      sourcemap: "inline",
+      sourcemap: "none",
       pageDir: "src/pages",
       buildDir: ".bunext/build",
       hydrate: ".bunext/react-ssr/hydrate.ts",
@@ -93,7 +93,9 @@ class Builder {
     await this.InitGetCustomPluginsFromUser();
     try {
       await this.InitGetFixingPlugins();
-    } catch {}
+    } catch (e) {
+      console.log("Plugin has not loaded correctly!\n", (e as Error).stack);
+    }
     return this;
   }
 
@@ -127,13 +129,11 @@ class Builder {
         entrypoints.push(path);
       }
       entrypoints = entrypoints.filter((e) => {
-        const allowedEndsWith = [
-          "hydrate.ts",
-          "layout.tsx",
-          "index.tsx",
-          "[id].tsx",
-        ];
-        if (allowedEndsWith.includes(e.split("/").at(-1) as string))
+        const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx"];
+        if (
+          allowedEndsWith.includes(e.split("/").at(-1) as string) ||
+          /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(e)
+        )
           return true;
         return false;
       });

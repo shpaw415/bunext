@@ -212,12 +212,11 @@ class BunextServer {
     filePath?: string;
   }) {
     const isDev = process.env.NODE_ENV == "development";
-
     if (!isDev) return;
 
     if (
       header.accept == "application/vnd.server-side-props" ||
-      header.accept.startsWith("text/html")
+      header.accept?.startsWith("text/html")
     ) {
       if (this.isClustered)
         await this.updateWorkerData({

@@ -871,3 +871,9 @@ Computer specs:
   - Fix a long time bug build crash when ServerComponents List, total length, was too big
   - improve build speed
 - Benchmark ( Single-Threaded & Multi-Threaded ) - README
+
+## 0.8.22
+
+- Fix missing regex for [segmentName]
+- Fix Concurrent Read & Write of the Database
+- Add utils function to make fake data

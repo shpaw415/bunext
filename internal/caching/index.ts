@@ -4,6 +4,11 @@ import type { revalidate, ssrElement } from "../../internal/types";
 import type { DBSchema } from "../../database/schema";
 import { type _Head } from "../../features/head";
 
+declare global {
+  //@ts-ignore
+  var CacheManage: CacheManager;
+}
+
 const dbSchema: DBSchema = [
   {
     name: "ssr",
@@ -83,27 +88,30 @@ class CacheManager {
       readwrite: true,
     })
   );
-
   private ssr = new Table<ssrElement, ssrElement>({
     db: this.db.databaseInstance,
     name: "ssr",
     shema: dbSchema,
+    WAL: true,
   });
   private revalidate = new Table<revalidate, revalidate>({
     db: this.db.databaseInstance,
     name: "revalidate",
     shema: dbSchema,
+    WAL: true,
   });
   private head = new Table<_Head, _Head>({
     db: this.db.databaseInstance,
     name: "head",
     shema: dbSchema,
+    WAL: true,
   });
 
   private page = new Table<ssrElement, ssrElement>({
     db: this.db.databaseInstance,
     name: "page",
     shema: dbSchema,
+    WAL: true,
   });
 
   constructor() {
@@ -137,7 +145,7 @@ class CacheManager {
     this.ssr.databaseInstance.run("DELETE FROM ssr");
   }
 }
+//@ts-ignore
+globalThis.CacheManage ??= new CacheManager();
 
-const CacheManage = new CacheManager();
-
-export default CacheManage;
+export default globalThis.CacheManage;
