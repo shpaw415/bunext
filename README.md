@@ -877,3 +877,4 @@ Computer specs:
 - Fix missing regex for [segmentName]
 - Fix Concurrent Read & Write of the Database
 - Add utils function to make fake data
+- cache is cleared for dev between version in browser

@@ -21,6 +21,7 @@ import { BunextRequest } from "./bunextRequest";
 import "./server_global";
 import { rm } from "node:fs/promises";
 import CacheManager from "./caching";
+import { generateRandomString } from "../features/utils";
 
 class ClientOnlyError extends Error {
   constructor() {
@@ -155,11 +156,29 @@ class StaticRouters {
           directory: this.buildDir,
           path: pathname,
         });
+        const d = new Date();
+        d.setTime(d.getTime() + 360000);
         if (staticResponse !== null) {
+          const DevHeader = {
+            "Cache-Control":
+              "public, max-age=0, must-revalidate, no-store, no-cache",
+            "Last-Modified": d.toUTCString(),
+            Expires: new Date("2000/01/01").toUTCString(),
+            Pragma: "no-cache",
+            ETag: generateRandomString(5),
+          };
+
+          const ProductionHeader = {
+            "Cache-Control": "public max-age=3600",
+          };
+
           return bunextReq.__SET_RESPONSE__(
             new Response(staticResponse, {
               headers: {
                 "Content-Type": "text/javascript",
+                ...(process.env.NODE_ENV == "production"
+                  ? ProductionHeader
+                  : DevHeader),
               },
             })
           );
@@ -414,7 +433,7 @@ class StaticRouters {
     const renderOptionData = {
       signal: request.signal,
       bootstrapScriptContent: preloadSriptsStrList.join(";"),
-      bootstrapModules: ["/.bunext/react-ssr/hydrate.js", "/bunext-scripts"],
+      bootstrapModules: ["/.bunext/react-ssr/hydrate.js"],
       onError,
     } as RenderToReadableStreamOptions;
 
