@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible Runtime: bun 1.1.0 - 1.1.42
+compatible Runtime: bun 1.1.0 - 1.1.43
 compatible OS: Linux, WSL
 
 N.B : Bun is in continuous change and compatibility between version is a
@@ -878,3 +878,7 @@ Computer specs:
 - Fix Concurrent Read & Write of the Database
 - Add utils function to make fake data
 - cache is cleared for dev between version in browser
+
+## 0.8.23
+
+- Fix Crash in dev mode introduced in Bun version 1.1.43

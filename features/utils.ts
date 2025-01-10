@@ -105,15 +105,24 @@ export function fileExtension(fileName: string) {
 
 const _utils = {
   /**
-   * Random number between min-max
+   * Random value from given props
    */
   randomFrom,
   /**
-   * return random value from given props
+   * Random number between min-max
    */
   randomIntFromInterval,
+  /**
+   * Random string of length: len
+   */
   randomString: generateRandomString,
+  /**
+   * Random Date between from and to
+   */
   randomDate,
+  /**
+   * Random Boolean
+   */
   randomBool,
 } as const;
 
@@ -141,6 +150,6 @@ export function randomIntFromInterval(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
-export function randomFrom(...props: any[]) {
+export function randomFrom<T>(...props: T[]) {
   return props[randomIntFromInterval(0, props.length - 1)];
 }

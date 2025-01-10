@@ -4,7 +4,6 @@ Priority 1
 - css module
 - Fix build import default component in serverComponents
   - temporary workaround: [DefaultName, OtherDefaultName]; when the default component is only used in the ServerComponent
-- fix "Argument list too long" on build
 
 Priority 2
 

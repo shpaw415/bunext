@@ -441,6 +441,7 @@ class StaticRouters {
       if (process.env.NODE_ENV == "development") {
         const { stdout, stderr } = Bun.spawnSync({
           env: {
+            ...process.env,
             module_path: serverSide.filePath,
             props: JSON.stringify({
               props: serverSidePropsResult,
