@@ -882,3 +882,7 @@ Computer specs:
 ## 0.8.23
 
 - Fix Crash in dev mode introduced in Bun version 1.1.43
+
+## 0.8.24
+
+- Fix crash with the dev client WebSocket 
