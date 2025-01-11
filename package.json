@@ -23,8 +23,8 @@
   "peerDependencies": {
     "react": "18.3.0",
     "react-dom": "18.3.0",
-    "typescript": "^5.3.3",
-    "@bunpmjs/bunext": "^0.8.21"
+    "typescript": "^5.7.2",
+    "@bunpmjs/bunext": "^0.8.23"
   },
   "dependencies": {
     "@base2/pretty-print-object": "1.0.2",

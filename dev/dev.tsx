@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { ReloadContext } from "../internal/router/index";
 
 declare global {
@@ -6,14 +6,21 @@ declare global {
 }
 globalThis.__BUNEXT_DEV_INIT ??= true;
 
-export function Dev() {
+export function Dev({ children }: { children: any }) {
   const reload = useContext(ReloadContext);
-  const [opened, setOpen] = useState(false);
-  const [retry, setRetry] = useState(false);
   const [_ws, setWs] = useState<WebSocket>();
-  useEffect(() => {
-    if (process.env.NODE_ENV != "development" || opened) return;
-    if (_ws) _ws.close();
+
+  const resetWs = useCallback(
+    (setter: React.Dispatch<React.SetStateAction<WebSocket | undefined>>) => {
+      setter((ws) => {
+        if (ws) ws.close();
+        return undefined;
+      });
+    },
+    []
+  );
+
+  const MakeWebSocket = useCallback(() => {
     const p = window.location;
     const ws = new WebSocket(
       `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${
@@ -28,13 +35,28 @@ export function Dev() {
         window.location.reload();
       }
     });
-    ws.addEventListener("open", () => setOpen(true));
-    ws.addEventListener("close", () => setOpen(false));
-    ws.addEventListener("error", () => setOpen(false));
-    setWs(ws);
-  }, [opened]);
-  if (!opened && _ws && _ws.readyState == 0)
-    setTimeout(() => setRetry(!retry), 5000);
+    ws.addEventListener("close", () => resetWs(setWs));
+    ws.addEventListener("error", () => resetWs(setWs));
+    return ws;
+  }, []);
 
-  return <></>;
+  const wsSetInterval = useCallback(
+    (setter: React.Dispatch<React.SetStateAction<WebSocket | undefined>>) => {
+      setInterval(() => {
+        setter((ws) => {
+          if (ws) return ws;
+          return MakeWebSocket();
+        });
+      }, 5000);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (process.env.NODE_ENV != "development") return;
+    setWs(MakeWebSocket());
+    wsSetInterval(setWs);
+  }, []);
+
+  return children;
 }
