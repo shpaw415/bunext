@@ -22,22 +22,25 @@ export function Dev({ children }: { children: any }) {
 
   const MakeWebSocket = useCallback(() => {
     const p = window.location;
-    const ws = new WebSocket(
-      `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${
-        globalThis.serverConfig.Dev.hotServerPort
-      }`
-    );
-    ws.addEventListener("message", (ev) => {
-      if (ev.data != "reload") return;
-      try {
-        reload();
-      } catch {
-        window.location.reload();
-      }
-    });
-    ws.addEventListener("close", () => resetWs(setWs));
-    ws.addEventListener("error", () => resetWs(setWs));
-    return ws;
+    try {
+      const ws = new WebSocket(
+        `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${
+          globalThis.serverConfig.Dev.hotServerPort
+        }`
+      );
+      ws.addEventListener("message", (ev) => {
+        if (ev.data != "reload") return;
+        try {
+          reload();
+        } catch {
+          window.location.reload();
+        }
+      });
+      ws.addEventListener("close", () => resetWs(setWs));
+      ws.addEventListener("error", () => resetWs(setWs));
+
+      return ws;
+    } catch {}
   }, []);
 
   const wsSetInterval = useCallback(
