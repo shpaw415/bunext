@@ -119,12 +119,18 @@ class CacheManager {
   }
   addSSR(path: string, elements: ssrElement["elements"]) {
     if (!Boolean(this.ssr.select({ where: { path } }).at(0))) {
-      this.ssr.insert([
-        {
-          path,
-          elements,
-        },
-      ]);
+      try {
+        this.ssr.insert([
+          {
+            path,
+            elements,
+          },
+        ]);
+      } catch (e) {
+        const err = e as Error;
+        throw err;
+        //console.log(err.cause, err.name, err.message);
+      }
     } else this.ssr.update({ where: { path }, values: { elements } });
 
     return {
