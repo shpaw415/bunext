@@ -1,6 +1,6 @@
 import type { FileSystemRouter, MatchedRoute } from "bun";
 import { NJSON } from "next-json";
-import { extname, join, relative } from "node:path";
+import { extname, join, relative, sep } from "node:path";
 import {
   renderToString,
   type RenderToReadableStreamOptions,
@@ -22,6 +22,7 @@ import "./server_global";
 import { rm } from "node:fs/promises";
 import CacheManager from "./caching";
 import { generateRandomString } from "../features/utils";
+import type Module from "node:module";
 
 class ClientOnlyError extends Error {
   constructor() {
@@ -669,30 +670,32 @@ class StaticRouters {
    * Next.js like module stacking
    */
   async stackLayouts(route: MatchedRoute, pageElement: JSX.Element) {
-    const layouts = route.name == "/" ? [""] : route.name.split("/");
     type _layout = ({
       children,
+      params,
     }: {
       children: JSX.Element;
+      params: Record<string, string>;
     }) => JSX.Element | Promise<JSX.Element>;
-    let layoutsJsxList: Array<_layout | string> = [];
-    let index = 0;
-    for await (const i of layouts) {
-      const path = layouts.slice(0, index + 1).join("/");
-      const pathToFile = normalize(
-        `${this.baseDir}/${this.pageDir}/${path}/layout.tsx`
-      );
-      if (!(await Bun.file(pathToFile).exists())) continue;
-      const defaultExport = (await import(pathToFile)).default;
-      if (!defaultExport)
-        throw new Error(
-          `no default export in ${relative(process.cwd(), route.filePath)}`
+
+    const layouts = route.name == "/" ? [""] : route.name.split("/");
+    const layoutImports: Array<Promise<{ default: _layout }>> = [];
+    layouts.reduce((prev, current) => {
+      const pathFromPageDir = join(prev || sep, current);
+      if (this.layoutPaths.includes(pathFromPageDir)) {
+        layoutImports.push(
+          import(
+            join(this.baseDir, this.pageDir, pathFromPageDir, "layout.tsx")
+          )
         );
-      if (defaultExport) layoutsJsxList.push(defaultExport);
-      index += 1;
-    }
-    layoutsJsxList.push(() => pageElement);
-    layoutsJsxList = layoutsJsxList.reverse();
+      }
+      return pathFromPageDir;
+    }, "" as string);
+
+    const layoutsJsxList: Array<_layout | string> = [
+      ...(await Promise.all(layoutImports)).map((module) => module.default),
+      () => pageElement,
+    ].reverse();
 
     let currentJsx: JSX.Element = <></>;
     for await (const Layout of layoutsJsxList) {
@@ -700,6 +703,7 @@ class StaticRouters {
       else
         currentJsx = await Layout({
           children: currentJsx,
+          params: route.params,
         });
     }
     return currentJsx;

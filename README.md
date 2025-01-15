@@ -887,3 +887,8 @@ Computer specs:
 
 - Fix crash with the dev client WebSocket 
 - Fix Layout not working if it's in a dynamic segment directory
+
+## 0.8.25
+
+- Fix Layout not rendering when it's in a dynamic segment directory and the request do not use the Client side router (direct access)
+- upgraded strategy for layout imports are now parallelized reducing loading time on cold start and dev mode

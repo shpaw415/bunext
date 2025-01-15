@@ -141,7 +141,6 @@ export const RouterHost = ({
             }`
           ),
         ]);
-
         const JsxToDisplay = await NextJsLayoutStacker({
           page: await module.default({
             props,
@@ -249,7 +248,7 @@ type _layout = ({
   params: Record<string, string | string[]>;
 }) => JSX.Element | Promise<JSX.Element>;
 
-async function NextJsLayoutStacker({
+export async function NextJsLayoutStacker({
   page,
   currentVersion,
   match,
@@ -262,14 +261,15 @@ async function NextJsLayoutStacker({
 
   let layoutStack: Array<_layout> = [];
   const formatedPath = match.path == "/" ? [""] : match.path.split("/");
+
   for await (const p of formatedPath) {
     currentPath += p.length > 0 ? p : "";
-    if (globalX.__LAYOUT_ROUTE__.includes(normalize(currentPath))) {
+    if (globalX.__LAYOUT_ROUTE__.includes(currentPath)) {
       layoutStack.push(
         (
           await import(
             normalize(
-              `${globalX.__PAGES_DIR__}${currentPath}/layout.js${
+              `/${globalX.__PAGES_DIR__}${currentPath}/layout.js${
                 process.env.NODE_ENV == "development"
                   ? "?" + currentVersion
                   : ""
