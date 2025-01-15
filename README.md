@@ -886,3 +886,4 @@ Computer specs:
 ## 0.8.24
 
 - Fix crash with the dev client WebSocket 
+- Fix Layout not working if it's in a dynamic segment directory

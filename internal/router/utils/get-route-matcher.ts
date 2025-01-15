@@ -1,5 +1,16 @@
 "use client";
-export function getRouteMatcher<T>(routes: Record<string, T>) {
+
+export type Match = {
+  path: string;
+  value: string;
+  params: {
+    [paramName: string]: string | string[];
+  };
+} | null;
+
+export function getRouteMatcher<T extends string>(
+  routes: Record<string, T>
+): (incoming: string) => Match {
   const processed = Object.entries(routes).map(([path, value]) => ({
     path,
     matcher: getRouteMatcherFunc(getRouteRegex(path)),

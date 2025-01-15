@@ -12,7 +12,7 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { unstable_batchedUpdates } from "react-dom";
-import { getRouteMatcher } from "./utils/get-route-matcher";
+import { getRouteMatcher, type Match } from "./utils/get-route-matcher";
 import type { _GlobalData } from "../types";
 import {
   _Session,
@@ -20,7 +20,6 @@ import {
   SessionDidUpdateContext,
 } from "../../features/session";
 import { AddServerActionCallback } from "../globals";
-
 const globalX = globalThis as unknown as _GlobalData;
 
 export const match = globalX.__ROUTES__
@@ -143,14 +142,14 @@ export const RouterHost = ({
           ),
         ]);
 
-        const JsxToDisplay = await NextJsLayoutStacker(
-          await module.default({
+        const JsxToDisplay = await NextJsLayoutStacker({
+          page: await module.default({
             props,
             params: matched.params,
           }),
-          target,
-          currentVersion
-        );
+          currentVersion,
+          match: matched,
+        });
 
         if (currentVersion === versionRef.current) {
           if (props?.redirect) {
@@ -243,19 +242,26 @@ function SessionProvider({ children }: { children: any }) {
   );
 }
 
-async function NextJsLayoutStacker(
-  page: JSX.Element,
-  path: string,
-  currentVersion: number
-) {
+type _layout = ({
+  children,
+}: {
+  children: JSX.Element;
+  params: Record<string, string | string[]>;
+}) => JSX.Element | Promise<JSX.Element>;
+
+async function NextJsLayoutStacker({
+  page,
+  currentVersion,
+  match,
+}: {
+  page: JSX.Element;
+  currentVersion: number;
+  match: Exclude<Match, null>;
+}) {
   let currentPath = "/";
-  type _layout = ({
-    children,
-  }: {
-    children: JSX.Element;
-  }) => JSX.Element | Promise<JSX.Element>;
+
   let layoutStack: Array<_layout> = [];
-  const formatedPath = path == "/" ? [""] : path.split("/");
+  const formatedPath = match.path == "/" ? [""] : match.path.split("/");
   for await (const p of formatedPath) {
     currentPath += p.length > 0 ? p : "";
     if (globalX.__LAYOUT_ROUTE__.includes(normalize(currentPath))) {
@@ -281,6 +287,7 @@ async function NextJsLayoutStacker(
   for await (const Layout of layoutStack) {
     currentJsx = await Layout({
       children: currentJsx,
+      params: match.params,
     });
   }
   return currentJsx;

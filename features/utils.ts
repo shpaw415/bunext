@@ -153,3 +153,12 @@ export function randomIntFromInterval(min: number, max: number) {
 export function randomFrom<T>(...props: T[]) {
   return props[randomIntFromInterval(0, props.length - 1)];
 }
+
+export function fileToBase64(file: Blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+  });
+}
