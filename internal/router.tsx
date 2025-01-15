@@ -669,7 +669,7 @@ class StaticRouters {
    * Next.js like module stacking
    */
   async stackLayouts(route: MatchedRoute, pageElement: JSX.Element) {
-    const layouts = route.pathname == "/" ? [""] : route.pathname.split("/");
+    const layouts = route.name == "/" ? [""] : route.name.split("/");
     type _layout = ({
       children,
     }: {
@@ -693,6 +693,7 @@ class StaticRouters {
     }
     layoutsJsxList.push(() => pageElement);
     layoutsJsxList = layoutsJsxList.reverse();
+
     let currentJsx: JSX.Element = <></>;
     for await (const Layout of layoutsJsxList) {
       if (typeof Layout == "string") continue;
