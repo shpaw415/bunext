@@ -20,7 +20,7 @@ async function install(total: boolean) {
   });
   if (total || !(await Bun.file(`${paths.basePagePath}/index.tsx`).exists()))
     cpSync(
-      `${paths.bunextModulePath}/componants/exemple`,
+      `${paths.bunextModulePath}/components/exemple`,
       `${paths.basePagePath}`,
       {
         recursive: true,
@@ -28,7 +28,7 @@ async function install(total: boolean) {
       }
     );
   if (total || !(await Bun.file(`static/favicon.ico`).exists()))
-    cpSync(`${paths.bunextModulePath}/componants/static`, "static", {
+    cpSync(`${paths.bunextModulePath}/components/static`, "static", {
       recursive: true,
       force: true,
     });
