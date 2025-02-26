@@ -1,0 +1,24 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  height: fit-content;
+  display: flex;
+  overflow-y: auto;
+}
+
+html {
+  max-width: 100dvw;
+  width: 100vw;
+  font-family: "Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+  color: antiquewhite;
+  overflow-x: hidden;
+}
+
+body {
+  width: 100%;
+  background: linear-gradient(black 10%, #144717 70%);
+  display: flex;
+  min-width: 100%;
+}

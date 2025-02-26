@@ -26,5 +26,5 @@
     }
   },
   "exclude": [ "node_modules" ],
-  "include": [ ".bunext/custom.d.ts","src", "internal", "plugins", "static", ".bunext" ],
+  "include": [ ".bunext/custom.d.ts","src", "internal", "plugins", "static", ".bunext", "components", "features" ],
 }

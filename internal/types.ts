@@ -24,6 +24,7 @@ export type _GlobalData = {
   __ROUTES__: Record<string, string>;
   __SERVERSIDE_PROPS__?: any;
   __LAYOUT_ROUTE__: string[];
+  __CSS_PATHS__: string[];
 };
 
 export type _globalThis = _GlobalData & {

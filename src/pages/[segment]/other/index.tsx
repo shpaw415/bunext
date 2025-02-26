@@ -1,3 +1,5 @@
+import "@static/style.css";
+
 type Params = {
   segment: string;
 };

@@ -6,7 +6,7 @@ declare global {
 }
 globalThis.__BUNEXT_DEV_INIT ??= true;
 
-export function Dev({ children }: { children: any }) {
+export function Dev({ children }: { children?: any }) {
   const reload = useContext(ReloadContext);
   const [_ws, setWs] = useState<WebSocket>();
 

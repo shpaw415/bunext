@@ -1,4 +1,5 @@
 import { Head } from "@bunpmjs/bunext/features/head";
+import "@static/style/other.css";
 
 Head.setHead({
   data: {

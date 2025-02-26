@@ -1,3 +1,5 @@
+import "@static/main.css";
+
 export default function MainLayout({ children }: { children: JSX.Element }) {
   return (
     <>

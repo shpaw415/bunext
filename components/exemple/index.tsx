@@ -7,6 +7,7 @@ Head.setHead({
     author: "shpaw415",
     publisher: "bunpmjs",
   },
+  path: "*",
 });
 
 export default function page() {

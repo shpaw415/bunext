@@ -1,7 +1,7 @@
 import { join, basename } from "node:path";
 import { type BuildOutput, type BunPlugin, type JavaScriptLoader } from "bun";
 import { normalize, resolve } from "path";
-import { isValidElement, type ReactNode, type ReactPortal } from "react";
+import { isValidElement, type JSX, type ReactNode } from "react";
 import reactElementToJSXString from "./jsxToString/index";
 import { unlinkSync } from "node:fs";
 import "./server_global";
@@ -657,50 +657,6 @@ class Builder {
       },
     } as BunPlugin;
   }
-  private SvgPlugin(): BunPlugin {
-    return {
-      name: "SvgIntegrationPlugin",
-      target: "browser",
-      setup(build) {
-        build.onLoad(
-          {
-            filter: /\.svg$/,
-          },
-          async (props) => {
-            const svg = await Bun.file(props.path).text();
-
-            let svgProps = "";
-
-            const innerElement = new HTMLRewriter()
-              .on("svg", {
-                element(e) {
-                  for (const i of e.attributes) {
-                    let reactKeyElement = i[0];
-                    if (reactKeyElement == "viewbox")
-                      reactKeyElement = "viewBox";
-                    svgProps += `${reactKeyElement}="${i[1]}"`;
-                  }
-                  e.removeAndKeepContent();
-                },
-              })
-              .transform(svg)
-              .replaceAll('"', '\\"');
-
-            return {
-              contents: `
-          "use client";
-          function Svg(props = {}){ 
-            return (<svg ${svgProps} {...props} dangerouslySetInnerHTML={{__html: "${innerElement}"}} />);
-          }
-          export default Svg;
-          `,
-              loader: "jsx",
-            };
-          }
-        );
-      },
-    };
-  }
 
   private async ServerComponentsToTag(modulePath: string) {
     // ServerComponent
@@ -764,7 +720,7 @@ class Builder {
     const build = await Bun.build({
       ...options,
       publicPath: "./",
-      plugins: [...this.plugins, this.NextJsPlugin(), this.SvgPlugin()],
+      plugins: [this.NextJsPlugin(), ...this.plugins],
       target: "browser",
       define: {
         "process.env.NODE_ENV": JSON.stringify(

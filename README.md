@@ -1,6 +1,6 @@
 ﻿# Compatibility
 
-compatible Runtime: bun 1.1.0 - 1.1.43
+compatible Runtime: bun 1.1.0 - 1.2.3
 compatible OS: Linux, WSL
 
 N.B : Bun is in continuous change and compatibility between version is a
@@ -30,7 +30,7 @@ bun run db:create # only create the types
 
 - Documentation
 
-- React 19 & React Compiler
+- React Compiler
 
 - SQlite performance & features
 
@@ -49,7 +49,7 @@ bun run db:create # only create the types
 
 - layout stacking
 
-- React
+- React 18 & 19
 
 - Static assets
 
@@ -144,6 +144,48 @@ function NextPage() {
 }
 
 ```
+
+## import
+
+### CSS (Bun ^1.2.1)
+css is automatically imported depending of the route.
+will be imported in layout order of display and finally the index
+
+```Javascript XML
+// index.tsx
+import "@static/style.css";
+import "@some-module/style/module-style.css";
+
+function Page() {
+  return <div className="wrapper" />;
+}
+
+```
+
+### SVG
+use svg file as component you can import
+- must be called as a Function in a Server Component
+- can be called in a XML Version in Client Component
+
+```Javascript XML
+// index.tsx
+import SVGIcon from "./my-svg.svg";
+
+export default function Page() {
+  return (
+    <div>
+      {SVGIcon()}
+      <Element />
+    </div>
+  );
+}
+
+function Element() {
+  return <SVGIcon className="icon" />
+}
+
+```
+
 
 ## Session
 
@@ -583,30 +625,6 @@ Head.setHead({
 });
 ```
 
-## SVG
-use svg file as component you can import
-- must be called as a Function in a Server Component
-- can be called in a XML Version in Client Component
-
-```Javascript XML
-// index.tsx
-import SVGIcon from "./my-svg.svg";
-
-export default function Page() {
-  return (
-    <div>
-      {SVGIcon()}
-      <Element />
-    </div>
-  );
-}
-
-function Element() {
-  return <SVGIcon className="icon" />
-}
-
-```
-
 
 ## Run Script at Startup
 
@@ -892,3 +910,9 @@ Computer specs:
 
 - Fix Layout not rendering when it's in a dynamic segment directory and the request do not use the Client side router (direct access)
 - upgraded strategy for layout imports are now parallelized reducing loading time on cold start and dev mode
+
+
+## 0.9.0
+
+- Removed unused code -> Performance upgrade
+- CSS is automatically imported in the head component

@@ -1,4 +1,4 @@
-import type { FileSystemRouter, MatchedRoute } from "bun";
+import { file, type FileSystemRouter, type MatchedRoute } from "bun";
 import { NJSON } from "next-json";
 import { extname, join, relative, sep } from "node:path";
 import {
@@ -13,7 +13,7 @@ import type {
   ServerConfig,
 } from "./types";
 import { normalize } from "path";
-import React from "react";
+import React, { type JSX } from "react";
 import "./server_global";
 import { mkdirSync, existsSync } from "node:fs";
 import { Head } from "../features/head";
@@ -22,7 +22,6 @@ import "./server_global";
 import { rm } from "node:fs/promises";
 import CacheManager from "./caching";
 import { generateRandomString } from "../features/utils";
-import type Module from "node:module";
 
 class ClientOnlyError extends Error {
   constructor() {
@@ -53,6 +52,8 @@ class StaticRouters {
     actions: Array<Function>;
   }[] = [];
   layoutPaths: string[];
+  cssPaths: string[] = [];
+  cssPathExists: string[] = [];
 
   baseDir = process.cwd();
   buildDir = ".bunext/build";
@@ -119,6 +120,8 @@ class StaticRouters {
     const serverSide = this.server?.match(request);
     const clientSide = this.client?.match(request);
 
+    await this.SetCssPathsExists(serverSide);
+
     const bunextReq = new BunextRequest({
       request,
       response: new Response(),
@@ -176,7 +179,7 @@ class StaticRouters {
           return bunextReq.__SET_RESPONSE__(
             new Response(staticResponse, {
               headers: {
-                "Content-Type": "text/javascript",
+                "Content-Type": staticResponse.type,
                 ...(process.env.NODE_ENV == "production"
                   ? ProductionHeader
                   : DevHeader),
@@ -422,6 +425,7 @@ class StaticRouters {
           ]
         )
       ),
+      __CSS_PATHS__: JSON.stringify(this.cssPathExists),
     } as const;
 
     const preloadSriptsStrList = [
@@ -497,6 +501,33 @@ class StaticRouters {
           }}
         />
       </Shell>
+    );
+  }
+
+  private async SetCssPathsExists(match: MatchedRoute | null | undefined) {
+    if (!match) return [];
+    let currentPath = "/";
+    const cssPaths: Array<string> = [];
+    const formatedPath = match.name == "/" ? [""] : match.name.split("/");
+
+    for await (const p of formatedPath) {
+      currentPath += p.length > 0 ? p : "";
+      if (this.layoutPaths.includes(currentPath)) {
+        cssPaths.push(normalize(`/${this.pageDir}${currentPath}/layout.css`));
+      }
+      if (p.length > 0) currentPath += "/";
+    }
+
+    await Promise.all(
+      [
+        ...cssPaths,
+        normalize(`/${this.pageDir}${currentPath}/index.css`),
+      ].filter(async (p) => {
+        if (this.cssPathExists.includes(p)) return true;
+        const exists = await file(normalize(`${this.buildDir}/${p}`)).exists();
+        if (exists) this.cssPathExists.push(p);
+        return exists;
+      })
     );
   }
 

@@ -8,7 +8,7 @@ import { TestElement } from "./test";
 import { useSession, GetSession } from "@bunpmjs/bunext/features/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
-import Test from "../../static/index.css";
+import "@static/index.css";
 
 type SessionType = {
   test: boolean;
@@ -21,12 +21,6 @@ Head.setHead({
       {
         name: "foo",
         content: "bar",
-      },
-    ],
-    link: [
-      {
-        rel: "stylesheet",
-        href: Test,
       },
     ],
   },
@@ -96,7 +90,6 @@ function IsLogged() {
   const session = useSession<SessionType>();
   const data = session.getData();
   const isLogged = Boolean(data?.test);
-  //console.log(session.getData());
   return <div>{isLogged ? "logged" : "not logged"}</div>;
 }
 

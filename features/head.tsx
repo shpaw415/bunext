@@ -1,7 +1,9 @@
 import { match, useReloadEffect } from "@bunpmjs/bunext/internal/router/index";
-import type { _globalThis } from "../internal/types";
+import type { _GlobalData, _globalThis } from "../internal/types";
 import { router } from "@bunpmjs/bunext/internal/router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { Match } from "../internal/router/utils/get-route-matcher";
+import { generateRandomString, normalize } from "./utils";
 
 export type _Head = {
   title?: string;
@@ -84,13 +86,20 @@ function HeadElement({ currentPath }: { currentPath: string }) {
   useEffect(() => {
     setReload(false);
   }, [reload]);
-  let path: string | undefined = "";
   currentPath = currentPath.split("?")[0];
-  if (typeof window != "undefined") {
-    path = match(currentPath)?.path;
-  } else {
-    path = router.server?.match(currentPath)?.name;
-  }
+
+  const path = useMemo(() => {
+    if (typeof window != "undefined") {
+      return match(currentPath)?.path;
+    } else {
+      return router.server?.match(currentPath)?.name;
+    }
+  }, [currentPath]);
+
+  const [cssPaths, setCssPaths] = useState<string[]>([]);
+  useEffect(() => {
+    setCssPaths(GetCssPaths(match(currentPath)));
+  }, [currentPath]);
 
   if (!path) throw new Error(currentPath + " not found");
 
@@ -107,9 +116,55 @@ function HeadElement({ currentPath }: { currentPath: string }) {
         {data?.publisher && <meta name="publisher" content={data.publisher} />}
         {data?.meta && data.meta.map((e, index) => <meta key={index} {...e} />)}
         {data?.link && data.link.map((e, index) => <link key={index} {...e} />)}
+        {cssPaths.map((p, i) => (
+          <link key={i} rel="stylesheet" href={p} />
+        ))}
       </head>
     )
   );
+}
+
+function setParamOnDevMode() {
+  if (process.env.NODE_ENV == "development")
+    return `?${generateRandomString(5)}`;
+  else return "";
+}
+
+function GetCssPaths(match: Match) {
+  if (!match) return [];
+  const globalX = globalThis as unknown as _GlobalData;
+  let currentPath = "/";
+
+  const cssPaths: Array<string> = [];
+  const formatedPath = match.path == "/" ? [""] : match.path.split("/");
+
+  for (const p of formatedPath) {
+    currentPath += p.length > 0 ? p : "";
+    if (globalX.__LAYOUT_ROUTE__.includes(currentPath)) {
+      const normailizePath = normalize(
+        `/${globalX.__PAGES_DIR__}${currentPath}/layout.css`
+      );
+      if (globalX.__CSS_PATHS__.includes(normailizePath))
+        cssPaths.push(normailizePath + setParamOnDevMode());
+    }
+    if (p.length > 0) currentPath += "/";
+  }
+
+  if (
+    globalX.__CSS_PATHS__.includes(
+      normalize(`/${globalX.__PAGES_DIR__}${currentPath}/index.css`)
+    )
+  ) {
+    cssPaths.push(
+      normalize(
+        `/${
+          globalX.__PAGES_DIR__
+        }${currentPath}/index.css${setParamOnDevMode()}`
+      )
+    );
+  }
+
+  return cssPaths;
 }
 
 export { Head, HeadElement };
