@@ -916,3 +916,8 @@ Computer specs:
 
 - Removed unused code -> Performance upgrade
 - CSS is automatically imported in the head component
+
+## 9.0.1
+
+- Fix Session not updating when the session is updated not from an event
+- Fix all error for typescript
