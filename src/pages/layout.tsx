@@ -1,5 +1,5 @@
 import { Head } from "@bunpmjs/bunext/features/head";
-import { useState } from "react";
+import { useState, type JSX } from "react";
 import "@static/index.css";
 
 type LayoutProps = {

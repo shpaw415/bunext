@@ -10,6 +10,7 @@ import React, {
   useRef,
   useState,
   useSyncExternalStore,
+  type JSX,
 } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher, type Match } from "./utils/get-route-matcher";
@@ -205,6 +206,7 @@ function SessionProvider({ children }: { children: any }) {
     setSessionTimer((c) => {
       clearTimeout(c);
       return setTimeout(() => {
+        console.log("");
         session.__DATA__.public = {};
         session.setSessionTimeout(0);
         session.update();
@@ -227,9 +229,14 @@ function SessionProvider({ children }: { children: any }) {
   );
   useEffect(() => {
     addToServerActionCallback();
-    if (session.getSessionTimeout() > 0) timerSetter();
-    session.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
-    session.update();
+    const sessionDataTimer = setInterval(() => {
+      if (globalThis.__PUBLIC_SESSION_DATA__) {
+        if (session.getSessionTimeout() > 0) timerSetter();
+        session.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
+        clearInterval(sessionDataTimer);
+        session.update();
+      }
+    }, 1000);
   }, []);
 
   return (

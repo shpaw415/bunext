@@ -1,10 +1,10 @@
 Priority 1
 
 - Database Gt, Lt, NotEqual, GtEq, LtEq, Exists
-- css module
-- css file as entrypoint in build step
 - Fix build import default component in serverComponents
   - temporary workaround: [DefaultName, OtherDefaultName]; when the default component is only used in the ServerComponent
+- Fix usePathName
+- Add session provider on the Shell for rerender the entire tree when session is updated
 
 Priority 2
 

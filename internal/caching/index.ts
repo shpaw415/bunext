@@ -118,6 +118,9 @@ class CacheManager {
     for (const tab of dbSchema) this.db.create(tab);
   }
   addSSR(path: string, elements: ssrElement["elements"]) {
+    const doUpdate = () =>
+      this.ssr.update({ where: { path }, values: { elements } });
+
     if (!Boolean(this.ssr.select({ where: { path } }).at(0))) {
       try {
         this.ssr.insert([
@@ -127,11 +130,11 @@ class CacheManager {
           },
         ]);
       } catch (e) {
-        const err = e as Error;
-        throw err;
-        //console.log(err.cause, err.name, err.message);
+        const err = e as Error & { code?: string };
+        if (err.code == "SQLITE_CONSTRAINT_PRIMARYKEY") doUpdate();
+        else throw err;
       }
-    } else this.ssr.update({ where: { path }, values: { elements } });
+    } else doUpdate();
 
     return {
       path,

@@ -1,7 +1,7 @@
 import { match, useReloadEffect } from "@bunpmjs/bunext/internal/router/index";
 import type { _GlobalData, _globalThis } from "../internal/types";
 import { router } from "@bunpmjs/bunext/internal/router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Match } from "../internal/router/utils/get-route-matcher";
 import { generateRandomString, normalize } from "./utils";
 
@@ -117,10 +117,23 @@ function HeadElement({ currentPath }: { currentPath: string }) {
         {data?.meta && data.meta.map((e, index) => <meta key={index} {...e} />)}
         {data?.link && data.link.map((e, index) => <link key={index} {...e} />)}
         {cssPaths.map((p, i) => (
-          <link key={i} rel="stylesheet" href={p} />
+          <LinkPreloader key={i} href={p} />
         ))}
       </head>
     )
+  );
+}
+
+function LinkPreloader({ href }: { href: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const setLoad = useCallback(() => setLoaded(true), []);
+  return (
+    <link
+      rel={loaded ? "stylesheet" : "preload"}
+      as="style"
+      onLoad={setLoad}
+      href={href}
+    />
   );
 }
 

@@ -1,7 +1,6 @@
 "use client";
 
-import { cloneElement } from "react";
-
+import { cloneElement, type JSX } from "react";
 import { navigate } from "../internal/router/index.tsx";
 import type { Builder } from "../internal/build.ts";
 import type { ClusterMessageType } from "@bunpmjs/bunext/internal/types.ts";

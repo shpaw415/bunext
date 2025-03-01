@@ -1,5 +1,5 @@
 {
-  "version": "0.8.26",
+  "version": "0.9.0",
   "include": [
     ".bunext",
     "docker",

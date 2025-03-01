@@ -163,6 +163,7 @@ class BunextServer {
       await router.InitServerActions();
     } else if (isMainThread) {
       if (isDryRun) {
+        //@ts-ignore
         await import("../../config/preload.ts");
         OnServerStart();
         if (isDev) {

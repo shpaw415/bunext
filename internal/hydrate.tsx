@@ -3,7 +3,7 @@ import { hydrateRoot, type ErrorInfo } from "react-dom/client";
 import { NextJsLayoutStacker, RouterHost } from "./router/index";
 import { getRouteMatcher } from "./router/utils/get-route-matcher";
 import type { ServerSideProps, _DisplayMode, _GlobalData } from "./types";
-import React from "react";
+import React, { type JSX } from "react";
 
 const globalX = globalThis as unknown as _GlobalData;
 

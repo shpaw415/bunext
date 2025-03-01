@@ -1,4 +1,5 @@
 import "@static/main.css";
+import { type JSX } from "react";
 
 export default function MainLayout({ children }: { children: JSX.Element }) {
   return (
