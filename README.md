@@ -921,3 +921,6 @@ Computer specs:
 
 - Fix Session not updating when the session is updated not from an event
 - Fix all error for typescript
+- Fix a false error when compiling in dev mode when caching a SSR component occur
+- Dynamically update Head with useHead
+- added exports to more explicit use ( you may modify your imports in your project ) 

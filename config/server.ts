@@ -1,4 +1,4 @@
-import type { ServerConfig } from "@bunpmjs/bunext/internal/types";
+import type { ServerConfig } from "@bunpmjs/bunext/internal/types.ts";
 const Config: ServerConfig = {
   HTTPServer: {
     port: 3010,

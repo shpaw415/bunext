@@ -2,7 +2,7 @@ import { _Session, type _SessionData } from "../features/session";
 import { webToken } from "@bunpmjs/json-webtoken";
 import "./server_global";
 import { DeleteSessionByID, SetSessionByID } from "./session";
-import { generateRandomString } from "@bunpmjs/bunext/features/utils";
+import { generateRandomString } from "../features/utils";
 
 export class BunextRequest {
   public request: Request;

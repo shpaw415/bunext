@@ -1,7 +1,7 @@
 import "@bunpmjs/bunext/internal/globals";
-import { HeadElement } from "@bunpmjs/bunext/features/head";
-import { Dev } from "@bunpmjs/bunext/dev/dev";
+import { Dev } from "@bunpmjs/bunext/dev/dev.tsx";
 import { type JSX } from "react";
+import { HeadProvider } from "@bunpmjs/bunext/head";
 export const Shell = ({
   children,
   route,
@@ -10,11 +10,12 @@ export const Shell = ({
   route: string;
 }) => {
   return (
-    <html>
-      <Dev>
-        <HeadElement currentPath={route} />
-        <body>{children}</body>
-      </Dev>
-    </html>
+    <HeadProvider currentPath={route}>
+      <html>
+        <Dev>
+          <body>{children}</body>
+        </Dev>
+      </html>
+    </HeadProvider>
   );
 };

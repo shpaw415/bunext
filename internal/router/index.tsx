@@ -206,7 +206,6 @@ function SessionProvider({ children }: { children: any }) {
     setSessionTimer((c) => {
       clearTimeout(c);
       return setTimeout(() => {
-        console.log("");
         session.__DATA__.public = {};
         session.setSessionTimeout(0);
         session.update();

@@ -8,7 +8,7 @@
     "name": "Justin Halle"
   },
   "engines": {
-    "bun": "1.1.x"
+    "bun": "1.1.x - 1.2.x"
   },
   "os": [
     "linux"
@@ -61,5 +61,19 @@
     "web",
     "server",
     "bun"
-  ]
+  ],
+  "exports": {
+    "./*": "./*",
+    "./head": "./features/head.tsx",
+    "./database": "./database/index.ts",
+    "./database/*": "./database/*",
+    "./internal/*": "./internal/*",
+    "./session": "./features/session.ts",
+    "./utils": "./features/utils.ts",
+    "./request": "./internal/bunextRequest.ts",
+    "./router": "./features/router.ts",
+    "./database/types": "./database/database_types.ts",
+    "./internal/globals": "./internal/globals.ts",
+    "./internal/server_global": "./internal/server_global.ts"
+  }
 }

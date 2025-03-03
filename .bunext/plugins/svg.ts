@@ -1,5 +1,5 @@
 import { plugin, type BunPlugin } from "bun";
-import { get } from "@bunpmjs/bunext/plugins/svg/init.ts";
+import { get } from "../../plugins/svg/init";
 
 const SvgPlugin: BunPlugin = {
   name: "SVG loader",

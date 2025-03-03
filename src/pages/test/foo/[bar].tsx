@@ -1,5 +1,5 @@
 import { Database } from "@bunpmjs/bunext/database";
-import type { _Users } from "@bunpmjs/bunext/database/database_types";
+import type { _Users } from "@bunpmjs/bunext/database/types";
 
 type Props = {
   params: {

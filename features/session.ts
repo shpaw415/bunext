@@ -1,7 +1,7 @@
 "use client";
-import { generateRandomString } from "@bunpmjs/bunext/features/utils";
-import type { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest";
-import { GetSessionByID } from "@bunpmjs/bunext/internal/session";
+import { generateRandomString } from "@bunpmjs/bunext/utils";
+import type { BunextRequest } from "@bunpmjs/bunext/request";
+import { GetSessionByID } from "@bunpmjs/bunext/internal/session.ts";
 import { createContext, useContext, useEffect, useState } from "react";
 export { GetSession } from "./bunextRequest";
 

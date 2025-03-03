@@ -1,7 +1,14 @@
-import { match, useReloadEffect } from "@bunpmjs/bunext/internal/router/index";
+import { match, useReloadEffect } from "../internal/router/index";
 import type { _GlobalData, _globalThis } from "../internal/types";
-import { router } from "@bunpmjs/bunext/internal/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { router } from "../internal/router";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { Match } from "../internal/router/utils/get-route-matcher";
 import { generateRandomString, normalize } from "./utils";
 
@@ -76,54 +83,6 @@ function deepMerge(obj: _Head, assign: _Head): _Head {
   return copy;
 }
 
-function HeadElement({ currentPath }: { currentPath: string }) {
-  const globalX = globalThis as unknown as _globalThis;
-
-  const [reload, setReload] = useState(false);
-  useReloadEffect(() => {
-    process.env.NODE_ENV == "development" && setReload(true);
-  }, []);
-  useEffect(() => {
-    setReload(false);
-  }, [reload]);
-  currentPath = currentPath.split("?")[0];
-
-  const path = useMemo(() => {
-    if (typeof window != "undefined") {
-      return match(currentPath)?.path;
-    } else {
-      return router.server?.match(currentPath)?.name;
-    }
-  }, [currentPath]);
-
-  const [cssPaths, setCssPaths] = useState<string[]>([]);
-  useEffect(() => {
-    setCssPaths(GetCssPaths(match(currentPath)));
-  }, [currentPath]);
-
-  if (!path) throw new Error(currentPath + " not found");
-
-  const data =
-    typeof window != "undefined"
-      ? deepMerge(globalX.__HEAD_DATA__["*"] || {}, globalX.__HEAD_DATA__[path])
-      : deepMerge(Head.head["*"] || {}, Head.head[path]);
-
-  return (
-    !reload && (
-      <head>
-        {data?.title && <title>{data.title}</title>}
-        {data?.author && <meta name="author" content={data.author} />}
-        {data?.publisher && <meta name="publisher" content={data.publisher} />}
-        {data?.meta && data.meta.map((e, index) => <meta key={index} {...e} />)}
-        {data?.link && data.link.map((e, index) => <link key={index} {...e} />)}
-        {cssPaths.map((p, i) => (
-          <LinkPreloader key={i} href={p} />
-        ))}
-      </head>
-    )
-  );
-}
-
 function LinkPreloader({ href }: { href: string }) {
   const [loaded, setLoaded] = useState(false);
   const setLoad = useCallback(() => setLoaded(true), []);
@@ -180,4 +139,108 @@ function GetCssPaths(match: Match) {
   return cssPaths;
 }
 
-export { Head, HeadElement };
+const HeadContext = createContext<(data: _Head) => void>(() => {});
+function HeadProvider({
+  currentPath,
+  children,
+}: {
+  currentPath: string;
+  children: any;
+}) {
+  const globalX = globalThis as unknown as _globalThis;
+
+  const [reload, setReload] = useState(false);
+  useReloadEffect(() => {
+    process.env.NODE_ENV == "development" && setReload(true);
+  }, []);
+  useEffect(() => {
+    setReload(false);
+  }, [reload]);
+  currentPath = currentPath.split("?")[0];
+
+  const path = useMemo(() => {
+    if (typeof window != "undefined") {
+      return match(currentPath)?.path;
+    } else {
+      return router.server?.match(currentPath)?.name;
+    }
+  }, [currentPath]);
+
+  const [cssPaths, setCssPaths] = useState<string[]>([]);
+  useEffect(() => {
+    setCssPaths(GetCssPaths(match(currentPath)));
+  }, [currentPath]);
+
+  if (!path) throw new Error(currentPath + " not found");
+
+  const PreloadedHeadData = useMemo(
+    () =>
+      typeof window != "undefined"
+        ? deepMerge(
+            globalX.__HEAD_DATA__["*"] || {},
+            globalX.__HEAD_DATA__[path]
+          )
+        : deepMerge(Head.head["*"] || {}, Head.head[path]),
+    [currentPath]
+  );
+
+  const [data, setData] = useState<_Head>({});
+
+  const dataSetter = useCallback(
+    (data: _Head) => {
+      setData(
+        typeof window != "undefined"
+          ? deepMerge(globalX.__HEAD_DATA__["*"] || {}, {
+              ...globalX.__HEAD_DATA__[path],
+              ...data,
+            })
+          : deepMerge(Head.head["*"] || {}, { ...Head.head[path], ...data })
+      );
+    },
+    [currentPath]
+  );
+
+  return (
+    <HeadContext.Provider value={dataSetter}>
+      {!reload && (
+        <HeadElement
+          data={{
+            ...data,
+            link: [
+              ...(data?.link ?? []),
+              ...cssPaths.map((path) => ({
+                rel: "stylesheet",
+                href: path,
+              })),
+            ],
+          }}
+        />
+      )}
+      {children}
+    </HeadContext.Provider>
+  );
+}
+
+function HeadElement({ data }: { data: _Head }) {
+  return (
+    <head>
+      {data?.title && <title>{data.title}</title>}
+      {data?.author && <meta name="author" content={data.author} />}
+      {data?.publisher && <meta name="publisher" content={data.publisher} />}
+      {data?.meta && data.meta.map((e, index) => <meta key={index} {...e} />)}
+      {data?.link && data.link.map((e, index) => <link key={index} {...e} />)}
+    </head>
+  );
+}
+/**
+ *
+ * @param data default value
+ * @returns updater function for updating headValue
+ */
+function useHead(data: _Head) {
+  const updater = useContext(HeadContext);
+  useMemo(() => updater(data), []);
+  return updater;
+}
+
+export { Head, useHead, HeadProvider };

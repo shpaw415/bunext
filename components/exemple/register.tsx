@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { GetSession } from "@bunpmjs/bunext/features/session";
+import { GetSession } from "@bunpmjs/bunext/session";
 
 export function Register({ content }: { content: string }) {
   const [state, set] = useState({

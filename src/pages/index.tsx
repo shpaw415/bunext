@@ -1,11 +1,7 @@
-import { Head } from "@bunpmjs/bunext/features/head";
-import {
-  Link,
-  revalidate,
-  revalidateEvery,
-} from "@bunpmjs/bunext/features/router";
+import { Head } from "@bunpmjs/bunext/head";
+import { Link, revalidate, revalidateEvery } from "@bunpmjs/bunext/router";
 import { TestElement } from "./test";
-import { useSession, GetSession } from "@bunpmjs/bunext/features/session";
+import { useSession, GetSession } from "@bunpmjs/bunext/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import "@static/index.css";

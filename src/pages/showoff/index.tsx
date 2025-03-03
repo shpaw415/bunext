@@ -1,4 +1,4 @@
-import { Head } from "@bunpmjs/bunext/features/head";
+import { Head } from "@bunpmjs/bunext/head";
 import Arrow from "./arrow.svg";
 Head.setHead({
   path: "/showoff",

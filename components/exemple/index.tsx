@@ -1,4 +1,4 @@
-import { Head } from "@bunpmjs/bunext/features/head";
+import { Head } from "@bunpmjs/bunext/head";
 import { Register } from "./register";
 
 Head.setHead({

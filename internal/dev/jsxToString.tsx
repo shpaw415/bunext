@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { router } from "@bunpmjs/bunext/internal/router";
+import { router } from "../../internal/router";
 import type { JSX } from "react";
 const modulePath = process.env.module_path as string;
 const props = JSON.parse(process.env.props as string) as {
