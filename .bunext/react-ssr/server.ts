@@ -1,5 +1,5 @@
-import "@bunpmjs/bunext/internal/globals";
-import "@bunpmjs/bunext/internal/server_global";
+import "@bunpmjs/bunext/internal/globals.ts";
+import "@bunpmjs/bunext/internal/server_global.ts";
 
 import { builder } from "@bunpmjs/bunext/internal/build.ts";
 import { router } from "@bunpmjs/bunext/internal/router.tsx";

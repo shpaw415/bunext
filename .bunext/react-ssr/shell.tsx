@@ -1,4 +1,4 @@
-import "@bunpmjs/bunext/internal/globals";
+import "@bunpmjs/bunext/internal/globals.ts";
 import { Dev } from "@bunpmjs/bunext/dev/dev.tsx";
 import { type JSX } from "react";
 import { HeadProvider } from "@bunpmjs/bunext/head";
