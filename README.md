@@ -597,7 +597,7 @@ export async function ReactElement() {
 ## Set Head meta data
 
 - set _path_ to the wanted route or \* for every routes
-- will be revalidate on build time ( can be dynamic )
+- will be revalidate on build time
 
 ```Javascript XML
 // /index.tsx
@@ -623,6 +623,28 @@ Head.setHead({
   },
   path: "/otherPath",
 });
+
+export default function Page() {
+  return <></>
+}
+```
+
+### Dynamic Head meta data
+
+
+- Dynamic Head data on every request
+
+```Javascript XML
+// /index.tsx
+import type { BunextRequest } from "@bunpmjs/bunext/request";
+
+export default function Page({request}:{props: any, params: any, request?: BunextRequest}) {
+  request?.setHead({
+    title: `Custom-title-${Math.random()}`
+  });
+
+  return <></>
+}
 ```
 
 
@@ -924,3 +946,5 @@ Computer specs:
 - Fix a false error when compiling in dev mode when caching a SSR component occur
 - Dynamically update Head with useHead
 - added exports to more explicit use ( you may modify your imports in your project ) 
+- Head data can be dynamic. Request object is parsed as props to the page element ( default export of index.tsx )
+- direct access to the request Object from any Component that run on the server. ( dynamic page )

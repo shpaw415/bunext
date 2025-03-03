@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { Match } from "../internal/router/utils/get-route-matcher";
 import { generateRandomString, normalize } from "./utils";
+import { RequestContext } from "../internal/context";
 
 export type _Head = {
   title?: string;
@@ -152,6 +153,8 @@ function HeadProvider({
   const globalX = globalThis as unknown as _globalThis;
 
   const [reload, setReload] = useState(false);
+  const request = useContext(RequestContext);
+
   useReloadEffect(() => {
     process.env.NODE_ENV == "development" && setReload(true);
   }, []);
@@ -182,13 +185,16 @@ function HeadProvider({
             globalX.__HEAD_DATA__["*"] || {},
             globalX.__HEAD_DATA__[path]
           )
-        : deepMerge(Head.head["*"] || {}, Head.head[path]),
-    [currentPath]
+        : deepMerge(Head.head["*"] || {}, {
+            ...Head.head[path],
+            ...request?.headData?.[path],
+          }),
+    [path]
   );
 
   const [data, setData] = useState<_Head>({});
 
-  useMemo(() => setData({}), [currentPath]);
+  useMemo(() => setData({}), [path]);
 
   const dataSetter = useCallback(
     (data: _Head) => {
@@ -201,12 +207,12 @@ function HeadProvider({
           : deepMerge(Head.head["*"] || {}, { ...Head.head[path], ...data })
       );
     },
-    [currentPath]
+    [path]
   );
 
   const providerData: headProviderType = useMemo(
-    () => [dataSetter, currentPath],
-    [dataSetter, currentPath]
+    () => [dataSetter, path],
+    [dataSetter, path]
   );
 
   return (
@@ -247,14 +253,11 @@ function HeadElement({ data }: { data: _Head }) {
  * @param data default value
  * @returns updater function for updating headValue
  */
-function useHead(data?: _Head) {
+function useHead({ data }: { data?: _Head }) {
   const [updater, path] = useContext(HeadContext);
-  data &&
-    Head.setHead({
-      path,
-      data,
-    });
-
+  useEffect(() => {
+    data && updater(data);
+  }, []);
   return updater;
 }
 

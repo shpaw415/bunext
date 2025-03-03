@@ -8,7 +8,7 @@ function GetBunextRequest(args: IArguments) {
 }
 
 /**
- * get session from a server context
+ * get session from a server context ( ServerAction )
  * @param args
  * @example GetSession(arguments)
  */
@@ -17,7 +17,7 @@ export function GetSession<DataType>(args: IArguments) {
   else throw new Error("you must set arguments from a server context");
 }
 /**
- *
+ * get request Object from a server context ( ServerAction )
  * @param args arguments
  * @example GetRequest(arguments)
  */

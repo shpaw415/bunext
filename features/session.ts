@@ -1,8 +1,9 @@
 "use client";
 import { generateRandomString } from "@bunpmjs/bunext/utils";
-import type { BunextRequest } from "@bunpmjs/bunext/request";
+import type { BunextRequest } from "@bunpmjs/bunext/server/request";
 import { GetSessionByID } from "@bunpmjs/bunext/internal/session.ts";
 import { createContext, useContext, useEffect, useState } from "react";
+import { RequestContext } from "../internal/context";
 export { GetSession } from "./bunextRequest";
 
 export type _SessionData<_SessionData> = {
@@ -219,6 +220,7 @@ export const SessionDidUpdateContext = createContext(false);
 export function useSession<DataType>(props?: {
   PreventRenderOnUpdate: boolean;
 }) {
+  const server_session = useContext(RequestContext);
   const session = useContext(SessionContext);
   const did_update = useContext(SessionDidUpdateContext);
   const [, setState] = useState(false);
@@ -227,5 +229,8 @@ export function useSession<DataType>(props?: {
     if (props?.PreventRenderOnUpdate) setState(did_update);
   }, [did_update]);
 
-  return session as InAppSession<DataType>;
+  return (
+    (server_session?.session as InAppSession<DataType>) ??
+    (session as InAppSession<DataType>)
+  );
 }

@@ -1,5 +1,5 @@
 import { GetSession } from "@bunpmjs/bunext/session";
-import type { BunextRequest } from "@bunpmjs/bunext/request";
+import type { BunextRequest } from "@bunpmjs/bunext/server/request";
 
 export function POST(request: BunextRequest) {
   const session = GetSession(arguments);

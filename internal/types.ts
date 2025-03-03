@@ -25,6 +25,19 @@ export type _GlobalData = {
   __SERVERSIDE_PROPS__?: any;
   __LAYOUT_ROUTE__: string[];
   __CSS_PATHS__: string[];
+  __HEAD_DATA__: string;
+  __PUBLIC_SESSION_DATA__: string;
+  __SESSION_TIMEOUT__: string;
+  serverConfig: {
+    Dev: {
+      hotServerPort: number;
+    };
+    HTTPServer: {
+      port: number;
+      threads: number;
+    };
+  };
+  __PROCESS_ENV__: Record<string, string>;
 };
 
 export type _globalThis = _GlobalData & {

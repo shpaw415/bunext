@@ -3,12 +3,15 @@ import { webToken } from "@bunpmjs/json-webtoken";
 import "./server_global";
 import { DeleteSessionByID, SetSessionByID } from "./session";
 import { generateRandomString } from "../features/utils";
+import { Head, type _Head } from "../features/head";
 
 export class BunextRequest {
   public request: Request;
   public response: Response;
   public session: _Session<any>;
   public webtoken: webToken<any>;
+  public headData?: Record<string, _Head>;
+  public path: string = "";
   /**
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
@@ -21,7 +24,7 @@ export class BunextRequest {
       cookieName: "bunext_session_token",
     });
     this.session = new _Session({
-      sessionTimeout: globalThis.serverConfig.session?.timeout,
+      sessionTimeout: globalThis?.serverConfig?.session?.timeout,
       request: this as any,
     });
     this.SessionID = (
@@ -31,6 +34,12 @@ export class BunextRequest {
   public __SET_RESPONSE__(response: Response) {
     this.response = response;
     return this;
+  }
+  public setHead(data: _Head) {
+    this.headData = {
+      ...Head.head,
+      [this.path]: data,
+    };
   }
   public setCookie(response: Response) {
     switch (globalThis.serverConfig.session?.type) {

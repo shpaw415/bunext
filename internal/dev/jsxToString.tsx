@@ -1,6 +1,8 @@
 import { renderToString } from "react-dom/server";
 import { router } from "../../internal/router";
 import type { JSX } from "react";
+import { BunextRequest } from "../bunextRequest";
+
 const modulePath = process.env.module_path as string;
 const props = JSON.parse(process.env.props as string) as {
   props: any;
@@ -14,16 +16,17 @@ if (!match) process.exit(1);
 
 let jsx: JSX.Element;
 
-try {
-  jsx = await router.CreateDynamicPage(modulePath, props, match);
-  WriteToStdout(jsx);
-} catch (e) {
-  WriteToStdout(undefined);
-  throw e;
-}
+const req = new BunextRequest({
+  request: new Request(url),
+  response: new Response(),
+});
+req.path = match.name;
 
-function WriteToStdout(jsx: JSX.Element | undefined) {
-  process.stdout.write(
-    `<!BUNEXT_SEPARATOR!>${jsx ? renderToString(jsx) : ""}<!BUNEXT_SEPARATOR!>`
-  );
-}
+jsx = await router.CreateDynamicPage(modulePath, props, match, req);
+
+process.send?.({
+  jsx: renderToString(jsx),
+  head: req.headData,
+});
+
+process.exit();

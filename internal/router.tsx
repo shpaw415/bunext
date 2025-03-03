@@ -1,4 +1,9 @@
-import { file, type FileSystemRouter, type MatchedRoute } from "bun";
+import {
+  file,
+  type FileSystemRouter,
+  type MatchedRoute,
+  type Subprocess,
+} from "bun";
 import { NJSON } from "next-json";
 import { extname, join, relative, sep } from "node:path";
 import {
@@ -7,6 +12,7 @@ import {
 } from "react-dom/server";
 import type {
   _DisplayMode,
+  _GlobalData,
   _SsrMode,
   ServerActionDataType,
   ServerActionDataTypeHeader,
@@ -16,12 +22,14 @@ import { normalize } from "path";
 import React, { type JSX } from "react";
 import "./server_global";
 import { mkdirSync, existsSync } from "node:fs";
-import { Head } from "../features/head";
+import { Head, type _Head } from "../features/head";
 import { BunextRequest } from "./bunextRequest";
 import "./server_global";
 import { rm } from "node:fs/promises";
 import CacheManager from "./caching";
 import { generateRandomString } from "../features/utils";
+import { createContext } from "react";
+import { RequestContext } from "./context";
 
 class ClientOnlyError extends Error {
   constructor() {
@@ -32,7 +40,8 @@ class ClientOnlyError extends Error {
 type pathNames =
   | "/bunextgetSessionData"
   | "/ServerActionGetter"
-  | "/bunextDeleteSession";
+  | "/bunextDeleteSession"
+  | "/favicon.ico";
 
 let LoadedNodeModule: Array<{
   path: string;
@@ -126,6 +135,7 @@ class StaticRouters {
       request,
       response: new Response(),
     });
+    if (serverSide) bunextReq.path = serverSide.name;
 
     switch (pathname as pathNames) {
       case "/ServerActionGetter":
@@ -142,12 +152,15 @@ class StaticRouters {
         await bunextReq.session.initData();
         bunextReq.session.delete();
         return bunextReq.__SET_RESPONSE__(bunextReq.setCookie(new Response()));
+
       default:
         const staticAssets = await this.serveFromDir({
           directory: this.staticDir,
           path: pathname,
         });
-        if (staticAssets !== null)
+        if (staticAssets == null && pathname == "/favicon.ico") {
+          return bunextReq.__SET_RESPONSE__(new Response());
+        } else if (staticAssets !== null)
           return bunextReq.__SET_RESPONSE__(
             new Response(staticAssets, {
               headers: {
@@ -426,9 +439,9 @@ class StaticRouters {
         )
       ),
       __CSS_PATHS__: JSON.stringify(this.cssPathExists),
-    } as const;
+    } as Record<keyof _GlobalData, string>;
 
-    const preloadSriptsStrList = [
+    const preloadSriptsStrList = () => [
       ...Object.keys(preloadScriptObj)
         .map((i) => `${i}=${(preloadScriptObj as any)[i]}`)
         .filter(Boolean),
@@ -437,38 +450,51 @@ class StaticRouters {
 
     const renderOptionData = {
       signal: request.signal,
-      bootstrapScriptContent: preloadSriptsStrList.join(";"),
+      bootstrapScriptContent: preloadSriptsStrList().join(";"),
       bootstrapModules: ["/.bunext/react-ssr/hydrate.js"],
       onError,
     } as RenderToReadableStreamOptions;
 
-    const makeJsx = async () => {
+    const makeJsx = async (bunext_request: BunextRequest) => {
       if (process.env.NODE_ENV == "development") {
-        const { stdout, stderr } = Bun.spawnSync({
-          env: {
-            ...process.env,
-            module_path: serverSide.filePath,
-            props: JSON.stringify({
-              props: serverSidePropsResult,
-              params: serverSide.params,
-            }),
-            url: request.url,
-          },
-          cwd: process.cwd(),
-          cmd: ["bun", `${import.meta.dirname}/dev/jsxToString.tsx`],
+        let pageString = "";
+        let proc: Subprocess<"ignore", "inherit", "inherit"> | undefined =
+          undefined as unknown as Subprocess<"ignore", "inherit", "inherit">;
+
+        await new Promise((resolve) => {
+          proc = Bun.spawn({
+            env: {
+              ...process.env,
+              module_path: serverSide.filePath,
+              props: JSON.stringify({
+                props: serverSidePropsResult,
+                params: serverSide.params,
+              }),
+              url: request.url,
+            },
+            cwd: process.cwd(),
+            cmd: ["bun", `${import.meta.dirname}/dev/jsxToString.tsx`],
+            stdout: "inherit",
+            stderr: "inherit",
+            ipc: ({
+              jsx,
+              head,
+              error,
+            }: {
+              jsx?: string;
+              head?: Record<string, _Head>;
+              error?: Error;
+            }) => {
+              if (jsx) pageString = jsx;
+              if (head) bunext_request.headData = head;
+              if (error) throw error;
+
+              resolve(true);
+            },
+          });
         });
-        const decoder = new TextDecoder();
-        const decodedStdError = decoder.decode(stderr);
-        const decodedStdOut = decoder.decode(stdout);
-        const splited = decodedStdOut.split("<!BUNEXT_SEPARATOR!>");
-        const pageString = splited[1] as string;
 
-        splited.splice(1, 1);
-        console.log(splited.join("\n"));
-
-        if (decodedStdError && pageString.length == 0)
-          throw Error(decodedStdError);
-        else if (decodedStdError) console.error(decodedStdError);
+        await proc.exited;
 
         return (
           <div
@@ -485,22 +511,30 @@ class StaticRouters {
               props: serverSidePropsResult,
               params: serverSide.params,
             },
-            serverSide
+            serverSide,
+            bunext_request
           ))
         );
     };
 
-    const jsxToServe: JSX.Element = await makeJsx();
+    const jsxToServe: JSX.Element = await makeJsx(bunextReq);
+    if (bunextReq.headData) {
+      preloadScriptObj.__HEAD_DATA__ = JSON.stringify(bunextReq.headData);
+      renderOptionData.bootstrapScriptContent =
+        preloadSriptsStrList().join(";");
+    }
     return (
-      <Shell route={serverSide.pathname + search} {...serverSidePropsResult}>
-        {jsxToServe}
-        <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: renderOptionData.bootstrapScriptContent || "",
-          }}
-        />
-      </Shell>
+      <RequestContext.Provider value={bunextReq}>
+        <Shell route={serverSide.pathname + search} {...serverSidePropsResult}>
+          {jsxToServe}
+          <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: renderOptionData.bootstrapScriptContent || "",
+            }}
+          />
+        </Shell>
+      </RequestContext.Provider>
     );
   }
 
@@ -555,9 +589,10 @@ class StaticRouters {
   public async CreateDynamicPage(
     module: string,
     props: { props: any; params: Record<string, string> },
-    serverSide: MatchedRoute
+    serverSide: MatchedRoute,
+    bunextRequest: BunextRequest
   ): Promise<JSX.Element> {
-    const jsxToServe = (
+    const ModuleDefault = (
       (await import(module)) as {
         default: ({
           props,
@@ -565,14 +600,21 @@ class StaticRouters {
         }: {
           props: any;
           params: any;
+          request?: BunextRequest;
         }) => Promise<JSX.Element>;
       }
-    ).default({
-      props: props.props,
-      params: props.params,
-    });
+    ).default;
 
-    return await this.stackLayouts(serverSide, await jsxToServe);
+    const JSXElement = async () => (
+      <RequestContext.Provider value={bunextRequest}>
+        {await this.stackLayouts(
+          serverSide,
+          await ModuleDefault({ ...props, request: bunextRequest })
+        )}
+      </RequestContext.Provider>
+    );
+
+    return JSXElement();
   }
 
   private async VerifyApiEndpoint(

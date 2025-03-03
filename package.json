@@ -70,10 +70,11 @@
     "./internal/*": "./internal/*",
     "./session": "./features/session.ts",
     "./utils": "./features/utils.ts",
-    "./request": "./internal/bunextRequest.ts",
+    "./server/request": "./internal/bunextRequest.ts",
     "./router": "./features/router.ts",
     "./database/types": "./database/database_types.ts",
     "./internal/globals": "./internal/globals.ts",
-    "./internal/server_global": "./internal/server_global.ts"
+    "./internal/server_global": "./internal/server_global.ts",
+    "./client/request": "./features/client/request.ts"
   }
 }

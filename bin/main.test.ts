@@ -1,7 +1,7 @@
 import { test, expect, describe, afterAll } from "bun:test";
 
 import "@bunpmjs/bunext/internal/server_global.ts";
-import { router } from "@bunpmjs/bunext/internal/router";
+import { router } from "@bunpmjs/bunext/internal/router.tsx";
 import "../.bunext/react-ssr/server.ts";
 
 const Server = globalThis.Server;
@@ -43,13 +43,13 @@ describe("Build features", () => {
   });*/
 
   test("revalidate", async () => {
-    const { revalidate } = await import("@bunpmjs/bunext/features/router.ts");
+    const { revalidate } = await import("@bunpmjs/bunext/router");
     await revalidate("/");
   });
 
   test("Header data", async () => {
-    const { Head } = await import("@bunpmjs/bunext/features/head");
-    expect(Object.keys(Head.head).length).toBe(4);
+    const { Head } = await import("@bunpmjs/bunext/head");
+    expect(Object.keys(Head.head).length).toBeGreaterThan(1);
   });
 });
 

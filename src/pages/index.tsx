@@ -1,10 +1,10 @@
-import { Head } from "@bunpmjs/bunext/head";
 import { Link, revalidate, revalidateEvery } from "@bunpmjs/bunext/router";
 import { TestElement } from "./test";
 import { useSession, GetSession } from "@bunpmjs/bunext/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import "@static/index.css";
+import { useRequest } from "@bunpmjs/bunext/client/request";
 
 type SessionType = {
   test: boolean;
@@ -15,19 +15,8 @@ export function TestServerElement1() {
 }
 
 function HeadSetter() {
-  const random = generateRandomString(5);
-
-  Head.setHead({
-    data: {
-      title: `my Homepage-${random}`,
-      meta: [
-        {
-          name: "foo",
-          content: "bar",
-        },
-      ],
-    },
-    path: "/",
+  useRequest()?.setHead({
+    title: "My-title-super",
   });
   return <></>;
 }

@@ -1,9 +1,30 @@
+import { useRequest, type BunextRequest } from "@bunpmjs/bunext/client/request";
 import "@static/style.css";
 
 type Params = {
   segment: string;
 };
 
-export default function Page({ params }: { params: Params }) {
-  return <p>{params.segment}</p>;
+function Head() {
+  const req = useRequest();
+  req?.setHead({
+    title: "super-title",
+  });
+
+  return <></>;
+}
+
+export default function Page({
+  params,
+  request,
+}: {
+  params: Params;
+  request?: BunextRequest;
+}) {
+  return (
+    <p>
+      <Head />
+      {params.segment}
+    </p>
+  );
 }
