@@ -4,21 +4,21 @@ import { useSession, GetSession } from "@bunpmjs/bunext/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import "@static/index.css";
-import { useRequest } from "@bunpmjs/bunext/client/request";
+import { Head } from "@bunpmjs/bunext/head";
 
 type SessionType = {
   test: boolean;
 };
 
+Head.setHead({
+  data: {
+    title: "Main page",
+  },
+  path: "/",
+});
+
 export function TestServerElement1() {
   return <div>{Bun.password.hashSync("allô")}</div>;
-}
-
-function HeadSetter() {
-  useRequest()?.setHead({
-    title: "My-title-super",
-  });
-  return <></>;
 }
 
 export default async function Page() {
@@ -26,7 +26,6 @@ export default async function Page() {
 
   return (
     <div>
-      <HeadSetter />
       <TestElement />
       <TestServerElement1 />
       {TestServerElement2()}

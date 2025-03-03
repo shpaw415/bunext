@@ -13,6 +13,7 @@ import {
 import type { Match } from "../internal/router/utils/get-route-matcher";
 import { generateRandomString, normalize } from "./utils";
 import { RequestContext } from "../internal/context";
+import { useRequest } from "./client/request";
 
 export type _Head = {
   title?: string;
@@ -255,6 +256,9 @@ function HeadElement({ data }: { data: _Head }) {
  */
 function useHead({ data }: { data?: _Head }) {
   const [updater, path] = useContext(HeadContext);
+  const request = useRequest();
+  if (request && data) request.setHead(data);
+
   useEffect(() => {
     data && updater(data);
   }, []);

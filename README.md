@@ -104,6 +104,11 @@ Like NextJs the routes are in src/pages.
 - _[id].tsx_ is a Dynamic Segment can be created by wrapping a file or folder name in square brackets: [segmentName]. For example, [id] or [slug].
 - _layout.tsx_ is the layout for the current route and sub-directory routes
 
+- _Props for index_ {props, params, request}
+  - props: Props from getServerSideProps.
+  - params: url search param from the Dynamic Segment.
+  - request: BunextRequest Object for direct access.
+
 ```Javascript XML
 //index.tsx
 export default function Page() {
@@ -111,17 +116,29 @@ export default function Page() {
 }
 
 //[action]/[id].tsx
+import type { BunextRequest } from '@bunpmjs/bunext/client/request';
 
 type Params = {
   action: string;
   id: string;
 };
 
-export default function DynamicPage({params}:{params: Params}) {
+type Props = {
+  server: boolean;
+};
+
+export function getServerSideProps(): Props {
+  return {
+    server: true
+  } as Props;
+}
+
+export default function DynamicPage({params, props}:{params: Params, props: Props, request?: BunextRequest}) {
   return (
     <div>
       action: {params.action} 
       id: {params.id}
+      props-server: {props.server}
     </div>
   );
 }
@@ -948,3 +965,4 @@ Computer specs:
 - added exports to more explicit use ( you may modify your imports in your project ) 
 - Head data can be dynamic. Request object is parsed as props to the page element ( default export of index.tsx )
 - direct access to the request Object from any Component that run on the server. ( dynamic page )
+- Dev build more verbose and cleaner

@@ -1,4 +1,4 @@
-import type { BunextRequest } from "@bunpmjs/bunext/server/request";
+import { useHead } from "@bunpmjs/bunext/head";
 import "@static/style/other.css";
 
 export function getServerSideProps() {
@@ -7,21 +7,15 @@ export function getServerSideProps() {
   };
 }
 
-export default function Page({
-  params,
-  props,
-  request,
-}: {
-  params: any;
-  props: any;
-  request?: BunextRequest;
-}) {
-  request?.setHead({
-    title: `Custom-title-${Math.random()}`,
-  });
+function Header() {
+  useHead({ data: { title: `Custom-title-${Math.random()}` } });
+  return <></>;
+}
 
+export default function Page({ params, props }: { params: any; props: any }) {
   return (
     <div>
+      <Header />
       <div>{JSON.stringify(props)}</div>
       <div
         onClick={() => {
