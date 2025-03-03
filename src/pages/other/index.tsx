@@ -1,13 +1,6 @@
 import { Head } from "@bunpmjs/bunext/head";
 import "@static/style/other.css";
 
-Head.setHead({
-  data: {
-    title: "some other",
-  },
-  path: "/other",
-});
-
 export function getServerSideProps() {
   return {
     test: "test",

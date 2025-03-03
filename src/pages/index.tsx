@@ -10,21 +10,26 @@ type SessionType = {
   test: boolean;
 };
 
-Head.setHead({
-  data: {
-    title: "my Homepage",
-    meta: [
-      {
-        name: "foo",
-        content: "bar",
-      },
-    ],
-  },
-  path: "/",
-});
-
 export function TestServerElement1() {
   return <div>{Bun.password.hashSync("allô")}</div>;
+}
+
+function HeadSetter() {
+  const random = generateRandomString(5);
+
+  Head.setHead({
+    data: {
+      title: `my Homepage-${random}`,
+      meta: [
+        {
+          name: "foo",
+          content: "bar",
+        },
+      ],
+    },
+    path: "/",
+  });
+  return <></>;
 }
 
 export default async function Page() {
@@ -32,6 +37,7 @@ export default async function Page() {
 
   return (
     <div>
+      <HeadSetter />
       <TestElement />
       <TestServerElement1 />
       {TestServerElement2()}

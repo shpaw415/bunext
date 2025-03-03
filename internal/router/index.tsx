@@ -188,13 +188,13 @@ export const RouterHost = ({
   return (
     <ReloadContext.Provider value={reload}>
       <VersionContext.Provider value={version}>
-        <SessionProvider>{current}</SessionProvider>
+        {current}
       </VersionContext.Provider>
     </ReloadContext.Provider>
   );
 };
 
-function SessionProvider({ children }: { children: any }) {
+export function SessionProvider({ children }: { children: any }) {
   const [updater, setUpdater] = useState(false);
   const session = useMemo(
     () => new _Session({ update_function: setUpdater }),

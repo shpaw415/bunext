@@ -1,3 +1,4 @@
+"use client";
 import { match, useReloadEffect } from "../internal/router/index";
 import type { _GlobalData, _globalThis } from "../internal/types";
 import { router } from "../internal/router";
@@ -139,7 +140,8 @@ function GetCssPaths(match: Match) {
   return cssPaths;
 }
 
-const HeadContext = createContext<(data: _Head) => void>(() => {});
+type headProviderType = [(data: _Head) => void, string];
+const HeadContext = createContext<headProviderType>([() => {}, "/"]);
 function HeadProvider({
   currentPath,
   children,
@@ -186,6 +188,8 @@ function HeadProvider({
 
   const [data, setData] = useState<_Head>({});
 
+  useMemo(() => setData({}), [currentPath]);
+
   const dataSetter = useCallback(
     (data: _Head) => {
       setData(
@@ -200,11 +204,17 @@ function HeadProvider({
     [currentPath]
   );
 
+  const providerData: headProviderType = useMemo(
+    () => [dataSetter, currentPath],
+    [dataSetter, currentPath]
+  );
+
   return (
-    <HeadContext.Provider value={dataSetter}>
+    <HeadContext.Provider value={providerData}>
       {!reload && (
         <HeadElement
           data={{
+            ...PreloadedHeadData,
             ...data,
             link: [
               ...(data?.link ?? []),
@@ -237,9 +247,14 @@ function HeadElement({ data }: { data: _Head }) {
  * @param data default value
  * @returns updater function for updating headValue
  */
-function useHead(data: _Head) {
-  const updater = useContext(HeadContext);
-  useMemo(() => updater(data), []);
+function useHead(data?: _Head) {
+  const [updater, path] = useContext(HeadContext);
+  data &&
+    Head.setHead({
+      path,
+      data,
+    });
+
   return updater;
 }
 
