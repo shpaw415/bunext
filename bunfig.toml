@@ -1,5 +1,4 @@
 preload = [
     "./.bunext/plugins/svg.ts",
-    "./.bunext/plugins/css.ts",
     "./.bunext/plugins/react-fix.ts"
 ]

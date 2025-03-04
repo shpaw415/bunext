@@ -105,9 +105,20 @@ function setParamOnDevMode() {
   else return "";
 }
 
-function GetCssPaths(match: Match) {
+function GlobalDataFromServerSide(): _GlobalData {
+  return {
+    __CSS_PATHS__: router.cssPathExists,
+    __LAYOUT_ROUTE__: router.layoutPaths,
+    __PAGES_DIR__: router.pageDir,
+  } as any;
+}
+
+function GetCssPaths(match: Match, options?: { onlyFilePath?: boolean }) {
   if (!match) return [];
-  const globalX = globalThis as unknown as _GlobalData;
+  const globalX =
+    typeof window != "undefined"
+      ? (globalThis as unknown as _GlobalData)
+      : (GlobalDataFromServerSide() as _GlobalData);
   let currentPath = "/";
 
   const cssPaths: Array<string> = [];
@@ -120,14 +131,22 @@ function GetCssPaths(match: Match) {
         `/${globalX.__PAGES_DIR__}${currentPath}/layout.css`
       );
       if (globalX.__CSS_PATHS__.includes(normailizePath))
-        cssPaths.push(normailizePath + setParamOnDevMode());
+        cssPaths.push(
+          normailizePath + (options?.onlyFilePath ? "" : setParamOnDevMode())
+        );
     }
     if (p.length > 0) currentPath += "/";
   }
   const cssPath = match.value.split(".");
   cssPath.pop();
   if (globalX.__CSS_PATHS__.includes(normalize(`${cssPath.join(".")}.css`))) {
-    cssPaths.push(normalize(`${cssPath.join(".")}.css${setParamOnDevMode()}`));
+    cssPaths.push(
+      normalize(
+        `${cssPath.join(".")}.css${
+          options?.onlyFilePath ? "" : setParamOnDevMode()
+        }`
+      )
+    );
   }
 
   return cssPaths;
@@ -211,17 +230,16 @@ function HeadProvider({
     <HeadContext.Provider value={providerData}>
       {!reload && (
         <HeadElement
+          path={path}
           data={{
             ...PreloadedHeadData,
             ...data,
-            link: [
-              ...(data?.link ?? []),
-              ...cssPaths.map((path) => ({
-                rel: "stylesheet",
-                href: path,
-              })),
-            ],
+            link: [...(data?.link ?? [])],
           }}
+          style={cssPaths.map((link) => ({
+            rel: "stylesheet",
+            href: link,
+          }))}
         />
       )}
       {children}
@@ -229,14 +247,54 @@ function HeadProvider({
   );
 }
 
-function HeadElement({ data }: { data: _Head }) {
+function HeadElement({
+  data,
+  path,
+  style,
+}: {
+  data: _Head;
+  path: string;
+  style: _Head["link"];
+}) {
+  const getPaths = () =>
+    GetCssPaths(
+      {
+        value: normalize(`/${router.pageDir}/${path}/index.js`),
+        params: {},
+        path: path,
+      },
+      {
+        onlyFilePath: true,
+      }
+    ).map((path) => `${router.buildDir}${path}`);
+
+  const getStringData = (filePath: string) => {
+    const buffer = require("fs").readFileSync(filePath);
+    return buffer.toString("utf-8") as string;
+  };
+
   return (
-    <head>
+    <head suppressHydrationWarning>
       {data?.title && <title>{data.title}</title>}
       {data?.author && <meta name="author" content={data.author} />}
       {data?.publisher && <meta name="publisher" content={data.publisher} />}
-      {data?.meta && data.meta.map((e, index) => <meta key={index} {...e} />)}
-      {data?.link && data.link.map((e, index) => <link key={index} {...e} />)}
+      {data?.meta?.map((e, index) => (
+        <meta key={index} {...e} />
+      ))}
+      {data?.link?.map((e, index) => (
+        <link key={index} {...e} />
+      ))}
+      {typeof window == "undefined" &&
+        getPaths().map((path, i) => (
+          <style
+            key={i}
+            dangerouslySetInnerHTML={{
+              __html: getStringData(path),
+            }}
+          />
+        ))}
+      {typeof window != "undefined" &&
+        style?.map((props, i) => <link key={i} rel="stylesheet" {...props} />)}
     </head>
   );
 }

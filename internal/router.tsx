@@ -28,7 +28,7 @@ import "./server_global";
 import { rm } from "node:fs/promises";
 import CacheManager from "./caching";
 import { generateRandomString } from "../features/utils";
-import { createContext } from "react";
+import { Suspense } from "react";
 import { RequestContext } from "./context";
 
 class ClientOnlyError extends Error {
@@ -89,6 +89,9 @@ class StaticRouters {
     );
     this.layoutPaths = this.getlayoutPaths();
   }
+  public async init() {
+    this.cssPathExists = await this.getCssPaths();
+  }
   public setRoutes() {
     this.server = new Bun.FileSystemRouter({
       dir: join(this.baseDir, this.pageDir),
@@ -129,7 +132,8 @@ class StaticRouters {
     const serverSide = this.server?.match(request);
     const clientSide = this.client?.match(request);
 
-    await this.SetCssPathsExists(serverSide);
+    if (process.env.NODE_ENV == "development")
+      this.cssPathExists = await this.getCssPaths();
 
     const bunextReq = new BunextRequest({
       request,
@@ -538,31 +542,21 @@ class StaticRouters {
     );
   }
 
-  private async SetCssPathsExists(match: MatchedRoute | null | undefined) {
-    if (!match) return [];
-    let currentPath = "/";
-    const cssPaths: Array<string> = [];
-    const formatedPath = match.name == "/" ? [""] : match.name.split("/");
-
-    for await (const p of formatedPath) {
-      currentPath += p.length > 0 ? p : "";
-      if (this.layoutPaths.includes(currentPath)) {
-        cssPaths.push(normalize(`/${this.pageDir}${currentPath}/layout.css`));
+  private async getCssPaths() {
+    const cwd = process.cwd();
+    const possible_css_path = Object.values(this.server?.routes || {}).map(
+      (path) => {
+        const trimPath = path.replace(cwd, "").split(".");
+        trimPath.pop();
+        return normalize(`${this.buildDir}${trimPath.join(".")}.css`);
       }
-      if (p.length > 0) currentPath += "/";
+    );
+    const cssFilesPath: string[] = [];
+    for await (const path of possible_css_path) {
+      if (await Bun.file(path).exists()) cssFilesPath.push(path);
     }
-    const cssPath = match.src.split(".");
-    cssPath.pop();
-    await Promise.all(
-      [
-        ...cssPaths,
-        normalize(`/${this.pageDir}/${cssPath.join(".")}.css`),
-      ].filter(async (p) => {
-        if (this.cssPathExists.includes(p)) return true;
-        const exists = await file(normalize(`${this.buildDir}/${p}`)).exists();
-        if (exists) this.cssPathExists.push(p);
-        return exists;
-      })
+    return cssFilesPath.map((path) =>
+      normalize(path.replace(this.buildDir, "/"))
     );
   }
 
@@ -857,6 +851,7 @@ async function Init() {
     recursive: true,
     force: true,
   });
+  await router.init();
 }
 
 if (!existsSync(".bunext/build/src/pages"))

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": [ "ESNext", "DOM" ],
+    "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
@@ -17,14 +17,23 @@
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@static/*": [
-        "./static/*"
-      ],
-      "@/*": [
-        "./src/*"
-      ],
+      "@static/*": ["./static/*"],
+      "@/*": ["./src/*"]
     }
   },
-  "exclude": [ "node_modules" ],
-  "include": [ ".bunext/custom.d.ts","src", "internal", "plugins", "static", ".bunext", "components", "features" ],
+  "exclude": ["node_modules"],
+  "include": [
+    ".bunext/custom.d.ts",
+    "src",
+    "internal",
+    "plugins",
+    "static",
+    ".bunext",
+    "components",
+    "features",
+    "bin",
+    "config",
+    "database",
+    "dev"
+  ]
 }

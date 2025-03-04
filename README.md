@@ -970,3 +970,4 @@ Computer specs:
 ## 0.9.3
 
 - Fix Css auto imports for dynamic segments
+- Auto import CSS render the css at first load suppressing the flickering effect on a direct access or first load
