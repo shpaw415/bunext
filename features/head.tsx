@@ -124,19 +124,10 @@ function GetCssPaths(match: Match) {
     }
     if (p.length > 0) currentPath += "/";
   }
-
-  if (
-    globalX.__CSS_PATHS__.includes(
-      normalize(`/${globalX.__PAGES_DIR__}${currentPath}/index.css`)
-    )
-  ) {
-    cssPaths.push(
-      normalize(
-        `/${
-          globalX.__PAGES_DIR__
-        }${currentPath}/index.css${setParamOnDevMode()}`
-      )
-    );
+  const cssPath = match.value.split(".");
+  cssPath.pop();
+  if (globalX.__CSS_PATHS__.includes(normalize(`${cssPath.join(".")}.css`))) {
+    cssPaths.push(normalize(`${cssPath.join(".")}.css${setParamOnDevMode()}`));
   }
 
   return cssPaths;

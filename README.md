@@ -966,3 +966,7 @@ Computer specs:
 - Head data can be dynamic. Request object is parsed as props to the page element ( default export of index.tsx )
 - direct access to the request Object from any Component that run on the server. ( dynamic page )
 - Dev build more verbose and cleaner
+
+## 0.9.3
+
+- Fix Css auto imports for dynamic segments

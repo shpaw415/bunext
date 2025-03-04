@@ -551,11 +551,12 @@ class StaticRouters {
       }
       if (p.length > 0) currentPath += "/";
     }
-
+    const cssPath = match.src.split(".");
+    cssPath.pop();
     await Promise.all(
       [
         ...cssPaths,
-        normalize(`/${this.pageDir}${currentPath}/index.css`),
+        normalize(`/${this.pageDir}/${cssPath.join(".")}.css`),
       ].filter(async (p) => {
         if (this.cssPathExists.includes(p)) return true;
         const exists = await file(normalize(`${this.buildDir}/${p}`)).exists();
