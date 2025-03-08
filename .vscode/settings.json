@@ -1,16 +1,17 @@
 {
-    "cSpell.words": [
-        "ansi",
-        "AUTOINCREMENT",
-        "Buildoptions",
-        "ENDSWITH",
-        "Mainoptions",
-        "outdir",
-        "serveractionid",
-        "shema",
-        "sqlite",
-        "STARTSWITH",
-        "viewbox",
-        "yafs"
-    ]
+  "cSpell.words": [
+    "ansi",
+    "AUTOINCREMENT",
+    "Buildoptions",
+    "ENDSWITH",
+    "Mainoptions",
+    "outdir",
+    "pathlike",
+    "serveractionid",
+    "shema",
+    "sqlite",
+    "STARTSWITH",
+    "viewbox",
+    "yafs"
+  ]
 }

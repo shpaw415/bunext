@@ -1,6 +1,6 @@
 import { Database } from "@bunpmjs/bunext/database";
 import type { _Users } from "@bunpmjs/bunext/database/types";
-
+import "@static/style.css";
 type Props = {
   params: {
     bar: string;

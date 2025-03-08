@@ -71,4 +71,28 @@ function Link({ href, children }: { href: string; children: JSX.Element }) {
   });
 }
 
-export { navigate, Link, revalidate, revalidateEvery };
+/**
+ * revalidate the specific path like: /some/path/id_1
+ * @param pathname pathLike of the route you want to revalidate
+ * @param timeout timeout in seconds
+ */
+function revalidateStatic(pathlike: URL | Request | string, timeout?: number) {
+  if (!isServer) publicThrow();
+
+  import("../internal/caching/index.ts").then((module) => {
+    const revalidate = () => {
+      const manager = new module.CacheManager();
+      if (pathlike instanceof Request) {
+        manager.removeStaticPage(new URL(pathlike.url).pathname);
+      } else if (pathlike instanceof URL) {
+        manager.removeStaticPage(pathlike.pathname);
+      } else {
+        manager.removeStaticPage(pathlike);
+      }
+    };
+    if (timeout == undefined) revalidate();
+    else setTimeout(() => revalidate(), timeout * 1000);
+  });
+}
+
+export { navigate, Link, revalidate, revalidateEvery, revalidateStatic };

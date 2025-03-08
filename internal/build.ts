@@ -14,7 +14,6 @@ import { BuildServerComponentWithHooksWarning } from "./logs";
 import CacheManager from "./caching";
 
 globalThis.React = await import("react");
-fetchCache.reset();
 
 type BuildOuts = {
   revalidates: {
@@ -324,7 +323,6 @@ class Builder {
    */
   async makeBuild(path?: string) {
     if (import.meta.main) return await this._makeBuild();
-    fetchCache.reset();
     let strRes: BuildOuts | undefined;
     const proc = Bun.spawn({
       cmd: ["bun", import.meta.filename],
@@ -740,7 +738,45 @@ class Builder {
       ],
       splitting: true,
     });
+    await this.afterBuild(build);
     return build;
+  }
+
+  private async afterBuild(build: BuildOutput) {
+    if (globalThis?.serverConfig?.experimental?.removeDuplicateExports) {
+      Promise.all(
+        build.outputs
+          .map((b) => b.path)
+          .filter((path) => path.endsWith("/index.js"))
+          .map(this.removeDuplicateExports)
+      );
+    }
+  }
+
+  async removeDuplicateExports(filePath: string) {
+    const file = Bun.file(filePath);
+    let content = await file.text();
+    const exportRegex = /export\s*(\*|\{[^}]*\})\s*from\s*['"]([^'"]+)['"];/g;
+    const exports: string[] = [];
+
+    let match;
+    while ((match = exportRegex.exec(content)) !== null) {
+      const exportStatement = match[0];
+      const exportPath = match[2];
+      if (!exports.includes(exportPath)) {
+        exports.push(exportPath);
+      }
+    }
+
+    exports.forEach((exportPath) => {
+      const duplicateRegex = new RegExp(
+        `export\\s*(\\*|\\{[^}]*\\})\\s*from\\s*['"]${exportPath}['"];`,
+        "g"
+      );
+      content = content.replace(duplicateRegex, "");
+    });
+
+    await file.write(content);
   }
 
   private isFunction(functionToCheck: any) {

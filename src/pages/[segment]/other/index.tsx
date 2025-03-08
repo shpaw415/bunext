@@ -1,3 +1,4 @@
+"use static";
 import { useRequest, type BunextRequest } from "@bunpmjs/bunext/client/request";
 import "@static/style.css";
 

@@ -78,6 +78,9 @@ export type ServerConfig = {
     timeout: number;
     type: "cookie" | "database:hard" | "database:memory";
   };
+  experimental?: Partial<{
+    removeDuplicateExports: boolean;
+  }>;
 };
 
 export type OnRequestType = (
@@ -91,6 +94,16 @@ export type ssrElement = {
     reactElement: string;
     htmlElement: string;
   }>;
+};
+
+export type staticPage = {
+  id: string;
+  pathname: string;
+  page: string;
+  /**
+   * must be json decode
+   */
+  props: string;
 };
 
 export type revalidate = {

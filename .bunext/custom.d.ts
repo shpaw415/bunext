@@ -1,10 +1,15 @@
+declare module "*.css" {
+  const Style: string;
+  export default Style;
+}
+
 declare module "*.svg" {
-  const Svg: (props?: React.HTMLProps<HTMLOrSVGElement>) => JSX.Element;
+  import { FC, SVGProps } from "react";
+  const Svg: FC<SVGProps<SVGSVGElement>>;
   export default Svg;
 }
 
-declare module "*.css" {
-  /** .css file path in /static */
-  const Style: string;
-  export default Style;
+declare module "*.module.css" {
+  const classes: { [key: string]: string };
+  export default classes;
 }

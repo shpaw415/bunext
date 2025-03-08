@@ -3,6 +3,8 @@
 import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
+import { normalize } from "../features/utils";
+import type { ServerConfig } from "../internal/types.ts";
 
 type _cmd =
   | "init"
@@ -22,6 +24,12 @@ declare global {
 }
 globalThis.processes ??= [];
 globalThis.head ??= {};
+
+const serverConfig = (await import(
+  normalize(process.cwd() + "/config/server.ts")
+)) as { default: ServerConfig };
+globalThis.serverConfig = serverConfig.default;
+
 if (import.meta.main)
   switch (cmd) {
     case "init":
@@ -34,7 +42,6 @@ if (import.meta.main)
       console.log(res);
       break;
     case "dev":
-      await (await import("../internal/build.ts")).builder.build();
       dev();
       break;
     case "production":
@@ -67,7 +74,9 @@ async function databaseSchemaMaker() {
   );
   await Bun.write(
     `${paths.bunextModulePath}/database/database_types.ts`,
-    [...types.types, ...types.typesWithDefaultAsRequired].map((type) => `export ${type}`).join("\n")
+    [...types.types, ...types.typesWithDefaultAsRequired]
+      .map((type) => `export ${type}`)
+      .join("\n")
   );
   const dbFile = Bun.file(`${paths.bunextModulePath}/database/index.ts`);
   let dbFileContent: string | string[] = await dbFile.text();
@@ -100,6 +109,7 @@ function dev() {
   Bun.spawn({
     cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
     stdout: "inherit",
+    stderr: "inherit",
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),

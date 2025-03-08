@@ -133,7 +133,7 @@ export function getServerSideProps(): Props {
   } as Props;
 }
 
-export default function DynamicPage({params, props}:{params: Params, props: Props, request?: BunextRequest}) {
+export default function DynamicPage({params, props}:{params: Params, props: Props, request?: Request}, bunextRequest: BunextRequest) {
   return (
     <div>
       action: {params.action} 
@@ -143,6 +143,67 @@ export default function DynamicPage({params, props}:{params: Params, props: Prop
   );
 }
 ```
+
+
+### use static
+
+This can significantly reduce server load for pages that does not need changes regularly or server processing
+
+ - bypass SSR Features
+ - cache the entire page for as long the server is running or it's revalidated
+ - getServerSideProps is ran only when it's revalidating
+
+```Javascript XML
+"use static";
+
+//[action]/[id].tsx
+import type { BunextRequest } from '@bunpmjs/bunext/client/request';
+import { revalidateStatic } from "@bunpmjs/bunext/router";
+
+type Params = {
+  action: "activate" | "remove";
+  id: string;
+};
+
+type Props = {
+  server: boolean;
+};
+
+export async function getServerSideProps({
+  params, 
+  request
+  }:{
+    params: Params, 
+    request: Request
+  }): Props {
+
+  // pathname => /activate/1 or /remove/43 or any other specific pathname
+  // will be revalidate after 3600 seconds
+  revalidateStatic(request, 3600);
+
+  return {
+    data: await (await fetch("http://foo.com/api")).json()
+  } as Props;
+}
+
+export default function DynamicPage({
+  params, 
+  props
+  }:{
+    params: Params, 
+    props: Props, 
+    request?: Request
+  }, bunextRequest: BunextRequest) {
+  return (
+    <div>
+      action: {params.action} 
+      id: {params.id}
+      props-server: {props.server}
+    </div>
+  );
+}
+```
+
 
 ### Navigate
 
@@ -971,3 +1032,14 @@ Computer specs:
 
 - Fix Css auto imports for dynamic segments
 - Auto import CSS render the css at first load suppressing the flickering effect on a direct access or first load
+
+## 0.9.4
+
+- Fix Css not imported on direct access for the css present on the Page element. ( worked for layouts )
+- SVG and CSS file are typed correctly
+- NEW FEATURE: "use static" directive at the top of a file
+  - cache the page for a specific pathname even with dynamic segments
+    - exemple for /a/path/[id] will cache /a/path/1 and /a/path/2
+    - it can be revalidate
+- Code Cleaned in the router.
+- fetch caching stronger

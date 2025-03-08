@@ -259,7 +259,7 @@ function HeadElement({
   const getPaths = () =>
     GetCssPaths(
       {
-        value: normalize(`/${router.pageDir}/${path}/index.js`),
+        value: normalize(`/${router.pageDir}/${path}.js`),
         params: {},
         path: path,
       },

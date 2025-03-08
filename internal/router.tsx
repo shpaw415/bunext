@@ -28,7 +28,6 @@ import "./server_global";
 import { rm } from "node:fs/promises";
 import CacheManager from "./caching";
 import { generateRandomString } from "../features/utils";
-import { Suspense } from "react";
 import { RequestContext } from "./context";
 
 class ClientOnlyError extends Error {
@@ -52,10 +51,9 @@ let LoadedNodeModule: Array<{
 const HTMLDocType = "<!DOCTYPE html>";
 
 class StaticRouters {
-  server?: FileSystemRouter;
-  client?: FileSystemRouter;
-  #routes_dump: string;
-
+  server: FileSystemRouter;
+  client: FileSystemRouter;
+  routes_dump: string;
   serverActions: {
     path: string;
     actions: Array<Function>;
@@ -63,6 +61,7 @@ class StaticRouters {
   layoutPaths: string[];
   cssPaths: string[] = [];
   cssPathExists: string[] = [];
+  staticRoutes: Array<keyof FileSystemRouter["routes"]> = [];
 
   baseDir = process.cwd();
   buildDir = ".bunext/build";
@@ -78,7 +77,7 @@ class StaticRouters {
       dir: join(this.baseDir, this.buildDir, this.pageDir),
       style: "nextjs",
     });
-    this.#routes_dump = NJSON.stringify(
+    this.routes_dump = NJSON.stringify(
       Object.fromEntries(
         Object.entries(this.client.routes).map(([path, filePath]) => [
           path,
@@ -91,455 +90,7 @@ class StaticRouters {
   }
   public async init() {
     this.cssPathExists = await this.getCssPaths();
-  }
-  public setRoutes() {
-    this.server = new Bun.FileSystemRouter({
-      dir: join(this.baseDir, this.pageDir),
-      style: "nextjs",
-    });
-    this.client = new Bun.FileSystemRouter({
-      dir: join(this.baseDir, this.buildDir, this.pageDir),
-      style: "nextjs",
-    });
-    this.#routes_dump = NJSON.stringify(
-      Object.fromEntries(
-        Object.entries(this.client.routes).map(([path, filePath]) => [
-          path,
-          "/" + relative(join(this.baseDir, this.buildDir), filePath),
-        ])
-      ),
-      { omitStack: true }
-    );
-  }
-  async serve(
-    request: Request,
-    request_header: Record<string, string>,
-    data: FormData,
-    {
-      Shell,
-      onError = (error, errorInfo) => {
-        if (error instanceof ClientOnlyError) return;
-        console.error(error, errorInfo);
-      },
-    }: {
-      Shell: React.ComponentType<{ children: React.ReactElement }>;
-      preloadScript?: Record<string, string>;
-      bootstrapModules?: string[];
-      onError?(error: unknown, errorInfo: React.ErrorInfo): string | void;
-    }
-  ): Promise<BunextRequest | null> {
-    const { pathname, search } = new URL(request.url);
-    const serverSide = this.server?.match(request);
-    const clientSide = this.client?.match(request);
-
-    if (process.env.NODE_ENV == "development")
-      this.cssPathExists = await this.getCssPaths();
-
-    const bunextReq = new BunextRequest({
-      request,
-      response: new Response(),
-    });
-    if (serverSide) bunextReq.path = serverSide.name;
-
-    switch (pathname as pathNames) {
-      case "/ServerActionGetter":
-        await bunextReq.session.initData();
-        return bunextReq.__SET_RESPONSE__(
-          await this.serverActionGetter(request_header, data, bunextReq)
-        );
-      case "/bunextgetSessionData":
-        await bunextReq.session.initData();
-        return bunextReq.__SET_RESPONSE__(
-          new Response(JSON.stringify(bunextReq.session.__DATA__.public))
-        );
-      case "/bunextDeleteSession":
-        await bunextReq.session.initData();
-        bunextReq.session.delete();
-        return bunextReq.__SET_RESPONSE__(bunextReq.setCookie(new Response()));
-
-      default:
-        const staticAssets = await this.serveFromDir({
-          directory: this.staticDir,
-          path: pathname,
-        });
-        if (staticAssets == null && pathname == "/favicon.ico") {
-          return bunextReq.__SET_RESPONSE__(new Response());
-        } else if (staticAssets !== null)
-          return bunextReq.__SET_RESPONSE__(
-            new Response(staticAssets, {
-              headers: {
-                "Content-Type": staticAssets.type,
-              },
-            })
-          );
-
-        const staticResponse = await this.serveFromDir({
-          directory: this.buildDir,
-          path: pathname,
-        });
-        const d = new Date();
-        d.setTime(d.getTime() + 360000);
-        if (staticResponse !== null) {
-          const DevHeader = {
-            "Cache-Control":
-              "public, max-age=0, must-revalidate, no-store, no-cache",
-            "Last-Modified": d.toUTCString(),
-            Expires: new Date("2000/01/01").toUTCString(),
-            Pragma: "no-cache",
-            ETag: generateRandomString(5),
-          };
-
-          const ProductionHeader = {
-            "Cache-Control": "public max-age=3600",
-          };
-
-          return bunextReq.__SET_RESPONSE__(
-            new Response(staticResponse, {
-              headers: {
-                "Content-Type": staticResponse.type,
-                ...(process.env.NODE_ENV == "production"
-                  ? ProductionHeader
-                  : DevHeader),
-              },
-            })
-          );
-        }
-        const nodeModuleFile = await this.serveFromDir({
-          directory: "node_modules",
-          path: normalize(pathname.replace("node_modules", "")),
-          suffixes: ["", ".js", ".jsx", ".ts", ".tsx"],
-        });
-        if (nodeModuleFile !== null) {
-          return await this.serveFileFromNodeModule(
-            pathname,
-            await nodeModuleFile.text(),
-            bunextReq
-          );
-        }
-        break;
-    }
-
-    if (!serverSide) return null;
-    if (!clientSide) {
-      const apiEndpointResult = await this.VerifyApiEndpoint(
-        bunextReq,
-        serverSide
-      );
-      if (!apiEndpointResult)
-        throw new TypeError(
-          "No client-side script found for server-side component: " +
-            serverSide.filePath
-        );
-      else return bunextReq.__SET_RESPONSE__(apiEndpointResult);
-    }
-
-    const module = await import(serverSide.filePath);
-    if (typeof module.getServerSideProps != "undefined")
-      await bunextReq.session.initData();
-    const result = await module?.getServerSideProps?.(
-      {
-        params: serverSide.params,
-        req: request,
-        query: serverSide.query,
-      },
-      bunextReq
-    );
-    const stringified = NJSON.stringify(result, { omitStack: true });
-    if (
-      typeof request_header.accept != "undefined" &&
-      request_header.accept == "application/vnd.server-side-props"
-    ) {
-      return bunextReq.__SET_RESPONSE__(
-        new Response(stringified, {
-          headers: {
-            ...bunextReq.response.headers,
-            "Content-Type": "application/vnd.server-side-props",
-            "Cache-Control": "no-store",
-          },
-        })
-      );
-    }
-
-    if (result?.redirect) {
-      return bunextReq.__SET_RESPONSE__(
-        new Response(null, {
-          status: 302,
-          headers: { Location: result.redirect },
-        })
-      );
-    }
-
-    const stream = this.makeStream(
-      await this.makeJSXPage({
-        Shell,
-        module: serverSide.filePath,
-        onError,
-        serverSidePropsString: stringified,
-        request,
-        search,
-        serverSide,
-        serverSidePropsResult: result,
-        bunextReq: bunextReq,
-      })
-    );
-
-    return bunextReq.__SET_RESPONSE__(stream);
-  }
-
-  private async serveFileFromNodeModule(
-    _path: string,
-    content: string,
-    req: BunextRequest
-  ) {
-    let mimeType = "";
-    let parsedContent = content;
-
-    const MakeTextRes = () =>
-      req.__SET_RESPONSE__(
-        new Response(parsedContent, {
-          headers: {
-            "Content-Type": "text/" + mimeType,
-          },
-        })
-      );
-    const MakeCustomRes = (contentType: string) =>
-      req.__SET_RESPONSE__(
-        new Response(parsedContent, {
-          headers: {
-            "Content-Type": contentType,
-          },
-        })
-      );
-
-    const foundedModule = LoadedNodeModule.find((e) => e.path == path);
-    if (foundedModule) {
-      mimeType = foundedModule.mimeType;
-      parsedContent = foundedModule.content;
-      return MakeTextRes();
-    }
-    //@ts-ignore
-    const path = Bun.fileURLToPath(import.meta.resolve(_path));
-    const ext = extname(path).replace(".", "");
-
-    const buildedFile = Bun.file(
-      normalize(
-        `.bunext/build/node_modules/${path.split("node_modules").at(-1)}`
-      )
-    );
-
-    if (await buildedFile.exists()) {
-      mimeType = "javascript";
-      parsedContent = await buildedFile.text();
-      return MakeTextRes();
-    }
-
-    switch (ext) {
-      case "css":
-      case "csv":
-      case "html":
-      case "xml":
-        mimeType = ext;
-        break;
-      case "ts":
-        mimeType = "javascript";
-        parsedContent = await new Bun.Transpiler({
-          target: "browser",
-          loader: "ts",
-        }).transform(parsedContent);
-        await Bun.write(buildedFile, parsedContent);
-        break;
-      case "tsx":
-        mimeType = "javascript";
-        parsedContent = await new Bun.Transpiler({
-          target: "browser",
-          loader: "tsx",
-        }).transform(parsedContent);
-        await Bun.write(buildedFile, parsedContent);
-        break;
-      case "jsx":
-        mimeType = "javascript";
-        parsedContent = await new Bun.Transpiler({
-          target: "browser",
-          loader: "jsx",
-        }).transform(parsedContent);
-        await Bun.write(buildedFile, parsedContent);
-        break;
-      case "js":
-        mimeType = "javascript";
-        break;
-      case "json":
-        return MakeCustomRes("application/json");
-      default:
-        return req.__SET_RESPONSE__(
-          new Response(null, {
-            status: 404,
-          })
-        );
-    }
-
-    return MakeTextRes();
-  }
-
-  private async makeJSXPage({
-    request,
-    serverSidePropsString,
-    onError,
-    serverSide,
-    module,
-    serverSidePropsResult,
-    search,
-    Shell,
-    bunextReq,
-  }: {
-    request: Request;
-    serverSidePropsString: string;
-    onError: (error: unknown, errorInfo: React.ErrorInfo) => string | void;
-    serverSide: MatchedRoute;
-    module: string;
-    serverSidePropsResult: any;
-    search: string;
-    Shell: React.ComponentType<{
-      children: React.ReactElement;
-    }>;
-    bunextReq: BunextRequest;
-  }) {
-    await bunextReq.session.initData();
-    const CreatedAt =
-      bunextReq.session.__DATA__.private?.__BUNEXT_SESSION_CREATED_AT__ || 0;
-
-    const sessionTimeout =
-      CreatedAt == 0
-        ? 0
-        : CreatedAt +
-          bunextReq.session.sessionTimeoutFromNow * 1000 -
-          (new Date().getTime() - CreatedAt);
-
-    const preloadScriptObj = {
-      __PAGES_DIR__: JSON.stringify(this.pageDir),
-      __INITIAL_ROUTE__: JSON.stringify(serverSide.pathname + search),
-      __ROUTES__: this.#routes_dump,
-      __SERVERSIDE_PROPS__: serverSidePropsString,
-      __LAYOUT_ROUTE__: JSON.stringify(this.layoutPaths),
-      __HEAD_DATA__: JSON.stringify(Head.head),
-      __PUBLIC_SESSION_DATA__: JSON.stringify(bunextReq.session.getData(true)),
-      __SESSION_TIMEOUT__: JSON.stringify(sessionTimeout),
-      serverConfig: JSON.stringify({
-        Dev: globalThis.serverConfig.Dev,
-        HTTPServer: globalThis.serverConfig.HTTPServer,
-      } as Partial<ServerConfig>),
-      __PROCESS_ENV__: JSON.stringify(
-        Object.assign(
-          {},
-          ...[
-            ...Object.keys(process.env)
-              .filter((k) => k.startsWith("PUBLIC"))
-              .map((k) => {
-                return { [k]: process.env[k] };
-              }),
-            {
-              NODE_ENV: process.env.NODE_ENV,
-            },
-          ]
-        )
-      ),
-      __CSS_PATHS__: JSON.stringify(this.cssPathExists),
-    } as Record<keyof _GlobalData, string>;
-
-    const preloadSriptsStrList = () => [
-      ...Object.keys(preloadScriptObj)
-        .map((i) => `${i}=${(preloadScriptObj as any)[i]}`)
-        .filter(Boolean),
-      "process={env: __PROCESS_ENV__};",
-    ];
-
-    const renderOptionData = {
-      signal: request.signal,
-      bootstrapScriptContent: preloadSriptsStrList().join(";"),
-      bootstrapModules: ["/.bunext/react-ssr/hydrate.js"],
-      onError,
-    } as RenderToReadableStreamOptions;
-
-    const makeJsx = async (bunext_request: BunextRequest) => {
-      if (process.env.NODE_ENV == "development") {
-        let pageString = "";
-        let proc: Subprocess<"ignore", "inherit", "inherit"> | undefined =
-          undefined as unknown as Subprocess<"ignore", "inherit", "inherit">;
-
-        await new Promise((resolve) => {
-          proc = Bun.spawn({
-            env: {
-              ...process.env,
-              module_path: serverSide.filePath,
-              props: JSON.stringify({
-                props: serverSidePropsResult,
-                params: serverSide.params,
-              }),
-              url: request.url,
-            },
-            cwd: process.cwd(),
-            cmd: ["bun", `${import.meta.dirname}/dev/jsxToString.tsx`],
-            stdout: "inherit",
-            stderr: "inherit",
-            ipc: ({
-              jsx,
-              head,
-              error,
-            }: {
-              jsx?: string;
-              head?: Record<string, _Head>;
-              error?: Error;
-            }) => {
-              if (jsx) pageString = jsx;
-              if (head) bunext_request.headData = head;
-              if (error) throw error;
-
-              resolve(true);
-            },
-          });
-        });
-
-        await proc.exited;
-
-        return (
-          <div
-            id="BUNEXT_INNER_PAGE_INSERTER"
-            dangerouslySetInnerHTML={{ __html: pageString }}
-          />
-        );
-      } else
-        return (
-          (await this.serverPrebuiltPage(serverSide, await import(module))) ||
-          (await this.CreateDynamicPage(
-            module,
-            {
-              props: serverSidePropsResult,
-              params: serverSide.params,
-            },
-            serverSide,
-            bunext_request
-          ))
-        );
-    };
-
-    const jsxToServe: JSX.Element = await makeJsx(bunextReq);
-    if (bunextReq.headData) {
-      preloadScriptObj.__HEAD_DATA__ = JSON.stringify(bunextReq.headData);
-      renderOptionData.bootstrapScriptContent =
-        preloadSriptsStrList().join(";");
-    }
-    return (
-      <RequestContext.Provider value={bunextReq}>
-        <Shell route={serverSide.pathname + search} {...serverSidePropsResult}>
-          {jsxToServe}
-          <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: renderOptionData.bootstrapScriptContent || "",
-            }}
-          />
-        </Shell>
-      </RequestContext.Provider>
-    );
+    this.staticRoutes = await this.getUseStaticRoutes();
   }
 
   private async getCssPaths() {
@@ -559,8 +110,65 @@ class StaticRouters {
       normalize(path.replace(this.buildDir, "/"))
     );
   }
+  private async getUseStaticRoutes() {
+    const useStaticRoute: string[] = [];
+    const regex = /(['"])use static\1/;
+    await Promise.all(
+      Object.entries(this.server?.routes || {})
+        .filter(([route]) => !route.endsWith("/layout"))
+        .map(async ([route, path]) => {
+          const fileContent = await Bun.file(path).text();
+          if (regex.test(fileContent.split("\n").at(0) as string))
+            useStaticRoute.push(route);
+        })
+    );
+    return useStaticRoute;
+  }
 
-  private async serverPrebuiltPage(
+  public setRoutes() {
+    this.server = new Bun.FileSystemRouter({
+      dir: join(this.baseDir, this.pageDir),
+      style: "nextjs",
+    });
+    this.client = new Bun.FileSystemRouter({
+      dir: join(this.baseDir, this.buildDir, this.pageDir),
+      style: "nextjs",
+    });
+    this.routes_dump = NJSON.stringify(
+      Object.fromEntries(
+        Object.entries(this.client.routes).map(([path, filePath]) => [
+          path,
+          "/" + relative(join(this.baseDir, this.buildDir), filePath),
+        ])
+      ),
+      { omitStack: true }
+    );
+  }
+
+  async serve(
+    request: Request,
+    request_header: Record<string, string>,
+    data: FormData,
+    {
+      Shell,
+    }: {
+      Shell: React.ComponentType<{ children: React.ReactElement }>;
+    }
+  ): Promise<BunextRequest | null> {
+    if (process.env.NODE_ENV == "development")
+      this.cssPathExists = await this.getCssPaths();
+
+    return new RequestManager({
+      request,
+      client: this.client,
+      server: this.server,
+      data,
+      request_header,
+      router: this,
+    }).make({ Shell });
+  }
+
+  async serverPrebuiltPage(
     serverSide: MatchedRoute,
     module: Record<string, Function>
   ) {
@@ -612,126 +220,10 @@ class StaticRouters {
     return JSXElement();
   }
 
-  private async VerifyApiEndpoint(
-    bunextreq: BunextRequest,
-    route: MatchedRoute
-  ) {
-    const ApiModule = await import(route.filePath);
-    if (typeof ApiModule[bunextreq.request.method.toUpperCase()] == "undefined")
-      return;
-    await bunextreq.session.initData();
-    const res = (await ApiModule[bunextreq.request.method](bunextreq)) as
-      | BunextRequest
-      | undefined;
-    if (res instanceof BunextRequest) {
-      return bunextreq.setCookie(res.response);
-    }
-    throw new Error(
-      `Api Endpoint ${route.filePath} did not returned a BunextRequest Object`
-    );
-  }
-
-  private makeStream(jsx: JSX.Element): Response {
-    const rewriter = new HTMLRewriter().on("#BUNEXT_INNER_PAGE_INSERTER", {
-      element(element) {
-        element.removeAndKeepContent();
-      },
-    });
-
-    const page = HTMLDocType + rewriter.transform(renderToString(jsx));
-
-    return new Response(page, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    });
-  }
   private getlayoutPaths() {
     return this.getFilesFromPageDir()
       .filter((f) => f.split("/").at(-1)?.includes("layout."))
       .map((l) => normalize(`//${l}`.split("/").slice(0, -1).join("/")));
-  }
-
-  private async serverActionGetter(
-    request_header: Record<string, string>,
-    data: FormData,
-    bunextReq: BunextRequest
-  ): Promise<Response> {
-    const reqData = this.extractServerActionHeader(request_header);
-
-    if (!reqData) throw new Error(`no request Data for ServerAction`);
-    const props = this.extractPostData(data);
-    const module = this.serverActions.find(
-      (s) => s.path === reqData.path.slice(1)
-    );
-    if (!module)
-      throw new Error(`no module found for ServerAction ${reqData.path}`);
-    const call = module.actions.find((f) => f.name === reqData.call);
-    if (!call)
-      throw new Error(
-        `no function founded for ServerAction ${reqData.path}/${reqData.call}`
-      );
-    const fillUndefinedParams = (
-      Array.apply(null, Array(call.length)) as Array<null>
-    ).map(() => undefined);
-    let result: ServerActionDataType = await call(
-      ...[...props, ...fillUndefinedParams, bunextReq]
-    );
-
-    let dataType: ServerActionDataTypeHeader = "json";
-    if (result instanceof Blob) {
-      dataType = "blob";
-    } else if (result instanceof File) {
-      dataType = "file";
-    } else {
-      result = JSON.stringify({ props: result });
-    }
-
-    return bunextReq.setCookie(
-      new Response(result as Exclude<ServerActionDataType, object>, {
-        headers: {
-          ...bunextReq.response.headers,
-          dataType,
-          fileData:
-            result instanceof File
-              ? JSON.stringify({
-                  name: result.name,
-                  lastModified: result.lastModified,
-                })
-              : undefined,
-        },
-      })
-    );
-  }
-
-  private extractServerActionHeader(header: Record<string, string>) {
-    if (!header.serveractionid) return null;
-    const serverActionData = header.serveractionid.split(":");
-
-    if (!serverActionData) return null;
-    return {
-      path: serverActionData[0],
-      call: serverActionData[1],
-    };
-  }
-  private extractPostData(data: FormData) {
-    return (
-      JSON.parse(decodeURI(data.get("props") as string)) as Array<any>
-    ).map((prop) => {
-      if (typeof prop == "string" && prop.startsWith("BUNEXT_FILE_")) {
-        return data.get(prop) as File;
-      } else if (
-        Array.isArray(prop) &&
-        prop.length > 0 &&
-        typeof prop[0] == "string" &&
-        prop[0].startsWith("BUNEXT_BATCH_FILES_")
-      ) {
-        return data.getAll(prop[0]);
-      } else if (typeof prop == "string" && prop == "BUNEXT_FORMDATA") {
-        return data;
-      } else return prop;
-    });
   }
 
   /**
@@ -846,6 +338,700 @@ class StaticRouters {
   }
 }
 
+class RequestManager {
+  request: Request;
+  server: FileSystemRouter;
+  serverSide: MatchedRoute | null;
+  client: FileSystemRouter;
+  clientSide: MatchedRoute | null;
+  request_header: Record<string, string>;
+  data: FormData;
+  bunextReq: BunextRequest;
+  pathname: string;
+  search: string;
+  router: StaticRouters;
+  serverSideProps?: {
+    value: any;
+    toString: () => string;
+  };
+
+  constructor(init: {
+    request: Request;
+    request_header: Record<string, string>;
+    data: FormData;
+    server: FileSystemRouter;
+    client: FileSystemRouter;
+    router: StaticRouters;
+  }) {
+    this.request = init.request;
+    this.request_header = init.request_header;
+    this.data = init.data;
+    this.server = init.server;
+    this.client = init.client;
+    this.router = init.router;
+
+    this.serverSide = this.server.match(this.request);
+    this.clientSide = this.client.match(this.request);
+
+    const { pathname, search } = new URL(this.request.url);
+    this.pathname = pathname;
+    this.search = search;
+    this.bunextReq = new BunextRequest({
+      request: this.request,
+      response: new Response(),
+    });
+  }
+
+  async make({
+    Shell,
+  }: {
+    Shell: React.ComponentType<{
+      children: React.ReactElement;
+    }>;
+  }): Promise<null | BunextRequest> {
+    return (
+      (await this.checkStaticServing()) ||
+      (await this.checkFeatureServing()) ||
+      (await this.servePage({ Shell }))
+    );
+  }
+
+  private formatPage(html: string) {
+    const rewriter = new HTMLRewriter().on("#BUNEXT_INNER_PAGE_INSERTER", {
+      element(element) {
+        element.removeAndKeepContent();
+      },
+    });
+    return [HTMLDocType, rewriter.transform(html)].join("\n");
+  }
+
+  private makeStream(jsx: JSX.Element): Response {
+    return new Response(this.formatPage(renderToString(jsx)), {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  private async serveServerAction() {
+    await this.bunextReq.session.initData();
+    return this.bunextReq.__SET_RESPONSE__(await this.serverActionGetter());
+  }
+  private async serveSessionData() {
+    await this.bunextReq.session.initData();
+    return this.bunextReq.__SET_RESPONSE__(
+      new Response(JSON.stringify(this.bunextReq.session.__DATA__.public))
+    );
+  }
+  private async serveDeleteSession() {
+    await this.bunextReq.session.initData();
+    this.bunextReq.session.delete();
+    return this.bunextReq.__SET_RESPONSE__(
+      this.bunextReq.setCookie(new Response())
+    );
+  }
+  private async serveStaticAssets() {
+    const staticAssets = await this.router.serveFromDir({
+      directory: this.router.staticDir,
+      path: this.pathname,
+    });
+    if (staticAssets == null && this.pathname == "/favicon.ico") {
+      return this.bunextReq.__SET_RESPONSE__(new Response());
+    } else if (staticAssets !== null)
+      return this.bunextReq.__SET_RESPONSE__(
+        new Response(staticAssets, {
+          headers: {
+            "Content-Type": staticAssets.type,
+          },
+        })
+      );
+    return null;
+  }
+  private async serveFromBuildDirectory() {
+    const staticResponse = await this.router.serveFromDir({
+      directory: router.buildDir,
+      path: this.pathname,
+    });
+    if (!staticResponse) return null;
+
+    const date = new Date();
+    date.setTime(date.getTime() + 360000);
+    const DevHeader = {
+      "Cache-Control": "public, max-age=0, must-revalidate, no-store, no-cache",
+      "Last-Modified": date.toUTCString(),
+      Expires: new Date("2000/01/01").toUTCString(),
+      Pragma: "no-cache",
+      ETag: generateRandomString(5),
+    };
+
+    const ProductionHeader = {
+      "Cache-Control": "public max-age=3600",
+    };
+
+    return this.bunextReq.__SET_RESPONSE__(
+      new Response(staticResponse, {
+        headers: {
+          "Content-Type": staticResponse.type,
+          ...(process.env.NODE_ENV == "production"
+            ? ProductionHeader
+            : DevHeader),
+        },
+      })
+    );
+  }
+  private async serveFromNodeModule() {
+    const nodeModuleFile = await this.router.serveFromDir({
+      directory: "node_modules",
+      path: normalize(this.pathname.replace("node_modules", "")),
+      suffixes: ["", ".js", ".jsx", ".ts", ".tsx"],
+    });
+    if (!nodeModuleFile) return null;
+
+    let mimeType = "";
+    let parsedContent = await nodeModuleFile.text();
+
+    const MakeTextRes = () =>
+      this.bunextReq.__SET_RESPONSE__(
+        new Response(parsedContent, {
+          headers: {
+            "Content-Type": "text/" + mimeType,
+          },
+        })
+      );
+    const MakeCustomRes = (contentType: string) =>
+      this.bunextReq.__SET_RESPONSE__(
+        new Response(parsedContent, {
+          headers: {
+            "Content-Type": contentType,
+          },
+        })
+      );
+
+    const foundedModule = LoadedNodeModule.find((e) => e.path == path);
+    if (foundedModule) {
+      mimeType = foundedModule.mimeType;
+      parsedContent = foundedModule.content;
+      return MakeTextRes();
+    }
+    const path = Bun.fileURLToPath(import.meta.resolve(this.pathname));
+    const ext = extname(path).replace(".", "");
+
+    const buildedFile = Bun.file(
+      normalize(
+        `.bunext/build/node_modules/${path.split("node_modules").at(-1)}`
+      )
+    );
+
+    if (await buildedFile.exists()) {
+      mimeType = "javascript";
+      parsedContent = await buildedFile.text();
+      return MakeTextRes();
+    }
+
+    switch (ext) {
+      case "css":
+      case "csv":
+      case "html":
+      case "xml":
+        mimeType = ext;
+        break;
+      case "ts":
+        mimeType = "javascript";
+        parsedContent = await new Bun.Transpiler({
+          target: "browser",
+          loader: "ts",
+        }).transform(parsedContent);
+        await Bun.write(buildedFile, parsedContent);
+        break;
+      case "tsx":
+        mimeType = "javascript";
+        parsedContent = await new Bun.Transpiler({
+          target: "browser",
+          loader: "tsx",
+        }).transform(parsedContent);
+        await Bun.write(buildedFile, parsedContent);
+        break;
+      case "jsx":
+        mimeType = "javascript";
+        parsedContent = await new Bun.Transpiler({
+          target: "browser",
+          loader: "jsx",
+        }).transform(parsedContent);
+        await Bun.write(buildedFile, parsedContent);
+        break;
+      case "js":
+        mimeType = "javascript";
+        break;
+      case "json":
+        return MakeCustomRes("application/json");
+      default:
+        return this.bunextReq.__SET_RESPONSE__(
+          new Response(null, {
+            status: 404,
+          })
+        );
+    }
+    return MakeTextRes();
+  }
+  private async MakeServerSideProps(): Promise<{
+    value: any;
+    toString: () => string;
+  }> {
+    if (this.serverSideProps) return this.serverSideProps;
+
+    if (!this.serverSide)
+      throw new Error(`no serverSide script found for ${this.pathname}`);
+
+    if (this.isUseStaticPath() && process.env.NODE_ENV == "production") {
+      const props = CacheManager.getStaticPage(this.request.url)?.props;
+      if (props) {
+        this.serverSideProps = {
+          toString: () => props,
+          value: JSON.parse(props),
+        };
+        return this.serverSideProps;
+      }
+    }
+
+    const module = await import(this.serverSide.filePath);
+    if (typeof module.getServerSideProps == "undefined")
+      return {
+        toString: () => NJSON.stringify(undefined, { omitStack: true }),
+        value: undefined,
+      };
+
+    await this.bunextReq.session.initData();
+    const result = await module?.getServerSideProps?.(
+      {
+        ...this.serverSide,
+        request: this.request,
+      },
+      this.bunextReq
+    );
+
+    const res = {
+      toString: () => NJSON.stringify(result, { omitStack: true }),
+      value: result,
+    };
+
+    this.serverSideProps = res;
+
+    return res;
+  }
+  private async serveServerSideProps(): Promise<null | BunextRequest> {
+    if (this.request_header?.accept != "application/vnd.server-side-props")
+      return null;
+
+    return this.bunextReq.__SET_RESPONSE__(
+      new Response((await this.MakeServerSideProps()).toString(), {
+        headers: {
+          ...this.bunextReq.response.headers,
+          "Content-Type": "application/vnd.server-side-props",
+          "Cache-Control": "no-store",
+        },
+      })
+    );
+  }
+  private async serveAPIEndpoint(): Promise<null | BunextRequest> {
+    if (this.clientSide || !this.serverSide) return null;
+
+    const ApiModule = await import(this.serverSide.filePath);
+    if (
+      typeof ApiModule[this.bunextReq.request.method.toUpperCase()] ==
+      "undefined"
+    )
+      return null;
+    await this.bunextReq.session.initData();
+    const res = (await ApiModule[this.bunextReq.request.method](
+      this.bunextReq
+    )) as BunextRequest | Response | undefined;
+    if (res instanceof BunextRequest) {
+      this.bunextReq.setCookie(res.response);
+    } else if (res instanceof Response) {
+      this.bunextReq.setCookie(res);
+    } else {
+      throw new Error(
+        `Api Endpoint ${this.serverSide.filePath} did not returned a BunextRequest or Response Object`
+      );
+    }
+    return this.bunextReq;
+  }
+  private async serveRedirectFromServerSideProps() {
+    const props = await this.MakeServerSideProps();
+    if (typeof props.value != "object" || !props.value?.redirect) return null;
+    return this.bunextReq.__SET_RESPONSE__(
+      new Response(null, {
+        status: 302,
+        headers: { Location: props.value.redirect },
+      })
+    );
+  }
+  private async servePage({
+    Shell,
+  }: {
+    Shell: React.ComponentType<{
+      children: React.ReactElement;
+    }>;
+  }) {
+    if (!this.serverSide) return null;
+
+    const chunkRegex = /chunk-[a-zA-Z0-9]+\.js/g;
+    if (chunkRegex.test(this.serverSide.pathname)) return null;
+    else if (this.serverSide.pathname == "/favicon.ico") return null;
+
+    const page = await this.makePage({ Shell });
+    if (!page) return null;
+    return this.bunextReq.__SET_RESPONSE__(this.makeStream(page));
+  }
+
+  private async checkStaticServing(): Promise<BunextRequest | null> {
+    switch (this.pathname as pathNames) {
+      case "/ServerActionGetter":
+        return this.serveServerAction();
+      case "/bunextgetSessionData":
+        return this.serveSessionData();
+      case "/bunextDeleteSession":
+        return this.serveDeleteSession();
+      default:
+        return (
+          (await this.serveStaticAssets()) ||
+          (await this.serveFromBuildDirectory()) ||
+          (await this.serveFromNodeModule())
+        );
+    }
+  }
+  private async checkFeatureServing(): Promise<BunextRequest | null> {
+    if (!this.serverSide) return null;
+
+    return (
+      (await this.serveServerSideProps()) ||
+      (await this.serveAPIEndpoint()) ||
+      (await this.serveRedirectFromServerSideProps())
+    );
+  }
+
+  private ErrorOnNoServerSideMatch() {
+    return new Error(`no serversideScript found for ${this.pathname}`);
+  }
+
+  private async MakePreLoadObject(): Promise<
+    Record<keyof _GlobalData, string>
+  > {
+    if (!this.serverSide) throw this.ErrorOnNoServerSideMatch();
+    await this.bunextReq.session.initData();
+    const CreatedAt =
+      this.bunextReq.session.__DATA__.private?.__BUNEXT_SESSION_CREATED_AT__ ||
+      0;
+
+    const sessionTimeout =
+      CreatedAt == 0
+        ? 0
+        : CreatedAt +
+          this.bunextReq.session.sessionTimeoutFromNow * 1000 -
+          (new Date().getTime() - CreatedAt);
+
+    return {
+      __PAGES_DIR__: JSON.stringify(this.router.pageDir),
+      __INITIAL_ROUTE__: JSON.stringify(this.serverSide.pathname + this.search),
+      __ROUTES__: this.router.routes_dump,
+      __SERVERSIDE_PROPS__: (await this.MakeServerSideProps()).toString(),
+      __LAYOUT_ROUTE__: JSON.stringify(this.router.layoutPaths),
+      __HEAD_DATA__: JSON.stringify(Head.head),
+      __PUBLIC_SESSION_DATA__: JSON.stringify(
+        this.bunextReq.session.getData(true)
+      ),
+      __SESSION_TIMEOUT__: JSON.stringify(sessionTimeout),
+      serverConfig: JSON.stringify({
+        Dev: globalThis.serverConfig.Dev,
+        HTTPServer: globalThis.serverConfig.HTTPServer,
+      } as Partial<ServerConfig>),
+      __PROCESS_ENV__: JSON.stringify({
+        NODE_ENV: process.env.NODE_ENV,
+        ...Object.assign(
+          {},
+          ...Object.entries(process.env)
+            .filter(([key]) => key.startsWith("PUBLIC"))
+            .map(([key, value]) => {
+              return { [key]: value };
+            })
+        ),
+      }),
+      __CSS_PATHS__: JSON.stringify(this.router.cssPathExists),
+    };
+  }
+
+  private preloadToStringArray(
+    preload: Record<keyof _GlobalData & string, string>
+  ) {
+    return Object.entries(preload)
+      .map(([key, value]) => `${key}=${value}`)
+      .filter(Boolean);
+  }
+
+  private async makeDevDynamicJSXElement() {
+    let pageString = "";
+    let proc: Subprocess<"ignore", "inherit", "inherit"> | undefined =
+      undefined as unknown as Subprocess<"ignore", "inherit", "inherit">;
+
+    const serverSideProps = (await this.MakeServerSideProps()).value;
+    await new Promise((resolve, reject) => {
+      if (!this.serverSide) {
+        reject(undefined);
+        throw this.ErrorOnNoServerSideMatch();
+      }
+      proc = Bun.spawn({
+        env: {
+          ...process.env,
+          module_path: this.serverSide.filePath,
+          props: JSON.stringify({
+            props: serverSideProps,
+            params: this.serverSide.params,
+          }),
+          url: this.request.url,
+        },
+        cwd: process.cwd(),
+        cmd: ["bun", `${import.meta.dirname}/dev/jsxToString.tsx`],
+        stdout: "inherit",
+        stderr: "inherit",
+        ipc: ({
+          jsx,
+          head,
+          error,
+        }: {
+          jsx?: string;
+          head?: Record<string, _Head>;
+          error?: Error;
+        }) => {
+          if (jsx) pageString = jsx;
+          if (head) this.bunextReq.headData = head;
+          if (error) throw error;
+
+          resolve(true);
+        },
+      });
+    });
+
+    await proc.exited;
+
+    return (
+      <div
+        id="BUNEXT_INNER_PAGE_INSERTER"
+        dangerouslySetInnerHTML={{ __html: pageString }}
+      />
+    );
+  }
+  //TODO: investigate why it's breaking the build once in a while
+  private async makeProductionDynamicJSXElement() {
+    if (!this.serverSide) return null;
+    return this.router.CreateDynamicPage(
+      this.serverSide.filePath,
+      {
+        props: (await this.MakeServerSideProps()).value,
+        params: this.serverSide.params,
+      },
+      this.serverSide,
+      this.bunextReq
+    );
+  }
+
+  private MakeDynamicJSXElement() {
+    if (!this.serverSide) return null;
+    if (process.env.NODE_ENV == "development" || true)
+      return this.makeDevDynamicJSXElement();
+  }
+  /**
+   * get static page or add it to the cache if it does not exists
+   */
+  private async getStaticPage() {
+    if (
+      !this.serverSide ||
+      !this.router.staticRoutes.includes(this.serverSide.pathname) ||
+      process.env.NODE_ENV == "development"
+    )
+      return null;
+
+    const cache = CacheManager.getStaticPage(this.request.url);
+    if (!cache) {
+      const jsx = await this.MakeDynamicJSXElement();
+      CacheManager.addStaticPage(
+        this.request.url,
+        renderToString(jsx),
+        (await this.MakeServerSideProps()).toString()
+      );
+      return jsx;
+    }
+
+    return await this.router.stackLayouts(
+      this.serverSide,
+      this.HTMLJSXWrapper(cache.page)
+    );
+  }
+  private isUseStaticPath() {
+    return (
+      this.serverSide &&
+      this.router.staticRoutes.includes(this.serverSide?.pathname)
+    );
+  }
+
+  private HTMLJSXWrapper(html: string) {
+    return (
+      <div
+        id="BUNEXT_INNER_PAGE_INSERTER"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  }
+
+  private async getPreRenderedPage() {
+    if (!this.serverSide) throw this.ErrorOnNoServerSideMatch();
+    const module = await import(this.serverSide.filePath);
+    const preBuiledPage = CacheManager.getSSR(
+      this.serverSide.filePath
+    )?.elements.find((e) =>
+      e.tag.endsWith(`${module.default.name}!>`)
+    )?.htmlElement;
+
+    if (!preBuiledPage) return null;
+
+    return await this.router.stackLayouts(
+      this.serverSide,
+      this.HTMLJSXWrapper(preBuiledPage)
+    );
+  }
+  async MakeJSXElement() {
+    if (process.env.NODE_ENV == "development")
+      return this.MakeDynamicJSXElement();
+    return (
+      (await this.getStaticPage()) ||
+      (await this.getPreRenderedPage()) ||
+      (await this.MakeDynamicJSXElement())
+    );
+  }
+
+  private async makePage({
+    Shell,
+  }: {
+    Shell: React.ComponentType<{
+      children: React.ReactElement;
+    }>;
+  }) {
+    if (!this.serverSide) return null;
+
+    const PageJSX = await this.MakeJSXElement();
+
+    const preloadScriptObj = await this.MakePreLoadObject();
+    const preloadSriptsStrList = [
+      ...this.preloadToStringArray(preloadScriptObj),
+      "process={env: __PROCESS_ENV__};",
+    ].join(";");
+
+    const renderOptionData = {
+      signal: this.request.signal,
+      bootstrapScriptContent: preloadSriptsStrList,
+      bootstrapModules: ["/.bunext/react-ssr/hydrate.js"],
+      onError: (error, errorInfo) => {
+        if (error instanceof ClientOnlyError) return;
+        console.error(error, errorInfo);
+      },
+    } as RenderToReadableStreamOptions;
+
+    const ShellJSX = (
+      <RequestContext.Provider value={this.bunextReq}>
+        <Shell
+          route={this.serverSide?.pathname + this.search}
+          {...(await this.MakeServerSideProps()).value}
+        >
+          {PageJSX}
+          <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: renderOptionData.bootstrapScriptContent || "",
+            }}
+          />
+        </Shell>
+      </RequestContext.Provider>
+    );
+    return ShellJSX;
+  }
+
+  private async serverActionGetter(): Promise<Response> {
+    const reqData = this.extractServerActionHeader(this.request_header);
+
+    if (!reqData) throw new Error(`no request Data for ServerAction`);
+    const props = this.extractPostData(this.data);
+    const module = this.router.serverActions.find(
+      (s) => s.path === reqData.path.slice(1)
+    );
+    if (!module)
+      throw new Error(`no module found for ServerAction ${reqData.path}`);
+    const call = module.actions.find((f) => f.name === reqData.call);
+    if (!call)
+      throw new Error(
+        `no function founded for ServerAction ${reqData.path}/${reqData.call}`
+      );
+    const fillUndefinedParams = (
+      Array.apply(null, Array(call.length)) as Array<null>
+    ).map(() => undefined);
+    let result: ServerActionDataType = await call(
+      ...[...props, ...fillUndefinedParams, this.bunextReq]
+    );
+
+    let dataType: ServerActionDataTypeHeader = "json";
+    if (result instanceof Blob) {
+      dataType = "blob";
+    } else if (result instanceof File) {
+      dataType = "file";
+    } else {
+      result = JSON.stringify({ props: result });
+    }
+
+    return this.bunextReq.setCookie(
+      new Response(result as Exclude<ServerActionDataType, object>, {
+        headers: {
+          ...this.bunextReq.response.headers,
+          dataType,
+          fileData:
+            result instanceof File
+              ? JSON.stringify({
+                  name: result.name,
+                  lastModified: result.lastModified,
+                })
+              : undefined,
+        },
+      })
+    );
+  }
+  private extractServerActionHeader(header: Record<string, string>) {
+    if (!header.serveractionid) return null;
+    const serverActionData = header.serveractionid.split(":");
+
+    if (!serverActionData) return null;
+    return {
+      path: serverActionData[0],
+      call: serverActionData[1],
+    };
+  }
+  private extractPostData(data: FormData) {
+    return (
+      JSON.parse(decodeURI(data.get("props") as string)) as Array<any>
+    ).map((prop) => {
+      if (typeof prop == "string" && prop.startsWith("BUNEXT_FILE_")) {
+        return data.get(prop) as File;
+      } else if (
+        Array.isArray(prop) &&
+        prop.length > 0 &&
+        typeof prop[0] == "string" &&
+        prop[0].startsWith("BUNEXT_BATCH_FILES_")
+      ) {
+        return data.getAll(prop[0]);
+      } else if (typeof prop == "string" && prop == "BUNEXT_FORMDATA") {
+        return data;
+      } else return prop;
+    });
+  }
+}
+
 async function Init() {
   await rm(".bunext/build/node_modules", {
     recursive: true,
@@ -859,4 +1045,4 @@ if (!existsSync(".bunext/build/src/pages"))
 const router = new StaticRouters();
 
 await Init();
-export { router, StaticRouters };
+export { router, StaticRouters, RequestManager };

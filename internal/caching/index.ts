@@ -1,8 +1,9 @@
 import Database from "bun:sqlite";
 import { _Database, Table } from "../../database/class";
-import type { revalidate, ssrElement } from "../../internal/types";
-import type { DBSchema } from "../../database/schema";
+import type { revalidate, ssrElement, staticPage } from "../../internal/types";
+import type { DBSchema, TableSchema } from "../../database/schema";
 import { type _Head } from "../../features/head";
+import { generateRandomString } from "../../features/utils";
 
 declare global {
   //@ts-ignore
@@ -79,6 +80,30 @@ const dbSchema: DBSchema = [
       },
     ],
   },
+  {
+    name: "static_page",
+    columns: [
+      {
+        name: "id",
+        type: "string",
+        primary: true,
+        unique: true,
+      },
+      {
+        name: "pathname",
+        type: "string",
+        unique: true,
+      },
+      {
+        name: "page",
+        type: "string",
+      },
+      {
+        name: "props",
+        type: "string",
+      },
+    ],
+  },
 ];
 
 class CacheManager {
@@ -88,31 +113,20 @@ class CacheManager {
       readwrite: true,
     })
   );
-  private ssr = new Table<ssrElement, ssrElement>({
-    db: this.db.databaseInstance,
-    name: "ssr",
-    shema: dbSchema,
-    WAL: true,
-  });
-  private revalidate = new Table<revalidate, revalidate>({
-    db: this.db.databaseInstance,
-    name: "revalidate",
-    shema: dbSchema,
-    WAL: true,
-  });
-  private head = new Table<_Head, _Head>({
-    db: this.db.databaseInstance,
-    name: "head",
-    shema: dbSchema,
-    WAL: true,
-  });
+  private ssr = this.CreateTable<ssrElement, ssrElement>("ssr");
+  private revalidate = this.CreateTable<revalidate, revalidate>("revalidate");
+  private head = this.CreateTable<_Head, _Head>("head");
+  private page = this.CreateTable<ssrElement, ssrElement>("page");
+  private static_page = this.CreateTable<staticPage, staticPage>("static_page");
 
-  private page = new Table<ssrElement, ssrElement>({
-    db: this.db.databaseInstance,
-    name: "page",
-    shema: dbSchema,
-    WAL: true,
-  });
+  private CreateTable<T1 extends {}, T2 extends {}>(name: string) {
+    return new Table<T1, T2>({
+      db: this.db.databaseInstance,
+      name: name,
+      shema: dbSchema,
+      WAL: true,
+    });
+  }
 
   constructor() {
     for (const tab of dbSchema) this.db.create(tab);
@@ -153,8 +167,45 @@ class CacheManager {
   clearSSR() {
     this.ssr.databaseInstance.run("DELETE FROM ssr");
   }
+
+  addStaticPage(url: string, page: string, props: string) {
+    const _url = new URL(url);
+    this.static_page.insert([
+      {
+        id: generateRandomString(32),
+        pathname: _url.pathname,
+        page,
+        props,
+      },
+    ]);
+  }
+  getStaticPage(url: string) {
+    const _url = new URL(url);
+    return (this.static_page
+      .select({
+        where: {
+          pathname: _url.pathname,
+        },
+        select: {
+          page: true,
+          props: true,
+        },
+      })
+      .at(0) ?? undefined) as staticPage | undefined;
+  }
+  removeStaticPage(pathname: string) {
+    this.static_page.delete({
+      where: {
+        pathname,
+      },
+    });
+  }
+  clearStaticPage() {
+    this.ssr.databaseInstance.run("DELETE FROM static_page");
+  }
 }
 //@ts-ignore
 globalThis.CacheManage ??= new CacheManager();
 
 export default globalThis.CacheManage;
+export { CacheManager };

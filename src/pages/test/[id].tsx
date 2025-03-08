@@ -2,7 +2,7 @@ import { Database } from "@bunpmjs/bunext/database";
 import { useRequest } from "@bunpmjs/bunext/client/request";
 import { useState } from "react";
 
-export default function Page(props: any) {
+export default function Page({ props }: any) {
   return (
     <div>
       {JSON.stringify(props)}

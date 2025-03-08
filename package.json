@@ -1,6 +1,6 @@
 {
   "name": "bunext",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "repository": "shpaw415/bunext",
   "bugs": "https://github.com/shpaw415/bunext",
   "license": "MIT",
@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "^1.2.4",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/web": "latest"
@@ -24,7 +24,7 @@
     "react": "18.3.0 - 19.x.x",
     "react-dom": "18.3.0 - 19.x.x",
     "typescript": "^5.7.2",
-    "@bunpmjs/bunext": "^0.9.0"
+    "@bunpmjs/bunext": "^0.9.3"
   },
   "dependencies": {
     "@base2/pretty-print-object": "1.0.2",

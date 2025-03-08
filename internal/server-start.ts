@@ -4,4 +4,5 @@ import CacheManager from "./caching";
 
 export default function Make() {
   CacheManager.clearSSR();
+  CacheManager.clearStaticPage();
 }

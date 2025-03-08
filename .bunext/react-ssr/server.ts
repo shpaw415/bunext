@@ -26,7 +26,7 @@ import {
 } from "@bunpmjs/bunext/internal/session.ts";
 import type { ClusterMessageType } from "@bunpmjs/bunext/internal/types.ts";
 import OnServerStart from "@bunpmjs/bunext/internal/server-start.ts";
-
+import "@bunpmjs/bunext/internal/caching/fetch.ts";
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
@@ -34,6 +34,7 @@ declare global {
     }
   }
 }
+
 globalThis.serverConfig ??= _ServerConfig;
 globalThis.clusterStatus ??= false;
 
