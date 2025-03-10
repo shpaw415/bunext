@@ -13,7 +13,7 @@ export async function getServerSideProps({
 }: {
   request: Request;
 }): Promise<Props> {
-  revalidateStatic(new URL(request.url), 1);
+  //revalidateStatic(new URL(request.url), 1);
   const fake = await (
     await fetch("https://jsonplaceholder.typicode.com/todos/1")
   ).json();

@@ -193,6 +193,21 @@ class CacheManager {
       })
       .at(0) ?? undefined) as staticPage | undefined;
   }
+  getStaticPageProps(url: string) {
+    const _url = new URL(url);
+    return (
+      (this.static_page
+        .select({
+          where: {
+            pathname: _url.pathname,
+          },
+          select: {
+            props: true,
+          },
+        })
+        .at(0) ?? undefined) as staticPage | undefined
+    )?.props;
+  }
   removeStaticPage(pathname: string) {
     this.static_page.delete({
       where: {

@@ -1043,3 +1043,7 @@ Computer specs:
     - it can be revalidate
 - Code Cleaned in the router.
 - fetch caching stronger
+
+## 0.9.5
+
+- "use static" performance upgrade

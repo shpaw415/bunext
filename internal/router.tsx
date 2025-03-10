@@ -165,7 +165,8 @@ class StaticRouters {
       data,
       request_header,
       router: this,
-    }).make({ Shell });
+      Shell,
+    }).make();
   }
 
   async serverPrebuiltPage(
@@ -354,6 +355,9 @@ class RequestManager {
     value: any;
     toString: () => string;
   };
+  Shell: React.ComponentType<{
+    children: React.ReactElement;
+  }>;
 
   constructor(init: {
     request: Request;
@@ -362,6 +366,9 @@ class RequestManager {
     server: FileSystemRouter;
     client: FileSystemRouter;
     router: StaticRouters;
+    Shell: React.ComponentType<{
+      children: React.ReactElement;
+    }>;
   }) {
     this.request = init.request;
     this.request_header = init.request_header;
@@ -369,6 +376,7 @@ class RequestManager {
     this.server = init.server;
     this.client = init.client;
     this.router = init.router;
+    this.Shell = init.Shell;
 
     this.serverSide = this.server.match(this.request);
     this.clientSide = this.client.match(this.request);
@@ -382,17 +390,11 @@ class RequestManager {
     });
   }
 
-  async make({
-    Shell,
-  }: {
-    Shell: React.ComponentType<{
-      children: React.ReactElement;
-    }>;
-  }): Promise<null | BunextRequest> {
+  async make(): Promise<null | BunextRequest> {
     return (
       (await this.checkStaticServing()) ||
       (await this.checkFeatureServing()) ||
-      (await this.servePage({ Shell }))
+      (await this.servePage())
     );
   }
 
@@ -584,7 +586,7 @@ class RequestManager {
       throw new Error(`no serverSide script found for ${this.pathname}`);
 
     if (this.isUseStaticPath() && process.env.NODE_ENV == "production") {
-      const props = CacheManager.getStaticPage(this.request.url)?.props;
+      const props = CacheManager.getStaticPageProps(this.request.url);
       if (props) {
         this.serverSideProps = {
           toString: () => props,
@@ -667,20 +669,19 @@ class RequestManager {
       })
     );
   }
-  private async servePage({
-    Shell,
-  }: {
-    Shell: React.ComponentType<{
-      children: React.ReactElement;
-    }>;
-  }) {
+  private async servePage() {
     if (!this.serverSide) return null;
-
-    const chunkRegex = /chunk-[a-zA-Z0-9]+\.js/g;
-    if (chunkRegex.test(this.serverSide.pathname)) return null;
     else if (this.serverSide.pathname == "/favicon.ico") return null;
 
-    const page = await this.makePage({ Shell });
+    if (this.isUseStaticPath()) {
+      const stringPage = await this.getStaticPage();
+      return this.bunextReq.__SET_RESPONSE__(new Response(stringPage));
+    }
+
+    const pageJSX = await this.MakeJSXElement();
+    if (!pageJSX) return null;
+
+    const page = await this.makePage(pageJSX);
     if (!page) return null;
     return this.bunextReq.__SET_RESPONSE__(this.makeStream(page));
   }
@@ -712,7 +713,7 @@ class RequestManager {
   }
 
   private ErrorOnNoServerSideMatch() {
-    return new Error(`no serversideScript found for ${this.pathname}`);
+    return new Error(`no serverSideScript found for ${this.pathname}`);
   }
 
   private async MakePreLoadObject(): Promise<
@@ -853,19 +854,25 @@ class RequestManager {
 
     const cache = CacheManager.getStaticPage(this.request.url);
     if (!cache) {
-      const jsx = await this.MakeDynamicJSXElement();
+      const pageJSX = await this.MakeDynamicJSXElement();
+      if (!pageJSX)
+        throw Error(
+          `Error Caching page JSX from path: ${this.serverSide.pathname}`
+        );
+      const PageWithLayouts = await this.router.stackLayouts(
+        this.serverSide,
+        pageJSX
+      );
+      const pageString = renderToString(this.makePage(PageWithLayouts));
       CacheManager.addStaticPage(
         this.request.url,
-        renderToString(jsx),
+        pageString,
         (await this.MakeServerSideProps()).toString()
       );
-      return jsx;
+      return pageString;
     }
 
-    return await this.router.stackLayouts(
-      this.serverSide,
-      this.HTMLJSXWrapper(cache.page)
-    );
+    return cache.page;
   }
   private isUseStaticPath() {
     return (
@@ -903,22 +910,12 @@ class RequestManager {
     if (process.env.NODE_ENV == "development")
       return this.MakeDynamicJSXElement();
     return (
-      (await this.getStaticPage()) ||
-      (await this.getPreRenderedPage()) ||
-      (await this.MakeDynamicJSXElement())
+      (await this.getPreRenderedPage()) || (await this.MakeDynamicJSXElement())
     );
   }
 
-  private async makePage({
-    Shell,
-  }: {
-    Shell: React.ComponentType<{
-      children: React.ReactElement;
-    }>;
-  }) {
+  private async makePage(page: JSX.Element) {
     if (!this.serverSide) return null;
-
-    const PageJSX = await this.MakeJSXElement();
 
     const preloadScriptObj = await this.MakePreLoadObject();
     const preloadSriptsStrList = [
@@ -938,18 +935,18 @@ class RequestManager {
 
     const ShellJSX = (
       <RequestContext.Provider value={this.bunextReq}>
-        <Shell
+        <this.Shell
           route={this.serverSide?.pathname + this.search}
           {...(await this.MakeServerSideProps()).value}
         >
-          {PageJSX}
+          {page}
           <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>
           <script
             dangerouslySetInnerHTML={{
               __html: renderOptionData.bootstrapScriptContent || "",
             }}
           />
-        </Shell>
+        </this.Shell>
       </RequestContext.Provider>
     );
     return ShellJSX;
