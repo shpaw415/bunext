@@ -622,7 +622,7 @@ class RequestManager {
       throw new Error(`no serverSide script found for ${this.pathname}`);
 
     if (this.isUseStaticPath(true)) {
-      const props = CacheManager.getStaticPageProps(this.request.url);
+      const props = CacheManager.getStaticPageProps(this.serverSide.pathname);
       if (props) {
         this.serverSideProps = {
           toString: () => props,
@@ -635,7 +635,7 @@ class RequestManager {
     const module = await import(this.serverSide.filePath);
     if (typeof module.getServerSideProps == "undefined")
       return {
-        toString: () => NJSON.stringify(undefined, { omitStack: true }),
+        toString: () => JSON.stringify(undefined),
         value: undefined,
       };
 

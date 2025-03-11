@@ -101,6 +101,7 @@ const dbSchema: DBSchema = [
       {
         name: "props",
         type: "string",
+        nullable: true,
       },
     ],
   },
@@ -263,13 +264,12 @@ class CacheManager {
       })
       .at(0) ?? undefined) as staticPage | undefined;
   }
-  getStaticPageProps(url: string) {
-    const _url = new URL(url);
+  getStaticPageProps(pathname: string) {
     return (
       (this.static_page
         .select({
           where: {
-            pathname: _url.pathname,
+            pathname,
           },
           select: {
             props: true,
