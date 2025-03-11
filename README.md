@@ -811,10 +811,15 @@ Computer specs:
 ![Multi-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.9.5/wrk-benchamrk-multi-threaded.png)
 
 
-### use static
+### use static Bunext - v0.9.5
 
 #### Without use static
+
 ![without-use-static](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.9.5/static/wrk-benchmark-without-use-static.png)
+
+#### With use static
+![use-static](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.9.5/static/wrk-benchmark-with-use-static.png)
+
 
 # Change Log
 
@@ -1063,8 +1068,8 @@ Computer specs:
 ## 0.9.5
 
 - "use static" performance upgrade
-- Routes that export default verified as SSR Element is now cached properly and make a stunning 50% performance upgrade the server load is way down
+- Routes that export default verified as SSR Element is now cached properly and make a stunning 80% and over performance upgrade the server load is way down
 - new benchmark 0.8.x vs 0.9.5
 - Fix "use static" not caching for dynamic segment
-- Dynamic page has now 100% performance upgrade
+- Dynamic page has now a 100% performance upgrade ( no joke )
 - "use static" benchmark
