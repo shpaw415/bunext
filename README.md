@@ -1068,7 +1068,7 @@ Computer specs:
 - Code Cleaned in the router.
 - fetch caching stronger
 
-## 0.9.5
+## 0.9.6
 
 - "use static" performance upgrade
 - Routes that export default verified as SSR Element is now cached properly and make a stunning 80% and over performance upgrade the server load is way down
