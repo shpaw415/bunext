@@ -97,7 +97,6 @@ export type ssrElement = {
 };
 
 export type staticPage = {
-  id: string;
   pathname: string;
   page: string;
   /**

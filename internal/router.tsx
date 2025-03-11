@@ -730,7 +730,7 @@ class RequestManager {
         );
     }
 
-    const pageJSX = await this.MakeJSXElement();
+    const pageJSX = await this.MakeDynamicJSXElement();
     if (!pageJSX) return null;
 
     const page = await this.makePage(pageJSX);
@@ -891,8 +891,10 @@ class RequestManager {
 
   private MakeDynamicJSXElement() {
     if (!this.serverSide) return null;
-    if (process.env.NODE_ENV == "development" || true)
+
+    if (process.env.NODE_ENV == "development")
       return this.makeDevDynamicJSXElement();
+    else return this.makeProductionDynamicJSXElement();
   }
   /**
    * get static page or add it to the cache if it does not exists
@@ -913,7 +915,7 @@ class RequestManager {
       );
       const pageString = renderToString(await this.makePage(PageWithLayouts));
       CacheManager.addStaticPage(
-        this.request.url,
+        this.serverSide.pathname,
         pageString,
         (await this.MakeServerSideProps()).toString()
       );
@@ -926,7 +928,7 @@ class RequestManager {
     if (andProduction && process.env.NODE_ENV != "production") return false;
     return Boolean(
       this.serverSide &&
-        this.router.staticRoutes.includes(this.serverSide?.pathname)
+        this.router.staticRoutes.includes(this.serverSide?.name)
     );
   }
   private async getSSRDefaultPage() {
@@ -957,7 +959,7 @@ class RequestManager {
     if (andProduction && process.env.NODE_ENV != "production") return false;
     return Boolean(
       this.serverSide &&
-        this.router.ssrAsDefaultRoutes.includes(this.serverSide?.pathname)
+        this.router.ssrAsDefaultRoutes.includes(this.serverSide?.name)
     );
   }
 
@@ -984,13 +986,6 @@ class RequestManager {
     return await this.router.stackLayouts(
       this.serverSide,
       this.HTMLJSXWrapper(preBuiledPage)
-    );
-  }
-  async MakeJSXElement() {
-    if (process.env.NODE_ENV == "development")
-      return this.MakeDynamicJSXElement();
-    return (
-      (await this.getPreRenderedPage()) || (await this.MakeDynamicJSXElement())
     );
   }
 

@@ -74,27 +74,32 @@ function Link({ href, children }: { href: string; children: JSX.Element }) {
   });
 }
 
+let timer: Timer | undefined = undefined;
+
 /**
  * revalidate the specific path like: /some/path/id_1
  * @param pathname pathLike of the route you want to revalidate
  * @param timeout timeout in seconds
  */
-function revalidateStatic(pathlike: URL | Request | string, timeout?: number) {
+function revalidateStatic(pathlike: Request | string, timeout?: number) {
   if (!isServer) publicThrow();
 
-  import("../internal/caching/index.ts").then((module) => {
-    const revalidate = () => {
+  import("../internal/caching/index.ts").then(async (module) => {
+    const revalidate = async () => {
       const manager = new module.CacheManager();
       if (pathlike instanceof Request) {
-        manager.removeStaticPage(new URL(pathlike.url).pathname);
-      } else if (pathlike instanceof URL) {
-        manager.removeStaticPage(pathlike.pathname);
+        const { router } = await import("../internal/router.tsx");
+        const match = router.server.match(pathlike);
+        manager.removeStaticPage(match?.pathname as string);
       } else {
         manager.removeStaticPage(pathlike);
       }
     };
     if (timeout == undefined) revalidate();
-    else setTimeout(() => revalidate(), timeout * 1000);
+    else {
+      clearTimeout(timer);
+      timer = setTimeout(() => revalidate(), timeout * 1000);
+    }
   });
 }
 

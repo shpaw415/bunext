@@ -794,7 +794,7 @@ Computer specs:
 
 
 
-### 0.8.x
+### Bunext - v0.8.x
 #### Single Threaded
 ![Single-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.8.x/wrk-benchmark-single-threaded.png)
 
@@ -802,13 +802,19 @@ Computer specs:
 
 ![Multi-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.8.x/wrk-benchmark-multi-threaded.png)
 
-### 0.9.5
+### Bunext - v0.9.5
 #### Single Threaded
-![Single-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.8.5/wrk-benchmark-single-threaded.png)
+![Single-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.9.5/wrk-benchmark-single-threaded.png)
 
 #### Multi-Threaded (12 Threads)
 
-![Multi-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.9.5/wrk-benchmark-multi-threaded.png)
+![Multi-Threaded](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.9.5/wrk-benchamrk-multi-threaded.png)
+
+
+### use static
+
+#### Without use static
+![without-use-static](https://raw.githubusercontent.com/shpaw415/bunext/refs/heads/main/benchmark/0.9.5/static/wrk-benchmark-without-use-static.png)
 
 # Change Log
 
@@ -1059,3 +1065,6 @@ Computer specs:
 - "use static" performance upgrade
 - Routes that export default verified as SSR Element is now cached properly and make a stunning 50% performance upgrade the server load is way down
 - new benchmark 0.8.x vs 0.9.5
+- Fix "use static" not caching for dynamic segment
+- Dynamic page has now 100% performance upgrade
+- "use static" benchmark

@@ -89,15 +89,10 @@ const dbSchema: DBSchema = [
     name: "static_page",
     columns: [
       {
-        name: "id",
-        type: "string",
-        primary: true,
-        unique: true,
-      },
-      {
         name: "pathname",
         type: "string",
         unique: true,
+        primary: true,
       },
       {
         name: "page",
@@ -228,16 +223,31 @@ class CacheManager {
 
   // Static Page
 
-  addStaticPage(url: string, page: string, props: string) {
-    const _url = new URL(url);
-    this.static_page.insert([
-      {
-        id: generateRandomString(32),
-        pathname: _url.pathname,
-        page,
-        props,
-      },
-    ]);
+  addStaticPage(pathname: string, page: string, props: string) {
+    try {
+      this.static_page.insert([
+        {
+          pathname,
+          page,
+          props,
+        },
+      ]);
+    } catch (e) {
+      if (
+        !this.isPrimaryError(e as Error, () =>
+          this.static_page.update({
+            where: {
+              pathname,
+            },
+            values: {
+              page,
+              props,
+            },
+          })
+        )
+      )
+        throw e;
+    }
   }
   getStaticPage(url: string) {
     const _url = new URL(url);

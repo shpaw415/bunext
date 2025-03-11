@@ -1,5 +1,3 @@
-"use static";
-
 import { useHead } from "@bunpmjs/bunext/head";
 import type { BunextRequest } from "@bunpmjs/bunext/features/client/request.ts";
 import { revalidateStatic } from "@bunpmjs/bunext/router";
@@ -13,11 +11,11 @@ export async function getServerSideProps({
 }: {
   request: Request;
 }): Promise<Props> {
-  //revalidateStatic(new URL(request.url), 1);
-  /*const fake = await (
+  /*revalidateStatic(request, 5);
+  const fake = await (
     await fetch("https://jsonplaceholder.typicode.com/todos/1")
-  ).json();*/
-  //console.log(fake);
+  ).json();
+  console.log(fake);*/
   return {
     id: "allo",
   };
