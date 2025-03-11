@@ -1,6 +1,7 @@
 ﻿# Compatibility
 
-compatible Runtime: bun 1.1.0 - 1.2.3
+compatible Runtime: bun 1.1.0 - 1.2.5
+
 compatible OS: Linux, WSL
 
 N.B : Bun is in continuous change and compatibility between version is a
@@ -23,7 +24,7 @@ When an update of Bunext is made you must run:
 #!/usr/bin/env bash
 # this is temporary and will change in future release
 bun bunext init
-bun run db:create # only create the types
+bun run db:create # only create the types and missing table
 ```
 
 ## What is planed
@@ -54,6 +55,8 @@ bun run db:create # only create the types
 - Static assets
 
 - Server components ("use server" & "use client")
+
+- "use static"
 
 - Revalidate ( Beta )
 
