@@ -1,6 +1,11 @@
 import Database from "bun:sqlite";
 import { _Database, Table } from "../../database/class";
-import type { revalidate, ssrElement, staticPage } from "../../internal/types";
+import type {
+  revalidate,
+  ssrElement,
+  SSRPage,
+  staticPage,
+} from "../../internal/types";
 import type { DBSchema, TableSchema } from "../../database/schema";
 import { type _Head } from "../../features/head";
 import { generateRandomString } from "../../features/utils";
@@ -104,6 +109,21 @@ const dbSchema: DBSchema = [
       },
     ],
   },
+  {
+    name: "page",
+    columns: [
+      {
+        name: "route",
+        type: "string",
+        primary: true,
+        unique: true,
+      },
+      {
+        name: "content",
+        type: "string",
+      },
+    ],
+  },
 ];
 
 class CacheManager {
@@ -116,7 +136,7 @@ class CacheManager {
   private ssr = this.CreateTable<ssrElement, ssrElement>("ssr");
   private revalidate = this.CreateTable<revalidate, revalidate>("revalidate");
   private head = this.CreateTable<_Head, _Head>("head");
-  private page = this.CreateTable<ssrElement, ssrElement>("page");
+  private page = this.CreateTable<SSRPage, SSRPage>("page");
   private static_page = this.CreateTable<staticPage, staticPage>("static_page");
 
   private CreateTable<T1 extends {}, T2 extends {}>(name: string) {
@@ -131,24 +151,62 @@ class CacheManager {
   constructor() {
     for (const tab of dbSchema) this.db.create(tab);
   }
+
+  //SSR Default Page
+
+  addSSRDefaultPage(route: string, content: string) {
+    try {
+      this.page.insert([{ route, content }]);
+    } catch (e) {
+      this.isPrimaryError(e as Error, () =>
+        this.page.update({
+          where: {
+            route,
+          },
+          values: {
+            content,
+          },
+        })
+      );
+    }
+  }
+  getSSRDefaultPage(route: string) {
+    return this.page
+      .select({
+        where: {
+          route,
+        },
+        select: {
+          content: true,
+        },
+      })
+      .at(0)?.content;
+  }
+  removeSSRDefaultPage(route: string) {
+    this.page.delete({
+      where: { route },
+    });
+  }
+  clearSSRDefaultPage() {
+    this.page.databaseInstance.run("DELETE FROM page");
+  }
+
+  // SSR Element
+
   addSSR(path: string, elements: ssrElement["elements"]) {
     const doUpdate = () =>
       this.ssr.update({ where: { path }, values: { elements } });
 
-    if (!Boolean(this.ssr.select({ where: { path } }).at(0))) {
-      try {
-        this.ssr.insert([
-          {
-            path,
-            elements,
-          },
-        ]);
-      } catch (e) {
-        const err = e as Error & { code?: string };
-        if (err.code == "SQLITE_CONSTRAINT_PRIMARYKEY") doUpdate();
-        else throw err;
-      }
-    } else doUpdate();
+    try {
+      this.ssr.insert([
+        {
+          path,
+          elements,
+        },
+      ]);
+    } catch (e) {
+      if (!this.isPrimaryError(e as Error, doUpdate)) throw e;
+    }
 
     return {
       path,
@@ -167,6 +225,8 @@ class CacheManager {
   clearSSR() {
     this.ssr.databaseInstance.run("DELETE FROM ssr");
   }
+
+  // Static Page
 
   addStaticPage(url: string, page: string, props: string) {
     const _url = new URL(url);
@@ -216,7 +276,13 @@ class CacheManager {
     });
   }
   clearStaticPage() {
-    this.ssr.databaseInstance.run("DELETE FROM static_page");
+    this.static_page.databaseInstance.run("DELETE FROM static_page");
+  }
+
+  private isPrimaryError(err: Error, callback?: Function) {
+    const is = (err as any).code == "SQLITE_CONSTRAINT_PRIMARYKEY";
+    callback?.();
+    return is;
   }
 }
 //@ts-ignore

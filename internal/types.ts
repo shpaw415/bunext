@@ -106,6 +106,11 @@ export type staticPage = {
   props: string;
 };
 
+export type SSRPage = {
+  route: string;
+  content: string;
+};
+
 export type revalidate = {
   path: string;
   time: number;

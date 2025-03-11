@@ -40,6 +40,9 @@ async function revalidate(...path: string[]) {
     } as ClusterMessageType);
     return;
   }
+  route.map(({ pathname }) =>
+    globalThis.CacheManage.removeSSRDefaultPage(pathname)
+  );
   await Promise.all(route.map(({ filePath }) => builder.resetPath(filePath)));
   await builder.makeBuild();
 }

@@ -1,5 +1,5 @@
 import {
-  file,
+  type BunFile,
   type FileSystemRouter,
   type MatchedRoute,
   type Subprocess,
@@ -62,6 +62,11 @@ class StaticRouters {
   cssPaths: string[] = [];
   cssPathExists: string[] = [];
   staticRoutes: Array<keyof FileSystemRouter["routes"]> = [];
+  ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
+
+  initPromise: Promise<boolean>;
+  initResolver?: (value: boolean | PromiseLike<boolean>) => void;
+  inited = false;
 
   baseDir = process.cwd();
   buildDir = ".bunext/build";
@@ -87,10 +92,33 @@ class StaticRouters {
       { omitStack: true }
     );
     this.layoutPaths = this.getlayoutPaths();
+    this.initPromise = new Promise((resolve) => (this.initResolver = resolve));
   }
   public async init() {
-    this.cssPathExists = await this.getCssPaths();
-    this.staticRoutes = await this.getUseStaticRoutes();
+    if (this.inited) return;
+    await Promise.all([
+      this.getCssPaths(),
+      this.getUseStaticRoutes(),
+      this.getSSRDefaultRoutes(),
+    ]).then(([css, staticPath, ssr]) => {
+      this.cssPathExists = css;
+      this.staticRoutes = staticPath;
+      this.ssrAsDefaultRoutes = ssr;
+
+      this.inited = true;
+      this.initResolver?.(true);
+    });
+  }
+  public isInited() {
+    return this.initPromise;
+  }
+
+  private getRoutesWithoutLayouts() {
+    type Route = string;
+    type Path = string;
+    return Object.entries(this.server?.routes || {}).filter(
+      ([route]) => !route.endsWith("/layout")
+    ) as [Route, Path][];
   }
 
   private async getCssPaths() {
@@ -114,15 +142,28 @@ class StaticRouters {
     const useStaticRoute: string[] = [];
     const regex = /(['"])use static\1/;
     await Promise.all(
-      Object.entries(this.server?.routes || {})
-        .filter(([route]) => !route.endsWith("/layout"))
-        .map(async ([route, path]) => {
-          const fileContent = await Bun.file(path).text();
-          if (regex.test(fileContent.split("\n").at(0) as string))
-            useStaticRoute.push(route);
-        })
+      this.getRoutesWithoutLayouts().map(async ([route, path]) => {
+        const fileContent = await Bun.file(path).text();
+        if (regex.test(fileContent.split("\n").at(0) as string))
+          useStaticRoute.push(route);
+      })
     );
     return useStaticRoute;
+  }
+
+  private async getSSRDefaultRoutes() {
+    const routes = this.getRoutesWithoutLayouts();
+    const defaultsExports = await Promise.all(
+      routes.map(async ([route, path]) => ({
+        module: (await import(path)) as {
+          default?: () => JSX.Element | Promise<JSX.Element>;
+        },
+        route,
+      }))
+    );
+    return defaultsExports
+      .filter((module) => module.module.default?.length == 0)
+      .map(({ route }) => route);
   }
 
   public setRoutes() {
@@ -157,7 +198,7 @@ class StaticRouters {
   ): Promise<BunextRequest | null> {
     if (process.env.NODE_ENV == "development")
       this.cssPathExists = await this.getCssPaths();
-
+    await this.isInited();
     return new RequestManager({
       request,
       client: this.client,
@@ -482,91 +523,87 @@ class RequestManager {
       })
     );
   }
-  private async serveFromNodeModule() {
+  private async serveFromNodeModule(): Promise<BunextRequest | null> {
     const nodeModuleFile = await this.router.serveFromDir({
       directory: "node_modules",
       path: normalize(this.pathname.replace("node_modules", "")),
-      suffixes: ["", ".js", ".jsx", ".ts", ".tsx"],
+      suffixes: [
+        "",
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+        ".css",
+        ".json",
+        ".xml",
+        ".csv",
+        ".html",
+      ],
     });
-    if (!nodeModuleFile) return null;
+    if (!nodeModuleFile || !(await nodeModuleFile.exists())) return null;
 
-    let mimeType = "";
-    let parsedContent = await nodeModuleFile.text();
-
-    const MakeTextRes = () =>
-      this.bunextReq.__SET_RESPONSE__(
-        new Response(parsedContent, {
-          headers: {
-            "Content-Type": "text/" + mimeType,
-          },
-        })
-      );
-    const MakeCustomRes = (contentType: string) =>
-      this.bunextReq.__SET_RESPONSE__(
-        new Response(parsedContent, {
-          headers: {
-            "Content-Type": contentType,
-          },
-        })
-      );
-
-    const foundedModule = LoadedNodeModule.find((e) => e.path == path);
-    if (foundedModule) {
-      mimeType = foundedModule.mimeType;
-      parsedContent = foundedModule.content;
-      return MakeTextRes();
-    }
+    const MakeTextRes = (content: BunFile | string, mimeType?: string) => {
+      if (content instanceof Blob) {
+        this.bunextReq.__SET_RESPONSE__(new Response(content));
+      } else {
+        this.bunextReq.__SET_RESPONSE__(
+          new Response(content, {
+            headers: {
+              "Content-Type": `text/${mimeType}`,
+            },
+          })
+        );
+      }
+      return this.bunextReq;
+    };
+    const buildFile = (path: string) =>
+      Bun.build({
+        entrypoints: [path],
+        outdir: this.router.buildDir + "/node_modules",
+        root: "node_modules",
+        splitting: false,
+        minify: process.env.NODE_ENV == "production",
+      });
     const path = Bun.fileURLToPath(import.meta.resolve(this.pathname));
     const ext = extname(path).replace(".", "");
 
-    const buildedFile = Bun.file(
-      normalize(
-        `.bunext/build/node_modules/${path.split("node_modules").at(-1)}`
-      )
-    );
-
-    if (await buildedFile.exists()) {
-      mimeType = "javascript";
-      parsedContent = await buildedFile.text();
-      return MakeTextRes();
-    }
+    const getBuildedFile = (ext: "css" | "js") => {
+      let formatedFileName = this.pathname.split(".");
+      formatedFileName.pop();
+      formatedFileName.push(ext);
+      return Bun.file(
+        normalize(`${this.router.buildDir}/${formatedFileName.join(".")}`)
+      );
+    };
 
     switch (ext) {
-      case "css":
       case "csv":
       case "html":
       case "xml":
-        mimeType = ext;
-        break;
-      case "ts":
-        mimeType = "javascript";
-        parsedContent = await new Bun.Transpiler({
-          target: "browser",
-          loader: "ts",
-        }).transform(parsedContent);
-        await Bun.write(buildedFile, parsedContent);
-        break;
-      case "tsx":
-        mimeType = "javascript";
-        parsedContent = await new Bun.Transpiler({
-          target: "browser",
-          loader: "tsx",
-        }).transform(parsedContent);
-        await Bun.write(buildedFile, parsedContent);
-        break;
-      case "jsx":
-        mimeType = "javascript";
-        parsedContent = await new Bun.Transpiler({
-          target: "browser",
-          loader: "jsx",
-        }).transform(parsedContent);
-        await Bun.write(buildedFile, parsedContent);
-        break;
-      case "js":
-        mimeType = "javascript";
-        break;
       case "json":
-        return MakeCustomRes("application/json");
+        return MakeTextRes(nodeModuleFile);
+      case "ts":
+      case "tsx":
+      case "jsx":
+      case "js":
+      case "css":
+        const formatedExt = ext == "css" ? "css" : "js";
+        const buildedFile = getBuildedFile(formatedExt);
+        if (
+          process.env.NODE_ENV == "production" &&
+          (await buildedFile.exists())
+        )
+          return MakeTextRes(buildedFile);
+        const res = await buildFile(`.${path}`);
+        if (res.success) {
+          return MakeTextRes(getBuildedFile(formatedExt));
+        }
+
+        return this.bunextReq.__SET_RESPONSE__(
+          new Response(null, {
+            status: 500,
+          })
+        );
       default:
         return this.bunextReq.__SET_RESPONSE__(
           new Response(null, {
@@ -574,7 +611,6 @@ class RequestManager {
           })
         );
     }
-    return MakeTextRes();
   }
   private async MakeServerSideProps(): Promise<{
     value: any;
@@ -585,7 +621,7 @@ class RequestManager {
     if (!this.serverSide)
       throw new Error(`no serverSide script found for ${this.pathname}`);
 
-    if (this.isUseStaticPath() && process.env.NODE_ENV == "production") {
+    if (this.isUseStaticPath(true)) {
       const props = CacheManager.getStaticPageProps(this.request.url);
       if (props) {
         this.serverSideProps = {
@@ -673,9 +709,25 @@ class RequestManager {
     if (!this.serverSide) return null;
     else if (this.serverSide.pathname == "/favicon.ico") return null;
 
-    if (this.isUseStaticPath()) {
+    if (this.isUseStaticPath(true)) {
       const stringPage = await this.getStaticPage();
-      return this.bunextReq.__SET_RESPONSE__(new Response(stringPage));
+      return this.bunextReq.__SET_RESPONSE__(
+        new Response(stringPage, {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+          },
+        })
+      );
+    } else if (this.isSSRDefaultExportPath(true)) {
+      const stringPage = await this.getSSRDefaultPage();
+      if (stringPage)
+        return this.bunextReq.__SET_RESPONSE__(
+          new Response(stringPage, {
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+            },
+          })
+        );
     }
 
     const pageJSX = await this.MakeJSXElement();
@@ -683,6 +735,7 @@ class RequestManager {
 
     const page = await this.makePage(pageJSX);
     if (!page) return null;
+
     return this.bunextReq.__SET_RESPONSE__(this.makeStream(page));
   }
 
@@ -845,12 +898,7 @@ class RequestManager {
    * get static page or add it to the cache if it does not exists
    */
   private async getStaticPage() {
-    if (
-      !this.serverSide ||
-      !this.router.staticRoutes.includes(this.serverSide.pathname) ||
-      process.env.NODE_ENV == "development"
-    )
-      return null;
+    if (!this.isUseStaticPath(true) || !this.serverSide) return null;
 
     const cache = CacheManager.getStaticPage(this.request.url);
     if (!cache) {
@@ -863,7 +911,7 @@ class RequestManager {
         this.serverSide,
         pageJSX
       );
-      const pageString = renderToString(this.makePage(PageWithLayouts));
+      const pageString = renderToString(await this.makePage(PageWithLayouts));
       CacheManager.addStaticPage(
         this.request.url,
         pageString,
@@ -874,10 +922,42 @@ class RequestManager {
 
     return cache.page;
   }
-  private isUseStaticPath() {
-    return (
+  private isUseStaticPath(andProduction?: boolean): boolean {
+    if (andProduction && process.env.NODE_ENV != "production") return false;
+    return Boolean(
       this.serverSide &&
-      this.router.staticRoutes.includes(this.serverSide?.pathname)
+        this.router.staticRoutes.includes(this.serverSide?.pathname)
+    );
+  }
+  private async getSSRDefaultPage() {
+    if (!this.isSSRDefaultExportPath(true) || !this.serverSide) return null;
+    const cache = CacheManager.getSSRDefaultPage(this.serverSide.pathname);
+    if (cache) return cache;
+
+    const preRenderedPage = await this.getPreRenderedPage();
+    if (!preRenderedPage) return null;
+
+    const PageWithLayouts = await this.router.stackLayouts(
+      this.serverSide,
+      preRenderedPage
+    );
+
+    const shelledPage = await this.makePage(PageWithLayouts);
+    if (!shelledPage) return null;
+    const stringifiedShelledPage = this.formatPage(renderToString(shelledPage));
+
+    CacheManager.addSSRDefaultPage(
+      this.serverSide.pathname,
+      stringifiedShelledPage
+    );
+
+    return stringifiedShelledPage;
+  }
+  private isSSRDefaultExportPath(andProduction?: boolean) {
+    if (andProduction && process.env.NODE_ENV != "production") return false;
+    return Boolean(
+      this.serverSide &&
+        this.router.ssrAsDefaultRoutes.includes(this.serverSide?.pathname)
     );
   }
 
@@ -1041,5 +1121,4 @@ if (!existsSync(".bunext/build/src/pages"))
   mkdirSync(".bunext/build/src/pages", { recursive: true });
 const router = new StaticRouters();
 
-await Init();
-export { router, StaticRouters, RequestManager };
+export { router, StaticRouters, RequestManager, Init };

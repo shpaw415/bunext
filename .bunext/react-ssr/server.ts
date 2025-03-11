@@ -25,7 +25,9 @@ import {
   SetSessionByID,
 } from "@bunpmjs/bunext/internal/session.ts";
 import type { ClusterMessageType } from "@bunpmjs/bunext/internal/types.ts";
-import OnServerStart from "@bunpmjs/bunext/internal/server-start.ts";
+import OnServerStart, {
+  OnServerStartCluster,
+} from "@bunpmjs/bunext/internal/server-start.ts";
 import "@bunpmjs/bunext/internal/caching/fetch.ts";
 declare global {
   namespace NodeJS {
@@ -149,7 +151,7 @@ class BunextServer {
         await import("../../config/preload.ts");
       }
       if (isDryRun) {
-        OnServerStart();
+        await OnServerStart();
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
@@ -166,7 +168,7 @@ class BunextServer {
       if (isDryRun) {
         //@ts-ignore
         await import("../../config/preload.ts");
-        OnServerStart();
+        await OnServerStart();
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
@@ -181,6 +183,7 @@ class BunextServer {
     } else if (!isMainThread) {
       if (isDryRun) this.RunServer();
       await router.InitServerActions();
+      await OnServerStartCluster();
     }
 
     if (isDryRun) globalThis.dryRun = false;

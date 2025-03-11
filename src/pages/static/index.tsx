@@ -14,9 +14,9 @@ export async function getServerSideProps({
   request: Request;
 }): Promise<Props> {
   //revalidateStatic(new URL(request.url), 1);
-  const fake = await (
+  /*const fake = await (
     await fetch("https://jsonplaceholder.typicode.com/todos/1")
-  ).json();
+  ).json();*/
   //console.log(fake);
   return {
     id: "allo",

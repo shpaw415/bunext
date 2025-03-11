@@ -5,6 +5,7 @@ import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import "@static/index.css";
 import { Head } from "@bunpmjs/bunext/head";
+import { useEffect } from "react";
 
 type SessionType = {
   test: boolean;
@@ -19,6 +20,16 @@ Head.setHead({
 
 export function TestServerElement1() {
   return <div>{Bun.password.hashSync("allô")}</div>;
+}
+
+function DynamicFileImport() {
+  useEffect(() => {
+    fetch("/node_modules/@bunpmjs/bunext/test.css").then(async (res) => {
+      console.log(await res.text());
+    });
+  }, []);
+
+  return <></>;
 }
 
 export default async function Page() {
@@ -43,6 +54,7 @@ export default async function Page() {
         Revalidate now
       </button>
       <IsLogged />
+      <DynamicFileImport />
     </div>
   );
 }

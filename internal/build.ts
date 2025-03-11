@@ -9,11 +9,11 @@ import { renderToString } from "react-dom/server";
 import type { ssrElement, ServerConfig } from "./types";
 import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
-import fetchCache from "./caching/fetch";
 import { BuildServerComponentWithHooksWarning } from "./logs";
 import CacheManager from "./caching";
+import * as React from "react";
 
-globalThis.React = await import("react");
+globalThis.React = React;
 
 type BuildOuts = {
   revalidates: {
@@ -66,6 +66,7 @@ class Builder {
     path: string;
     time: number;
   }[] = [];
+  private inited = false;
 
   public remove_node_modules_files_path = [
     "@bunpmjs/bunext/database/index.ts",
@@ -89,12 +90,14 @@ class Builder {
   }
 
   async Init() {
+    if (this.inited) return this;
     await this.InitGetCustomPluginsFromUser();
     try {
       await this.InitGetFixingPlugins();
     } catch (e) {
       console.log("Plugin has not loaded correctly!\n", (e as Error).stack);
     }
+    this.inited = true;
     return this;
   }
 
@@ -793,8 +796,8 @@ class Builder {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
   }
 }
-const builder = await new Builder(process.cwd()).Init();
-
+const builder = new Builder(process.cwd());
+await builder.Init();
 if (import.meta.main) {
   await builder.makeBuild();
   process.exit(0);
