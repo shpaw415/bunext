@@ -47,22 +47,22 @@ async function install(total: boolean) {
 
   const packageJson = (await Bun.file("package.json").json()) as packageJson;
   packageJson.scripts = {
-    ...packageJson.scripts,
     bunext: "bunext",
     build: "bunext build",
     dev: "bunext dev",
     "db:create": "bunext database:create",
     start: "bunext production",
+    ...packageJson.scripts,
   };
   packageJson.dependencies = {
+    react: "19.0.0",
+    "react-dom": "19.0.0",
     ...packageJson.dependencies,
-    react: "18.3.1",
-    "react-dom": "18.3.1",
   };
   packageJson.devDependencies = {
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
     ...packageJson.devDependencies,
-    "@types/react": "18.3.1",
-    "@types/react-dom": "18.3.1",
   };
   const beautify = require("json-beautify");
   const beatifiedJson = beautify(packageJson, null, 2, 50);

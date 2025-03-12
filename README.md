@@ -10,6 +10,8 @@ problem for Bunext there is possible crash over some new version of Bun.
 
 I will keep up to date the framework for what it needs
 
+Watch for braking changes until stable version 1.0.0
+
 # bunext
 
 - Nextjs inspired Framework compatible with Bun Runtime
