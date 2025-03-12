@@ -1081,4 +1081,5 @@ Computer specs:
 
 ## 0.9.7
 
-- Fix serverSideProps breaking when it's undefined 
+- Fix serverSideProps breaking when it's undefined
+- Fix update problem where it over-write existing React and rect-dom and update the default rect & react-dom installed to 19.0.0
