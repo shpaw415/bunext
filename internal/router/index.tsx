@@ -35,7 +35,7 @@ async function fetchServerSideProps(pathname: string) {
     },
   });
   if (response.ok) {
-    const text = await response.text();
+    const text = (await response.text()) || "undefined";
     return eval(`(${text})`);
   }
   throw new Error("Failed to fetch");

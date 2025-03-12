@@ -449,10 +449,11 @@ class RequestManager {
   }
 
   private makeStream(jsx: JSX.Element): Response {
-    return new Response(this.formatPage(renderToString(jsx)), {
+    return new Response(Bun.gzipSync(this.formatPage(renderToString(jsx))), {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
+        "Content-Encoding": "gzip",
       },
     });
   }
@@ -712,9 +713,10 @@ class RequestManager {
     if (this.isUseStaticPath(true)) {
       const stringPage = await this.getStaticPage();
       return this.bunextReq.__SET_RESPONSE__(
-        new Response(stringPage, {
+        new Response(Bun.gzipSync(stringPage || ""), {
           headers: {
             "content-type": "text/html; charset=utf-8",
+            "Content-Encoding": "gzip",
           },
         })
       );
@@ -722,9 +724,10 @@ class RequestManager {
       const stringPage = await this.getSSRDefaultPage();
       if (stringPage)
         return this.bunextReq.__SET_RESPONSE__(
-          new Response(stringPage, {
+          new Response(Bun.gzipSync(stringPage), {
             headers: {
               "content-type": "text/html; charset=utf-8",
+              "Content-Encoding": "gzip",
             },
           })
         );

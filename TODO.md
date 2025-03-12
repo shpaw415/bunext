@@ -6,9 +6,10 @@ Priority 1
 - Fix usePathName
 - Add serverComponent Hooks
 - Add request url containing @static mapped to the static assets
-- "use static" page caching dynamic page associated with it's URL and searchParams
+- Gzip html response 
+  - https://developer.chrome.com/docs/lighthouse/performance/uses-text-compression?utm_source=lighthouse&utm_medium=devtools&hl=fr
+  - csspurge for head element
   
 Priority 2
 
 - Max body size in config
-- Remove build overhead

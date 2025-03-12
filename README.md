@@ -1076,3 +1076,7 @@ Computer specs:
 - Fix "use static" not caching for dynamic segment
 - Dynamic page has now a 100% performance upgrade ( no joke )
 - "use static" benchmark
+
+## 0.9.7
+
+- Fix serverSideProps breaking when it's undefined 
