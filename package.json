@@ -23,7 +23,7 @@
   "peerDependencies": {
     "react": "18.3.0 - 19.x.x",
     "react-dom": "18.3.0 - 19.x.x",
-    "typescript": "^5.7.2",
+    "typescript": "^5.8.2",
     "@bunpmjs/bunext": "^0.9.3"
   },
   "dependencies": {

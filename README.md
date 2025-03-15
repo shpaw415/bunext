@@ -171,7 +171,7 @@ type Params = {
 };
 
 type Props = {
-  server: boolean;
+  data: Object;
 };
 
 export async function getServerSideProps({
@@ -188,7 +188,7 @@ export async function getServerSideProps({
 
   return {
     data: await (await fetch("http://foo.com/api")).json()
-  } as Props;
+  };
 }
 
 export default function DynamicPage({
