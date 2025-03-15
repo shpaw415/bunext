@@ -66,6 +66,7 @@ export class _Session<DataType> {
    */
   setExpiration(expiration: number) {
     this.session_expiration_override = expiration;
+    return this;
   }
   public getSessionTimeout() {
     return globalThis.__SESSION_TIMEOUT__;
