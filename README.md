@@ -203,7 +203,7 @@ export default function DynamicPage({
     <div>
       action: {params.action} 
       id: {params.id}
-      props-server: {props.server}
+      props-server: {JSON.stringify(props.data)}
     </div>
   );
 }
