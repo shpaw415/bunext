@@ -71,7 +71,11 @@ export class BunextRequest {
     }
     const setExpire = () => {
       if (this.session.__DELETE__) return -100000;
-      return globalThis.serverConfig.session?.timeout || 3600;
+      return (
+        this.session.session_expiration_override ??
+        globalThis.serverConfig.session?.timeout ??
+        3600
+      );
     };
 
     response.headers.append(

@@ -28,6 +28,8 @@ export type InAppSession<DataType> = Omit<
   | "isUpdated"
   | "initData"
   | "updated_id"
+  | "setSessionTimeout"
+  | "session_expiration_override"
 >;
 export class _Session<DataType> {
   public __DATA__: _SessionData<any> = {
@@ -40,6 +42,7 @@ export class _Session<DataType> {
   private request?: BunextRequest;
   private update_function?: React.Dispatch<React.SetStateAction<boolean>>;
   public updated_id = generateRandomString(5);
+  public session_expiration_override?: number;
 
   constructor({
     data,
@@ -56,6 +59,13 @@ export class _Session<DataType> {
     if (sessionTimeout) this.sessionTimeoutFromNow = sessionTimeout;
     if (request) this.request = request;
     if (update_function) this.update_function = update_function;
+  }
+  /**
+   * override set the session expiration
+   * @param expiration expiration in seconds
+   */
+  setExpiration(expiration: number) {
+    this.session_expiration_override = expiration;
   }
   public getSessionTimeout() {
     return globalThis.__SESSION_TIMEOUT__;
