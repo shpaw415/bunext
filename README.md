@@ -197,8 +197,7 @@ export default function DynamicPage({
   }:{
     params: Params, 
     props: Props, 
-    request?: Request
-  }, bunextRequest: BunextRequest) {
+  }) {
   return (
     <div>
       action: {params.action} 
