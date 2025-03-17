@@ -1086,3 +1086,4 @@ Computer specs:
 ## 0.9.8
 
 - Override the session Expiration with the new method session.setExpiration()
+- fix params not reaching getServerSideProps

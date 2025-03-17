@@ -643,8 +643,8 @@ class RequestManager {
     await this.bunextReq.session.initData();
     const result = await module?.getServerSideProps?.(
       {
-        ...this.serverSide,
         request: this.request,
+        params: this.serverSide.params,
       },
       this.bunextReq
     );
