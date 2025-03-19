@@ -26,6 +26,7 @@ export default function Page({
     <p>
       <Head />
       {params.segment}
+      test
     </p>
   );
 }

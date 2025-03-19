@@ -1,9 +1,14 @@
 import { join, basename } from "node:path";
-import { type BuildOutput, type BunPlugin, type JavaScriptLoader } from "bun";
+import {
+  type BuildConfig,
+  type BuildOutput,
+  type BunPlugin,
+  type JavaScriptLoader,
+} from "bun";
 import { normalize, resolve } from "path";
 import { isValidElement, type JSX, type ReactNode } from "react";
 import reactElementToJSXString from "./jsxToString/index";
-import { unlinkSync } from "node:fs";
+import { mkdirSync, rmSync, unlinkSync } from "node:fs";
 import "./server_global";
 import { renderToString } from "react-dom/server";
 import type { ssrElement, ServerConfig } from "./types";
@@ -11,6 +16,7 @@ import { exitCodes } from "./globals";
 import { Head, type _Head } from "../features/head";
 import { BuildServerComponentWithHooksWarning } from "./logs";
 import CacheManager from "./caching";
+import { router } from "./router";
 import * as React from "react";
 
 globalThis.React = React;
@@ -89,6 +95,19 @@ class Builder {
     };
   }
 
+  clearBuildDir() {
+    try {
+      rmSync(this.options.buildDir as string, {
+        recursive: true,
+        force: true,
+      });
+    } catch {}
+    mkdirSync(
+      normalize(`${this.options.buildDir as string}/${this.options.pageDir}`),
+      { recursive: true }
+    );
+  }
+
   async Init() {
     if (this.inited) return this;
     await this.InitGetCustomPluginsFromUser();
@@ -118,36 +137,81 @@ class Builder {
     this.plugins.push(...serverConfig.build.plugins);
   }
 
-  async build(onlyPath?: string) {
-    process.env.__BUILD_MODE__ = "true";
+  async getEntryPoints() {
     const { baseDir, hydrate, pageDir, sourcemap, buildDir, minify } =
       this.options;
 
     let entrypoints = [join(baseDir, hydrate)];
-
-    if (!onlyPath) {
-      const absPageDir = join(baseDir, pageDir as string);
-      for await (const path of this.glob(absPageDir)) {
-        entrypoints.push(path);
-      }
-      entrypoints = entrypoints.filter((e) => {
-        const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx"];
-        if (
-          allowedEndsWith.includes(e.split("/").at(-1) as string) ||
-          /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(e)
-        )
-          return true;
-        return false;
-      });
-    } else {
-      entrypoints.push(onlyPath);
+    const absPageDir = join(baseDir, pageDir as string);
+    for await (const path of this.glob(absPageDir)) {
+      entrypoints.push(path);
     }
+    entrypoints = entrypoints.filter((e) => {
+      const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx"];
+      if (
+        allowedEndsWith.includes(e.split("/").at(-1) as string) ||
+        /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(e)
+      )
+        return true;
+      return false;
+    });
+
+    return entrypoints;
+  }
+  /**
+   *
+   * @param fromPath the current path to get the layout entry points from
+   * @returns absolute paths of layouts
+   */
+  async getLayoutEntryPoints(fromPath?: string) {
+    const { baseDir, pageDir } = this.options;
+
+    const layoutsPaths = router.layoutPaths;
+    const pathFromPageDir = fromPath?.split(pageDir).at(1);
+
+    if (pathFromPageDir) {
+      const cwd = process.cwd();
+      const layoutPathsFromCurrentPath = layoutsPaths
+        .map((path) => normalize(path.replace("layout.tsx", "")))
+        .filter((e) => pathFromPageDir.startsWith(e))
+        .map((path) => normalize(`${cwd}/${pageDir}/${path}/layout.tsx`));
+      return layoutPathsFromCurrentPath;
+    }
+
+    let entrypoints = [];
+    const absPageDir = join(baseDir, pageDir as string);
+    for await (const path of this.glob(absPageDir)) {
+      entrypoints.push(path);
+    }
+    entrypoints = entrypoints.filter((e) => {
+      const allowedEndsWith = ["layout.tsx"];
+      if (allowedEndsWith.includes(e.split("/").at(-1) as string)) return true;
+      return false;
+    });
+    return entrypoints;
+  }
+
+  async build(onlyPath?: string) {
+    process.env.__BUILD_MODE__ = "true";
+    const { baseDir, hydrate, sourcemap, buildDir, minify } = this.options;
+
+    const entrypoints =
+      onlyPath && process.env.NODE_ENV == "development"
+        ? [
+            join(baseDir, hydrate),
+            onlyPath,
+            ...(await this.getLayoutEntryPoints(onlyPath)),
+          ]
+        : await this.getEntryPoints();
+
     this.buildOutput = await this.CreateBuild({
       entrypoints: entrypoints,
       sourcemap,
       outdir: join(baseDir, buildDir as string),
       minify,
+      splitting: true,
     });
+
     this.cleanBuildDir(this.buildOutput);
     process.env.__BUILD_MODE__ = "false";
     return this.buildOutput;
@@ -709,7 +773,7 @@ class Builder {
       ) as { [key: string]: string };
   }
 
-  private async CreateBuild(options: _CreateBuild) {
+  private async CreateBuild(options: BuildConfig) {
     const { define } = this.options;
 
     //@ts-ignore
@@ -719,15 +783,21 @@ class Builder {
     }
 
     const build = await Bun.build({
-      ...options,
+      splitting: true,
       publicPath: "./",
-      plugins: [this.NextJsPlugin(), ...this.plugins],
       target: "browser",
+      ...options,
+      plugins: [
+        this.NextJsPlugin(),
+        ...this.plugins,
+        ...(options?.plugins || []),
+      ],
       define: {
         "process.env.NODE_ENV": JSON.stringify(
           process.env.NODE_ENV || "development"
         ),
         ...define,
+        ...options.define,
       },
       external: [
         "bun",
@@ -738,8 +808,8 @@ class Builder {
         import.meta.filename,
         "@bunpmjs/bunext/features/router.ts",
         "@bunpmjs/bunext/features/request.ts",
+        ...(options.external || []),
       ],
-      splitting: true,
     });
     await this.afterBuild(build);
     return build;

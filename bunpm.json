@@ -1,5 +1,5 @@
 {
-  "version": "0.9.7",
+  "version": "0.9.8",
   "include": [
     ".bunext",
     "docker",
@@ -12,6 +12,7 @@
     "internal",
     "plugins",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "tsconfig.json"
   ]
 }

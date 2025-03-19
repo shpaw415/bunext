@@ -1,3 +1,4 @@
+import { Link } from "@bunpmjs/bunext/router";
 import { useHead } from "@bunpmjs/bunext/head";
 import "@static/style/other.css";
 
@@ -24,6 +25,9 @@ export default function Page({ params, props }: { params: any; props: any }) {
       >
         {JSON.stringify(params || {})}
       </div>
+      <Link href="/other/static">
+        <button>Go to static</button>
+      </Link>
     </div>
   );
 }

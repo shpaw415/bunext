@@ -1,10 +1,13 @@
 import type { BunFile, BunPlugin } from "bun";
 import type { _Head } from "../features/head";
+import type { BunextRequest } from "./bunextRequest";
 
-export interface ServerSideProps {
-  props?: any;
-  redirect?: string;
-}
+export type ServerSideProps =
+  | {
+      redirect?: string;
+    }
+  | Record<string, any>
+  | undefined;
 
 export type _DisplayMode = {
   nextjs?: {
@@ -19,6 +22,7 @@ export const URLpaths = {
 };
 
 export type _GlobalData = {
+  __DEV_ROUTE_PREFETCH__: Array<string>;
   __PAGES_DIR__: string;
   __INITIAL_ROUTE__: string;
   __ROUTES__: Record<string, string>;
@@ -102,7 +106,7 @@ export type staticPage = {
   /**
    * must be json decode
    */
-  props: string;
+  props?: string | Record<string, any> | { redirect: string };
 };
 
 export type SSRPage = {
@@ -153,3 +157,15 @@ export type ClusterMessageType =
         id: string;
       };
     };
+
+export type getServerSidePropsFunction = (
+  request_data: { params: Record<string, string>; request: Request },
+  bunextRequest: BunextRequest
+) => Promise<undefined | {}> | undefined | {};
+
+export type ReactShellComponent = React.ComponentType<{
+  children: Array<React.ReactElement>;
+  props?: ServerSideProps;
+  params?: Record<string, string>;
+  route: string;
+}>;

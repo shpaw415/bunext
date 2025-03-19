@@ -3,6 +3,8 @@ import { test, expect, describe, afterAll } from "bun:test";
 import "@bunpmjs/bunext/internal/server_global.ts";
 import { router } from "@bunpmjs/bunext/internal/router.tsx";
 import "../.bunext/react-ssr/server.ts";
+import { Shell } from "../.bunext/react-ssr/shell.tsx";
+import { ParseServerSideProps } from "../internal/router/index.tsx";
 
 const Server = globalThis.Server;
 
@@ -90,6 +92,95 @@ test("API EndPoint", async () => {
   await make();
   await make();
   await make();
+});
+
+describe("Request features", () => {
+  test("server-side-props:DEFINED", async () => {
+    const headers = {
+      accept: "application/vnd.server-side-props",
+    };
+    const req = new Request(
+      `http://localhost:${serverConfig.HTTPServer.port}/serversideprops`,
+      {
+        headers: {
+          accept: "application/vnd.server-side-props",
+        },
+      }
+    );
+    const res = await router.serve(req, headers, new FormData(), {
+      Shell: Shell as any,
+    });
+    if (!res?.response) throw new Error("No response");
+    const parsed = ParseServerSideProps(await res.response.text());
+    expect(parsed?.test).toBe(true);
+  });
+  test("server-side-props:UNDEFINED", async () => {
+    const headers = {
+      accept: "application/vnd.server-side-props",
+    };
+    const req = new Request(
+      `http://localhost:${serverConfig.HTTPServer.port}/serversideprops/undefined`,
+      {
+        headers: {
+          accept: "application/vnd.server-side-props",
+        },
+      }
+    );
+    const res = await router.serve(req, headers, new FormData(), {
+      Shell: Shell as any,
+    });
+    if (!res?.response) throw new Error("No response");
+    const parsed = ParseServerSideProps(await res.response.text());
+    expect(parsed).toBeUndefined();
+  });
+
+  test("server-side-props:STATIC:DEFINED", async () => {
+    const make = async () => {
+      const headers = {
+        accept: "application/vnd.server-side-props",
+      };
+      const req = new Request(
+        `http://localhost:${serverConfig.HTTPServer.port}/serversideprops/static`,
+        {
+          headers: {
+            accept: "application/vnd.server-side-props",
+          },
+        }
+      );
+      const res = await router.serve(req, headers, new FormData(), {
+        Shell: Shell as any,
+      });
+      if (!res?.response) throw new Error("No response");
+      const parsed = ParseServerSideProps(await res.response.text());
+      expect(parsed?.redirect).toBe("/");
+      expect(parsed?.params).toEqual({});
+    };
+    await make();
+    await make();
+  });
+  test("server-side-props:STATIC:UNDEFINED", async () => {
+    const make = async () => {
+      const headers = {
+        accept: "application/vnd.server-side-props",
+      };
+      const req = new Request(
+        `http://localhost:${serverConfig.HTTPServer.port}/serversideprops/static/undefined`,
+        {
+          headers: {
+            accept: "application/vnd.server-side-props",
+          },
+        }
+      );
+      const res = await router.serve(req, headers, new FormData(), {
+        Shell: Shell as any,
+      });
+      if (!res?.response) throw new Error("No response");
+      const parsed = ParseServerSideProps(await res.response.text());
+      expect(parsed).toBeUndefined();
+    };
+    await make();
+    await make();
+  });
 });
 
 afterAll(async () => {

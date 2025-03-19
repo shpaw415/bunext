@@ -14,9 +14,12 @@ import type {
   _DisplayMode,
   _GlobalData,
   _SsrMode,
+  getServerSidePropsFunction,
+  ReactShellComponent,
   ServerActionDataType,
   ServerActionDataTypeHeader,
   ServerConfig,
+  ServerSideProps,
 } from "./types";
 import { normalize } from "path";
 import React, { type JSX } from "react";
@@ -41,12 +44,6 @@ type pathNames =
   | "/ServerActionGetter"
   | "/bunextDeleteSession"
   | "/favicon.ico";
-
-let LoadedNodeModule: Array<{
-  path: string;
-  mimeType: string;
-  content: string;
-}> = [];
 
 const HTMLDocType = "<!DOCTYPE html>";
 
@@ -77,23 +74,52 @@ class StaticRouters {
     this.server = new Bun.FileSystemRouter({
       dir: join(this.baseDir, this.pageDir),
       style: "nextjs",
+      fileExtensions: [".tsx", ".ts", ".js", ".jsx"],
     });
     this.client = new Bun.FileSystemRouter({
       dir: join(this.baseDir, this.buildDir, this.pageDir),
       style: "nextjs",
     });
-    this.routes_dump = NJSON.stringify(
+    this.routes_dump = this.getRouteDumpFromServerSide(this.server);
+    this.layoutPaths = this.getlayoutPaths();
+    this.initPromise = new Promise((resolve) => (this.initResolver = resolve));
+  }
+
+  private getRouteDumpFromServerSide(serverFileRouter: FileSystemRouter) {
+    const routes = Object.fromEntries(
+      Object.entries(serverFileRouter.routes)
+        .filter(([path, filePath]) => {
+          const filename = filePath.split("/").at(-1);
+          if (!filename) return false;
+          if (
+            filename == "index.tsx" ||
+            filename == "layout.tsx" ||
+            /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(filename)
+          )
+            return true;
+          return false;
+        })
+        .map(([path, filePath]) => {
+          const filePathArray = filePath.split(this.baseDir).at(1)?.split(".");
+          filePathArray?.pop();
+          filePathArray?.push("js");
+          return [path, filePathArray?.join(".")];
+        })
+    );
+    return NJSON.stringify(routes, { omitStack: true });
+  }
+  getRouteDumpFromClient(client: FileSystemRouter) {
+    return NJSON.stringify(
       Object.fromEntries(
-        Object.entries(this.client.routes).map(([path, filePath]) => [
+        Object.entries(client).map(([path, filePath]) => [
           path,
           "/" + relative(join(this.baseDir, this.buildDir), filePath),
         ])
       ),
       { omitStack: true }
     );
-    this.layoutPaths = this.getlayoutPaths();
-    this.initPromise = new Promise((resolve) => (this.initResolver = resolve));
   }
+
   public async init() {
     if (this.inited) return;
     await Promise.all([
@@ -193,7 +219,7 @@ class StaticRouters {
     {
       Shell,
     }: {
-      Shell: React.ComponentType<{ children: React.ReactElement }>;
+      Shell: ReactShellComponent;
     }
   ): Promise<BunextRequest | null> {
     if (process.env.NODE_ENV == "development")
@@ -396,9 +422,7 @@ class RequestManager {
     value: any;
     toString: () => string;
   };
-  Shell: React.ComponentType<{
-    children: React.ReactElement;
-  }>;
+  Shell: ReactShellComponent;
 
   constructor(init: {
     request: Request;
@@ -407,9 +431,7 @@ class RequestManager {
     server: FileSystemRouter;
     client: FileSystemRouter;
     router: StaticRouters;
-    Shell: React.ComponentType<{
-      children: React.ReactElement;
-    }>;
+    Shell: ReactShellComponent;
   }) {
     this.request = init.request;
     this.request_header = init.request_header;
@@ -614,8 +636,8 @@ class RequestManager {
     }
   }
   private async MakeServerSideProps(): Promise<{
-    value: any;
-    toString: () => string;
+    value: ServerSideProps;
+    toString: () => string | undefined;
   }> {
     if (this.serverSideProps) return this.serverSideProps;
 
@@ -626,17 +648,19 @@ class RequestManager {
       const props = CacheManager.getStaticPageProps(this.serverSide.pathname);
       if (props) {
         this.serverSideProps = {
-          toString: () => props,
-          value: JSON.parse(props),
+          toString: () => JSON.stringify(props),
+          value: props,
         };
         return this.serverSideProps;
       }
     }
 
-    const module = await import(this.serverSide.filePath);
-    if (typeof module.getServerSideProps == "undefined")
+    const module = (await import(this.serverSide.filePath)) as {
+      getServerSideProps?: getServerSidePropsFunction;
+    };
+    if (module?.getServerSideProps == undefined)
       return {
-        toString: () => JSON.stringify(undefined),
+        toString: () => undefined,
         value: undefined,
       };
 
@@ -789,10 +813,12 @@ class RequestManager {
           (new Date().getTime() - CreatedAt);
 
     return {
+      __DEV_ROUTE_PREFETCH__: "[]",
       __PAGES_DIR__: JSON.stringify(this.router.pageDir),
       __INITIAL_ROUTE__: JSON.stringify(this.serverSide.pathname + this.search),
       __ROUTES__: this.router.routes_dump,
-      __SERVERSIDE_PROPS__: (await this.MakeServerSideProps()).toString(),
+      __SERVERSIDE_PROPS__:
+        (await this.MakeServerSideProps()).toString() ?? "undefined",
       __LAYOUT_ROUTE__: JSON.stringify(this.router.layoutPaths),
       __HEAD_DATA__: JSON.stringify(Head.head),
       __PUBLIC_SESSION_DATA__: JSON.stringify(
@@ -920,7 +946,7 @@ class RequestManager {
       CacheManager.addStaticPage(
         this.serverSide.pathname,
         pageString,
-        (await this.MakeServerSideProps()).toString()
+        (await this.MakeServerSideProps()).value
       );
       return pageString;
     }

@@ -21,9 +21,10 @@
       "@/*": ["./src/*"]
     }
   },
+
   "exclude": ["node_modules"],
   "include": [
-    ".bunext/custom.d.ts",
+    "./.bunext/custom.d.ts",
     "src",
     "internal",
     "plugins",

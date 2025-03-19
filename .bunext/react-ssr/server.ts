@@ -29,6 +29,7 @@ import OnServerStart, {
   OnServerStartCluster,
 } from "@bunpmjs/bunext/internal/server-start.ts";
 import "@bunpmjs/bunext/internal/caching/fetch.ts";
+import OnRequest from "@bunpmjs/bunext/internal/onRequest.ts";
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
@@ -59,6 +60,7 @@ class BunextServer {
     this.server = Bun.serve({
       port: this.port,
       async fetch(request) {
+        await OnRequest(request);
         request.headers.toJSON();
 
         const OnRequestResponse = await Bypassrequest(request);
@@ -86,7 +88,7 @@ class BunextServer {
       );
     };
 
-    this.hotServer = Bun.serve({
+    this.hotServer = Bun.serve<undefined, {}>({
       websocket: {
         message: (ws, message) => {},
         open(ws) {
@@ -155,7 +157,7 @@ class BunextServer {
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
-          await builder.makeBuild();
+          //await builder.makeBuild();
         } else {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) throw new Error("Production build failed");
@@ -172,7 +174,7 @@ class BunextServer {
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
-          await builder.makeBuild();
+          //await builder.makeBuild();
         } else {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) throw new Error("Production build failed");
@@ -207,33 +209,11 @@ class BunextServer {
     if (log) console.log(log);
   }
 
-  private async checkBuildOnDevMode({
-    url,
-    header,
-    filePath,
-  }: {
-    url: URL;
-    header: Record<string, string>;
-    filePath?: string;
-  }) {
-    const isDev = process.env.NODE_ENV == "development";
-    if (!isDev) return;
-
-    if (
-      header.accept == "application/vnd.server-side-props" ||
-      header.accept?.startsWith("text/html")
-    ) {
-      if (this.isClustered)
-        await this.updateWorkerData({
-          path: filePath,
-        });
-      else {
-        this.makeBuildAwaiter();
-        if (filePath) await builder.resetPath(filePath);
-        await builder.makeBuild();
-      }
-    } else if (url.pathname.endsWith(".js") && url.search.startsWith("?"))
-      await this.waittingBuildFinish;
+  private async checkBuildOnDevMode({ filePath }: { filePath?: string }) {
+    if (this.isClustered && filePath)
+      await this.updateWorkerData({
+        path: filePath,
+      });
   }
 
   async serve(request: Request) {
@@ -244,9 +224,7 @@ class BunextServer {
     }
     try {
       await this.checkBuildOnDevMode({
-        url: new URL(request.url),
         filePath: router.server?.match(request)?.filePath,
-        header: JSONHeader,
       });
       let response: BunextRequest | null = await router.serve(
         request,
@@ -369,7 +347,7 @@ class BunextServer {
           path: data?.path,
         },
       } as ClusterMessageType);
-      await this.waittingBuildFinish;
+      //await this.waittingBuildFinish;
     } else {
       for (const worker of Object.values(cluster.workers || [])) {
         worker?.send("build_done");

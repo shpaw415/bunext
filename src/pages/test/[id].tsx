@@ -12,7 +12,7 @@ export default function Page({ props }: any) {
 }
 
 function Test() {
-  const [state, setState] = useState("allo");
+  const [state, setState] = useState("allo1");
   useRequest()?.setHead({
     title: `random-${Math.random()}`,
   });
@@ -26,6 +26,6 @@ export async function TestElement() {
 export async function getServerSideProps(props: any) {
   return {
     allo: true,
-    other: [1, 2],
+    other: [1, 3, 3],
   };
 }

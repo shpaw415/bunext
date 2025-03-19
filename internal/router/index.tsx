@@ -35,10 +35,14 @@ async function fetchServerSideProps(pathname: string) {
     },
   });
   if (response.ok) {
-    const text = (await response.text()) || "undefined";
-    return eval(`(${text})`);
+    return ParseServerSideProps(await response.text());
   }
   throw new Error("Failed to fetch");
+}
+
+export function ParseServerSideProps(props: string) {
+  if (props?.length > 0) return JSON.parse(props) as Record<string, any>;
+  else return undefined;
 }
 
 const VersionContext = createContext(0);
@@ -134,6 +138,7 @@ export const RouterHost = ({
       try {
         const matched = match(target.split("?").at(0) as string);
         if (!matched) throw new Error("no match found");
+        await OnDevRouterUpdate(matched);
         const [props, module] = await Promise.all([
           fetchServerSideProps(target),
           import(
@@ -193,6 +198,13 @@ export const RouterHost = ({
     </ReloadContext.Provider>
   );
 };
+
+async function OnDevRouterUpdate(matched: Exclude<Match, null>) {
+  if (process.env.NODE_ENV != "development") return;
+  if (matched.path == location.pathname) return;
+  window.location.assign(matched.path);
+  return new Promise(() => {});
+}
 
 export function SessionProvider({ children }: { children: any }) {
   const [updater, setUpdater] = useState(false);

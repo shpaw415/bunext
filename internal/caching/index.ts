@@ -6,9 +6,8 @@ import type {
   SSRPage,
   staticPage,
 } from "../../internal/types";
-import type { DBSchema, TableSchema } from "../../database/schema";
+import type { DBSchema } from "../../database/schema";
 import { type _Head } from "../../features/head";
-import { generateRandomString } from "../../features/utils";
 
 declare global {
   //@ts-ignore
@@ -100,8 +99,9 @@ const dbSchema: DBSchema = [
       },
       {
         name: "props",
-        type: "string",
+        type: "json",
         nullable: true,
+        DataType: {},
       },
     ],
   },
@@ -224,13 +224,13 @@ class CacheManager {
 
   // Static Page
 
-  addStaticPage(pathname: string, page: string, props: string) {
+  addStaticPage(pathname: string, page: string, raw_props?: any) {
     try {
       this.static_page.insert([
         {
           pathname,
           page,
-          props,
+          props: raw_props,
         },
       ]);
     } catch (e) {
@@ -242,7 +242,7 @@ class CacheManager {
             },
             values: {
               page,
-              props,
+              props: raw_props,
             },
           })
         )
@@ -250,7 +250,7 @@ class CacheManager {
         throw e;
     }
   }
-  getStaticPage(url: string) {
+  getStaticPage(url: string): staticPage | undefined {
     const _url = new URL(url);
     return (this.static_page
       .select({
@@ -262,7 +262,9 @@ class CacheManager {
           props: true,
         },
       })
-      .at(0) ?? undefined) as staticPage | undefined;
+      .at(0) ?? undefined) as
+      | (Omit<staticPage, "props"> & { props: string })
+      | undefined;
   }
   getStaticPageProps(pathname: string) {
     return (

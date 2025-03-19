@@ -24,7 +24,7 @@ export function TestServerElement1() {
 
 function DynamicFileImport() {
   useEffect(() => {
-    fetch("/node_modules/@bunpmjs/bunext/test.css").then(async (res) => {
+    fetch("/node_modules/@bunpmjs/bunext/static/test.css").then(async (res) => {
       console.log(await res.text());
     });
   }, []);
