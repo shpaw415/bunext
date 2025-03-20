@@ -471,7 +471,7 @@ This version improves readability, adds more examples, and organizes the content
   </details>
 
   <details>
-    <summary>📢 0.9.9</summary>
+    <summary>📢 0.9.10</summary>
 
   - Added more **tests to prevent previous errors from recurring**  
   - Fix **`getServerSideProps` breaking request** when `undefined` on route change/refresh in dev mode  

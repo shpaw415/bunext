@@ -674,7 +674,7 @@ class RequestManager {
     );
 
     const res = {
-      toString: () => NJSON.stringify(result, { omitStack: true }),
+      toString: () => JSON.stringify(result),
       value: result,
     };
 
