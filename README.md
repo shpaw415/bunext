@@ -1,7 +1,3 @@
-I'll rewrite your documentation to make it clearer, more engaging, and with more examples. Here's an improved version:  
-
----
-
 # 🚀 Bunext Documentation  
 
 Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, providing high-performance SSR, CSR, static site generation, and multi-threaded HTTP workers. It is optimized for modern development workflows with built-in SQLite support, session management, and server actions.  
