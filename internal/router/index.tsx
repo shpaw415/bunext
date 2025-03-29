@@ -23,6 +23,8 @@ import {
 import { AddServerActionCallback } from "../globals";
 const globalX = globalThis as unknown as _GlobalData;
 
+const __MAIN_ROUTE__ = `${globalX.__INITIAL_ROUTE__}`;
+
 export const match = globalX.__ROUTES__
   ? getRouteMatcher(globalX.__ROUTES__)
   : () => null;
@@ -201,8 +203,9 @@ export const RouterHost = ({
 
 async function OnDevRouterUpdate(matched: Exclude<Match, null>) {
   if (process.env.NODE_ENV != "development") return;
-  if (matched.path == location.pathname) return;
-  window.location.assign(matched.path);
+  console.log(matched.path, __MAIN_ROUTE__);
+  if (matched.path == __MAIN_ROUTE__) return;
+  window.location.href = matched.path;
   return new Promise(() => {});
 }
 

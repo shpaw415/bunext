@@ -1,3 +1,5 @@
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/shpaw415/bunext?utm_source=oss&utm_medium=github&utm_campaign=shpaw415%2Fbunext&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 # 🚀 Bunext Documentation  
 
 Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, providing high-performance SSR, CSR, static site generation, and multi-threaded HTTP workers. It is optimized for modern development workflows with built-in SQLite support, session management, and server actions.  
@@ -477,6 +479,13 @@ This version improves readability, adds more examples, and organizes the content
   - Fix **`getServerSideProps` breaking request** when `undefined` on route change/refresh in dev mode  
   - **Faster development mode** reducing build time exponentially  
 
+  </details>
+
+  <details>
+    <summary>📢 0.9.11</summary>
+
+    - Fix Dev mode Reloading page on every file modification.
+    - adding code rabbit review
   </details>
 
 </details>
