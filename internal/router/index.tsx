@@ -23,11 +23,11 @@ import {
 import { AddServerActionCallback } from "../globals";
 const globalX = globalThis as unknown as _GlobalData;
 
-const __MAIN_ROUTE__ = `${globalX.__INITIAL_ROUTE__}`;
-
 export const match = globalX.__ROUTES__
   ? getRouteMatcher(globalX.__ROUTES__)
   : () => null;
+
+const __MAIN_ROUTE__ = match(`${globalX.__INITIAL_ROUTE__}`)?.path;
 
 async function fetchServerSideProps(pathname: string) {
   const response = await fetch(pathname, {

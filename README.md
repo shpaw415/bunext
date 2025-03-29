@@ -482,7 +482,7 @@ This version improves readability, adds more examples, and organizes the content
   </details>
 
   <details>
-    <summary>📢 0.9.12</summary>
+    <summary>📢 0.9.14</summary>
 
     - Fix Dev mode Reloading page on every file modification.
     - adding code rabbit review
