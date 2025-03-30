@@ -43,17 +43,14 @@ export function watchBuild(build: initFunction, paths: string[]) {
 export const doWatchBuild = () =>
   watchBuild(
     async (path) => {
-      if (path?.startsWith("pages")) {
-        if (path.endsWith(".ts") || path.endsWith(".tsx")) {
-          const EntryPoints = await builder.getEntryPoints();
-          const probablePath = normalize(`${process.cwd()}/src/${path}`);
-          if (EntryPoints.includes(probablePath)) {
-            await builder.resetPath(probablePath);
-            await builder.makeBuild(probablePath);
-          } else {
-            await builder.makeBuild();
-          }
-        }
+      if (!path || !globalThis.dev.current_dev_path) return;
+      const EntryPoints = await builder.getEntryPoints();
+      const probablePath = normalize(
+        `${process.cwd()}/src/${globalThis.dev.current_dev_path}`
+      );
+      if (EntryPoints.includes(probablePath)) {
+        await builder.resetPath(probablePath);
+        await builder.makeBuild(probablePath);
       }
       sendSignal();
     },

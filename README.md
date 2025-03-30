@@ -486,6 +486,7 @@ This version improves readability, adds more examples, and organizes the content
 
     - Fix Dev mode Reloading page on every file modification.
     - adding code rabbit review
+    - Fix page wasn't reloading after a file change if it wasn't the index or layout
   </details>
 
 </details>

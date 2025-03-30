@@ -11,6 +11,12 @@ declare global {
   var Server: undefined | BunextServer;
   var clusterStatus: boolean;
   var serverConfig: ServerConfig;
+  var dev: {
+    current_dev_path?: string;
+  };
 }
 globalThis.socketList ??= [];
 globalThis.dryRun ??= true;
+globalThis.dev ??= {
+  current_dev_path: undefined,
+};

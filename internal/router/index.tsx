@@ -204,7 +204,7 @@ export const RouterHost = ({
 async function OnDevRouterUpdate(matched: Exclude<Match, null>) {
   if (process.env.NODE_ENV != "development") return;
   if (matched.path == __MAIN_ROUTE__) return;
-  window.location.href = matched.path;
+  window.location.href = window.location.href;
   return new Promise(() => {});
 }
 
