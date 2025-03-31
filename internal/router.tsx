@@ -710,8 +710,10 @@ class RequestManager {
       this.bunextReq
     )) as BunextRequest | Response | undefined;
     if (res instanceof BunextRequest) {
+      this.bunextReq = res;
       this.bunextReq.setCookie(res.response);
     } else if (res instanceof Response) {
+      this.bunextReq.response = res;
       this.bunextReq.setCookie(res);
     } else {
       throw new Error(
