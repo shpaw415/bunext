@@ -493,6 +493,7 @@ This version improves readability, adds more examples, and organizes the content
     <summary>📢 0.9.17</summary>
     
     - Redirection is now possible in a ServerAction 
+    - Fix regression API Endpoint cannot be reach introduced in 0.9.10
   </details>
 
 </details>

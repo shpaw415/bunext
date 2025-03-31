@@ -143,7 +143,7 @@ class Builder {
 
     let entrypoints = [join(baseDir, hydrate)];
     const absPageDir = join(baseDir, pageDir as string);
-    for await (const path of this.glob(absPageDir)) {
+    for await (const path of this.glob(absPageDir, "**/*.{tsx,jsx}")) {
       entrypoints.push(path);
     }
     entrypoints = entrypoints.filter((e) => {

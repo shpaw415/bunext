@@ -15,7 +15,8 @@ async function onDevRequest(request: Request) {
     match &&
     !match.src.endsWith("layout.tsx") &&
     match.pathname != "/favicon.ico" &&
-    request.headers.get("accept") != "application/vnd.server-side-props"
+    request.headers.get("accept") != "application/vnd.server-side-props" &&
+    match.filePath.endsWith("tsx")
   ) {
     setDevCurrentPath(match);
     await builder.resetPath(match.filePath);
