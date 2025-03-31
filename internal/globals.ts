@@ -2,6 +2,7 @@ import type { _Head } from "../features/head";
 import { jsxDEV, Fragment, type JSXSource } from "react/jsx-dev-runtime";
 import { jsxs, jsx } from "react/jsx-runtime";
 import React from "react";
+import { navigate } from "./router/index";
 
 declare global {
   var head: { [key: string]: _Head };
@@ -165,7 +166,9 @@ async function ParseServerActionResponse(response: Response) {
 
   switch (response.headers.get("dataType") as ServerActionDataTypeHeader) {
     case "json":
-      return ((await response.json()) as { props: any }).props;
+      const props = ((await response.json()) as { props: any }).props;
+      if (props?.redirect) navigate(props.redirect);
+      return props;
     case "blob":
       return await response.blob();
     case "file":

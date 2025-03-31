@@ -6,7 +6,7 @@ Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, pro
 
 ## 🔧 Compatibility  
 
-- **Bun Version**: `1.1.0 - 1.2.5`  
+- **Bun Version**: `1.1.0 - 1.2.7`  
 - **Supported OS**: Linux, WSL (Windows support in progress)  
 - **Note**: Bun is evolving rapidly. New versions may cause compatibility issues. Watch for breaking changes before version `1.0.0`.  
 
@@ -482,11 +482,17 @@ This version improves readability, adds more examples, and organizes the content
   </details>
 
   <details>
-    <summary>📢 0.9.14</summary>
+    <summary>📢 0.9.16</summary>
 
     - Fix Dev mode Reloading page on every file modification.
     - adding code rabbit review
     - Fix page wasn't reloading after a file change if it wasn't the index or layout
+  </details>
+
+  <details>
+    <summary>📢 0.9.17</summary>
+    
+    - Redirection is now possible in a ServerAction 
   </details>
 
 </details>
