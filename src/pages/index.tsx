@@ -105,6 +105,7 @@ export async function ServerSetSession() {
 }
 
 export async function ServerPrintSession() {
+  console.log(Bunext.version);
   console.log(GetSession(arguments).getData());
 }
 

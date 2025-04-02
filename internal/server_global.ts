@@ -24,6 +24,7 @@ declare global {
   var dev: {
     current_dev_path?: string;
   };
+  //@ts-ignore
   var Bunext: BunextType;
 }
 globalThis.socketList ??= [];
@@ -39,6 +40,7 @@ if (typeof window == "undefined") {
   globalThis.Bunext ??= {
     version: packageJson.version,
     request: {
+      //@ts-ignore
       bunext: req.BunextRequest,
     },
     router: {
@@ -56,10 +58,13 @@ if (typeof window == "undefined") {
     },
     session: {
       hook: {
+        //@ts-ignore
         useSession: useSession,
       },
+      //@ts-ignore
       get: GetSession,
     },
+    //@ts-ignore
     database: Database(),
   };
 } else {
@@ -83,6 +88,7 @@ if (typeof window == "undefined") {
     },
     session: {
       hook: {
+        //@ts-ignore
         useSession,
       },
       get: undefined as any,

@@ -7,9 +7,6 @@ import type { ClusterMessageType } from "@bunpmjs/bunext/internal/types.ts";
 // only use this module in a server context
 
 const isServer = typeof window == "undefined";
-const builder = (
-  isServer ? (await import("../internal/build.ts")).builder : undefined
-) as Builder;
 const publicThrow = () => {
   throw new Error("you cannot call revalidate in a client context");
 };
@@ -27,6 +24,7 @@ const findRouteOrThrow = (path: string) => {
 };
 
 async function revalidate(...path: string[]) {
+  const builder = (await import("../internal/build.ts")).builder as Builder;
   if (!isServer) publicThrow();
   const route = path
     .map((path) => findRouteOrThrow(path))
@@ -52,9 +50,10 @@ async function revalidate(...path: string[]) {
  * @param seconde every x seconde to revalide
  */
 
-function revalidateEvery(path: string | string[], seconde: number) {
+async function revalidateEvery(path: string | string[], seconde: number) {
   if (!isServer) return;
   if (!Array.isArray(path)) path = [path];
+  const builder = (await import("../internal/build.ts")).builder;
 
   if (builder.revalidates.find((r: any) => r.path === path)) return;
   for (const p of path) {
