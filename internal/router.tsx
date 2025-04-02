@@ -906,7 +906,6 @@ class RequestManager {
       />
     );
   }
-  //TODO: investigate why it's breaking the build once in a while
   private async makeProductionDynamicJSXElement() {
     if (!this.serverSide) return null;
     return this.router.CreateDynamicPage(

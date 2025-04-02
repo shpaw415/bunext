@@ -21,6 +21,7 @@ import {
   SessionDidUpdateContext,
 } from "../../features/session";
 import { AddServerActionCallback } from "../globals";
+import { RequestContext } from "../context";
 const globalX = globalThis as unknown as _GlobalData;
 
 export const match = globalX.__ROUTES__
@@ -362,10 +363,9 @@ export function useLocationProperty<S extends Location[keyof Location]>(
  * @returns the current pathname
  */
 export function usePathname() {
-  return useLocationProperty(
-    () => location.pathname,
-    () => globalX.__INITIAL_ROUTE__
-  );
+  const requestContext = useContext(RequestContext);
+  if (typeof window != "undefined") return location.pathname;
+  return new URL(requestContext?.request.url as string).pathname;
 }
 
 /**
