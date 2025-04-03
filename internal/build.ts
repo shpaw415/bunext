@@ -205,7 +205,14 @@ class Builder {
         : await this.getEntryPoints();
 
     this.buildOutput = await this.CreateBuild({
-      entrypoints: entrypoints,
+      entrypoints: [
+        ...entrypoints,
+        "react",
+        "react-dom",
+        "scheduler",
+        "react-dom/client",
+        "react/jsx-dev-runtime",
+      ],
       sourcemap,
       outdir: join(baseDir, buildDir as string),
       minify,

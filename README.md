@@ -496,4 +496,10 @@ This version improves readability, adds more examples, and organizes the content
     - Fix regression API Endpoint cannot be reach introduced in 0.9.10
   </details>
 
+   <details>
+    <summary>📢 0.9.18</summary>
+    
+    - New Global object Bunext for every Bunext features
+  </details>
+
 </details>

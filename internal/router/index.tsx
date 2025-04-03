@@ -205,8 +205,7 @@ export const RouterHost = ({
 async function OnDevRouterUpdate(matched: Exclude<Match, null>) {
   if (process.env.NODE_ENV != "development") return;
   if (matched.path == __MAIN_ROUTE__) return;
-  window.location.href = window.location.href;
-  return new Promise(() => {});
+  await fetch(window.location.href);
 }
 
 export function SessionProvider({ children }: { children: any }) {
