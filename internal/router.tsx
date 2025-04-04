@@ -546,6 +546,21 @@ class RequestManager {
       })
     );
   }
+
+  private MakeTextRes(content: BunFile | string, mimeType?: string) {
+    if (content instanceof Blob) {
+      this.bunextReq.__SET_RESPONSE__(new Response(content));
+    } else {
+      this.bunextReq.__SET_RESPONSE__(
+        new Response(content, {
+          headers: {
+            "Content-Type": `text/${mimeType}`,
+          },
+        })
+      );
+    }
+    return this.bunextReq;
+  }
   private async serveFromNodeModule(): Promise<BunextRequest | null> {
     const nodeModuleFile = await this.router.serveFromDir({
       directory: "node_modules",
@@ -564,21 +579,6 @@ class RequestManager {
       ],
     });
     if (!nodeModuleFile || !(await nodeModuleFile.exists())) return null;
-
-    const MakeTextRes = (content: BunFile | string, mimeType?: string) => {
-      if (content instanceof Blob) {
-        this.bunextReq.__SET_RESPONSE__(new Response(content));
-      } else {
-        this.bunextReq.__SET_RESPONSE__(
-          new Response(content, {
-            headers: {
-              "Content-Type": `text/${mimeType}`,
-            },
-          })
-        );
-      }
-      return this.bunextReq;
-    };
     const buildFile = (path: string) =>
       Bun.build({
         entrypoints: [path],
@@ -604,7 +604,7 @@ class RequestManager {
       case "html":
       case "xml":
       case "json":
-        return MakeTextRes(nodeModuleFile);
+        return this.MakeTextRes(nodeModuleFile);
       case "ts":
       case "tsx":
       case "jsx":
@@ -616,10 +616,10 @@ class RequestManager {
           process.env.NODE_ENV == "production" &&
           (await buildedFile.exists())
         )
-          return MakeTextRes(buildedFile);
+          return this.MakeTextRes(buildedFile);
         const res = await buildFile(`.${path}`);
         if (res.success) {
-          return MakeTextRes(getBuildedFile(formatedExt));
+          return this.MakeTextRes(getBuildedFile(formatedExt));
         }
 
         return this.bunextReq.__SET_RESPONSE__(

@@ -53,6 +53,9 @@ export default async function Page() {
       <button onClick={async () => await ServerRevalidateNow()}>
         Revalidate now
       </button>
+      <Link href="/dynamic">
+        <button>Goto dynamic</button>
+      </Link>
       <IsLogged />
       <DynamicFileImport />
     </div>

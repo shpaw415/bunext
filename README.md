@@ -283,6 +283,58 @@ console.log(process.env.API_KEY); // Server-only
 
 ---
 
+
+##  Dynamic import module
+**Experimental**
+
+Import module from directory you don't want to explicitly add to your code.
+Exemple: templates, you does not want to import every of them, 
+
+
+### Config
+```ts
+import type { OnRequestType } from "@bunpmjs/bunext/internal/types.ts";
+
+const onRequest: OnRequestType = async (request) => {
+  const res = await Bunext.plugins.onRequest.serveFrom({
+    directory: "src/dynamic",
+    request,
+  });
+  if (res) return res;
+};
+
+export default onRequest;
+```
+
+### Usage
+```tsx
+"use client";
+
+export function getServerSideProps() {
+  // make a Glob of files or get from the Database
+  return {
+    template_name: "component_1"
+  }
+}
+
+export default async function DynamicImport({props}:{props: { template_name: string }}) {
+  const dynamicPath = `/src/dynamic/${props.template_name}`;
+
+  return (
+    <div>
+      {typeof window != "undefined" ? (
+        (await import(dynamicPath)).default()
+      ) : (
+        <></>
+      )}
+    </div>
+  );
+}
+
+
+```
+
+
 ## 📊 Benchmarks  
 
 Bunext is optimized for **speed** and **efficiency**.  
@@ -500,6 +552,7 @@ This version improves readability, adds more examples, and organizes the content
     <summary>📢 0.9.18</summary>
     
     - New Global object Bunext for every Bunext features
+    - Dynamic Module loading feature. ( Load Module without knowing the name at first ). Exemple will follow
   </details>
 
 </details>

@@ -3,6 +3,6 @@
 
 import type { OnRequestType } from "@bunpmjs/bunext/internal/types.ts";
 
-const onRequest: OnRequestType = (request) => {};
+const onRequest: OnRequestType = async (request) => {};
 
 export default onRequest;

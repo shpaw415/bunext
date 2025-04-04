@@ -11,6 +11,7 @@ import packageJson from "../package.json";
 import { useSession, GetSession } from "../features/session";
 import { navigate, usePathname } from "./router/index";
 import { Database } from "../database/index";
+import { serveFrom } from "../features/onRequest/utils";
 
 declare global {
   var socketList: ServerWebSocket<unknown>[];
@@ -40,8 +41,7 @@ if (typeof window == "undefined") {
   globalThis.Bunext ??= {
     version: packageJson.version,
     request: {
-      //@ts-ignore
-      bunext: req.BunextRequest,
+      bunext: req.BunextRequest as any,
     },
     router: {
       revalidate: {
@@ -58,14 +58,16 @@ if (typeof window == "undefined") {
     },
     session: {
       hook: {
-        //@ts-ignore
-        useSession: useSession,
+        useSession: useSession as any,
       },
-      //@ts-ignore
-      get: GetSession,
+      get: GetSession as any,
     },
-    //@ts-ignore
-    database: Database(),
+    database: Database() as any,
+    plugins: {
+      onRequest: {
+        serveFrom,
+      },
+    },
   };
 } else {
   globalThis.Bunext ??= {
@@ -94,6 +96,11 @@ if (typeof window == "undefined") {
       get: undefined as any,
     },
     database: undefined as any,
+    plugins: {
+      onRequest: {
+        serveFrom: undefined as any,
+      },
+    },
   };
 }
 
@@ -146,6 +153,21 @@ type BunextType = {
      * @example GetSession(arguments)
      */
     get: typeof GetSession;
+  };
+  plugins: {
+    onRequest: {
+      /**
+       * serve from a directory
+       * for dynamic imports, build the file and serve it
+       * @param directory the directory to serve from
+       * @param request the request object
+       * @param buildOptions the build options
+       * @returns the response object
+       * @example serveFrom({ directory: "/src/dynamic", request })
+       * @example serveFrom({ directory: "/src/dynamic", request, buildOptions: { splitting: true } })
+       */
+      serveFrom: typeof serveFrom;
+    };
   };
   database: ReturnType<typeof Database>;
 };

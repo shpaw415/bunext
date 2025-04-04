@@ -15,16 +15,16 @@
   ],
   "type": "module",
   "devDependencies": {
-    "@types/bun": "1.2.5",
+    "@types/bun": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/web": "latest"
   },
   "peerDependencies": {
-    "react": "18.3.0 - 19.x.x",
-    "react-dom": "18.3.0 - 19.x.x",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "typescript": "^5.8.2",
-    "@bunpmjs/bunext": "0.9.3 - latest"
+    "@bunpmjs/bunext": "^0.9.17"
   },
   "dependencies": {
     "@base2/pretty-print-object": "1.0.2",
