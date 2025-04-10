@@ -1,4 +1,4 @@
-import type { Link } from "../components";
+import type { Link as _Link } from "../components";
 import type { navigate, usePathname } from "../../../internal/router/index";
 import type {
   revalidate,
@@ -11,6 +11,10 @@ export type Router = {
   navigate: Navigate;
   hooks: Hooks;
 };
+
+declare global {
+  var Link: typeof _Link;
+}
 
 type Revalidate = {
   /**
@@ -35,7 +39,7 @@ type Revalidate = {
 type Navigate = {
   to: typeof navigate;
   components: {
-    link: typeof Link;
+    link: typeof _Link;
   };
 };
 

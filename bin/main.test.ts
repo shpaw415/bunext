@@ -1,8 +1,8 @@
 import "../internal/server/bunext_global.ts";
 import { test, expect, describe, afterAll } from "bun:test";
 
-import "@bunpmjs/bunext/internal/server_global.ts";
-import { router } from "@bunpmjs/bunext/internal/router.tsx";
+import "@bunpmjs/bunext/internal/server/server_global.ts";
+import { router } from "@bunpmjs/bunext/internal/server/router.tsx";
 import "../.bunext/react-ssr/server.ts";
 import { Shell } from "../.bunext/react-ssr/shell.tsx";
 import { ParseServerSideProps } from "../internal/router/index.tsx";
@@ -46,7 +46,9 @@ describe("Build features", () => {
   });*/
 
   test("revalidate", async () => {
-    const { revalidate } = await import("@bunpmjs/bunext/features/router.ts");
+    const { revalidate } = await import(
+      "@bunpmjs/bunext/features/router/revalidate.ts"
+    );
     await revalidate("/");
   });
 

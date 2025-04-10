@@ -1,10 +1,10 @@
 "use static";
 
-import { BunextRequest } from "@bunpmjs/bunext/internal/bunextRequest.ts";
+import { BunextRequest } from "@bunpmjs/bunext/internal/server/bunextRequest.ts";
 
 export function getServerSideProps(
   { params, request }: { params: {}; request: Request },
-  bunextReq: BunextRequest
+  bunextReq: typeof Bunext.request.bunext
 ) {
   if (!Boolean(params)) throw new Error("No params");
   if (!Boolean(request)) throw new Error("No request");

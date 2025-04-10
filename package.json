@@ -18,13 +18,13 @@
     "@types/bun": "^1.2.8",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.1",
-    "@types/web": "^0.0.216"
+    "@types/web": "^0.0.216",
+    "@bunpmjs/bunext": "github:shpaw415/bunext"
   },
   "peerDependencies": {
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "typescript": "^5.8.2",
-    "@bunpmjs/bunext": "^0.9.17"
+    "typescript": "^5.8.2"
   },
   "dependencies": {
     "@base2/pretty-print-object": "1.0.2",
@@ -66,15 +66,11 @@
     "./*": "./*",
     "./head": "./features/head.tsx",
     "./database": "./database/index.ts",
-    "./database/*": "./database/*",
-    "./internal/*": "./internal/*",
-    "./session": "./features/session.ts",
-    "./utils": "./features/utils.ts",
-    "./server/request": "./internal/bunextRequest.ts",
-    "./router": "./features/router.ts",
     "./database/types": "./database/database_types.ts",
-    "./internal/globals": "./internal/globals.ts",
-    "./internal/server_global": "./internal/server_global.ts",
-    "./client/request": "./features/client/request.ts"
+    "./session": "./features/session/session.ts",
+    "./utils": "./features/utils/index.ts",
+    "./request": "./internal/server/bunextRequest.ts",
+    "./router/*": "./features/router/*",
+    "./client/*": "./features/client/*"
   }
 }

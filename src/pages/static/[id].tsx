@@ -1,6 +1,5 @@
 import { useHead } from "@bunpmjs/bunext/head";
-import type { BunextRequest } from "@bunpmjs/bunext/features/client/request.ts";
-import { revalidateStatic } from "@bunpmjs/bunext/router";
+import type { BunextRequest } from "@bunpmjs/bunext/internal/server/bunextRequest.ts";
 
 type Props = {
   id: string;
@@ -11,7 +10,7 @@ export async function getServerSideProps({
 }: {
   request: Request;
 }): Promise<Props> {
-  revalidateStatic(request, 5);
+  Bunext.router.revalidate.static(request, 5);
   return {
     id: "allo",
   };

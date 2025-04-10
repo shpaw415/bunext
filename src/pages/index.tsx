@@ -1,4 +1,3 @@
-import { Link, revalidate, revalidateEvery } from "@bunpmjs/bunext/router";
 import { TestElement } from "./test";
 import { useSession, GetSession } from "@bunpmjs/bunext/session";
 import { generateRandomString } from "../../features/utils";
@@ -33,7 +32,7 @@ function DynamicFileImport() {
 }
 
 export default async function Page() {
-  revalidateEvery("/", 5);
+  Bunext.router.revalidate.ssr.every("/", 5);
 
   return (
     <div>
@@ -41,9 +40,9 @@ export default async function Page() {
       <TestServerElement1 />
       {TestServerElement2()}
       <TestElement3 />
-      <Link href="/other">
+      <Bunext.router.navigate.components.link href="/other">
         <button>Other pages</button>
-      </Link>
+      </Bunext.router.navigate.components.link>
       <SetSessionButton />
       <DeleteSessionButton />
       <button onClick={() => fetch("/api/v1", { method: "POST" })}>api</button>
@@ -53,9 +52,9 @@ export default async function Page() {
       <button onClick={async () => await ServerRevalidateNow()}>
         Revalidate now
       </button>
-      <Link href="/dynamic">
+      <Bunext.router.navigate.components.link href="/dynamic">
         <button>Goto dynamic</button>
-      </Link>
+      </Bunext.router.navigate.components.link>
       <IsLogged />
       <DynamicFileImport />
     </div>
@@ -117,5 +116,5 @@ export async function ServerDeleteSession() {
 }
 
 export async function ServerRevalidateNow() {
-  await revalidate("/");
+  await Bunext.router.revalidate.ssr.now("/");
 }

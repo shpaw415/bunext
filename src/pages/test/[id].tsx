@@ -1,5 +1,3 @@
-import { Database } from "@bunpmjs/bunext/database";
-import { useRequest } from "@bunpmjs/bunext/client/request";
 import { useState } from "react";
 
 export default function Page({ props }: any) {
@@ -13,7 +11,7 @@ export default function Page({ props }: any) {
 
 function Test() {
   const [state, setState] = useState("allo1");
-  useRequest()?.setHead({
+  Bunext.request.hook.useRequest()?.setHead({
     title: `random-${Math.random()}`,
   });
   return <div>{state}</div>;

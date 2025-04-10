@@ -1,5 +1,4 @@
 "use static";
-import { useRequest, type BunextRequest } from "@bunpmjs/bunext/client/request";
 import "@static/style.css";
 
 type Params = {
@@ -7,7 +6,7 @@ type Params = {
 };
 
 function Head() {
-  const req = useRequest();
+  const req = Bunext.request.hook.useRequest();
   req?.setHead({
     title: "super-title",
   });
@@ -20,7 +19,7 @@ export default function Page({
   request,
 }: {
   params: Params;
-  request?: BunextRequest;
+  request?: typeof Bunext.request.bunext;
 }) {
   return (
     <p>
