@@ -1,6 +1,12 @@
 import type { BunFile, BunPlugin } from "bun";
 import type { _Head } from "../features/head";
-import type { BunextRequest } from "./bunextRequest";
+import type { BunextRequest } from "./server/bunextRequest.ts";
+import type { revalidate } from "../features/router/revalidate.ts";
+import type { Plugins } from "../plugins/bunext_object/type.ts";
+import type { Router } from "../features/router/bunext_object/types.ts";
+import type { Database } from "../database/bunext_object/types.ts";
+import type { Session } from "../features/session/bunext_object/types.ts";
+import type { _Request } from "../features/request/bunext_object/types.ts";
 
 export type ServerSideProps =
   | {
@@ -71,6 +77,11 @@ export type ServerConfig = {
   HTTPServer: {
     port: number;
     threads?: number | "all_cpu_core";
+    config?: Partial<
+      Bun.ServeFunctionOptions<unknown, {} | undefined> & {
+        static?: {} | undefined;
+      }
+    >;
   };
   Dev: {
     hotServerPort: number;
@@ -82,9 +93,6 @@ export type ServerConfig = {
     timeout: number;
     type: "cookie" | "database:hard" | "database:memory";
   };
-  experimental?: Partial<{
-    removeDuplicateExports: boolean;
-  }>;
 };
 
 export type OnRequestType = (
@@ -169,3 +177,12 @@ export type ReactShellComponent = React.ComponentType<{
   params?: Record<string, string>;
   route: string;
 }>;
+
+export type BunextType = {
+  version: string;
+  request: _Request;
+  router: Router;
+  session: Session;
+  plugins: Plugins;
+  database: Database;
+};

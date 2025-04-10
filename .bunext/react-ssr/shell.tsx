@@ -1,8 +1,9 @@
 import "@bunpmjs/bunext/internal/globals.ts";
 import { Dev } from "@bunpmjs/bunext/dev/dev.tsx";
 import { type JSX } from "react";
-import { HeadProvider } from "@bunpmjs/bunext/head";
+import { HeadProvider } from "@bunpmjs/bunext/features/head.tsx";
 import { SessionProvider } from "@bunpmjs/bunext/internal/router/index.tsx";
+
 export const Shell = ({
   children,
   route,
@@ -20,5 +21,5 @@ export const Shell = ({
         </HeadProvider>
       </html>
     </SessionProvider>
-  );
+  ) as any;
 };

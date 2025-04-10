@@ -19,9 +19,9 @@ import {
   _Session,
   SessionContext,
   SessionDidUpdateContext,
-} from "../../features/session";
+} from "../../features/session/session";
 import { AddServerActionCallback } from "../globals";
-import { RequestContext } from "../context";
+import { RequestContext } from "../server/context";
 const globalX = globalThis as unknown as _GlobalData;
 
 export const match = globalX.__ROUTES__

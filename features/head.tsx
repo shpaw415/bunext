@@ -1,7 +1,7 @@
 "use client";
 import { match, useReloadEffect } from "../internal/router/index";
 import type { _GlobalData, _globalThis } from "../internal/types";
-import { router } from "../internal/router";
+import { router } from "../internal/server/router";
 import {
   createContext,
   useCallback,
@@ -12,8 +12,8 @@ import {
 } from "react";
 import type { Match } from "../internal/router/utils/get-route-matcher";
 import { generateRandomString, normalize } from "./utils";
-import { RequestContext } from "../internal/context";
-import { useRequest } from "./client/request";
+import { RequestContext } from "../internal/server/context";
+import { useRequest } from "./request/hooks";
 
 export type _Head = {
   title?: string;

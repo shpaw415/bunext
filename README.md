@@ -317,19 +317,29 @@ export function getServerSideProps() {
   }
 }
 
-export default async function DynamicImport({props}:{props: { template_name: string }}) {
-  const dynamicPath = `/src/dynamic/${props.template_name}`;
+export default async function DynamicImport({props}:{props: {template_name: string}}) {
+  return (
+    <Bunext.plugins.onRequest.components.DynamicComponent
+      pathName={`/src/dynamic/${props.template_name}`}
+      elementName="default"
+      props={{ title: "foo-bar" }}
+    />
+  );
+}
 
+
+// /src/dynamic/:template_name
+
+export default function DynamicComponent({ title }: { title: string }) {
   return (
     <div>
-      {typeof window != "undefined" ? (
-        (await import(dynamicPath)).default()
-      ) : (
-        <></>
-      )}
+      <h1>{title}</h1>
+      <h1>Dynamic Component</h1>
+      <p>This component is loaded dynamically.</p>
     </div>
   );
 }
+
 
 
 ```
@@ -552,7 +562,8 @@ This version improves readability, adds more examples, and organizes the content
     <summary>📢 0.9.18</summary>
     
     - New Global object Bunext for every Bunext features
-    - Dynamic Module loading feature. ( Load Module without knowing the name at first ). Exemple will follow
+    - Dynamic Module loading feature. ( Load Module without knowing the name at first ). Exemple will follow + tooling, components
+    - HTTPServer options can be set from the config file config/server.ts
   </details>
 
 </details>

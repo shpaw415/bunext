@@ -3,7 +3,7 @@
 import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
-import { normalize } from "../features/utils";
+import { normalize } from "../features/utils/index.ts";
 import type { ServerConfig } from "../internal/types.ts";
 
 type _cmd =
@@ -36,7 +36,7 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      const builder = (await import("../internal/build.ts")).builder;
+      const builder = (await import("../internal/server/build.ts")).builder;
       await builder.preBuildAll();
       const res = await builder.build();
       console.log(res);

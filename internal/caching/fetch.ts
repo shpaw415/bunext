@@ -14,6 +14,7 @@ export class BunextFetchCaching {
   constructor() {
     if (typeof window != "undefined") return;
     globalThis.__FETCH_BUNEXT__ ??= fetch;
+    //@ts-ignore
     globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
       return this.fetch(input, init);
     };

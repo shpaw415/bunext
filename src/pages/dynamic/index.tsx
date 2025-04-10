@@ -1,15 +1,14 @@
 "use client";
 
-export default async function DynamicImport() {
-  const dynamicPath = `/src/dynamic/component`;
-
+export default function DynamicImport({ props }: { props: any }) {
   return (
-    <div>
-      {typeof window != "undefined" ? (
-        (await import(dynamicPath)).DynamicComponent()
-      ) : (
-        <></>
-      )}
-    </div>
+    <Bunext.plugins.onRequest.components.DynamicComponent
+      pathName={`/src/dynamic/component`}
+      elementName="DynamicComponent"
+      bootStrap={{
+        style: ["/src/dynamic/style.css"],
+      }}
+      props={{ title: "title" }}
+    />
   );
 }

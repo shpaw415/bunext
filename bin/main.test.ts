@@ -1,3 +1,4 @@
+import "../internal/server/bunext_global.ts";
 import { test, expect, describe, afterAll } from "bun:test";
 
 import "@bunpmjs/bunext/internal/server_global.ts";
@@ -45,12 +46,12 @@ describe("Build features", () => {
   });*/
 
   test("revalidate", async () => {
-    const { revalidate } = await import("@bunpmjs/bunext/router");
+    const { revalidate } = await import("@bunpmjs/bunext/features/router.ts");
     await revalidate("/");
   });
 
   test("Header data", async () => {
-    const { Head } = await import("@bunpmjs/bunext/head");
+    const { Head } = await import("@bunpmjs/bunext/features/head.tsx");
     expect(Object.keys(Head.head).length).toBeGreaterThan(1);
   });
 });

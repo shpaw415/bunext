@@ -35,6 +35,7 @@
     "bin",
     "config",
     "database",
-    "dev"
+    "dev",
+    "./node_modules/@bunpmjs/bunext"
   ]
 }

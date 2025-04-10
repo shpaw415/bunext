@@ -1,4 +1,4 @@
-import Database from "bun:sqlite";
+import type Database from "bun:sqlite";
 import { _Database, Table } from "../../database/class";
 import type {
   revalidate,
@@ -123,17 +123,12 @@ const dbSchema: DBSchema = [
 ];
 
 class CacheManager {
-  private db: _Database = new _Database(
-    new Database(import.meta.dirname + "/cache.sqlite", {
-      create: true,
-      readwrite: true,
-    })
-  );
-  private ssr = this.CreateTable<ssrElement, ssrElement>("ssr");
-  private revalidate = this.CreateTable<revalidate, revalidate>("revalidate");
-  private head = this.CreateTable<_Head, _Head>("head");
-  private page = this.CreateTable<SSRPage, SSRPage>("page");
-  private static_page = this.CreateTable<staticPage, staticPage>("static_page");
+  private db: _Database;
+  private ssr: Table<ssrElement, ssrElement>;
+  private revalidate: Table<revalidate, revalidate>;
+  private head: Table<_Head, _Head>;
+  private page: Table<SSRPage, SSRPage>;
+  private static_page: Table<staticPage, staticPage>;
 
   private CreateTable<T1 extends {}, T2 extends {}>(name: string) {
     return new Table<T1, T2>({
@@ -145,6 +140,19 @@ class CacheManager {
   }
 
   constructor() {
+    const db = require("bun:sqlite").default as typeof Database;
+    this.db = new _Database(
+      new db(import.meta.dirname + "/cache.sqlite", {
+        create: true,
+        readwrite: true,
+      })
+    );
+    this.ssr = this.CreateTable<ssrElement, ssrElement>("ssr");
+    this.revalidate = this.CreateTable<revalidate, revalidate>("revalidate");
+    this.head = this.CreateTable<_Head, _Head>("head");
+    this.page = this.CreateTable<SSRPage, SSRPage>("page");
+    this.static_page = this.CreateTable<staticPage, staticPage>("static_page");
+
     for (const tab of dbSchema) this.db.create(tab);
   }
 
@@ -298,7 +306,7 @@ class CacheManager {
   }
 }
 //@ts-ignore
-globalThis.CacheManage ??= new CacheManager();
+if (typeof window == "undefined") globalThis.CacheManage ??= new CacheManager();
 
 export default globalThis.CacheManage;
 export { CacheManager };
