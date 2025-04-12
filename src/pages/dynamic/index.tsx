@@ -9,6 +9,7 @@ export default function DynamicImport({ props }: { props: any }) {
         style: ["/src/dynamic/style.css"],
       }}
       props={{ title: "title" }}
+      id="test"
     />
   );
 }

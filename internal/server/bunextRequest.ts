@@ -4,6 +4,7 @@ import "./server_global";
 import { DeleteSessionByID, SetSessionByID } from "../session";
 import { generateRandomString } from "../../features/utils";
 import { Head, type _Head } from "../../features/head";
+import { MakeDynamicComponent, type FeatureType } from "./server-features";
 
 export class BunextRequest {
   public request: Request;
@@ -16,6 +17,11 @@ export class BunextRequest {
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
   public SessionID?: string;
+  public features: FeatureType = {
+    dynamicComponent: {
+      components: [],
+    },
+  };
 
   constructor(props: { request: Request; response: Response }) {
     this.request = props.request;

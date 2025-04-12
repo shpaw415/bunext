@@ -34,6 +34,8 @@ import { generateRandomString } from "../../features/utils";
 import { RequestContext } from "./context";
 
 import "./bunext_global.ts";
+import type { HTML_Rewrite_plugin_function } from "../../plugins/router/html_rewrite/types.ts";
+import type { Request_Plugin } from "../../plugins/router/request/types.ts";
 
 class ClientOnlyError extends Error {
   constructor() {
@@ -62,6 +64,9 @@ class StaticRouters {
   cssPathExists: string[] = [];
   staticRoutes: Array<keyof FileSystemRouter["routes"]> = [];
   ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
+
+  HTML_ReWritePlugins: Array<HTML_Rewrite_plugin_function> = [];
+  Request_Plugins: Array<Request_Plugin> = [];
 
   initPromise: Promise<boolean>;
   initResolver?: (value: boolean | PromiseLike<boolean>) => void;
@@ -122,17 +127,38 @@ class StaticRouters {
     );
   }
 
+  private async PluginLoader<T>(path: string) {
+    const plugins_files_paths = Array.from(
+      new Bun.Glob("**.ts").scanSync({
+        cwd: normalize(`${import.meta.dirname}/../../plugins/${path}`),
+        onlyFiles: true,
+        absolute: true,
+      })
+    );
+
+    return (
+      await Promise.all(
+        plugins_files_paths.map(
+          async (path) => (await import(path)).default as T
+        )
+      )
+    ).filter((f) => typeof f == "function");
+  }
+
   public async init() {
     if (this.inited) return;
     await Promise.all([
       this.getCssPaths(),
       this.getUseStaticRoutes(),
       this.getSSRDefaultRoutes(),
-    ]).then(([css, staticPath, ssr]) => {
+      this.PluginLoader<HTML_Rewrite_plugin_function>(`router/html_rewrite`),
+      this.PluginLoader<Request_Plugin>(`router/request`),
+    ]).then(([css, staticPath, ssr, HTMLReWritePlugin, requestPlugins]) => {
       this.cssPathExists = css;
       this.staticRoutes = staticPath;
       this.ssrAsDefaultRoutes = ssr;
-
+      this.HTML_ReWritePlugins = HTMLReWritePlugin;
+      this.Request_Plugins = requestPlugins;
       this.inited = true;
       this.initResolver?.(true);
     });
@@ -457,29 +483,42 @@ class RequestManager {
 
   async make(): Promise<null | BunextRequest> {
     return (
+      (await this.checkPluginServing()) ||
       (await this.checkStaticServing()) ||
       (await this.checkFeatureServing()) ||
       (await this.servePage())
     );
   }
 
-  private formatPage(html: string) {
-    const rewriter = new HTMLRewriter().on("#BUNEXT_INNER_PAGE_INSERTER", {
-      element(element) {
-        element.removeAndKeepContent();
-      },
-    });
+  private async checkPluginServing() {
+    for await (const plugin of this.router.Request_Plugins) {
+      const res = await plugin(this.bunextReq);
+      if (res) return res;
+    }
+  }
+
+  private async formatPage(html: string) {
+    const rewriter = new HTMLRewriter();
+    await Promise.all(
+      this.router.HTML_ReWritePlugins.map((plugin) =>
+        plugin(rewriter, this.bunextReq)
+      )
+    );
+
     return [HTMLDocType, rewriter.transform(html)].join("\n");
   }
 
-  private makeStream(jsx: JSX.Element): Response {
-    return new Response(Bun.gzipSync(this.formatPage(renderToString(jsx))), {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Content-Encoding": "gzip",
-      },
-    });
+  private async makeStream(jsx: JSX.Element): Promise<Response> {
+    return new Response(
+      Bun.gzipSync(await this.formatPage(renderToString(jsx))),
+      {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "Content-Encoding": "gzip",
+        },
+      }
+    );
   }
 
   private async serveServerAction() {
@@ -767,7 +806,7 @@ class RequestManager {
     const page = await this.makePage(pageJSX);
     if (!page) return null;
 
-    return this.bunextReq.__SET_RESPONSE__(this.makeStream(page));
+    return this.bunextReq.__SET_RESPONSE__(await this.makeStream(page));
   }
 
   private async checkStaticServing(): Promise<BunextRequest | null> {
@@ -978,7 +1017,9 @@ class RequestManager {
 
     const shelledPage = await this.makePage(PageWithLayouts);
     if (!shelledPage) return null;
-    const stringifiedShelledPage = this.formatPage(renderToString(shelledPage));
+    const stringifiedShelledPage = await this.formatPage(
+      renderToString(shelledPage)
+    );
 
     CacheManager.addSSRDefaultPage(
       this.serverSide.pathname,

@@ -59,7 +59,7 @@ export type _globalThis = _GlobalData & {
  *  - port: HTTP server port
  *  - threads: Http worker (multi-threading)
  *    - **only available on Linux with Bun ^1.1.25**
- *
+ *  - config: Bun.serve config to pass
  * Dev
  *  - hotServerPort: Hot reload Server port
  *
@@ -67,11 +67,14 @@ export type _globalThis = _GlobalData & {
  *  - plugins: custom plugins for the build
  *
  * session
- *  - timeout: Invalidate session after X seconds of Idle
+ *  - timeout: Invalidate session after X seconds of Idle ( default to 3600 )
  *  - type:
  *      - cookie  : max of 4096 chars ( good for small session data )
  *      - database:hard : session kept on a database on the hard drive ( good for big session data but slower then memory)
  *      - database:memory : session kept on a database in memory ( good for big session data but must have enough RAM )
+ *
+ * router:
+ *   - dynamicPaths: Array of base path of Dynamic loaded module
  */
 export type ServerConfig = {
   HTTPServer: {
@@ -92,6 +95,12 @@ export type ServerConfig = {
   session?: {
     timeout: number;
     type: "cookie" | "database:hard" | "database:memory";
+  };
+  router?: {
+    /**
+     * Array of base path of Dynamic loaded module
+     */
+    dynamicPaths: Array<string>;
   };
 };
 

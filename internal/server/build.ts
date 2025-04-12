@@ -21,6 +21,7 @@ import * as React from "react";
 import { InitGlobalServerConfig } from "./global_init";
 
 import "./bunext_global";
+import type { Build_Plugins } from "../../plugins/build/types";
 
 await InitGlobalServerConfig();
 
@@ -61,6 +62,7 @@ class Builder {
   private afterBuildPlugins: Array<
     (output: Bun.BuildArtifact) => Promise<void>
   > = [];
+  private BuildPluginsConfig: Partial<Bun.BuildConfig> = {};
   /**
    * absolute path
    */
@@ -119,7 +121,7 @@ class Builder {
     await this.InitGetCustomPluginsFromUser();
     await this.InitAfterBuildPlugins();
     try {
-      await this.InitGetFixingPlugins();
+      await this.InitGetPlugins();
     } catch (e) {
       console.log("Plugin has not loaded correctly!\n", (e as Error).stack);
     }
@@ -139,15 +141,46 @@ class Builder {
     }
   }
 
-  private async InitGetFixingPlugins() {
-    const fixesFiles = await Array.fromAsync(
+  private async InitGetPlugins() {
+    const PluginsModules = await Array.fromAsync(
       this.glob(`${import.meta.dirname}/../../plugins/build`, "**/*.ts")
     );
-    for await (const filePath of fixesFiles) {
-      const plugin = (await import(filePath))?.default;
-      if (!plugin) continue;
-      this.plugins.push(plugin);
-    }
+    const plugins = (
+      await Promise.all(
+        PluginsModules.map(async (path) => {
+          return (await import(path))?.default as undefined | Build_Plugins;
+        })
+      )
+    ).filter((c) => c != undefined);
+    this.plugins.push(
+      ...plugins.map((p) => p.plugin).filter((c) => c != undefined)
+    );
+
+    const config = plugins
+      .map((p) => p.buildOptions)
+      .filter((p) => p != undefined);
+
+    const entrypoints = config
+      .map((p) => p.entrypoints)
+      .filter((p) => p != undefined)
+      .reduce((p, n) => [...p, ...n], []);
+
+    const external = config
+      .map((p) => p.external)
+      .filter((p) => p != undefined)
+      .reduce((p, n) => [...p, ...n], []);
+
+    const define = Object.assign(
+      {},
+      ...config.map((p) => p.define).filter((p) => p != undefined)
+    );
+
+    this.BuildPluginsConfig = {
+      ...Object.assign({}, ...config),
+      entrypoints,
+      external,
+      define,
+    };
   }
 
   private async InitGetCustomPluginsFromUser() {
@@ -210,7 +243,7 @@ class Builder {
 
   async build(onlyPath?: string) {
     process.env.__BUILD_MODE__ = "true";
-    const { baseDir, hydrate, sourcemap, buildDir, minify } = this.options;
+    const { baseDir, hydrate, sourcemap, buildDir, ...options } = this.options;
 
     const entrypoints =
       onlyPath && process.env.NODE_ENV == "development"
@@ -223,18 +256,10 @@ class Builder {
 
     this.buildOutput = await this.CreateBuild({
       env: "*",
-      entrypoints: [
-        ...entrypoints,
-        "react",
-        "react-dom",
-        "scheduler",
-        "react-dom/client",
-        "react/jsx-dev-runtime",
-      ],
+      entrypoints,
       sourcemap,
       outdir: join(baseDir, buildDir as string),
-      minify,
-      splitting: true,
+      ...options,
     });
 
     this.cleanBuildDir(this.buildOutput);
@@ -807,6 +832,7 @@ class Builder {
 
   private async CreateBuild(options: BuildConfig) {
     const { define } = this.options;
+    const { entrypoints, ..._options } = options;
 
     //@ts-ignore
     if (Bun.semver.satisfies(Bun.version, "1.1.39 - x.x.x") && !options.env) {
@@ -815,10 +841,20 @@ class Builder {
     }
 
     const build = await Bun.build({
+      ...this.BuildPluginsConfig,
       splitting: true,
       publicPath: "./",
       target: "browser",
-      ...options,
+      entrypoints: [
+        "react",
+        "react-dom",
+        "scheduler",
+        "react-dom/client",
+        "react/jsx-dev-runtime",
+        ...entrypoints,
+        ...(this.BuildPluginsConfig?.entrypoints ?? []),
+      ],
+      ..._options,
       plugins: [
         this.NextJsPlugin(),
         ...this.plugins,
@@ -830,6 +866,7 @@ class Builder {
         ),
         ...define,
         ...options.define,
+        ...this.BuildPluginsConfig.define,
       },
       external: [
         "bun",
@@ -841,6 +878,7 @@ class Builder {
         "@bunpmjs/bunext/features/router.ts",
         "@bunpmjs/bunext/features/request.ts",
         ...(options.external || []),
+        ...(this.BuildPluginsConfig?.external || []),
       ],
     });
     await this.afterBuild(build);

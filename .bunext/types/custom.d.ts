@@ -13,3 +13,7 @@ declare module "*.svg" {
   const Svg: FC<SVGProps<SVGSVGElement>>;
   export default Svg;
 }
+
+declare module "node_modules/@types/bun/node_modules/bun-types/extensions.d.ts" {
+  export {}; // Empty export to shadow the original module
+}

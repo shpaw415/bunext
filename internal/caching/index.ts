@@ -1,4 +1,4 @@
-import type Database from "bun:sqlite";
+import Database from "bun:sqlite";
 import { _Database, Table } from "../../database/class";
 import type {
   revalidate,
@@ -140,9 +140,8 @@ class CacheManager {
   }
 
   constructor() {
-    const db = require("bun:sqlite").default as typeof Database;
     this.db = new _Database(
-      new db(import.meta.dirname + "/cache.sqlite", {
+      new Database(import.meta.dirname + "/cache.sqlite", {
         create: true,
         readwrite: true,
       })

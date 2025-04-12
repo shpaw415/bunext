@@ -14,6 +14,9 @@ const Config: ServerConfig = {
     timeout: 3600,
     type: "database:hard",
   },
+  router: {
+    dynamicPaths: ["src/dynamic"],
+  },
 };
 
 export default Config;
