@@ -1,14 +1,18 @@
-"use client";
+"use static";
 
-export default function DynamicImport({ props }: { props: any }) {
+export function getServerSideProps() {
+  return "component";
+}
+
+export default function DynamicImport({ props }: { props: {} }) {
   return (
     <Bunext.plugins.onRequest.components.DynamicComponent
-      pathName={`/src/dynamic/component`}
+      pathName={`/src/dynamic/${props}`}
       elementName="DynamicComponent"
       bootStrap={{
         style: ["/src/dynamic/style.css"],
       }}
-      props={{ title: "title" }}
+      props={{ title: Math.random() }}
       id="test"
     />
   );

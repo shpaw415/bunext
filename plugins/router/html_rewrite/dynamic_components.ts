@@ -1,12 +1,15 @@
 import { renderToString } from "react-dom/server";
 import type { HTML_Rewrite_plugin_function } from "./types";
 import { type JSX } from "react";
-import { type FeatureType } from "../../../internal/server/server-features";
 
 const cwd = process.cwd();
 
 const Rewrite_Plugin: HTML_Rewrite_plugin_function = (rewrite, bunext_req) => {
-  const components: FeatureType["dynamicComponent"]["components"] = [];
+  const components: Array<{
+    id: string;
+    content: string;
+    elementType: React.ReactElement<any, any>;
+  }> = [];
 
   rewrite.on(".BUNEXT_Dynamic_Element", {
     async element(element) {

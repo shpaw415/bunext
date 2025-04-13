@@ -24,13 +24,7 @@ declare global {
 }
 
 export type FeatureType = {
-  dynamicComponent: {
-    components: Array<{
-      id: string;
-      content: string;
-      elementType: keyof JSX.IntrinsicElements;
-    }>;
-  };
+  globalData: Record<string, string>;
 };
 
 export async function MakeDynamicComponent({

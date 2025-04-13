@@ -4,7 +4,7 @@ import "./server_global";
 import { DeleteSessionByID, SetSessionByID } from "../session";
 import { generateRandomString } from "../../features/utils";
 import { Head, type _Head } from "../../features/head";
-import { MakeDynamicComponent, type FeatureType } from "./server-features";
+import { type FeatureType } from "./server-features";
 
 export class BunextRequest {
   public request: Request;
@@ -17,10 +17,8 @@ export class BunextRequest {
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
   public SessionID?: string;
-  public features: FeatureType = {
-    dynamicComponent: {
-      components: [],
-    },
+  public plugins: FeatureType = {
+    globalData: {},
   };
 
   constructor(props: { request: Request; response: Response }) {
@@ -100,6 +98,11 @@ export class BunextRequest {
       httpOnly: true,
       secure: false,
     });
+  }
+  public InjectGlobalValues(values: Record<string, any>) {
+    for (const [key, val] of Object.entries(values)) {
+      this.plugins.globalData[key] = JSON.stringify(val);
+    }
   }
   encodeSessionData(data: any) {
     return encodeURI(JSON.stringify(data));

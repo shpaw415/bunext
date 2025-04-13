@@ -129,7 +129,7 @@ class StaticRouters {
 
   private async PluginLoader<T>(path: string) {
     const plugins_files_paths = Array.from(
-      new Bun.Glob("**.ts").scanSync({
+      new Bun.Glob("**/*.ts").scanSync({
         cwd: normalize(`${import.meta.dirname}/../../plugins/${path}`),
         onlyFiles: true,
         absolute: true,
@@ -779,14 +779,15 @@ class RequestManager {
 
     if (this.isUseStaticPath(true)) {
       const stringPage = await this.getStaticPage();
-      return this.bunextReq.__SET_RESPONSE__(
-        new Response(Bun.gzipSync(stringPage || ""), {
-          headers: {
-            "content-type": "text/html; charset=utf-8",
-            "Content-Encoding": "gzip",
-          },
-        })
-      );
+      if (stringPage)
+        return this.bunextReq.__SET_RESPONSE__(
+          new Response(Bun.gzipSync(stringPage || ""), {
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+              "Content-Encoding": "gzip",
+            },
+          })
+        );
     } else if (this.isSSRDefaultExportPath(true)) {
       const stringPage = await this.getSSRDefaultPage();
       if (stringPage)
@@ -984,7 +985,9 @@ class RequestManager {
         this.serverSide,
         pageJSX
       );
-      const pageString = renderToString(await this.makePage(PageWithLayouts));
+      const pageString = await this.formatPage(
+        renderToString(await this.makePage(PageWithLayouts))
+      );
       CacheManager.addStaticPage(
         this.serverSide.pathname,
         pageString,

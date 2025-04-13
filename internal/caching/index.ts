@@ -122,13 +122,42 @@ const dbSchema: DBSchema = [
   },
 ];
 
+class CacheManagerExtends {
+  private db = new _Database(
+    new Database(import.meta.dirname + "/cache.sqlite", {
+      create: true,
+      readwrite: true,
+    })
+  );
+  private dbSchema: DBSchema;
+
+  constructor({ shema }: { shema: DBSchema }) {
+    this.dbSchema = shema;
+    for (const tab of this.dbSchema) this.db.create(tab);
+  }
+
+  protected CreateTable<T1 extends {}, T2 extends {}>(name: string) {
+    return new Table<T1, T2>({
+      db: this.db.databaseInstance,
+      name: name,
+      shema: this.dbSchema,
+      WAL: true,
+    });
+  }
+}
+
 class CacheManager {
-  private db: _Database;
-  private ssr: Table<ssrElement, ssrElement>;
-  private revalidate: Table<revalidate, revalidate>;
-  private head: Table<_Head, _Head>;
-  private page: Table<SSRPage, SSRPage>;
-  private static_page: Table<staticPage, staticPage>;
+  private db = new _Database(
+    new Database(import.meta.dirname + "/cache.sqlite", {
+      create: true,
+      readwrite: true,
+    })
+  );
+  private ssr = this.CreateTable<ssrElement, ssrElement>("ssr");
+  private revalidate = this.CreateTable<revalidate, revalidate>("revalidate");
+  private head = this.CreateTable<_Head, _Head>("head");
+  private page = this.CreateTable<SSRPage, SSRPage>("page");
+  private static_page = this.CreateTable<staticPage, staticPage>("static_page");
 
   private CreateTable<T1 extends {}, T2 extends {}>(name: string) {
     return new Table<T1, T2>({
@@ -140,18 +169,6 @@ class CacheManager {
   }
 
   constructor() {
-    this.db = new _Database(
-      new Database(import.meta.dirname + "/cache.sqlite", {
-        create: true,
-        readwrite: true,
-      })
-    );
-    this.ssr = this.CreateTable<ssrElement, ssrElement>("ssr");
-    this.revalidate = this.CreateTable<revalidate, revalidate>("revalidate");
-    this.head = this.CreateTable<_Head, _Head>("head");
-    this.page = this.CreateTable<SSRPage, SSRPage>("page");
-    this.static_page = this.CreateTable<staticPage, staticPage>("static_page");
-
     for (const tab of dbSchema) this.db.create(tab);
   }
 
@@ -308,4 +325,4 @@ class CacheManager {
 if (typeof window == "undefined") globalThis.CacheManage ??= new CacheManager();
 
 export default globalThis.CacheManage;
-export { CacheManager };
+export { CacheManager, CacheManagerExtends };
