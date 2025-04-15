@@ -15,6 +15,24 @@ export function DynamicComponent({ title }: { title: string }) {
   );
 }
 
+export function one({ title }: { title: string }) {
+  return (
+    <span>
+      <h1>{title}</h1>
+      <p>One exported</p>
+    </span>
+  );
+}
+
+export function two({ title }: { title: string }) {
+  return (
+    <span>
+      <h1>{title}</h1>
+      <p>Two exported</p>
+    </span>
+  );
+}
+
 function Test() {
   const [state, set] = useState(0);
   return <button onClick={() => set(Math.random())}>{state}</button>;

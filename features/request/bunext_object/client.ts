@@ -6,6 +6,9 @@ const BunextRequest: _Request = {
   hook: {
     useRequest,
   },
+  get: {
+    request: undefined as any,
+  },
 };
 
 export default BunextRequest;

@@ -19,6 +19,4 @@ const Config: ServerConfig = {
   },
 };
 
-console.log(Config);
-
 export default Config;

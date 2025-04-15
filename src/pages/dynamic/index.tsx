@@ -1,5 +1,3 @@
-"use static";
-
 export function getServerSideProps() {
   return "component";
 }
