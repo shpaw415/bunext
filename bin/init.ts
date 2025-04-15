@@ -1,9 +1,8 @@
 #!/bin/env bun
 
-import { cpSync, rmSync } from "fs";
+import { cpSync } from "fs";
 import { paths } from "../internal/globals";
 import { generateUuid } from "../features/utils";
-import { _Database } from "../database/class";
 
 await install(false);
 
