@@ -1,4 +1,4 @@
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/shpaw415/bunext?utm_source=oss&utm_medium=github&utm_campaign=shpaw415%2Fbunext&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 
 # 🚀 Bunext Documentation  
 
@@ -6,11 +6,13 @@ Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, pro
 
 ## 🔧 Compatibility  
 
-- **Bun Version**: `1.1.0 - 1.2.7`  
+- **Bun Version**: `1.1.0 - 1.2.9`  
 - **Supported OS**: Linux, WSL (Windows support in progress)  
 - **Note**: Bun is evolving rapidly. New versions may cause compatibility issues. Watch for breaking changes before version `1.0.0`.  
 
 ---
+
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/shpaw415/bunext?utm_source=oss&utm_medium=github&utm_campaign=shpaw415%2Fbunext&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 ## 📦 Installation & Setup  
 
@@ -292,18 +294,22 @@ Exemple: templates, you does not want to import every of them,
 
 
 ### Config
+In config/server.ts add 
 ```ts
-import type { OnRequestType } from "@bunpmjs/bunext/internal/types.ts";
-
-const onRequest: OnRequestType = async (request) => {
-  const res = await Bunext.plugins.onRequest.serveFrom({
-    directory: "src/dynamic",
-    request,
-  });
-  if (res) return res;
+const Config: ServerConfig = {
+  HTTPServer: {
+    port: 3010,
+  },
+  Dev: {
+    hotServerPort: 3005,
+  },
+  session: {
+    type: "database:hard",
+  },
+  router: {
+    dynamicPaths: ["src/dynamic"], // base paths of dynamic components
+  },
 };
-
-export default onRequest;
 ```
 
 ### Usage
@@ -564,6 +570,15 @@ This version improves readability, adds more examples, and organizes the content
     - New Global object Bunext for every Bunext features
     - Dynamic Module loading feature. ( Load Module without knowing the name at first ). Exemple will follow + tooling, components
     - HTTPServer options can be set from the config file config/server.ts
+  </details>
+
+<details>
+    <summary>📢 0.10.1</summary>
+    
+    - Update Global Bunext object
+    - Refactor many components
+    - dynamic components method change ( only needs to add the server config )
+    - cleanup code for readability and maintainability
   </details>
 
 </details>

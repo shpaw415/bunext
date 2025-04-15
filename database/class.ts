@@ -229,9 +229,15 @@ export class Table<
           case "Date":
             return { [key]: new Date(params[key]) };
           case "json":
-            return {
-              [key]: JSON.parse(params[key]),
-            };
+            try {
+              return {
+                [key]: JSON.parse(params[key]),
+              };
+            } catch {
+              return {
+                [key]: params[key],
+              };
+            }
           case "boolean":
             return { [key]: params[key] == 1 ? true : false };
           default:

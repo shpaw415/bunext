@@ -15,7 +15,7 @@ const Config: ServerConfig = {
     type: "database:hard",
   },
   router: {
-    dynamicPaths: [],
+    dynamicPaths: ["src/dynamic"],
   },
 };
 

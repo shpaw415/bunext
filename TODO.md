@@ -12,5 +12,3 @@ Priority 1
   - csspurge for head element
   
 Priority 2
-
-- Max body size in config

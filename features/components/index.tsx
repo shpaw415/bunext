@@ -14,6 +14,7 @@ export function DynamicComponent<T extends {}>({
   bootStrap,
   props,
   onError,
+  fallback,
   id,
 }: {
   pathName: string;
@@ -23,6 +24,7 @@ export function DynamicComponent<T extends {}>({
   }>;
   props?: T;
   onError?: () => void;
+  fallback?: JSX.Element;
   id?: string;
 }) {
   const [El, setEl] = useState<JSX.Element | undefined>(() => {
@@ -36,13 +38,13 @@ export function DynamicComponent<T extends {}>({
       });
 
     if (id) {
-      const El = globalThis.__BUNEXT_dynamicComponents__.find(
+      const El = globalThis?.__BUNEXT_dynamicComponents__?.find(
         (p) => p.id == id
       );
-      if (!El) return undefined;
-      return createElement(El.elementType, {
+      if (!El) return fallback;
+      return createElement(El.element.type, {
         dangerouslySetInnerHTML: {
-          __html: El.content,
+          __html: decodeURI(El.content),
         },
       });
     }

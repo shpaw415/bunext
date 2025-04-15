@@ -14,23 +14,8 @@ function setRevalidate(
   }
 }
 
-declare global {
-  //@ts-ignore
-  var __BUNEXT_dynamicComponents__: Array<{
-    id: string;
-    content: string;
-    elementType: keyof JSX.IntrinsicElements;
-  }>;
-}
-
 export type FeatureType = {
-  dynamicComponent: {
-    components: Array<{
-      id: string;
-      content: string;
-      elementType: keyof JSX.IntrinsicElements;
-    }>;
-  };
+  globalData: Record<string, string>;
 };
 
 export async function MakeDynamicComponent({

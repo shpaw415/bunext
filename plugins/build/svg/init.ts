@@ -18,6 +18,27 @@ globalThis.SVGCache ??= new Table<cacheType, cacheType>({
     readwrite: true,
     create: true,
   }),
+  shema: [
+    {
+      name: "svg_cache",
+      columns: [
+        {
+          name: "path",
+          type: "string",
+          primary: true,
+          unique: true,
+        },
+        {
+          name: "data",
+          type: "string",
+        },
+        {
+          name: "hash",
+          type: "number",
+        },
+      ],
+    },
+  ],
 });
 
 async function get(path: string) {

@@ -9,7 +9,9 @@ export default async function Make() {
   CacheManager.clearSSR();
   CacheManager.clearStaticPage();
   CacheManager.clearSSRDefaultPage();
-  Bun.$`mv node_modules/@types/bun/node_modules/bun-types/extensions.d.ts node_modules/@types/bun/node_modules/bun-types/extensions.d.ts.bak`;
+  try {
+    await Bun.$`mv node_modules/@types/bun/node_modules/bun-types/extensions.d.ts node_modules/@types/bun/node_modules/bun-types/extensions.d.ts.bak`.quiet();
+  } catch {}
   await Init();
 }
 
