@@ -6,15 +6,17 @@ declare global {
   var MainDatabase: _BunDB;
 }
 
-globalThis.dbShema ??= (
-  await import(`${process.cwd()}/config/database.ts`)
-).default;
+try {
+  globalThis.dbShema ??= (
+    await import(`${process.cwd()}/config/database.ts`)
+  ).default;
 
-globalThis.MainDatabase ??= new _BunDB("./config/bunext.sqlite", {
-  create: true,
-});
-const MainDatabase = globalThis.MainDatabase;
-MainDatabase.exec("PRAGMA journal_mode = WAL;");
+  globalThis.MainDatabase ??= new _BunDB("./config/bunext.sqlite", {
+    create: true,
+  });
+  const MainDatabase = globalThis.MainDatabase;
+  MainDatabase.exec("PRAGMA journal_mode = WAL;");
+} catch {}
 
 export class _Database {
   databaseInstance: _BunDB;
