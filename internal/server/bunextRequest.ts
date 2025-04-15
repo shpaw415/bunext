@@ -101,7 +101,11 @@ export class BunextRequest {
   }
   public InjectGlobalValues(values: Record<string, any>) {
     for (const [key, val] of Object.entries(values)) {
-      this.plugins.globalData[key] = JSON.stringify(val);
+      try {
+        this.plugins.globalData[key] = JSON.stringify(val);
+      } catch (error) {
+        console.error(`Failed to serialize value for key "${key}":`, error);
+      }
     }
   }
   encodeSessionData(data: any) {
