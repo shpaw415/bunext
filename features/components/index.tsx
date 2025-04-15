@@ -42,9 +42,9 @@ export function DynamicComponent<T extends {}>({
         (p) => p.id == id
       );
       if (!El) return fallback;
-      return createElement(El.elementType, {
+      return createElement(El.element.type, {
         dangerouslySetInnerHTML: {
-          __html: El.content,
+          __html: decodeURI(El.content),
         },
       });
     }

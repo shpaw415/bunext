@@ -12,7 +12,7 @@ export default function DynamicImport({ props }: { props: {} }) {
       bootStrap={{
         style: ["/src/dynamic/style.css"],
       }}
-      props={{ title: Math.random() }}
+      props={{ title: "hello" }}
       id="test"
     />
   );

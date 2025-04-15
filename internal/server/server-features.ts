@@ -14,15 +14,6 @@ function setRevalidate(
   }
 }
 
-declare global {
-  //@ts-ignore
-  var __BUNEXT_dynamicComponents__: Array<{
-    id: string;
-    content: string;
-    elementType: keyof JSX.IntrinsicElements;
-  }>;
-}
-
 export type FeatureType = {
   globalData: Record<string, string>;
 };
