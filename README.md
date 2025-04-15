@@ -1,4 +1,4 @@
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/shpaw415/bunext?utm_source=oss&utm_medium=github&utm_campaign=shpaw415%2Fbunext&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 
 # 🚀 Bunext Documentation  
 
@@ -11,6 +11,8 @@ Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, pro
 - **Note**: Bun is evolving rapidly. New versions may cause compatibility issues. Watch for breaking changes before version `1.0.0`.  
 
 ---
+
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/shpaw415/bunext?utm_source=oss&utm_medium=github&utm_campaign=shpaw415%2Fbunext&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 ## 📦 Installation & Setup  
 
@@ -576,6 +578,7 @@ This version improves readability, adds more examples, and organizes the content
     - Update Global Bunext object
     - Refactor many components
     - dynamic components method change ( only needs to add the server config )
+    - cleanup code for readability and maintainability
   </details>
 
 </details>
