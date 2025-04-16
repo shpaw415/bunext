@@ -31,6 +31,14 @@ import OnServerStart, { OnServerStartCluster } from "./server-start.ts";
 import "../caching/fetch.ts";
 import OnRequest from "./onRequest.ts";
 import { InitGlobalServerConfig } from "./global_init.ts";
+import {
+  benchmark_console,
+  DevConsole,
+  StartLog,
+  TerminalIcon,
+  TextColor,
+  ToColor,
+} from "./logs.ts";
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
@@ -42,6 +50,22 @@ declare global {
 await InitGlobalServerConfig();
 
 globalThis.clusterStatus ??= false;
+
+const excludesPathToNotLog = [
+  "/src/pages",
+  "/node_modules/react",
+  "/.bunext",
+  "/node_modules/scheduler",
+  "/chunk-",
+];
+
+function StatusCodeToColor(statusCode: number) {
+  if (statusCode >= 500) return "red";
+  else if (statusCode >= 400) return "#333";
+  else if (statusCode >= 300) return "yellow";
+  else if (statusCode >= 200) return "green";
+  return TextColor;
+}
 
 class BunextServer {
   onRequest?: OnRequestType;
@@ -58,8 +82,6 @@ class BunextServer {
   WaitingBuildFinishResolver:
     | ((value: boolean | PromiseLike<boolean>) => void)
     | undefined;
-
-  constantLog = [`Serving: http://${this.hostName}:${this.port}`];
 
   constructor({
     onRequest,
@@ -82,21 +104,43 @@ class BunextServer {
       ...(globalThis.serverConfig?.HTTPServer.config as any),
       async fetch(request) {
         await OnRequest(request);
-        request.headers.toJSON();
+        const headerJSON = request.headers.toJSON();
+        return benchmark_console(
+          (time, result) => {
+            const url = new URL(request.url);
 
-        const OnRequestResponse = await self.onRequest?.(request);
-        if (OnRequestResponse) return OnRequestResponse;
+            if (
+              excludesPathToNotLog
+                .map((path) => url.pathname.startsWith(path))
+                .includes(true) ||
+              headerJSON["accept"] == "application/vnd.server-side-props"
+            )
+              return undefined;
+            return `${ToColor("green", TerminalIcon.success)} ${ToColor(
+              TextColor,
+              request.method.toUpperCase()
+            )} ${ToColor(TextColor, url.pathname)} ${ToColor(
+              StatusCodeToColor(result.status),
+              result.status
+            )} ${ToColor(TextColor, `in ${time}ms`)}`;
+          },
+          async () => {
+            const OnRequestResponse = await self.onRequest?.(request);
+            if (OnRequestResponse) return OnRequestResponse;
 
-        try {
-          const response = await self.serve(request);
-          if (response instanceof Response) return response;
-          else if (response instanceof BunextRequest) return response.response;
-        } catch (e) {
-          console.log(e);
-        }
-        return new Response("Not found!!", {
-          status: 404,
-        });
+            try {
+              const response = await self.serve(request);
+              if (response instanceof Response) return response;
+              else if (response instanceof BunextRequest)
+                return response.response;
+            } catch (e) {
+              console.log(e);
+            }
+            return new Response("Not found!!", {
+              status: 404,
+            });
+          }
+        );
       },
     });
   }
@@ -159,6 +203,27 @@ class BunextServer {
   }
 
   async init() {
+    const isDryRun = Boolean(globalThis.dryRun);
+    DevConsole(StartLog);
+    isDryRun &&
+      DevConsole(
+        `${ToColor("green", TerminalIcon.success)} ${ToColor(
+          TextColor,
+          "Starting..."
+        )}`
+      );
+    benchmark_console(
+      (time) =>
+        isDryRun &&
+        `${ToColor("green", TerminalIcon.success)} ${ToColor(
+          TextColor,
+          `Ready in ${time}ms`
+        )}`,
+      () => this._init()
+    );
+  }
+
+  private async _init() {
     const isDev = process.env.NODE_ENV == "development";
     const isDryRun = globalThis.dryRun;
     const isMainThread = cluster.isPrimary;
@@ -171,7 +236,7 @@ class BunextServer {
     router.client?.reload();
     if (!globalThis.clusterStatus) {
       if (isMainThread) {
-        await import("../../config/preload.ts");
+        await import(this.preloadModulePath);
       }
       if (isDryRun) {
         await OnServerStart();
@@ -190,7 +255,7 @@ class BunextServer {
     } else if (isMainThread) {
       if (isDryRun) {
         //@ts-ignore
-        await import("../../config/preload.ts");
+        await import(this.preloadModulePath);
         await OnServerStart();
         if (isDev) {
           doWatchBuild();
@@ -211,23 +276,10 @@ class BunextServer {
 
     if (isDryRun) globalThis.dryRun = false;
 
-    this.logDevConsole(
-      this.isClustered && !isDev
-        ? "Starting Bunext in Multi-threaded mode"
-        : undefined
-    );
+    if (this.isClustered && !isDev && isMainThread)
+      console.log("Starting Bunext in Multi-threaded mode");
 
     return this;
-  }
-
-  logDevConsole(log?: any) {
-    if (
-      typeof process.env.bun_worker != "undefined" &&
-      process.env.bun_worker != "1"
-    )
-      return;
-    console.log(this.constantLog.join("\n"));
-    if (log) console.log(log);
   }
 
   private async checkBuildOnDevMode({ filePath }: { filePath?: string }) {

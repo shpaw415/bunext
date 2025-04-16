@@ -3,6 +3,13 @@ import { router } from "./router";
 import "./server_global";
 import { normalize } from "../../features/utils";
 import type { MatchedRoute } from "bun";
+import {
+  benchmark_console,
+  DevConsole,
+  TerminalIcon,
+  TextColor,
+  ToColor,
+} from "./logs";
 
 export default async function OnRequest(request: Request) {
   await onDevRequest(request);
@@ -18,9 +25,24 @@ async function onDevRequest(request: Request) {
     request.headers.get("accept") != "application/vnd.server-side-props" &&
     match.filePath.endsWith("tsx")
   ) {
+    DevConsole(
+      `${ToColor("blue", TerminalIcon.info)} ${ToColor(
+        TextColor,
+        `compiling ${match.pathname} ...`
+      )}`
+    );
     setDevCurrentPath(match);
-    await builder.resetPath(match.filePath);
-    await builder.makeBuild(match.filePath);
+    await benchmark_console(
+      (time) =>
+        `${ToColor("green", TerminalIcon.success)} ${ToColor(
+          TextColor,
+          `compiled ${match.pathname} in ${time}ms`
+        )}`,
+      async () => {
+        await builder.resetPath(match.filePath);
+        await builder.makeBuild(match.filePath);
+      }
+    );
   }
 }
 

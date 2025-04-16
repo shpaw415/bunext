@@ -580,5 +580,10 @@ This version improves readability, adds more examples, and organizes the content
     - dynamic components method change ( only needs to add the server config )
     - cleanup code for readability and maintainability
   </details>
+  <details>
+    <summary>📢 0.10.2</summary>
+
+    - Fix regression introduced in 0.9.18 where the onRequest file was not imported correctly
+</details>
 
 </details>
