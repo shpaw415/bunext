@@ -1,5 +1,4 @@
-import type { DBSchema } from "../database/schema";
-import { Union } from "../database/schema";
+import { Union, type DBSchema } from "@bunpmjs/bunext/database/schema.ts";
 
 const MyDatabaseShema: DBSchema = [
   {

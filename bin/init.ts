@@ -54,13 +54,13 @@ async function install(total: boolean) {
     ...packageJson.scripts,
   };
   packageJson.dependencies = {
-    react: "19.0.0",
-    "react-dom": "19.0.0",
+    react: "19.1.0",
+    "react-dom": "19.1.0",
     ...packageJson.dependencies,
   };
   packageJson.devDependencies = {
-    "@types/react": "19.0.0",
-    "@types/react-dom": "19.0.0",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
     ...packageJson.devDependencies,
   };
   const beautify = require("json-beautify");
@@ -114,6 +114,6 @@ function tsConfig() {
       },
     },
     exclude: ["node_modules"],
-    include: [".bunext/custom.d.ts", "src"],
+    include: [".bunext/types/custom.d.ts", "src"],
   };
 }
