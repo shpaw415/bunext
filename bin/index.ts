@@ -27,6 +27,7 @@ globalThis.head ??= {};
 if (import.meta.main)
   switch (cmd) {
     case "init":
+      process.env.__INIT__ = "true";
       await init();
       break;
     case "build":
