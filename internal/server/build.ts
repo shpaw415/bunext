@@ -1,3 +1,6 @@
+import "./server_global.ts";
+import "./bunext_global";
+
 import { join, basename } from "node:path";
 import {
   type BuildConfig,
@@ -9,7 +12,6 @@ import { normalize, resolve } from "path";
 import { isValidElement, type JSX, type ReactNode } from "react";
 import reactElementToJSXString from "../jsxToString/index";
 import { mkdirSync, rmSync, unlinkSync } from "node:fs";
-import "./server_global";
 import { renderToString } from "react-dom/server";
 import type { ssrElement } from "../types";
 import { exitCodes } from "../globals";
@@ -18,12 +20,8 @@ import { BuildServerComponentWithHooksWarning } from "./logs";
 import CacheManager from "../caching";
 import { router } from "./router";
 import * as React from "react";
-import { InitGlobalServerConfig } from "./global_init";
 
-import "./bunext_global";
 import type { Build_Plugins } from "../../plugins/build/types";
-
-await InitGlobalServerConfig();
 
 globalThis.React = React;
 

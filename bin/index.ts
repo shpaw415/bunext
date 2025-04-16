@@ -1,9 +1,8 @@
 #!/bin/env bun
-
+import "../internal/server/server_global.ts";
 import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
-import { InitGlobalServerConfig } from "../internal/server/global_init.ts";
 
 type _cmd =
   | "init"
@@ -31,22 +30,18 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      await InitGlobalServerConfig();
       const builder = (await import("../internal/server/build.ts")).builder;
       await builder.preBuildAll();
       const res = await builder.build();
       console.log(res);
       break;
     case "dev":
-      await InitGlobalServerConfig();
       dev();
       break;
     case "production":
-      await InitGlobalServerConfig();
       production();
       break;
     case "database:create":
-      await InitGlobalServerConfig();
       await databaseSchemaMaker();
       await databaseCreator();
       break;

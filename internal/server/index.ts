@@ -1,6 +1,5 @@
 import "../globals.ts";
 import "./server_global.ts";
-import "./global_init.ts";
 
 import { builder } from "./build.ts";
 import { router } from "./router.tsx";
@@ -30,7 +29,6 @@ import type {
 import OnServerStart, { OnServerStartCluster } from "./server-start.ts";
 import "../caching/fetch.ts";
 import OnRequest from "./onRequest.ts";
-import { InitGlobalServerConfig } from "./global_init.ts";
 import {
   benchmark_console,
   DevConsole,
@@ -46,8 +44,6 @@ declare global {
     }
   }
 }
-
-await InitGlobalServerConfig();
 
 globalThis.clusterStatus ??= false;
 

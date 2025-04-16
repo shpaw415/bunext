@@ -1,7 +1,6 @@
 import type { ServerWebSocket } from "bun";
 import type { BunextType, ServerConfig } from "../types.ts";
 import type { BunextServer } from "./index.ts";
-import { InitGlobalServerConfig } from "./global_init.ts";
 
 declare global {
   var socketList: ServerWebSocket<unknown>[];
@@ -23,5 +22,23 @@ globalThis.dryRun ??= true;
 globalThis.dev ??= {
   current_dev_path: undefined,
 };
+
+export async function InitGlobalServerConfig() {
+  if (globalThis?.serverConfig) return;
+
+  if (Boolean(process.env.__INIT__)) {
+    globalThis.serverConfig ??= (await import("../../config/server")).default;
+    return;
+  }
+
+  const config: ServerConfig = (
+    await import(
+      process.env?.__BUNEXT_DEV__
+        ? `${process.cwd()}/config.dev/server.ts`
+        : `${process.cwd()}/config/server.ts`
+    )
+  ).default as ServerConfig;
+  globalThis.serverConfig ??= config;
+}
 
 await InitGlobalServerConfig();
