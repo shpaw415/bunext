@@ -3,8 +3,6 @@
 import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
-import { normalize } from "../features/utils/index.ts";
-import type { ServerConfig } from "../internal/types.ts";
 import { InitGlobalServerConfig } from "../internal/server/global_init.ts";
 
 type _cmd =

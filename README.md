@@ -581,7 +581,7 @@ This version improves readability, adds more examples, and organizes the content
     - cleanup code for readability and maintainability
   </details>
   <details>
-    <summary>📢 0.10.2</summary>
+    <summary>📢 0.10.3</summary>
 
     - Fix regression introduced in 0.9.18 where the onRequest file was not imported correctly
     - much more verbose CLI outputs and automatic benchmarking
