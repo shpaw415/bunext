@@ -1222,6 +1222,10 @@ async function Init() {
 
 if (!existsSync(".bunext/build/src/pages"))
   mkdirSync(".bunext/build/src/pages", { recursive: true });
-const router = new StaticRouters();
+
+let router: StaticRouters = undefined as any;
+try {
+  router = new StaticRouters();
+} catch {}
 
 export { router, StaticRouters, RequestManager, Init };
