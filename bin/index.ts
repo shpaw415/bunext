@@ -3,6 +3,7 @@ import "../internal/server/server_global.ts";
 import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
+import { StartLog } from "../internal/server/logs.ts";
 
 type _cmd =
   | "init"
@@ -117,6 +118,7 @@ function dev() {
 
 function production() {
   process.env.NODE_ENV = "production";
+  console.log(StartLog);
   const proc = Bun.spawn({
     cmd: [
       "bun",
