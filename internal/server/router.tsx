@@ -1223,9 +1223,8 @@ async function Init() {
 if (!existsSync(".bunext/build/src/pages"))
   mkdirSync(".bunext/build/src/pages", { recursive: true });
 
-let router: StaticRouters = undefined as any;
-try {
-  router = new StaticRouters();
-} catch {}
+const router: StaticRouters = Boolean(process.env.__INIT__)
+  ? (undefined as any)
+  : new StaticRouters();
 
 export { router, StaticRouters, RequestManager, Init };

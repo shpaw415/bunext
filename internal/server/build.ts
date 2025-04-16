@@ -907,7 +907,9 @@ class Builder {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
   }
 }
-const builder = new Builder(process.cwd());
+const builder: Builder = Boolean(process.env.__INIT__)
+  ? (undefined as any)
+  : new Builder(process.cwd());
 await builder.Init();
 if (import.meta.main) {
   await builder.makeBuild();

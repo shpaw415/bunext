@@ -212,7 +212,7 @@ class BunextServer {
           "Starting..."
         )}`
       );
-    benchmark_console(
+    return benchmark_console(
       (time) =>
         isDryRun &&
         `${ToColor("green", TerminalIcon.success)} ${ToColor(

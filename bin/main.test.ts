@@ -167,7 +167,7 @@ describe("Request features", () => {
         accept: "application/vnd.server-side-props",
       };
       const req = new Request(
-        `http://localhost:${serverConfig.HTTPServer.port}/serversideprops/static/undefined`,
+        `http://localhost:${globalThis.serverConfig.HTTPServer.port}/serversideprops/static/undefined`,
         {
           headers: {
             accept: "application/vnd.server-side-props",
