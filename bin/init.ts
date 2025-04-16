@@ -3,6 +3,7 @@
 import { cpSync } from "fs";
 import { paths } from "../internal/globals";
 import { generateUuid } from "../features/utils";
+import { AfterBunextInitMessage } from "../internal/server/logs";
 
 await install(false);
 
@@ -82,6 +83,8 @@ async function install(total: boolean) {
   Bun.spawnSync({
     cmd: ["bun", "i"],
   });
+
+  console.log(AfterBunextInitMessage);
 }
 
 function tsConfig() {

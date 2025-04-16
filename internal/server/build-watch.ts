@@ -4,6 +4,13 @@ import "./server_global";
 import { paths } from "../globals";
 import { builder } from "./build";
 import { normalize } from "node:path";
+import {
+  benchmark_console,
+  DevConsole,
+  TerminalIcon,
+  TextColor,
+  ToColor,
+} from "./logs";
 
 type initFunction = (path?: string) => Promise<any>;
 
@@ -39,7 +46,7 @@ export function watchBuild(build: initFunction, paths: string[]) {
     )
   );
 }
-
+const cwd = process.cwd();
 export const doWatchBuild = () =>
   watchBuild(
     async (path) => {
@@ -49,8 +56,32 @@ export const doWatchBuild = () =>
         `${process.cwd()}/src/${globalThis.dev.current_dev_path}`
       );
       if (EntryPoints.includes(probablePath)) {
-        await builder.resetPath(probablePath);
-        await builder.makeBuild(probablePath);
+        const pathnameArray = probablePath
+          .replace(`${cwd}/src/pages`, "")
+          .split("/");
+        pathnameArray.pop();
+        const pathname = pathnameArray.join("/") || "/";
+        setTimeout(
+          () =>
+            DevConsole(
+              `${ToColor("blue", TerminalIcon.info)} ${ToColor(
+                TextColor,
+                `compiling ${pathname} ...`
+              )}`
+            ),
+          100
+        );
+        await benchmark_console(
+          (time) =>
+            `${ToColor("green", TerminalIcon.success)} ${ToColor(
+              TextColor,
+              `compiled ${pathname} in ${time}ms`
+            )}`,
+          async () => {
+            await builder.resetPath(probablePath);
+            await builder.makeBuild(probablePath);
+          }
+        );
       }
       sendSignal();
     },
