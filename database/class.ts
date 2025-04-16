@@ -5,7 +5,6 @@ declare global {
   var dbShema: DBSchema;
   var MainDatabase: _BunDB;
 }
-
 try {
   globalThis.dbShema ??= (
     await import(`${process.cwd()}/config/database.ts`)
@@ -14,15 +13,14 @@ try {
   globalThis.MainDatabase ??= new _BunDB("./config/bunext.sqlite", {
     create: true,
   });
-  const MainDatabase = globalThis.MainDatabase;
-  MainDatabase.exec("PRAGMA journal_mode = WAL;");
+  globalThis?.MainDatabase?.exec("PRAGMA journal_mode = WAL;");
 } catch {}
 
 export class _Database {
   databaseInstance: _BunDB;
 
   constructor(db?: _BunDB) {
-    this.databaseInstance = db || MainDatabase;
+    this.databaseInstance = db || globalThis?.MainDatabase || {};
   }
 
   create(data: _Create) {
@@ -195,7 +193,7 @@ export class Table<
     WAL?: boolean;
   }) {
     this.name = name;
-    this.databaseInstance = db || MainDatabase;
+    this.databaseInstance = db || globalThis.MainDatabase || {};
     this.shema = shema || globalThis.dbShema;
     this.debug = debug || false;
     if (WAL && db) this.databaseInstance.exec("PRAGMA journal_mode = WAL;");
