@@ -23,10 +23,13 @@ globalThis.dev ??= {
   current_dev_path: undefined,
 };
 
+if (process.argv[2] == "init") {
+  globalThis.__INIT__ = true;
+}
+
 export async function InitGlobalServerConfig() {
   if (globalThis?.serverConfig) return;
-
-  if (Boolean(process.env.__INIT__)) {
+  if (globalThis.__INIT__) {
     globalThis.serverConfig ??= (await import("../../config/server")).default;
     return;
   }

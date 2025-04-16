@@ -1223,7 +1223,7 @@ async function Init() {
 if (!existsSync(".bunext/build/src/pages"))
   mkdirSync(".bunext/build/src/pages", { recursive: true });
 
-const router: StaticRouters = Boolean(process.env.__INIT__)
+const router: StaticRouters = Boolean(globalThis.__INIT__)
   ? (undefined as any)
   : new StaticRouters();
 

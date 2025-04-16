@@ -19,6 +19,7 @@ const DBShemaPath = "database.ts";
 
 declare global {
   var processes: Subprocess[];
+  var __INIT__: boolean | undefined;
 }
 globalThis.processes ??= [];
 globalThis.head ??= {};
@@ -26,7 +27,6 @@ globalThis.head ??= {};
 if (import.meta.main)
   switch (cmd) {
     case "init":
-      process.env.__INIT__ = "true";
       await init();
       break;
     case "build":
