@@ -5,6 +5,7 @@ import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
 import { normalize } from "../features/utils/index.ts";
 import type { ServerConfig } from "../internal/types.ts";
+import { InitGlobalServerConfig } from "../internal/server/global_init.ts";
 
 type _cmd =
   | "init"
@@ -25,29 +26,28 @@ declare global {
 globalThis.processes ??= [];
 globalThis.head ??= {};
 
-const serverConfig = (await import(
-  normalize(process.cwd() + "/config/server.ts")
-)) as { default: ServerConfig };
-globalThis.serverConfig = serverConfig.default;
-
 if (import.meta.main)
   switch (cmd) {
     case "init":
       await init();
       break;
     case "build":
+      await InitGlobalServerConfig();
       const builder = (await import("../internal/server/build.ts")).builder;
       await builder.preBuildAll();
       const res = await builder.build();
       console.log(res);
       break;
     case "dev":
+      await InitGlobalServerConfig();
       dev();
       break;
     case "production":
+      await InitGlobalServerConfig();
       production();
       break;
     case "database:create":
+      await InitGlobalServerConfig();
       await databaseSchemaMaker();
       await databaseCreator();
       break;
