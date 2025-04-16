@@ -1,10 +1,7 @@
 #!/bin/env bun
 
-import { exitCodes, paths } from "../internal/globals.ts";
-import { ConvertShemaToType, type DBSchema } from "../database/schema";
+import type { DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
-import { InitGlobalServerConfig } from "../internal/server/global_init.ts";
-
 type _cmd =
   | "init"
   | "build"
@@ -30,22 +27,22 @@ if (import.meta.main)
       await init();
       break;
     case "build":
-      await InitGlobalServerConfig();
+      await require("../internal/server/global_init.ts").InitGlobalServerConfig();
       const builder = (await import("../internal/server/build.ts")).builder;
       await builder.preBuildAll();
       const res = await builder.build();
       console.log(res);
       break;
     case "dev":
-      await InitGlobalServerConfig();
+      await require("../internal/server/global_init.ts").InitGlobalServerConfig();
       dev();
       break;
     case "production":
-      await InitGlobalServerConfig();
+      await require("../internal/server/global_init.ts").InitGlobalServerConfig();
       production();
       break;
     case "database:create":
-      await InitGlobalServerConfig();
+      await require("../internal/server/global_init.ts").InitGlobalServerConfig();
       await databaseSchemaMaker();
       await databaseCreator();
       break;
@@ -67,9 +64,10 @@ async function databaseSchemaMaker() {
   }
   const Importseparator = '("<Bunext_TypeImposts>");';
   const ExportSeparator = '("<Bunext_DBExport>");';
-  const types = ConvertShemaToType(
+  const types = (await import("../database/schema")).ConvertShemaToType(
     require(`${process.cwd()}/config/${DBShemaPath}`).default
   );
+  const { paths } = await import("../internal/globals.ts");
   await Bun.write(
     `${paths.bunextModulePath}/database/database_types.ts`,
     [...types.types, ...types.typesWithDefaultAsRequired]
@@ -103,6 +101,7 @@ async function databaseCreator() {
 }
 
 function dev() {
+  const { paths } = require("../internal/globals.ts");
   process.env.NODE_ENV = "development";
   Bun.spawn({
     cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
@@ -120,6 +119,8 @@ function dev() {
 }
 
 function production() {
+  const { paths, exitCodes } = require("../internal/globals.ts");
+
   process.env.NODE_ENV = "production";
   const proc = Bun.spawn({
     cmd: [

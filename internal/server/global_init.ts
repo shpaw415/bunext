@@ -11,5 +11,7 @@ export async function InitGlobalServerConfig() {
       )
     ).default as ServerConfig;
     globalThis.serverConfig ??= config;
-  } catch {}
+  } catch {
+    globalThis.serverConfig ??= (await import("../../config/server")).default;
+  }
 }
