@@ -13,6 +13,7 @@ declare global {
   var serverConfig: ServerConfig;
   var dev: {
     current_dev_path?: string;
+    pathname?: string;
   };
   //@ts-ignore
   var Bunext: BunextType;
@@ -21,6 +22,7 @@ globalThis.socketList ??= [];
 globalThis.dryRun ??= true;
 globalThis.dev ??= {
   current_dev_path: undefined,
+  pathname: undefined,
 };
 
 if (process.argv[2] == "init") {

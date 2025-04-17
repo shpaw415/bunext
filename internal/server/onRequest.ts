@@ -3,6 +3,7 @@ import { router } from "./router";
 import "./server_global";
 import { normalize } from "../../features/utils";
 import type { MatchedRoute } from "bun";
+import { relative } from "node:path";
 import {
   benchmark_console,
   DevConsole,
@@ -45,10 +46,17 @@ async function onDevRequest(request: Request) {
     );
   }
 }
-
+const cwd = process.cwd();
 function setDevCurrentPath(match: MatchedRoute) {
-  globalThis.dev.current_dev_path = match.filePath.replace(
-    normalize(process.cwd() + "/src") + "/",
-    ""
-  );
+  const relativePathFromSrcPath = relative(cwd + "/src", match.filePath);
+
+  const PathnameArray = relativePathFromSrcPath.split(".");
+  PathnameArray.pop();
+
+  globalThis.dev = {
+    current_dev_path: relativePathFromSrcPath,
+    pathname: PathnameArray.join("."),
+  };
+
+  console.log(globalThis.dev);
 }

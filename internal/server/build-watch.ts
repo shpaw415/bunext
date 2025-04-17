@@ -3,7 +3,7 @@ import { sendSignal } from "../../dev/hotServer";
 import "./server_global";
 import { paths } from "../globals";
 import { builder } from "./build";
-import { normalize } from "node:path";
+import { normalize, relative } from "node:path";
 import {
   benchmark_console,
   DevConsole,
@@ -56,11 +56,12 @@ export const doWatchBuild = () =>
         `${process.cwd()}/src/${globalThis.dev.current_dev_path}`
       );
       if (EntryPoints.includes(probablePath)) {
-        const pathnameArray = probablePath
-          .replace(`${cwd}/src/pages`, "")
-          .split("/");
+        const pathnameArray = relative(`${cwd}/src/pages`, probablePath).split(
+          "."
+        );
         pathnameArray.pop();
-        const pathname = pathnameArray.join("/") || "/";
+        const pathname = pathnameArray.join(".") || "/";
+
         setTimeout(
           () =>
             DevConsole(

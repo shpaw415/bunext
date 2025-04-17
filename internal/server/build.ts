@@ -380,7 +380,7 @@ class Builder {
           continue;
         }
         const absolutePath = Bun.fileURLToPath(
-          (await import.meta.resolve?.(imp)) || ""
+          import.meta.resolve?.(imp) || ""
         );
         CacheManager.deleteSSR(absolutePath);
       }

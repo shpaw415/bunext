@@ -11,4 +11,6 @@ Priority 1
   - https://developer.chrome.com/docs/lighthouse/performance/uses-text-compression?utm_source=lighthouse&utm_medium=devtools&hl=fr
   - csspurge for head element
   
+- add Bunext plugin feature
+  - html_rewrite, onBuild, afterBuild, client_global_data, onRequest
 Priority 2
