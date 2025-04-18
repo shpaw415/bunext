@@ -2,10 +2,8 @@ import { DynamicComponent } from "../../features/components";
 import type { Plugins } from "./type";
 
 const PluginInit: Plugins = {
-  onRequest: {
-    components: {
-      DynamicComponent,
-    },
+  components: {
+    DynamicComponent,
   },
 };
 

@@ -3,6 +3,7 @@ import { useSession, GetSession } from "@bunpmjs/bunext/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import "@static/index.css";
+import "@static/style.css";
 import { Head } from "@bunpmjs/bunext/head";
 import { useEffect } from "react";
 
@@ -70,6 +71,7 @@ function SetSessionButton() {
         await ServerSetSession();
         session.update();
       }}
+      className="bg-red-500 border-blue-300 border-4"
     >
       update session
       {random}

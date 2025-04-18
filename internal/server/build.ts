@@ -22,6 +22,9 @@ import { router } from "./router";
 import * as React from "react";
 
 import type { Build_Plugins } from "../../plugins/build/types";
+import type { AfterBuildMain } from "../../plugins/after_build_main/types.ts";
+import { PluginLoader } from "./plugin-loader.ts";
+import type { BeforeBuild } from "../../plugins/before_build_main/types.ts";
 
 globalThis.React = React;
 
@@ -52,7 +55,7 @@ type _Mainoptions = {
   define?: Record<string, string>;
 };
 
-class Builder {
+class Builder extends PluginLoader {
   public options: _Mainoptions;
   public preBuildPaths: Array<string> = [];
   private buildOutput?: BuildOutput;
@@ -61,6 +64,8 @@ class Builder {
     (output: Bun.BuildArtifact) => Promise<void>
   > = [];
   private BuildPluginsConfig: Partial<Bun.BuildConfig> = {};
+  private AfterBuildMainThread: Array<AfterBuildMain> = [];
+  private BeforeBuildMainThread: Array<BeforeBuild> = [];
   /**
    * absolute path
    */
@@ -83,6 +88,7 @@ class Builder {
   ];
 
   constructor(baseDir: string) {
+    super();
     this.options = {
       minify: Bun.env.NODE_ENV === "production",
       sourcemap: "none",
@@ -117,7 +123,17 @@ class Builder {
     if (this.inited) return this;
     this.Check_remove_node_modules_files_path();
     await this.InitGetCustomPluginsFromUser();
-    await this.InitAfterBuildPlugins();
+    this.afterBuildPlugins.push(
+      ...(await this.PluginLoader<(output: Bun.BuildArtifact) => Promise<void>>(
+        "after_build"
+      ))
+    );
+    this.AfterBuildMainThread.push(
+      ...(await this.PluginLoader<AfterBuildMain>("after_build_main"))
+    );
+    this.BeforeBuildMainThread.push(
+      ...(await this.PluginLoader<BeforeBuild>("before_build_main"))
+    );
     try {
       await this.InitGetPlugins();
     } catch (e) {
@@ -127,32 +143,8 @@ class Builder {
     return this;
   }
 
-  async InitAfterBuildPlugins() {
-    const afterBuildFiles = await Array.fromAsync(
-      this.glob(`${import.meta.dirname}/../../plugins/after_build`, "**/*.ts")
-    );
-    for await (const filePath of afterBuildFiles) {
-      const module = await import(filePath);
-
-      if (!Boolean(module?.default)) continue;
-      this.afterBuildPlugins.push(module.default);
-    }
-  }
-
   private async InitGetPlugins() {
-    const PluginsModules = await Array.fromAsync(
-      this.glob(`${import.meta.dirname}/../../plugins/build`, "**/*.ts")
-    );
-    const plugins = (
-      await Promise.all(
-        PluginsModules.map(async (path) => {
-          return (await import(path))?.default as undefined | Build_Plugins;
-        })
-      )
-    ).filter((c) => c != undefined);
-    this.plugins.push(
-      ...plugins.map((p) => p.plugin).filter((c) => c != undefined)
-    );
+    const plugins = await this.PluginLoader<Build_Plugins>("build");
 
     const config = plugins
       .map((p) => p.buildOptions)
@@ -446,6 +438,7 @@ class Builder {
   async makeBuild(path?: string) {
     if (import.meta.main) return await this._makeBuild();
     let strRes: BuildOuts | undefined;
+    await Promise.all(this.BeforeBuildMainThread.map((p) => p()));
     const proc = Bun.spawn({
       cmd: ["bun", import.meta.filename],
       cwd: process.cwd(),
@@ -482,6 +475,7 @@ class Builder {
     this.revalidates = strRes?.revalidates || [];
     Head.head = strRes?.head || {};
     globalThis.Server?.updateWorkerData();
+    await Promise.all(this.AfterBuildMainThread.map((p) => p()));
     return strRes as BuildOuts;
   }
 

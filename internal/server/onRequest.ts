@@ -1,7 +1,6 @@
 import { builder } from "./build";
 import { router } from "./router";
 import "./server_global";
-import { normalize } from "../../features/utils";
 import type { MatchedRoute } from "bun";
 import { relative } from "node:path";
 import {
@@ -57,6 +56,4 @@ function setDevCurrentPath(match: MatchedRoute) {
     current_dev_path: relativePathFromSrcPath,
     pathname: PathnameArray.join("."),
   };
-
-  console.log(globalThis.dev);
 }

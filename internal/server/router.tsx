@@ -37,6 +37,7 @@ import "./bunext_global.ts";
 import type { HTML_Rewrite_plugin_function } from "../../plugins/router/html_rewrite/types.ts";
 import type { Request_Plugin } from "../../plugins/router/request/types.ts";
 import type { Client_Global_Data } from "../../plugins/client_global_data/types.ts";
+import { PluginLoader } from "./plugin-loader.ts";
 
 class ClientOnlyError extends Error {
   constructor() {
@@ -52,7 +53,7 @@ type pathNames =
 
 const HTMLDocType = "<!DOCTYPE html>";
 
-class StaticRouters {
+class StaticRouters extends PluginLoader {
   server: FileSystemRouter;
   client: FileSystemRouter;
   routes_dump: string;
@@ -86,6 +87,7 @@ class StaticRouters {
   staticDir = "static";
 
   constructor() {
+    super();
     this.server = new Bun.FileSystemRouter({
       dir: join(this.baseDir, this.pageDir),
       style: "nextjs",
@@ -133,24 +135,6 @@ class StaticRouters {
       ),
       { omitStack: true }
     );
-  }
-
-  private async PluginLoader<T>(path: string) {
-    const plugins_files_paths = Array.from(
-      new Bun.Glob("**/*.ts").scanSync({
-        cwd: normalize(`${import.meta.dirname}/../../plugins/${path}`),
-        onlyFiles: true,
-        absolute: true,
-      })
-    );
-
-    return (
-      await Promise.all(
-        plugins_files_paths.map(
-          async (path) => (await import(path)).default as T
-        )
-      )
-    ).filter((f) => f != undefined);
   }
 
   public async init() {

@@ -1,10 +1,6 @@
 import { DynamicComponent } from "../../features/components";
 
 export type Plugins = {
-  onRequest: onRequest;
-};
-
-type onRequest = {
   components: {
     /**
      * @param pathName the path to the component
