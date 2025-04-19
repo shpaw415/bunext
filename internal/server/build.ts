@@ -129,12 +129,16 @@ class Builder extends PluginLoader {
   }
 
   private async InitGetPlugins() {
-    const plugins = this.getPlugins()
+    const pluginsData = this.getPlugins()
       .map((p) => p.build)
       .filter((p) => p != undefined);
 
-    const config = plugins
+    const config = pluginsData
       .map((p) => p.buildOptions)
+      .filter((p) => p != undefined);
+
+    const plugins = pluginsData
+      .map((p) => p.plugin)
       .filter((p) => p != undefined);
 
     const entrypoints = config
@@ -157,6 +161,7 @@ class Builder extends PluginLoader {
       entrypoints,
       external,
       define,
+      plugins,
     };
   }
 
@@ -842,6 +847,7 @@ class Builder extends PluginLoader {
         this.NextJsPlugin(),
         ...this.plugins,
         ...(options?.plugins || []),
+        ...(this.BuildPluginsConfig?.plugins || []),
       ],
       define: {
         "process.env.NODE_ENV": JSON.stringify(
