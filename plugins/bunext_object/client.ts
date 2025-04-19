@@ -1,10 +1,7 @@
-import { DynamicComponent } from "../../features/components";
 import type { Plugins } from "./type";
 
 const PluginInit: Plugins = {
-  components: {
-    DynamicComponent,
-  },
+  create: undefined as any,
 };
 
 export default PluginInit;

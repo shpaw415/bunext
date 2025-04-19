@@ -34,9 +34,6 @@ import { generateRandomString } from "../../features/utils";
 import { RequestContext } from "./context";
 
 import "./bunext_global.ts";
-import type { HTML_Rewrite_plugin_function } from "../../plugins/router/html_rewrite/types.ts";
-import type { Request_Plugin } from "../../plugins/router/request/types.ts";
-import type { Client_Global_Data } from "../../plugins/client_global_data/types.ts";
 import { PluginLoader } from "./plugin-loader.ts";
 
 class ClientOnlyError extends Error {
@@ -66,16 +63,6 @@ class StaticRouters extends PluginLoader {
   cssPathExists: string[] = [];
   staticRoutes: Array<keyof FileSystemRouter["routes"]> = [];
   ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
-
-  plugins: {
-    HTML_ReWritePlugins: Array<HTML_Rewrite_plugin_function>;
-    Request_Plugins: Array<Request_Plugin>;
-    client_global_data_Plugins: Array<Client_Global_Data>;
-  } = {
-    HTML_ReWritePlugins: [],
-    Request_Plugins: [],
-    client_global_data_Plugins: [],
-  };
 
   initPromise: Promise<boolean>;
   initResolver?: (value: boolean | PromiseLike<boolean>) => void;
@@ -143,30 +130,13 @@ class StaticRouters extends PluginLoader {
       this.getCssPaths(),
       this.getUseStaticRoutes(),
       this.getSSRDefaultRoutes(),
-      this.PluginLoader<HTML_Rewrite_plugin_function<unknown>>(
-        `router/html_rewrite`
-      ),
-      this.PluginLoader<Request_Plugin>(`router/request`),
-      this.PluginLoader<Client_Global_Data>("client_global_data"),
-    ]).then(
-      ([
-        css,
-        staticPath,
-        ssr,
-        HTMLReWritePlugin,
-        requestPlugins,
-        clientGlobalPlugins,
-      ]) => {
-        this.cssPathExists = css;
-        this.staticRoutes = staticPath;
-        this.ssrAsDefaultRoutes = ssr;
-        this.plugins.HTML_ReWritePlugins = HTMLReWritePlugin;
-        this.plugins.Request_Plugins = requestPlugins;
-        this.plugins.client_global_data_Plugins = clientGlobalPlugins;
-        this.inited = true;
-        this.initResolver?.(true);
-      }
-    );
+    ]).then(([css, staticPath, ssr]) => {
+      this.cssPathExists = css;
+      this.staticRoutes = staticPath;
+      this.ssrAsDefaultRoutes = ssr;
+      this.inited = true;
+      this.initResolver?.(true);
+    });
   }
   public isInited() {
     return this.initPromise;
@@ -496,7 +466,10 @@ class RequestManager {
   }
 
   private async checkPluginServing() {
-    for await (const plugin of this.router.plugins.Request_Plugins) {
+    const plugins = (await this.router.getPlugins())
+      .map((p) => p.router?.request)
+      .filter((p) => p != undefined);
+    for await (const plugin of plugins) {
       const res = await plugin(this.bunextReq);
       if (res) return res;
     }
@@ -504,8 +477,11 @@ class RequestManager {
 
   private async formatPage(html: string) {
     const rewriter = new HTMLRewriter();
+    const plugins = (await this.router.getPlugins())
+      .map((p) => p.router?.html_rewrite)
+      .filter((p) => p != undefined);
     const afters = await Promise.all(
-      this.router.plugins.HTML_ReWritePlugins.map(async (plugin) => {
+      plugins.map(async (plugin) => {
         const context: unknown = plugin.initContext?.(this.bunextReq);
         await plugin.rewrite?.(rewriter, this.bunextReq, context);
         return {

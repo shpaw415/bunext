@@ -17,7 +17,7 @@ export default function DynamicImport({
 }) {
   return (
     <>
-      <Bunext.plugins.onRequest.components.DynamicComponent
+      <Bunext.components.DynamicComponent
         pathName={`/src/dynamic/component`}
         elementName={params.module}
         bootStrap={{

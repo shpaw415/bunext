@@ -1,5 +1,5 @@
 import Database from "bun:sqlite";
-import { _Database, Table } from "../../../database/class";
+import { _Database, Table } from "../../database/class";
 import { transform } from "@svgr/core";
 
 declare global {

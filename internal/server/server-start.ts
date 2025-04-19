@@ -1,10 +1,11 @@
 // this is called on server start
 
 import { router } from "./router";
-import type { ServerStart } from "../../plugins/server-start/types";
 
 export default async function Make() {
-  const plugins = await router.PluginLoader<ServerStart>("server-start");
+  const plugins = (await router.getPlugins())
+    .map((p) => p.serverStart)
+    .filter((p) => p != undefined);
   const mains = plugins.map((p) => p.main).filter((p) => p != undefined);
 
   if (process.env.NODE_ENV == "development") {
@@ -16,9 +17,9 @@ export default async function Make() {
 }
 
 export async function OnServerStartCluster() {
-  const plugins = (await router.PluginLoader<ServerStart>("server-start"))
-    .map((p) => p.cluster)
+  const plugins = (await router.getPlugins())
+    .map((p) => p?.serverStart?.cluster)
     .filter((p) => p != undefined);
 
-  await Promise.all(plugins.map((p) => p()));
+  await Promise.all(plugins.map((p) => p?.()));
 }

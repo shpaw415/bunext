@@ -5,6 +5,6 @@ export default function AfterBuildPluginMaker(
   isEnabled: (config: ServerConfig) => boolean,
   plugin: (BuildArtifact: Bun.BuildArtifact) => Promise<void> | void
 ) {
-  if (!isEnabled(globalThis.serverConfig)) return undefined;
+  if (!isEnabled(globalThis.serverConfig as ServerConfig)) return undefined;
   return plugin;
 }

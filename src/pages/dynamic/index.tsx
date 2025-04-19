@@ -4,7 +4,7 @@ export function getServerSideProps() {
 
 export default function DynamicImport({ props }: { props: {} }) {
   return (
-    <Bunext.plugins.onRequest.components.DynamicComponent
+    <Bunext.components.DynamicComponent
       pathName={`/src/dynamic/${props}`}
       elementName="DynamicComponent"
       bootStrap={{
