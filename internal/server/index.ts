@@ -200,7 +200,7 @@ class BunextServer {
 
   async init() {
     const isDryRun = Boolean(globalThis.dryRun);
-    DevConsole(StartLog);
+    DevConsole(`${StartLog}`);
     isDryRun &&
       DevConsole(
         `${ToColor("green", TerminalIcon.success)} ${ToColor(

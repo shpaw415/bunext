@@ -10,6 +10,7 @@ declare global {
   //@ts-ignore
   var Server: undefined | BunextServer;
   var clusterStatus: boolean;
+  //@ts-ignore
   var serverConfig: ServerConfig;
   var dev: {
     current_dev_path?: string;
@@ -43,6 +44,7 @@ export async function InitGlobalServerConfig() {
         : `${process.cwd()}/config/server.ts`
     )
   ).default as ServerConfig;
+  //@ts-ignore
   globalThis.serverConfig ??= config;
 }
 
