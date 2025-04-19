@@ -37,7 +37,7 @@ async function MakeEntryPoints() {
         )
       )
     )
-  ).reduce((p, n) => [...p, ...n], []);
+  ).flat();
 
   return entrypoints;
 }
@@ -64,7 +64,7 @@ export default {
               );
 
             const props = _props
-              ? (JSON.parse(decodeURI(_props)) as {})
+              ? (JSON.parse(decodeURI(_props)) as unknown)
               : undefined;
             // Validate and resolve the import path
             const absPath = normalize(join(cwd, pathName));

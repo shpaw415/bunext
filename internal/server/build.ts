@@ -115,14 +115,12 @@ class Builder extends PluginLoader {
     if (this.inited) return this;
     this.Check_remove_node_modules_files_path();
     await this.InitGetCustomPluginsFromUser();
+    await this.initPlugins();
     this.remove_node_modules_files_path.push(
-      ...(await this.getPlugins())
-        .map((p) => p.removeFromBuild)
-        .filter((p) => p != undefined)
-        .reduce((p, n) => [...p, ...n], [])
+      ...this.getPlugins().flatMap((p) => p.removeFromBuild ?? [])
     );
     try {
-      await this.InitGetPlugins();
+      this.InitGetPlugins();
     } catch (e) {
       console.log("Plugin has not loaded correctly!\n", (e as Error).stack);
     }
@@ -131,7 +129,7 @@ class Builder extends PluginLoader {
   }
 
   private async InitGetPlugins() {
-    const plugins = (await this.getPlugins())
+    const plugins = this.getPlugins()
       .map((p) => p.build)
       .filter((p) => p != undefined);
 
@@ -428,9 +426,7 @@ class Builder extends PluginLoader {
     if (import.meta.main) return await this._makeBuild();
     let strRes: BuildOuts | undefined;
     await Promise.all(
-      (
-        await this.getPlugins()
-      ).map(({ before_build_main }) => before_build_main?.())
+      this.getPlugins().map(({ before_build_main }) => before_build_main?.())
     );
     const proc = Bun.spawn({
       cmd: ["bun", import.meta.filename],
@@ -469,9 +465,7 @@ class Builder extends PluginLoader {
     Head.head = strRes?.head || {};
     globalThis.Server?.updateWorkerData();
     await Promise.all(
-      (
-        await this.getPlugins()
-      ).map(({ after_build_main }) => after_build_main?.())
+      this.getPlugins().map(({ after_build_main }) => after_build_main?.())
     );
     return strRes as BuildOuts;
   }
@@ -875,7 +869,7 @@ class Builder extends PluginLoader {
   }
 
   private async afterBuild(build: BuildOutput) {
-    const afterBuildPlugins = (await this.getPlugins())
+    const afterBuildPlugins = this.getPlugins()
       .map((p) => p.after_build)
       .filter((p) => p != undefined);
     for await (const output of build.outputs) {

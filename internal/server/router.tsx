@@ -126,6 +126,7 @@ class StaticRouters extends PluginLoader {
 
   public async init() {
     if (this.inited) return;
+    await this.initPlugins();
     await Promise.all([
       this.getCssPaths(),
       this.getUseStaticRoutes(),
@@ -466,7 +467,8 @@ class RequestManager {
   }
 
   private async checkPluginServing() {
-    const plugins = (await this.router.getPlugins())
+    const plugins = this.router
+      .getPlugins()
       .map((p) => p.router?.request)
       .filter((p) => p != undefined);
     for await (const plugin of plugins) {
@@ -477,7 +479,8 @@ class RequestManager {
 
   private async formatPage(html: string) {
     const rewriter = new HTMLRewriter();
-    const plugins = (await this.router.getPlugins())
+    const plugins = this.router
+      .getPlugins()
       .map((p) => p.router?.html_rewrite)
       .filter((p) => p != undefined);
     const afters = await Promise.all(
