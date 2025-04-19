@@ -380,7 +380,6 @@ This version improves readability, adds more examples, and organizes the content
 
 ## 📌 Changelog  
 
-<details>
   <summary>🔹 0.8.x Versions</summary>
 
   <details>
@@ -395,7 +394,6 @@ This version improves readability, adds more examples, and organizes the content
   - Added tests for database  
   - Automatic session timeout update UI  
 
-  </details>
 
   <details>
     <summary>📢 0.8.19</summary>
@@ -571,7 +569,10 @@ This version improves readability, adds more examples, and organizes the content
     - Dynamic Module loading feature. ( Load Module without knowing the name at first ). Exemple will follow + tooling, components
     - HTTPServer options can be set from the config file config/server.ts
   </details>
+</details>
 
+<details>
+<summary>0.10.x</summary>
 <details>
     <summary>📢 0.10.1</summary>
     
@@ -585,6 +586,11 @@ This version improves readability, adds more examples, and organizes the content
 
     - Fix regression introduced in 0.9.18 where the onRequest file was not imported correctly
     - much more verbose CLI outputs and automatic benchmarking
-</details>
+  </details>
+  <details>
+    <summary>📢 0.10.4</summary>
 
+    - Add a plugin system for altering the life cycle of the build, request and routing process
+    - Bunext global object updated
+  </details>
 </details>
