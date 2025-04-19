@@ -3,7 +3,9 @@
 import { router } from "./router";
 
 export default async function Make() {
-  const plugins = (await router.getPlugins())
+  await router.initPlugins();
+  const plugins = router
+    .getPlugins()
     .map((p) => p.serverStart)
     .filter((p) => p != undefined);
   const mains = plugins.map((p) => p.main).filter((p) => p != undefined);
@@ -17,7 +19,9 @@ export default async function Make() {
 }
 
 export async function OnServerStartCluster() {
-  const plugins = (await router.getPlugins())
+  await router.initPlugins();
+  const plugins = router
+    .getPlugins()
     .map((p) => p?.serverStart?.cluster)
     .filter((p) => p != undefined);
 
