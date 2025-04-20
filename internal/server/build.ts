@@ -73,7 +73,7 @@ class Builder extends PluginLoader {
   }[] = [];
   private inited = false;
   private BuilderWorker?: Bun.Subprocess<"ignore", "inherit", "inherit">;
-  private BuildWorkerAwaiter: Promise<void> = new Promise(() => {});
+  private BuildWorkerAwaiter: Promise<void> = Promise.resolve();
   private BuildWorkerResolver: () => void = () => {};
 
   public remove_node_modules_files_path = [
@@ -481,6 +481,9 @@ class Builder extends PluginLoader {
       },
       stdout: "inherit",
       stderr: "inherit",
+      onExit: () => {
+        self.BuilderWorker = undefined;
+      },
       ipc(_message) {
         const message = _message as BuildWorkerResponse;
 
