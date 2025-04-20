@@ -1,7 +1,6 @@
-import { builder } from "./build";
-import { router } from "./router";
-import "./server_global";
-import type { MatchedRoute } from "bun";
+import { builder } from "../internal/server/build";
+import type { BunextPlugin } from "./types";
+import { router } from "../internal/server/router";
 import { relative } from "node:path";
 import {
   benchmark_console,
@@ -9,11 +8,21 @@ import {
   TerminalIcon,
   TextColor,
   ToColor,
-} from "./logs";
+} from "../internal/server/logs";
+import type { MatchedRoute } from "bun";
 
-export default async function OnRequest(request: Request) {
-  await onDevRequest(request);
-}
+const plugin: BunextPlugin =
+  process.env.NODE_ENV == "development"
+    ? {
+        router: {
+          request: async (request) => {
+            await onDevRequest(request.request);
+          },
+        },
+      }
+    : {};
+
+export default plugin;
 
 async function onDevRequest(request: Request) {
   if (process.env.NODE_ENV != "development") return;

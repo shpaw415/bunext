@@ -21,10 +21,15 @@ import { router } from "./router";
 import * as React from "react";
 
 import { PluginLoader } from "./plugin-loader.ts";
+import type {
+  BuildWorkerMessage,
+  BuildWorkerResponse,
+} from "./build-worker.ts";
+import { generateRandomString } from "../../features/utils/index.ts";
 
 globalThis.React = React;
 
-type BuildOuts = {
+export type BuildOuts = {
   revalidates: {
     path: string;
     time: number;
@@ -67,6 +72,9 @@ class Builder extends PluginLoader {
     time: number;
   }[] = [];
   private inited = false;
+  private BuilderWorker?: Bun.Subprocess<"ignore", "inherit", "inherit">;
+  private BuildWorkerAwaiter: Promise<void> = new Promise(() => {});
+  private BuildWorkerResolver: () => void = () => {};
 
   public remove_node_modules_files_path = [
     "bunext-js/database/index.ts",
@@ -126,9 +134,11 @@ class Builder extends PluginLoader {
 
   async Init() {
     if (this.inited) return this;
+    this.inited = true;
     this.Check_remove_node_modules_files_path();
     await this.InitGetCustomPluginsFromUser();
     await this.initPlugins();
+    this.createAwaiter();
     this.remove_node_modules_files_path.push(
       ...this.getPlugins().flatMap((p) => p.removeFromBuild ?? [])
     );
@@ -137,7 +147,6 @@ class Builder extends PluginLoader {
     } catch (e) {
       console.log("Plugin has not loaded correctly!\n", (e as Error).stack);
     }
-    this.inited = true;
     return this;
   }
 
@@ -183,8 +192,7 @@ class Builder extends PluginLoader {
   }
 
   async getEntryPoints() {
-    const { baseDir, hydrate, pageDir, sourcemap, buildDir, minify } =
-      this.options;
+    const { baseDir, hydrate, pageDir } = this.options;
 
     let entrypoints = [join(baseDir, hydrate)];
     const absPageDir = join(baseDir, pageDir as string);
@@ -275,7 +283,12 @@ class Builder extends PluginLoader {
   async preBuild(modulePath: string) {
     Head._setCurrentPath(modulePath);
     const moduleContent = await Bun.file(modulePath).text();
-    const _module = await import(modulePath);
+    const _module = await import(
+      modulePath +
+        (process.env.NODE_ENV == "development"
+          ? `?${generateRandomString(5)}`
+          : "")
+    );
     const isServer = !this.isUseClient(moduleContent);
     const { exports } = new Bun.Transpiler({ loader: "tsx" }).scan(
       moduleContent
@@ -389,8 +402,8 @@ class Builder extends PluginLoader {
     return Boolean(CacheManager.getSSR(path));
   }
 
-  private async _makeBuild() {
-    const BuildPath = process.env.BuildPath;
+  private async _makeBuild(path?: string) {
+    const BuildPath = path ?? process.env.BuildPath;
 
     try {
       BuildPath
@@ -436,57 +449,108 @@ class Builder extends PluginLoader {
 
     return data as BuildOuts;
   }
-  /**
-   * this will set this.ssrElements & this.revalidates and make the build out from
-   * a child process to avoid some error while building multiple time from the main process.
-   */
-  async makeBuild(path?: string) {
-    if (import.meta.main) return await this._makeBuild();
-    let strRes: BuildOuts | undefined;
-    await Promise.all(
-      this.getPlugins().map(({ before_build_main }) => before_build_main?.())
-    );
-    const proc = Bun.spawn({
-      cmd: ["bun", import.meta.filename],
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NODE_ENV: process.env.NODE_ENV,
-        BuildPath: path,
-        __BUILD_MODE__: "true",
-      },
-      stdout: "inherit",
-      stderr: "inherit",
-      ipc(message) {
-        const data = message as procIPCdata;
-        switch (data.type) {
-          case "build":
-            strRes = {
-              revalidates: data.revalidates,
-              head: {
-                ...data.head,
-                ...Head.head,
-              },
-            };
-            break;
-          case "error":
-            throw data.error;
-        }
-      },
-    });
-    const code = await proc.exited;
-    if (code != 0) {
-      console.log("Build exited with code", code);
-      return;
-    }
-    this.revalidates = strRes?.revalidates || [];
-    Head.head = strRes?.head || {};
+
+  async updateData(data: BuildOuts) {
+    this.revalidates = data.revalidates;
+    Head.head = data.head;
     globalThis.Server?.updateWorkerData();
     await Promise.all(
       this.getPlugins().map(({ after_build_main }) => after_build_main?.())
     );
-    return strRes as BuildOuts;
   }
+
+  private createAwaiter() {
+    const self = this;
+    self.BuildWorkerAwaiter = new Promise<void>((resolve) => {
+      self.BuildWorkerResolver = resolve;
+    });
+  }
+
+  private createBuildWorker() {
+    const self = this;
+    if (self.BuilderWorker) {
+      return;
+    }
+    this.BuilderWorker = Bun.spawn({
+      cmd: ["bun", join(import.meta.dirname, "build-worker.ts")],
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NODE_ENV: process.env.NODE_ENV,
+        __BUILD_MODE__: "true",
+      },
+      stdout: "inherit",
+      stderr: "inherit",
+      ipc(_message) {
+        const message = _message as BuildWorkerResponse;
+
+        switch (message.type) {
+          case "build":
+            if (!message.success) {
+              message.message && console.log(message.message);
+              message.error && console.error(message.error);
+              self.BuildWorkerResolver();
+              break;
+            }
+            if (message.data) {
+              self.updateData(message.data).then(() => {
+                self.BuildWorkerResolver();
+              });
+              break;
+            }
+        }
+      },
+    });
+  }
+
+  async makeBuild(path?: string) {
+    let strRes: BuildOuts | undefined;
+    this.createBuildWorker();
+    await Promise.all(
+      this.getPlugins().map(({ before_build_main }) => before_build_main?.())
+    );
+    if (this.BuilderWorker) {
+      this.BuilderWorker.send({
+        type: "build",
+        BuildPath: path,
+      } as BuildWorkerMessage);
+      await this.BuildWorkerAwaiter;
+      this.createAwaiter();
+      if (this.BuilderWorker.exitCode) {
+        console.log("BuilderWorker exited");
+        this.createBuildWorker();
+      }
+      await Promise.all(
+        this.getPlugins().map(({ after_build_main }) => after_build_main?.())
+      );
+
+      strRes = {
+        revalidates: this.revalidates,
+        head: Head.head,
+      };
+      globalThis.Server?.updateWorkerData();
+      return strRes;
+    } else {
+      console.log(
+        "BuilderWorker not found, using the main process to build.\nThis may cause some errors."
+      );
+      strRes = await this._makeBuild(path);
+      if (strRes) {
+        this.revalidates = strRes.revalidates;
+        Head.head = strRes.head;
+        this.updateData(strRes);
+      }
+      await Promise.all(
+        this.getPlugins().map(({ after_build_main }) => after_build_main?.())
+      );
+      return strRes as BuildOuts;
+    }
+  }
+
+  /**
+   * this will set this.ssrElements & this.revalidates and make the build out from
+   * a child process to avoid some error while building multiple time from the main process.
+   */
 
   private ServerActionToClient(func: Function, ModulePath: string): string {
     const path = ModulePath.split(this.options.pageDir as string).at(
@@ -915,9 +979,11 @@ const builder: Builder = Boolean(process.env.__INIT__)
   ? (undefined as any)
   : new Builder(process.cwd());
 await builder.Init();
+/*
 if (import.meta.main) {
   await builder.makeBuild();
   process.exit(0);
 }
+  */
 
 export { builder, Builder };

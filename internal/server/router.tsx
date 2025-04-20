@@ -151,13 +151,15 @@ class StaticRouters extends PluginLoader {
     ) as [Route, Path][];
   }
 
-  private async getCssPaths() {
+  async getCssPaths(clear: boolean = false) {
     const cwd = process.cwd();
+    if (clear) this.cssPathExists = [];
+
     const possible_css_path = Object.values(this.server?.routes || {}).map(
       (path) => {
         const trimPath = path.replace(cwd, "").split(".");
         trimPath.pop();
-        return normalize(`${this.buildDir}${trimPath.join(".")}.css`);
+        return join(this.buildDir, trimPath.join(".") + ".css");
       }
     );
     const cssFilesPath: string[] = [];
@@ -226,8 +228,6 @@ class StaticRouters extends PluginLoader {
       Shell: ReactShellComponent;
     }
   ): Promise<BunextRequest | null> {
-    if (process.env.NODE_ENV == "development")
-      this.cssPathExists = await this.getCssPaths();
     await this.isInited();
     return new RequestManager({
       request,
@@ -475,6 +475,8 @@ class RequestManager {
       const res = await plugin(this.bunextReq);
       if (res) return res;
     }
+    if (process.env.NODE_ENV == "development")
+      this.router.cssPathExists = await this.router.getCssPaths();
   }
 
   private async formatPage(html: string) {
