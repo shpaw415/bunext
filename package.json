@@ -1,8 +1,8 @@
 {
   "name": "bunext-js",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "repository": "shpaw415/bunext",
-  "bugs": "https://github.com/shpaw415/bunext",
+  "bugs": "shpaw415@gmail.com",
   "license": "MIT",
   "author": {
     "name": "Justin Halle"
