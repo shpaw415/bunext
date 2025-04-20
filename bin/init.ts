@@ -38,11 +38,11 @@ async function install(total: boolean) {
       force: true,
     });
   }
-  if (true || total || !(await Bun.file(`bunfig.toml`).exists())) {
-    cpSync(`${paths.bunextModulePath}/bin/bunfig.toml`, "bunfig.toml", {
-      force: true,
-      recursive: true,
-    });
+  const bunfigFile = Bun.file(`bunfig.toml`);
+  if (true || total || !(await bunfigFile.exists())) {
+    await bunfigFile.write(
+      `preload = ["./.bunext/plugins/svg.ts", "./.bunext/plugins/css.ts", "./.bunext/plugins/react-fix.ts"]`
+    );
   }
 
   const packageJson = (await Bun.file("package.json").json()) as packageJson;
