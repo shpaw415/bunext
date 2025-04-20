@@ -17,6 +17,7 @@ const Config: ServerConfig = {
   router: {
     dynamicPaths: [],
   },
+  bunext_plugins: [],
 };
 
 export default Config;

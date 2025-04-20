@@ -29,6 +29,5 @@ export default function Page() {
 }
 
 function ArrowElement() {
-  //@ts-ignore
   return <Arrow className="arrow" />;
 }

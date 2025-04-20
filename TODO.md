@@ -14,3 +14,10 @@ Priority 1
 - add Bunext plugin feature
   - html_rewrite, onBuild, afterBuild, client_global_data, onRequest
 Priority 2
+
+
+- Documentation 
+  - plugin system
+  - route and sub-route
+  - layout
+  - bunext global object

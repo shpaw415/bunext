@@ -7,6 +7,8 @@ import type { Router } from "../features/router/bunext_object/types.ts";
 import type { Database } from "../database/bunext_object/types.ts";
 import type { Session } from "../features/session/bunext_object/types.ts";
 import type { _Request } from "../features/request/bunext_object/types.ts";
+import type { BunextPlugin } from "../plugins/types.ts";
+import type { ComponentType } from "../features/components/bunext_global/types.ts";
 
 export type ServerSideProps =
   | {
@@ -102,6 +104,7 @@ export type ServerConfig = {
      */
     dynamicPaths: Array<string>;
   };
+  bunext_plugins?: Array<BunextPlugin>;
 };
 
 export type OnRequestType = (
@@ -194,4 +197,5 @@ export type BunextType = {
   session: Session;
   plugins: Plugins;
   database: Database;
+  components: ComponentType;
 };

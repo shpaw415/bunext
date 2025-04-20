@@ -1,4 +1,4 @@
-import AfterBuildPluginMaker from "../../internal/server/after_build";
+import type { BunextPlugin } from "./types";
 
 /**
  * Fixes duplicate exports in Bun.Build output files
@@ -91,5 +91,6 @@ async function processBundleFile(file: Bun.BuildArtifact) {
   }
 }
 
-const plugin = AfterBuildPluginMaker(() => true, processBundleFile);
-export default plugin;
+export default {
+  after_build: processBundleFile,
+} as BunextPlugin;
