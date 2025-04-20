@@ -1,7 +1,7 @@
 // bypass the server Response and return a custom response or
 // return void otherwise
 
-import type { OnRequestType } from "@bunpmjs/bunext/internal/types.ts";
+import type { OnRequestType } from "bunext-js/internal/types.ts";
 
 const onRequest: OnRequestType = async (request) => {};
 

@@ -1,4 +1,4 @@
-import { BunextServer } from "@bunpmjs/bunext/internal/server/index.ts";
+import { BunextServer } from "bunext-js/internal/server/index.ts";
 import { Shell } from "./shell";
 import onRequest from "../../config/onRequest";
 

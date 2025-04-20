@@ -1,5 +1,5 @@
 import { plugin, type BunPlugin } from "bun";
-import { get } from "@bunpmjs/bunext/plugins/svg/init.ts"; // must be absolute
+import { get } from "bunext-js/plugins/svg/init.ts"; // must be absolute
 
 const SvgPlugin: BunPlugin = {
   name: "SVG loader",

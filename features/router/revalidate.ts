@@ -2,7 +2,7 @@
 
 import { navigate } from "../../internal/router/index.tsx";
 import type { Builder } from "../../internal/server/build.ts";
-import type { ClusterMessageType } from "@bunpmjs/bunext/internal/types.ts";
+import type { ClusterMessageType } from "../../internal/types.ts";
 // only use this module in a server context
 
 const isServer = typeof window == "undefined";

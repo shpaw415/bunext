@@ -19,13 +19,15 @@ Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, pro
 To install Bunext, use:  
 
 ```sh
-bun i @bunpmjs/bunext
+bun i bunext-js
+# OR
+bun create bunext-app
 ```  
 
 Then initialize your project:  
 
 ```sh
-bun bunext init  
+bun bunext init  # if you used bun i bunext-js
 bun run db:create  # Creates types and missing tables in the database  
 ```  
 
@@ -122,7 +124,7 @@ Revalidate static pages after a set time:
 ```tsx
 "use static";
 
-import { revalidateStatic } from "@bunpmjs/bunext/router";
+import { revalidateStatic } from "bunext-js/router";
 
 export async function getServerSideProps({request}: {request: Request}) {
     revalidateStatic(request, 3600) // revalidate after 1 hour
@@ -138,7 +140,7 @@ export default function Page({ props }: { props: { data: any } }) {
 Revalidate static pages in an Action:  
 
 ```tsx
-import { revalidateStatic } from "@bunpmjs/bunext/router";
+import { revalidateStatic } from "bunext-js/router";
 
 export async function ServerRevalidateStaticPage(path: string) {
     // path ex: /page/345 ( /page/[id] )
@@ -154,7 +156,7 @@ export async function ServerRevalidateStaticPage(path: string) {
 Bunext provides two ways to navigate between pages:  
 
 ```tsx
-import { navigate, Link } from "@bunpmjs/bunext/internal/router";
+import { navigate, Link } from "bunext-js/internal/router";
 
 function NextPage() {
   return (
@@ -177,7 +179,7 @@ Bunext supports **server-side and client-side session management**.
 ### 📌 Set Session Data (Server-Side)  
 
 ```tsx
-import { GetSession } from "@bunpmjs/bunext/features/session";
+import { GetSession } from "bunext-js/features/session";
 
 export async function ServerSetSession({ username }) {
   const session = GetSession(arguments);
@@ -188,7 +190,7 @@ export async function ServerSetSession({ username }) {
 ### 📌 Access Session Data (Client-Side)  
 
 ```tsx
-import { useSession } from "@bunpmjs/bunext/features/session";
+import { useSession } from "bunext-js/features/session";
 
 export default function UserStatus() {
   const session = useSession();
@@ -238,7 +240,7 @@ Call this function from a client component:
 ### 📌 Define Schema  
 
 ```ts
-import { DBSchema } from "@bunpmjs/bunext/database/schema";
+import { DBSchema } from "bunext-js/database/schema";
 
 const schema: DBSchema = [
   {
@@ -263,7 +265,7 @@ bun run db:create
 ### 📌 Query Database  
 
 ```tsx
-import { Database } from "@bunpmjs/bunext/database";
+import { Database } from "bunext-js/database";
 
 const db = Database();
 const users = db.Users.select({ where: { role: "admin" } });

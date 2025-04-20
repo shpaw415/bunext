@@ -9,7 +9,7 @@ const files = (await Array.fromAsync(res)).filter(
 
 await Promise.all(
   files.map((file) => {
-    return cp(file, "node_modules/@bunpmjs/bunext/" + file, {
+    return cp(file, "node_modules/bunext-js/" + file, {
       recursive: true,
       force: true,
     });

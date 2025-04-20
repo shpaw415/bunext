@@ -1,8 +1,8 @@
 import "../internal/server/bunext_global.ts";
 import { test, expect, describe, afterAll } from "bun:test";
 
-import "@bunpmjs/bunext/internal/server/server_global.ts";
-import { router } from "@bunpmjs/bunext/internal/server/router.tsx";
+import "bunext-js/internal/server/server_global.ts";
+import { router } from "bunext-js/internal/server/router.tsx";
 import "../.bunext/react-ssr/server.ts";
 import { Shell } from "../.bunext/react-ssr/shell.tsx";
 import { ParseServerSideProps } from "../internal/router/index.tsx";
@@ -36,7 +36,7 @@ describe("Server Features", () => {
 
 describe("Build features", () => {
   /*test.skip("Build", async () => {
-    const { builder } = await import("@bunpmjs/bunext/internal/build");
+    const { builder } = await import("bunext-js/internal/build");
     const buildOut = await builder.testBuild();
     expect(buildOut?.ssrElement.length).toBeGreaterThan(0);
     expect(buildOut?.revalidates.length).toBeGreaterThan(0);
@@ -47,13 +47,13 @@ describe("Build features", () => {
 
   test("revalidate", async () => {
     const { revalidate } = await import(
-      "@bunpmjs/bunext/features/router/revalidate.ts"
+      "bunext-js/features/router/revalidate.ts"
     );
     await revalidate("/");
   });
 
   test("Header data", async () => {
-    const { Head } = await import("@bunpmjs/bunext/features/head.tsx");
+    const { Head } = await import("bunext-js/features/head.tsx");
     expect(Object.keys(Head.head).length).toBeGreaterThan(1);
   });
 });

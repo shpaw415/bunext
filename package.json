@@ -1,5 +1,5 @@
 {
-  "name": "bunext",
+  "name": "bunext-js",
   "version": "0.10.4",
   "repository": "shpaw415/bunext",
   "bugs": "https://github.com/shpaw415/bunext",
@@ -19,7 +19,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.1",
     "@types/web": "^0.0.216",
-    "@bunpmjs/bunext": "github:shpaw415/bunext",
+    "bunext-js": "github:shpaw415/bunext",
     "tailwindcss": "^4.1.4",
     "@tailwindcss/postcss": "4.1.4",
     "@tailwindcss/cli": "4.1.4"

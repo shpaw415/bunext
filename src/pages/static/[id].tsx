@@ -1,5 +1,5 @@
-import { useHead } from "@bunpmjs/bunext/head";
-import type { BunextRequest } from "@bunpmjs/bunext/internal/server/bunextRequest.ts";
+import { useHead } from "bunext-js/head";
+import type { BunextRequest } from "bunext-js/internal/server/bunextRequest.ts";
 
 type Props = {
   id: string;
