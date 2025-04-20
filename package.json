@@ -19,7 +19,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.1",
     "@types/web": "^0.0.216",
-    "bunext-js": "github:shpaw415/bunext",
+    "bunext-js": "github:shpaw415/bunext#npm-new-name",
     "tailwindcss": "^4.1.4",
     "@tailwindcss/postcss": "4.1.4",
     "@tailwindcss/cli": "4.1.4"
