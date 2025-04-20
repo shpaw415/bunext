@@ -1,4 +1,4 @@
-version: '3.4'
+version: "3.4"
 services:
   bun-server:
     restart: always
@@ -10,6 +10,4 @@ services:
     volumes:
       - ./config/bunext.sqlite:/usr/app/config/bunext.sqlite
       - ./config/session.sqlite:/usr/app/config/session.sqlite
-    entrypoint: bun node_modules/@bunpmjs/bunext/bin/index.ts production
-    
-    
+    entrypoint: bun node_modules/bunext-js/bin/index.ts production

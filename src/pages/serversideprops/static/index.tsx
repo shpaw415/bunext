@@ -1,6 +1,6 @@
 "use static";
 
-import { BunextRequest } from "@bunpmjs/bunext/internal/server/bunextRequest.ts";
+import { BunextRequest } from "bunext-js/internal/server/bunextRequest.ts";
 
 export function getServerSideProps(
   { params, request }: { params: {}; request: Request },

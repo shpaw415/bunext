@@ -1,10 +1,10 @@
 import { TestElement } from "./test";
-import { useSession, GetSession } from "@bunpmjs/bunext/session";
+import { useSession, GetSession } from "bunext-js/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 import "@static/index.css";
 import "@static/style.css";
-import { Head } from "@bunpmjs/bunext/head";
+import { Head } from "bunext-js/head";
 import { useEffect } from "react";
 
 type SessionType = {
@@ -24,7 +24,7 @@ export function TestServerElement1() {
 
 function DynamicFileImport() {
   useEffect(() => {
-    fetch("/node_modules/@bunpmjs/bunext/static/test.css").then(async (res) => {
+    fetch("/node_modules/bunext-js/static/test.css").then(async (res) => {
       console.log(await res.text());
     });
   }, []);

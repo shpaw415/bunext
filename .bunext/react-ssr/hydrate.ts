@@ -1,7 +1,7 @@
 "use client";
-import { hydrate } from "@bunpmjs/bunext/internal/hydrate.tsx";
+import { hydrate } from "bunext-js/internal/hydrate.tsx";
 import { Shell } from "./shell";
-import "@bunpmjs/bunext/internal/globals.ts";
-import "@bunpmjs/bunext/internal/client/bunext_global.ts";
+import "bunext-js/internal/globals.ts";
+import "bunext-js/internal/client/bunext_global.ts";
 
 await hydrate(Shell as any);

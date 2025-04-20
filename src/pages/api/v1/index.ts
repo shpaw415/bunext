@@ -1,4 +1,4 @@
-import type { BunextRequest } from "@bunpmjs/bunext/internal/server/bunextRequest.ts";
+import type { BunextRequest } from "bunext-js/internal/server/bunextRequest.ts";
 
 export function POST(request: BunextRequest) {
   const session = Bunext.session.get(arguments);

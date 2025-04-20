@@ -1,8 +1,8 @@
-import "@bunpmjs/bunext/internal/globals.ts";
-import { Dev } from "@bunpmjs/bunext/dev/dev.tsx";
+import "bunext-js/internal/globals.ts";
+import { Dev } from "bunext-js/dev/dev.tsx";
 import { type JSX } from "react";
-import { HeadProvider } from "@bunpmjs/bunext/features/head.tsx";
-import { SessionProvider } from "@bunpmjs/bunext/internal/router/index.tsx";
+import { HeadProvider } from "bunext-js/features/head.tsx";
+import { SessionProvider } from "bunext-js/internal/router/index.tsx";
 
 export const Shell = ({
   children,

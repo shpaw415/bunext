@@ -1,6 +1,5 @@
 import "./server_global.ts";
 import "./bunext_global";
-
 import { join, basename } from "node:path";
 import {
   type BuildConfig,
@@ -52,6 +51,8 @@ type _Mainoptions = {
   define?: Record<string, string>;
 };
 
+const cwd = process.cwd();
+
 class Builder extends PluginLoader {
   public options: _Mainoptions;
   public preBuildPaths: Array<string> = [];
@@ -68,16 +69,28 @@ class Builder extends PluginLoader {
   private inited = false;
 
   public remove_node_modules_files_path = [
-    "@bunpmjs/bunext/database/index.ts",
-    "@bunpmjs/bunext/internal/server/build.ts",
-    "@bunpmjs/bunext/internal/server/router.tsx",
-    "@bunpmjs/bunext/internal/server/bunextRequest.ts",
+    "bunext-js/database/index.ts",
+    "bunext-js/internal/server/build.ts",
+    "bunext-js/internal/server/router.tsx",
+    "bunext-js/internal/server/bunextRequest.ts",
     "@bunpmjs/json-webtoken/index.ts",
-    "@bunpmjs/bunext/database/class.ts",
-    "@bunpmjs/bunext/internal/session.ts",
-    "@bunpmjs/bunext/internal/caching/index.ts",
-    "@bunpmjs/bunext/internal/server/bunext_global.ts",
+    "bunext-js/database/class.ts",
+    "bunext-js/internal/session.ts",
+    "bunext-js/internal/caching/index.ts",
+    "bunext-js/internal/server/bunext_global.ts",
   ];
+
+  private dev_remove_file_path = Boolean(process.env.__BUNEXT_DEV__)
+    ? [
+        `database/index.ts`,
+        `internal/server/build.ts`,
+        `internal/server/router.tsx`,
+        `internal/server/bunextRequest.ts`,
+        `database/class.ts`,
+        `internal/session.ts`,
+        `internal/caching/index.ts`,
+      ]
+    : [];
 
   constructor(baseDir: string) {
     super();
@@ -713,9 +726,7 @@ class Builder extends PluginLoader {
           {
             filter: new RegExp(
               "^" +
-                self.escapeRegExp(
-                  normalize(join(self.options.baseDir, "node_modules"))
-                ) +
+                self.escapeRegExp(normalize(self.options.baseDir)) +
                 "/.*" +
                 "\\.(ts|tsx|jsx)$"
             ),
@@ -750,7 +761,8 @@ class Builder extends PluginLoader {
             if (
               self.remove_node_modules_files_path.includes(
                 path.replace(self.options.baseDir + "/node_modules/", "")
-              )
+              ) ||
+              self.dev_remove_file_path.includes(path.replace(cwd + "/", ""))
             ) {
               return {
                 contents: "",
@@ -864,8 +876,8 @@ class Builder extends PluginLoader {
         "crypto",
         "node:path",
         import.meta.filename,
-        "@bunpmjs/bunext/features/router.ts",
-        "@bunpmjs/bunext/features/request.ts",
+        "bunext-js/features/router.ts",
+        "bunext-js/features/request.ts",
         ...(options.external || []),
         ...(this.BuildPluginsConfig?.external || []),
       ],

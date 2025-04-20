@@ -9,7 +9,7 @@ COPY --chown=bun:bun src src
 COPY --chown=bun:bun static static
 COPY --chown=bun:bun config config
 COPY .env ./
-RUN bun node_modules/@bunpmjs/bunext/bin/index.ts init && bun node_modules/@bunpmjs/bunext/bin/index.ts database:create
+RUN bun node_modules/bunext-js/bin/index.ts init && bun node_modules/bunext-js/bin/index.ts database:create
 COPY tsconfig.json package.json ./
 RUN bun update
 
@@ -17,4 +17,4 @@ RUN bun update
 
 USER bun
 EXPOSE 3000/tcp
-ENTRYPOINT [ "bun", "node_modules/@bunpmjs/bunext/bin/index.ts" , "production"]
+ENTRYPOINT [ "bun", "node_modules/bunext-js/bin/index.ts" , "production"]
