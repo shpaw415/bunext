@@ -44,7 +44,7 @@ async function onDevRequest(request: Request) {
         url.pathname.replace("index.js", "").replace(router.pageDir, "")
       )
     );
-    if (match && match.filePath.endsWith("tsx")) {
+    if (match?.filePath?.endsWith("tsx")) {
       await MakeBuild(match);
       return;
     }
