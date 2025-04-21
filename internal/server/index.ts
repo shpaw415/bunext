@@ -28,7 +28,6 @@ import type {
 } from "../types.ts";
 import OnServerStart, { OnServerStartCluster } from "./server-start.ts";
 import "../caching/fetch.ts";
-import OnRequest from "./onRequest.ts";
 import {
   benchmark_console,
   DevConsole,
@@ -99,7 +98,6 @@ class BunextServer {
       port: this.port,
       ...(globalThis.serverConfig?.HTTPServer.config as any),
       async fetch(request) {
-        await OnRequest(request);
         const headerJSON = request.headers.toJSON();
         return benchmark_console(
           (time, result) => {
@@ -121,9 +119,8 @@ class BunextServer {
             )} ${ToColor(TextColor, `in ${time}ms`)}`;
           },
           async () => {
-            const OnRequestResponse = await self.onRequest?.(request);
-            if (OnRequestResponse) return OnRequestResponse;
-
+            const res = await self.onRequest?.(request);
+            if (res) return res;
             try {
               const response = await self.serve(request);
               if (response instanceof Response) return response;
@@ -239,10 +236,12 @@ class BunextServer {
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
-          //await builder.makeBuild();
         } else {
           const buildoutput = await builder.makeBuild();
-          if (!buildoutput) throw new Error("Production build failed");
+          if (!buildoutput) {
+            console.log(buildoutput);
+            throw new Error("Production build failed");
+          }
           setRevalidate(buildoutput.revalidates);
         }
         this.RunServer();
@@ -256,7 +255,6 @@ class BunextServer {
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
-          //await builder.makeBuild();
         } else {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) throw new Error("Production build failed");
@@ -416,7 +414,6 @@ class BunextServer {
           path: data?.path,
         },
       } as ClusterMessageType);
-      //await this.waittingBuildFinish;
     } else {
       for (const worker of Object.values(cluster.workers || [])) {
         worker?.send("build_done");

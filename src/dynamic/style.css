@@ -1,9 +1,10 @@
+/* src/dynamic/style.css */
 .test {
   color: red;
-  background-color: blue;
-  font-size: 20px;
-  padding: 10px;
+  text-align: center;
+  background-color: #00f;
   border-radius: 5px;
   margin: 5px;
-  text-align: center;
+  padding: 10px;
+  font-size: 20px;
 }
