@@ -37,31 +37,29 @@ export type BuildOuts = {
   head: Record<string, _Head>;
 };
 
-type procIPCdata =
-  | ({
-      type: "build";
-    } & BuildOuts)
-  | {
-      type: "error";
-      error: Error;
-    };
-
 type _Mainoptions = {
   baseDir: string;
   buildDir: string;
   pageDir: string;
   hydrate: string;
-  sourcemap: "external" | "none" | "inline";
-  minify: boolean;
-  define?: Record<string, string>;
 };
+
+declare global {
+  var __BUNEXT_BUILD_PROCESS__:
+    | Bun.Subprocess<"ignore", "inherit", "inherit">
+    | undefined;
+}
 
 const cwd = process.cwd();
 
 class Builder extends PluginLoader {
-  public options: _Mainoptions;
+  public options: _Mainoptions = {
+    pageDir: "src/pages",
+    buildDir: ".bunext/build",
+    hydrate: ".bunext/react-ssr/hydrate.ts",
+    baseDir: process.cwd(),
+  };
   public preBuildPaths: Array<string> = [];
-  private buildOutput?: BuildOutput;
   public plugins: BunPlugin[] = [];
   private BuildPluginsConfig: Partial<Bun.BuildConfig> = {};
   /**
@@ -72,8 +70,8 @@ class Builder extends PluginLoader {
     time: number;
   }[] = [];
   private inited = false;
-  private BuilderWorker?: Bun.Subprocess<"ignore", "inherit", "inherit">;
-  private BuildWorkerAwaiter: Promise<void> = Promise.resolve();
+  public BuilderWorker?: Bun.Subprocess<"ignore", "inherit", "inherit">;
+  public BuildWorkerAwaiter: Promise<void> = Promise.resolve();
   private BuildWorkerResolver: () => void = () => {};
 
   public remove_node_modules_files_path = [
@@ -100,16 +98,8 @@ class Builder extends PluginLoader {
       ]
     : [];
 
-  constructor(baseDir: string) {
+  constructor() {
     super();
-    this.options = {
-      minify: Bun.env.NODE_ENV === "production",
-      sourcemap: "none",
-      pageDir: "src/pages",
-      buildDir: ".bunext/build",
-      hydrate: ".bunext/react-ssr/hydrate.ts",
-      baseDir,
-    };
   }
 
   clearBuildDir() {
@@ -138,7 +128,6 @@ class Builder extends PluginLoader {
     this.Check_remove_node_modules_files_path();
     await this.InitGetCustomPluginsFromUser();
     await this.initPlugins();
-    this.createAwaiter();
     this.remove_node_modules_files_path.push(
       ...this.getPlugins().flatMap((p) => p.removeFromBuild ?? [])
     );
@@ -246,7 +235,7 @@ class Builder extends PluginLoader {
 
   async build(onlyPath?: string) {
     process.env.__BUILD_MODE__ = "true";
-    const { baseDir, hydrate, sourcemap, buildDir, ...options } = this.options;
+    const { baseDir, hydrate, buildDir, ...options } = this.options;
 
     const entrypoints =
       onlyPath && process.env.NODE_ENV == "development"
@@ -257,17 +246,55 @@ class Builder extends PluginLoader {
           ]
         : await this.getEntryPoints();
 
-    this.buildOutput = await this.CreateBuild({
-      env: "*",
-      entrypoints,
-      sourcemap,
+    const build = await Bun.build({
+      env: Bun.semver.satisfies(Bun.version, "1.1.39 - x.x.x")
+        ? "PUBLIC_*"
+        : "*",
+      minify: Bun.env.NODE_ENV == "production",
+      sourcemap: "none",
+      ...this.BuildPluginsConfig,
       outdir: join(baseDir, buildDir as string),
-      ...options,
+      splitting: true,
+      publicPath: "./",
+      target: "browser",
+      entrypoints: [
+        "react",
+        "react-dom",
+        "scheduler",
+        "react-dom/client",
+        "react/jsx-dev-runtime",
+        ...entrypoints,
+        ...(this.BuildPluginsConfig?.entrypoints ?? []),
+      ],
+      plugins: [
+        this.NextJsPlugin(),
+        ...this.plugins,
+        ...(this.BuildPluginsConfig?.plugins || []),
+      ],
+      define: {
+        "process.env.NODE_ENV": JSON.stringify(
+          process.env.NODE_ENV || "development"
+        ),
+        ...this.BuildPluginsConfig.define,
+      },
+      external: [
+        "bun",
+        "node",
+        "bun:sqlite",
+        "crypto",
+        "node:path",
+        import.meta.filename,
+        "bunext-js/features/router.ts",
+        "bunext-js/features/request.ts",
+        ...(this.BuildPluginsConfig?.external || []),
+      ],
     });
+    await this.afterBuild(build);
 
-    this.cleanBuildDir(this.buildOutput);
+    this.cleanBuildDir(build);
     process.env.__BUILD_MODE__ = "false";
-    return this.buildOutput;
+
+    return build;
   }
   private async cleanBuildDir(buildOutput: BuildOutput) {
     for await (const file of this.glob(this.options.buildDir as string, "**")) {
@@ -339,15 +366,6 @@ class Builder extends PluginLoader {
       CacheManager.addSSR(modulePath, moduleSSR.elements);
     }
   }
-  private toJSX(el: JSX.Element) {
-    return reactElementToJSXString(el, {
-      showFunctions: true,
-      showDefaultProps: true,
-      useFragmentShortSyntax: true,
-      sortProps: false,
-      useBooleanShorthandSyntax: false,
-    });
-  }
   async preBuildAll(skip?: ssrElement[]) {
     const files = await Array.fromAsync(
       this.glob(
@@ -359,6 +377,16 @@ class Builder extends PluginLoader {
       await this.preBuild(file);
     }
   }
+  private toJSX(el: JSX.Element) {
+    return reactElementToJSXString(el, {
+      showFunctions: true,
+      showDefaultProps: true,
+      useFragmentShortSyntax: true,
+      sortProps: false,
+      useBooleanShorthandSyntax: false,
+    });
+  }
+
   isUseClient(fileData: string) {
     const line = fileData
       .split("\n")
@@ -420,7 +448,7 @@ class Builder extends PluginLoader {
       process.exit(exitCodes.build);
     }
     try {
-      const output = await builder.build(BuildPath);
+      const output = await this.build(BuildPath);
       if (!output.success) {
         console.log(output);
         throw new Error("Build Error");
@@ -467,11 +495,18 @@ class Builder extends PluginLoader {
   }
 
   private createBuildWorker() {
-    const self = this;
-    if (self.BuilderWorker) {
-      return;
+    if (process.env.NODE_ENV == "development") {
+      if (!globalThis.__BUNEXT_BUILD_PROCESS__)
+        globalThis.__BUNEXT_BUILD_PROCESS__ = this.makeBuildWorker();
+      this.BuilderWorker = globalThis.__BUNEXT_BUILD_PROCESS__;
     }
-    this.BuilderWorker = Bun.spawn({
+    if (!this.BuilderWorker) this.BuilderWorker = this.makeBuildWorker();
+  }
+
+  private makeBuildWorker() {
+    const self = this;
+
+    return Bun.spawn({
       cmd: ["bun", join(import.meta.dirname, "build-worker.ts")],
       cwd: process.cwd(),
       env: {
@@ -483,6 +518,7 @@ class Builder extends PluginLoader {
       stderr: "inherit",
       onExit: () => {
         self.BuilderWorker = undefined;
+        globalThis.__BUNEXT_BUILD_PROCESS__ = undefined;
       },
       ipc(_message) {
         const message = _message as BuildWorkerResponse;
@@ -505,7 +541,9 @@ class Builder extends PluginLoader {
       },
     });
   }
-
+  public awaitBuildFinish() {
+    return this.BuildWorkerAwaiter;
+  }
   async makeBuild(path?: string) {
     let strRes: BuildOuts | undefined;
     this.createBuildWorker();
@@ -513,25 +551,24 @@ class Builder extends PluginLoader {
       this.getPlugins().map(({ before_build_main }) => before_build_main?.())
     );
     if (this.BuilderWorker) {
+      await this.awaitBuildFinish();
+      this.createAwaiter();
       this.BuilderWorker.send({
         type: "build",
         BuildPath: path,
       } as BuildWorkerMessage);
-      await this.BuildWorkerAwaiter;
-      this.createAwaiter();
+      await this.awaitBuildFinish();
       if (this.BuilderWorker.exitCode) {
         console.log("BuilderWorker exited");
         this.createBuildWorker();
       }
-      await Promise.all(
-        this.getPlugins().map(({ after_build_main }) => after_build_main?.())
-      );
-
       strRes = {
         revalidates: this.revalidates,
         head: Head.head,
       };
-      globalThis.Server?.updateWorkerData();
+
+      await this.updateData(strRes);
+
       return strRes;
     } else {
       console.log(
@@ -543,9 +580,6 @@ class Builder extends PluginLoader {
         Head.head = strRes.head;
         this.updateData(strRes);
       }
-      await Promise.all(
-        this.getPlugins().map(({ after_build_main }) => after_build_main?.())
-      );
       return strRes as BuildOuts;
     }
   }
@@ -897,62 +931,6 @@ class Builder extends PluginLoader {
       ) as { [key: string]: string };
   }
 
-  private async CreateBuild(options: BuildConfig) {
-    const { define } = this.options;
-    const { entrypoints, ..._options } = options;
-
-    //@ts-ignore
-    if (Bun.semver.satisfies(Bun.version, "1.1.39 - x.x.x") && !options.env) {
-      //@ts-ignore
-      options.env = "PUBLIC_*";
-    }
-
-    const build = await Bun.build({
-      ...this.BuildPluginsConfig,
-      splitting: true,
-      publicPath: "./",
-      target: "browser",
-      entrypoints: [
-        "react",
-        "react-dom",
-        "scheduler",
-        "react-dom/client",
-        "react/jsx-dev-runtime",
-        ...entrypoints,
-        ...(this.BuildPluginsConfig?.entrypoints ?? []),
-      ],
-      ..._options,
-      plugins: [
-        this.NextJsPlugin(),
-        ...this.plugins,
-        ...(options?.plugins || []),
-        ...(this.BuildPluginsConfig?.plugins || []),
-      ],
-      define: {
-        "process.env.NODE_ENV": JSON.stringify(
-          process.env.NODE_ENV || "development"
-        ),
-        ...define,
-        ...options.define,
-        ...this.BuildPluginsConfig.define,
-      },
-      external: [
-        "bun",
-        "node",
-        "bun:sqlite",
-        "crypto",
-        "node:path",
-        import.meta.filename,
-        "bunext-js/features/router.ts",
-        "bunext-js/features/request.ts",
-        ...(options.external || []),
-        ...(this.BuildPluginsConfig?.external || []),
-      ],
-    });
-    await this.afterBuild(build);
-    return build;
-  }
-
   private async afterBuild(build: BuildOutput) {
     const afterBuildPlugins = this.getPlugins()
       .map((p) => p.after_build)
@@ -980,7 +958,7 @@ class Builder extends PluginLoader {
 }
 const builder: Builder = Boolean(process.env.__INIT__)
   ? (undefined as any)
-  : new Builder(process.cwd());
+  : new Builder();
 await builder.Init();
 /*
 if (import.meta.main) {

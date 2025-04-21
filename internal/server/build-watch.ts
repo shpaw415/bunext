@@ -57,11 +57,10 @@ export const doWatchBuild = () =>
       );
       if (EntryPoints.includes(probablePath)) {
         const pathnameArray = relative(`${cwd}/src/pages`, probablePath).split(
-          "."
+          "/"
         );
         pathnameArray.pop();
-        const pathname = pathnameArray.join(".") || "/";
-
+        const pathname = pathnameArray.join("/") || "/";
         setTimeout(
           () =>
             DevConsole(

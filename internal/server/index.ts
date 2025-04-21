@@ -255,7 +255,6 @@ class BunextServer {
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
-          //await builder.makeBuild();
         } else {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) throw new Error("Production build failed");
@@ -415,7 +414,6 @@ class BunextServer {
           path: data?.path,
         },
       } as ClusterMessageType);
-      //await this.waittingBuildFinish;
     } else {
       for (const worker of Object.values(cluster.workers || [])) {
         worker?.send("build_done");

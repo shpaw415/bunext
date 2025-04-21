@@ -42,7 +42,7 @@ export default async function Page() {
       {TestServerElement2()}
       <TestElement3 />
       <Bunext.router.navigate.components.link href="/other">
-        <button>Other pages</button>
+        <button>Other page</button>
       </Bunext.router.navigate.components.link>
       <SetSessionButton />
       <DeleteSessionButton />

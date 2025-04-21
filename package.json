@@ -19,10 +19,10 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.1",
     "@types/web": "^0.0.216",
-    "bunext-js": "github:shpaw415/bunext#npm-new-name",
     "tailwindcss": "^4.1.4",
     "@tailwindcss/postcss": "4.1.4",
-    "@tailwindcss/cli": "4.1.4"
+    "@tailwindcss/cli": "4.1.4",
+    "tailwind-bunext-plugin": "0.1.0"
   },
   "peerDependencies": {
     "react": "^19.1.0",
@@ -50,10 +50,10 @@
     "test": "bun run build && bun test ./bin/main.test.ts",
     "clear": "rm -rf .bunext/build/* .bunext/build/.bunext config/bunext.* config/session.*",
     "to:module": "bun bin/to_node_module.ts",
-    "dev": "bun bunext dev",
-    "start": "bun bunext production",
+    "dev": "bun ./bin/index.ts dev",
+    "start": "bun ./bin/index.ts production",
     "build": "bun to:module && bun bunext build",
-    "db:create": "bun bunext database:create"
+    "db:create": "bun ./bin/index.ts database:create"
   },
   "keywords": [
     "react",

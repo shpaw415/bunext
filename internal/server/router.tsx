@@ -69,9 +69,9 @@ class StaticRouters extends PluginLoader {
   inited = false;
 
   baseDir = process.cwd();
-  buildDir = ".bunext/build";
-  pageDir = "src/pages";
-  staticDir = "static";
+  buildDir = ".bunext/build" as const;
+  pageDir = "src/pages" as const;
+  staticDir = "static" as const;
 
   constructor() {
     super();

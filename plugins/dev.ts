@@ -10,6 +10,7 @@ import {
   ToColor,
 } from "../internal/server/logs";
 import type { MatchedRoute } from "bun";
+import { normalize } from "path";
 
 const plugin: BunextPlugin =
   process.env.NODE_ENV == "development"
@@ -22,8 +23,6 @@ const plugin: BunextPlugin =
       }
     : {};
 
-export default plugin;
-
 async function onDevRequest(request: Request) {
   if (process.env.NODE_ENV != "development") return;
   const match = router.server.match(request);
@@ -32,26 +31,23 @@ async function onDevRequest(request: Request) {
     !match.src.endsWith("layout.tsx") &&
     match.pathname != "/favicon.ico" &&
     request.headers.get("accept") != "application/vnd.server-side-props" &&
-    match.filePath.endsWith("tsx")
+    match.filePath.endsWith("index.tsx")
   ) {
-    DevConsole(
-      `${ToColor("blue", TerminalIcon.info)} ${ToColor(
-        TextColor,
-        `compiling ${match.pathname} ...`
-      )}`
+    await MakeBuild(match);
+    return;
+  }
+
+  const url = new URL(request.url);
+  if (url.pathname.endsWith("index.js")) {
+    const match = router.server.match(
+      normalize(
+        url.pathname.replace("index.js", "").replace(router.pageDir, "")
+      )
     );
-    setDevCurrentPath(match);
-    await benchmark_console(
-      (time) =>
-        `${ToColor("green", TerminalIcon.success)} ${ToColor(
-          TextColor,
-          `compiled ${match.pathname} in ${time}ms`
-        )}`,
-      async () => {
-        await builder.resetPath(match.filePath);
-        await builder.makeBuild(match.filePath);
-      }
-    );
+    if (match && match.filePath.endsWith("tsx")) {
+      await MakeBuild(match);
+      return;
+    }
   }
 }
 const cwd = process.cwd();
@@ -66,3 +62,28 @@ function setDevCurrentPath(match: MatchedRoute) {
     pathname: PathnameArray.join("."),
   };
 }
+
+async function MakeBuild(match: MatchedRoute) {
+  await builder.awaitBuildFinish();
+  DevConsole(
+    `${ToColor("blue", TerminalIcon.info)} ${ToColor(
+      TextColor,
+      `compiling ${match.pathname} ...`
+    )}`
+  );
+  setDevCurrentPath(match);
+  await benchmark_console(
+    (time) =>
+      `${ToColor("green", TerminalIcon.success)} ${ToColor(
+        TextColor,
+        `compiled ${match.pathname} in ${time}ms`
+      )}`,
+    async () => {
+      await builder.resetPath(match.filePath);
+      await builder.makeBuild(match.filePath);
+      router.client.reload();
+    }
+  );
+}
+
+export default plugin;
