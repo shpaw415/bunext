@@ -596,3 +596,13 @@ This version improves readability, adds more examples, and organizes the content
     - Bunext global object updated
   </details>
 </details>
+
+
+<details>
+<summary>0.11.x</summary>
+<details>
+    <summary>📢 0.11.0</summary>
+    
+    - Build process worker thread (improve build time by removing the overhead of triggering a new process each time) 
+  </details>
+</details>
