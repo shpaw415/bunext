@@ -31,7 +31,8 @@ async function onDevRequest(request: Request) {
     !match.src.endsWith("layout.tsx") &&
     match.pathname != "/favicon.ico" &&
     request.headers.get("accept") != "application/vnd.server-side-props" &&
-    match.filePath.endsWith("index.tsx")
+    match.filePath.endsWith(".tsx") &&
+    !isDevCurrentPath(match)
   ) {
     await MakeBuild(match);
     return;
@@ -44,7 +45,7 @@ async function onDevRequest(request: Request) {
         url.pathname.replace("index.js", "").replace(router.pageDir, "")
       )
     );
-    if (match?.filePath?.endsWith("tsx")) {
+    if (match?.filePath?.endsWith("tsx") && !isDevCurrentPath(match)) {
       await MakeBuild(match);
       return;
     }
@@ -53,7 +54,6 @@ async function onDevRequest(request: Request) {
 const cwd = process.cwd();
 function setDevCurrentPath(match: MatchedRoute) {
   const relativePathFromSrcPath = relative(cwd + "/src", match.filePath);
-
   const PathnameArray = relativePathFromSrcPath.split(".");
   PathnameArray.pop();
 
@@ -61,6 +61,13 @@ function setDevCurrentPath(match: MatchedRoute) {
     current_dev_path: relativePathFromSrcPath,
     pathname: PathnameArray.join("."),
   };
+}
+function isDevCurrentPath(match: MatchedRoute) {
+  if (globalThis.dev?.current_dev_path) {
+    const relativePathFromSrcPath = relative(cwd + "/src", match.filePath);
+    return globalThis.dev.current_dev_path == relativePathFromSrcPath;
+  }
+  return false;
 }
 
 async function MakeBuild(match: MatchedRoute) {
