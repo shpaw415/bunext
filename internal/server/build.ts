@@ -567,8 +567,6 @@ class Builder extends PluginLoader {
         head: Head.head,
       };
 
-      await this.updateData(strRes);
-
       return strRes;
     } else {
       console.log(

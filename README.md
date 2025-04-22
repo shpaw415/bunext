@@ -601,7 +601,7 @@ This version improves readability, adds more examples, and organizes the content
 <details>
 <summary>0.11.x</summary>
 <details>
-    <summary>📢 0.11.0</summary>
+    <summary>📢 0.11.1</summary>
     
     - Build process worker thread (improve build time by removing the overhead of triggering a new process each time) 
   </details>
