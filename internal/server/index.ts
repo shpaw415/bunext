@@ -196,9 +196,10 @@ class BunextServer {
   }
 
   async init() {
-    const isDryRun = Boolean(globalThis.dryRun);
+    const dry = Boolean(globalThis.dryRun);
+    console.clear();
     DevConsole(`${StartLog}`);
-    isDryRun &&
+    dry &&
       DevConsole(
         `${ToColor("green", TerminalIcon.success)} ${ToColor(
           TextColor,
@@ -207,7 +208,7 @@ class BunextServer {
       );
     return benchmark_console(
       (time) =>
-        isDryRun &&
+        dry &&
         `${ToColor("green", TerminalIcon.success)} ${ToColor(
           TextColor,
           `Ready in ${time}ms`

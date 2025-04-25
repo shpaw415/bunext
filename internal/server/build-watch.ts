@@ -11,7 +11,6 @@ import {
   TextColor,
   ToColor,
 } from "./logs";
-import type { BunextPlugin } from "../../plugins/types";
 
 type initFunction = (path?: string) => Promise<any>;
 

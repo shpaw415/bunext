@@ -15,7 +15,15 @@ export default async function Make() {
     await Promise.all(devs.map((plugin) => plugin()));
   }
 
-  await Promise.all(mains.map((plugin) => plugin()));
+  await Promise.all(
+    mains.map(async (plugin) => {
+      try {
+        await plugin();
+      } catch (e) {
+        console.error(`OnServerStart plugin failed`, e);
+      }
+    })
+  );
 }
 
 export async function OnServerStartCluster() {
