@@ -1,6 +1,13 @@
 import { router } from "../../internal/server/router";
 import type { BunextPlugin } from "../types";
 
+/**
+ * Generates a TypeScript union type definition representing all application routes.
+ *
+ * Dynamic route segments (e.g., `[param]`) are replaced with `${string}` template placeholders. Routes associated with layout files are excluded.
+ *
+ * @returns A string containing the TypeScript type definition for `RoutesType`.
+ */
 function makeType() {
   const routes = Object.entries(
     JSON.parse(router.routes_dump) as Record<string, string>
