@@ -2,6 +2,16 @@ import { useEffect, useRef } from "react";
 import { navigate } from "./revalidate";
 import type { RoutesType } from "../../plugins/typed-route/type";
 
+/**
+ * Renders an anchor element that intercepts navigation to handle client-side routing.
+ *
+ * When clicked, opens the link in a new tab if the Ctrl key is pressed; otherwise, navigates programmatically using the custom {@link navigate} function.
+ *
+ * @param href - The destination route to navigate to.
+ *
+ * @remark
+ * The native click event is intercepted to prevent default browser navigation. All standard anchor attributes except `href` are supported.
+ */
 export function Link({
   ...props
 }: { href: RoutesType } & Omit<
