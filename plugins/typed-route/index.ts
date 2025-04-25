@@ -24,7 +24,12 @@ function makeType() {
 export default {
   serverStart: {
     async dev() {
-      await Bun.write(`${import.meta.dirname}/type.ts`, makeType());
+      try {
+        await Bun.write(`${import.meta.dirname}/type.ts`, makeType());
+        console.log("✅ Generated type-safe routes");
+      } catch (error) {
+        console.error("❌ Failed to generate type-safe routes:", error);
+      }
     },
   },
 } as BunextPlugin;
