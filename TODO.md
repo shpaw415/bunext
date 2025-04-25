@@ -10,7 +10,8 @@ Priority 1
 - Add request url containing @static mapped to the static assets
 - Gzip html response 
   - https://developer.chrome.com/docs/lighthouse/performance/uses-text-compression?utm_source=lighthouse&utm_medium=devtools&hl=fr
-  - csspurge for head element
+
+- csspurge for head element
   
 Priority 2
 
@@ -20,3 +21,9 @@ Priority 2
   - route and sub-route
   - layout
   - bunext global object
+  - api endpoints
+  - Server Action
+  - Server Components
+  - Env variable
+  - Server config
+  - Work-around

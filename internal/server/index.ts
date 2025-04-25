@@ -197,7 +197,7 @@ class BunextServer {
 
   async init() {
     const dry = Boolean(globalThis.dryRun);
-    console.clear();
+    process.env.NODE_ENV == "development" && console.clear();
     DevConsole(`${StartLog}`);
     dry &&
       DevConsole(
