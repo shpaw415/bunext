@@ -26,7 +26,7 @@ export function Link({
       { signal: ctrl.signal }
     );
     return () => ctrl.abort();
-  }, []);
+  }, [props.href]);
 
   return <a ref={_ref} {...props} />;
 }
