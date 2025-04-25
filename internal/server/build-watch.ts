@@ -11,6 +11,7 @@ import {
   TextColor,
   ToColor,
 } from "./logs";
+import type { BunextPlugin } from "../../plugins/types";
 
 type initFunction = (path?: string) => Promise<any>;
 
@@ -47,9 +48,13 @@ export function watchBuild(build: initFunction, paths: string[]) {
   );
 }
 const cwd = process.cwd();
+
+
 export const doWatchBuild = () =>
   watchBuild(
     async (path) => {
+      await Promise.all(builder.getPlugins().map((p) => p.onFileSystemChange?.(path)))
+
       if (!path || !globalThis.dev.current_dev_path) return;
       const EntryPoints = await builder.getEntryPoints();
       const probablePath = normalize(

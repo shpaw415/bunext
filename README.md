@@ -6,7 +6,7 @@ Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, pro
 
 ## 🔧 Compatibility  
 
-- **Bun Version**: `1.1.0 - 1.2.9`  
+- **Bun Version**: `1.1.0 - 1.2.10`  
 - **Supported OS**: Linux, WSL (Windows support in progress)  
 - **Note**: Bun is evolving rapidly. New versions may cause compatibility issues. Watch for breaking changes before version `1.0.0`.  
 
@@ -20,6 +20,7 @@ To install Bunext, use:
 
 ```sh
 bun i bunext-js
+bun bunext init
 # OR
 bun create bunext-app
 ```  
@@ -27,7 +28,6 @@ bun create bunext-app
 Then initialize your project:  
 
 ```sh
-bun bunext init  # if you used bun i bunext-js
 bun run db:create  # Creates types and missing tables in the database  
 ```  
 
@@ -212,6 +212,7 @@ export async function ServerDeleteSession() {
 
 Bunext supports **Server Actions** for secure API calls.  
 
+ - function name must start with the keyword Server 
  - **File & File[]** must be at the first level of params.
  - formData is supported without other params
  - params must be serializable 
@@ -574,7 +575,7 @@ This version improves readability, adds more examples, and organizes the content
 </details>
 
 <details>
-<summary>0.10.x</summary>
+<summary>🔹0.10.x</summary>
 <details>
     <summary>📢 0.10.1</summary>
     
@@ -599,10 +600,19 @@ This version improves readability, adds more examples, and organizes the content
 
 
 <details>
-<summary>0.11.x</summary>
+<summary>🔹0.11.x</summary>
 <details>
     <summary>📢 0.11.1</summary>
     
     - Build process worker thread (improve build time by removing the overhead of triggering a new process each time) 
   </details>
+
+  <details>
+    <summary>📢 0.11.2</summary>
+    
+    - Upgraded Version of Link element now is a Anchor element and ctrl+click will open in a new tab.
+    - Link and navigate has typeSafe route path
+    - BunextPlugin has onFileSystemChange new key (doc will follow)
+  </details>
 </details>
+

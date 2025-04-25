@@ -1,16 +1,32 @@
-import { cloneElement, type JSX } from "react";
+import { useEffect, useRef } from "react";
+import { navigate } from "./revalidate";
+import type { RoutesType } from "../../plugins/typed-route/type";
 
 export function Link({
-  href,
-  children,
-}: {
-  href: string;
-  children: JSX.Element;
-}) {
-  return cloneElement<React.HTMLAttributes<HTMLElement>>(children, {
-    onClick: (e) => {
-      children.props.onClick && children.props.onClick(e);
-      Bunext.router.navigate.to(href);
-    },
-  });
+  ...props
+}: { href: RoutesType } & Omit<
+  React.DetailedHTMLProps<
+    React.AnchorHTMLAttributes<HTMLAnchorElement>,
+    HTMLAnchorElement
+  >,
+  "href"
+>) {
+  const _ref = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const ref =
+      (props.ref as React.RefObject<HTMLAnchorElement> | undefined) ?? _ref;
+    ref.current?.addEventListener(
+      "click",
+      (c) => {
+        c.preventDefault();
+        if (c.ctrlKey) return window.open(props.href, "_blank");
+        navigate(props.href);
+      },
+      { signal: ctrl.signal }
+    );
+    return () => ctrl.abort();
+  }, []);
+
+  return <a ref={_ref} {...props} />;
 }

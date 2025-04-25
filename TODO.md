@@ -1,6 +1,5 @@
 Priority 1
 
-- TypeSafe routes 
 - PassThrough data SSR->Client
 - Database Gt, Lt, NotEqual, GtEq, LtEq, Exists
 - Fix build import default component in serverComponents
