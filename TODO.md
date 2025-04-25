@@ -1,4 +1,4 @@
-Priority 1
+# Priority 1
 
 - test every components and client side features
 - PassThrough data SSR->Client
@@ -13,17 +13,24 @@ Priority 1
 
 - csspurge for head element
   
-Priority 2
+
+# Priority 2
 
 
-- Documentation 
+## Documentation 
+
+  - bunext global object
+  - API endpoints
+  - server actions
+  - server components
+  - environment variables
+  - server configuration
+  - workaround
+  - navigation
+  - session
+  - database
   - plugin system
   - route and sub-route
   - layout
-  - bunext global object
-  - api endpoints
-  - Server Action
-  - Server Components
-  - Env variable
-  - Server config
-  - Work-around
+  - directive (use client, use server, use static)
+  - SVG components
