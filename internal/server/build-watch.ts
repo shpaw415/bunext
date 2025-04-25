@@ -38,6 +38,15 @@ class SingleTaskPool {
   }
 }
 
+/**
+ * Watches specified directories and triggers the provided build function on file changes.
+ *
+ * Sets up recursive file system watchers on each path in {@link paths}. When a file changes, the {@link build} function is invoked with the changed file's path. Ensures that only one build runs at a time, queuing additional changes until the current build completes.
+ *
+ * @param build - Asynchronous function to execute when a file change is detected.
+ * @param paths - Array of directory paths to watch recursively.
+ * @returns An array of file watcher objects for the specified paths.
+ */
 export function watchBuild(build: initFunction, paths: string[]) {
   const wrapper = new SingleTaskPool(build);
   wrapper.run();
