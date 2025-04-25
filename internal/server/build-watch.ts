@@ -58,11 +58,20 @@ export function watchBuild(build: initFunction, paths: string[]) {
 }
 const cwd = process.cwd();
 
-
 export const doWatchBuild = () =>
   watchBuild(
     async (path) => {
-      await Promise.all(builder.getPlugins().map((p) => p.onFileSystemChange?.(path)))
+      await Promise.all(
+        builder.getPlugins().map(async (p) => {
+          try {
+            if (p.onFileSystemChange) {
+              await p.onFileSystemChange(path);
+            }
+          } catch (error) {
+            console.error(`Error in plugin's onFileSystemChange hook:`, error);
+          }
+        })
+      );
 
       if (!path || !globalThis.dev.current_dev_path) return;
       const EntryPoints = await builder.getEntryPoints();
