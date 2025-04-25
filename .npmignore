@@ -4,3 +4,13 @@ external-plugins
 README.old.md
 static
 src
+git.sh
+test.ts
+TODO.md
+test.json
+tsconfig.tsbuildinfo
+.devdbrc
+.vscode
+config.dev
+new_css_features
+docker
