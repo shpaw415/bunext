@@ -20,6 +20,7 @@ export class BunextRequest {
   public plugins: FeatureType = {
     globalData: {},
   };
+  public URL: URL;
 
   constructor(props: { request: Request; response: Response }) {
     this.request = props.request;
@@ -34,6 +35,7 @@ export class BunextRequest {
     this.SessionID = (
       this.webtoken.session() as undefined | { id: string }
     )?.id;
+    this.URL = new URL(this.request.url);
   }
   public __SET_RESPONSE__(response: Response) {
     this.response = response;

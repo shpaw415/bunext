@@ -6,7 +6,7 @@ Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, pro
 
 ## 🔧 Compatibility  
 
-- **Bun Version**: `1.1.0 - 1.2.9`  
+- **Bun Version**: `1.1.0 - 1.2.10`  
 - **Supported OS**: Linux, WSL (Windows support in progress)  
 - **Note**: Bun is evolving rapidly. New versions may cause compatibility issues. Watch for breaking changes before version `1.0.0`.  
 
@@ -20,6 +20,7 @@ To install Bunext, use:
 
 ```sh
 bun i bunext-js
+bun bunext init
 # OR
 bun create bunext-app
 ```  
@@ -27,7 +28,6 @@ bun create bunext-app
 Then initialize your project:  
 
 ```sh
-bun bunext init  # if you used bun i bunext-js
 bun run db:create  # Creates types and missing tables in the database  
 ```  
 
@@ -172,6 +172,62 @@ function NextPage() {
 
 ---
 
+
+## API Endpoint
+
+Define HTTP method handlers in files under `src/pages` to automatically create API endpoints.
+
+### 📁 Example: `src/pages/api/v1/index.ts`
+
+```ts
+import type { BunextRequest } from "bunext-js/features/request";
+
+export function POST(request: BunextRequest) {
+  request.response = new Response("POST");
+  return request;
+}
+
+export function GET(request: BunextRequest) {
+  request.response = new Response("GET");
+  return request;
+}
+
+export function PUT(request: BunextRequest) {
+  request.response = new Response("PUT");
+  return request;
+}
+
+export function DELETE(request: BunextRequest) {
+  request.response = new Response("DELETE");
+  return request;
+}
+```
+
+---
+
+## 🌐 Making Requests from the Client
+
+You can send requests to this API using the native `fetch` function:
+
+```ts
+await fetch("https://my.site.com/api/v1", {
+  method: "POST",
+  body: JSON.stringify({ foo: "bar" })
+});
+// Response will be: "POST"
+```
+
+---
+
+### ✅ Features
+- Fully typed request with `BunextRequest`
+- Auto-routing based on file path
+- Clean, REST-like interface using standard HTTP verbs
+
+
+
+
+
 ## 🛠️ Sessions  
 
 Bunext supports **server-side and client-side session management**.  
@@ -212,6 +268,7 @@ export async function ServerDeleteSession() {
 
 Bunext supports **Server Actions** for secure API calls.  
 
+ - function name must start with the keyword Server 
  - **File & File[]** must be at the first level of params.
  - formData is supported without other params
  - params must be serializable 
@@ -574,7 +631,7 @@ This version improves readability, adds more examples, and organizes the content
 </details>
 
 <details>
-<summary>0.10.x</summary>
+<summary>🔹0.10.x</summary>
 <details>
     <summary>📢 0.10.1</summary>
     
@@ -599,10 +656,20 @@ This version improves readability, adds more examples, and organizes the content
 
 
 <details>
-<summary>0.11.x</summary>
+<summary>🔹0.11.x</summary>
 <details>
     <summary>📢 0.11.1</summary>
     
     - Build process worker thread (improve build time by removing the overhead of triggering a new process each time) 
   </details>
+
+  <details>
+    <summary>📢 0.11.2</summary>
+    
+    - Upgraded Version of Link element now is a Anchor element and ctrl+click will open in a new tab.
+    - Link and navigate has typeSafe route path
+    - BunextPlugin has onFileSystemChange new key (doc will follow)
+    - update Doc for missing section API endpoints
+  </details>
 </details>
+

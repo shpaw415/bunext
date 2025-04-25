@@ -22,6 +22,7 @@ import {
 } from "../../features/session/session";
 import { AddServerActionCallback } from "../globals";
 import { RequestContext } from "../server/context";
+import type { RoutesType } from "../../plugins/typed-route/type";
 const globalX = globalThis as unknown as _GlobalData;
 
 export const match = globalX.__ROUTES__
@@ -372,7 +373,7 @@ export function usePathname() {
  * @param to the path to navigate to
  * @param param1 the options, which can include `replace`
  */
-export const navigate = (to: string, { replace = false } = {}) =>
+export const navigate = (to: RoutesType, { replace = false } = {}) =>
   history[replace ? eventReplaceState : eventPushState](null, "", to);
 
 const eventPopstate = "popstate";

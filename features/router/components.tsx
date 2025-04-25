@@ -1,16 +1,42 @@
-import { cloneElement, type JSX } from "react";
+import { useEffect, useRef } from "react";
+import { navigate } from "./revalidate";
+import type { RoutesType } from "../../plugins/typed-route/type";
 
+/**
+ * Renders an anchor element that intercepts navigation to handle client-side routing.
+ *
+ * When clicked, opens the link in a new tab if the Ctrl key is pressed; otherwise, navigates programmatically using the custom {@link navigate} function.
+ *
+ * @param href - The destination route to navigate to.
+ *
+ * @remark
+ * The native click event is intercepted to prevent default browser navigation. All standard anchor attributes except `href` are supported.
+ */
 export function Link({
-  href,
-  children,
-}: {
-  href: string;
-  children: JSX.Element;
-}) {
-  return cloneElement<React.HTMLAttributes<HTMLElement>>(children, {
-    onClick: (e) => {
-      children.props.onClick && children.props.onClick(e);
-      Bunext.router.navigate.to(href);
-    },
-  });
+  ...props
+}: { href: RoutesType } & Omit<
+  React.DetailedHTMLProps<
+    React.AnchorHTMLAttributes<HTMLAnchorElement>,
+    HTMLAnchorElement
+  >,
+  "href"
+>) {
+  const _ref = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const ref =
+      (props.ref as React.RefObject<HTMLAnchorElement> | undefined) ?? _ref;
+    ref.current?.addEventListener(
+      "click",
+      (c) => {
+        c.preventDefault();
+        if (c.ctrlKey) return window.open(props.href, "_blank");
+        navigate(props.href);
+      },
+      { signal: ctrl.signal }
+    );
+    return () => ctrl.abort();
+  }, [props.href]);
+
+  return <a ref={_ref} {...props} />;
 }
