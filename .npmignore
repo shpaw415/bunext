@@ -2,7 +2,6 @@ benchmark
 .vscode
 external-plugins
 README.old.md
-static
 src
 git.sh
 test.ts
@@ -14,3 +13,4 @@ tsconfig.tsbuildinfo
 config.dev
 new_css_features
 docker
+./static

@@ -34,3 +34,5 @@
   - layout
   - directive (use client, use server, use static)
   - SVG components
+  - Head component
+    - dynamic head component

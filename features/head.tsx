@@ -314,4 +314,9 @@ function useHead({ data }: { data?: _Head }) {
   return updater;
 }
 
-export { Head, useHead, HeadProvider };
+function HeadComponent({ ...props }: _Head) {
+  useHead({ data: props });
+  return <></>;
+}
+
+export { Head, HeadComponent, useHead, HeadProvider };

@@ -103,6 +103,121 @@ export default function DynamicPage({
 
 ---
 
+# ⚙️ Server Components
+
+Bunext supports **Server Components**, which run **only at build time** and are re-executed only when `revalidate()` is triggered.
+
+---
+
+## ✅ How It Works
+
+- Any exported function without the `"use client"` directive is treated as a **Server Component**.
+- Must have **no props**.
+- Must be **exported** (not inline) and can be `async`.
+- `revalidate()` will re-run **all Server Components** used on the page.
+- Must not have hooks
+
+---
+
+### 📦 Example
+
+```tsx
+// index.tsx
+
+export default async function Page() {
+  return (
+    <div>
+      {await Components()}
+      <NotValid />
+    </div>
+  );
+}
+
+// ✅ Valid Server Component
+export async function Components() {
+  const res = await (await fetch("https://some-api.com/api")).json();
+  return <div>{JSON.stringify(res)}</div>;
+}
+
+// ❌ Invalid - has props
+export function NotValid({ someProps }: { someProps: string }) {
+  return <div>{someProps}</div>;
+}
+```
+---
+🧩 Nested Server Components
+You can also compose Server Components by nesting them.
+
+```tsx
+// index.tsx
+
+export default async function Page() {
+  return (
+    <main>
+      {await Parent()}
+    </main>
+  );
+}
+
+export async function Parent() {
+  return (
+    <section>
+      <h2>Parent Component</h2>
+      {await Child()}
+    </section>
+  );
+}
+
+export async function Child() {
+  const data = await (await fetch("https://some-api.com/stats")).json();
+  return <pre>{JSON.stringify(data, null, 2)}</pre>;
+}
+```
+
+---
+🔁 Revalidating Components
+Bunext allows scheduled and manual revalidation.
+
+⏱ Scheduled Revalidation
+
+```tsx
+// index.tsx
+import { revalidate } from "bunext-js/features/router/revalidate.ts";
+
+export default function Page() {
+  revalidateEvery("/", 3600); // revalidate this page every hour
+
+  return (
+    <div>
+      <button onClick={() => ServerRevalidate(["/"])}>Revalidate / path</button>
+    </div>
+  );
+}
+
+
+
+```
+---
+🔄 Manual Revalidation
+
+```tsx
+import { revalidate } from "bunext-js/features/router/revalidate.ts";
+
+export async function ServerRevalidate(...paths: string[]) {
+  revalidate(...paths);
+}
+```
+
+---
+
+📝 Rules to apply
+  - ✅ Keep Server Components pure – no side effects.
+  - ✅ Fetch data server-side with async/await.
+  - ❌ Avoid using props.
+  - ❌ Don't mutate state or use hooks like useState or useEffect.
+
+---
+
 ## 🚀 Static Pages with `"use static"`  
 
 You can **cache pages for better performance** using `"use static"`.  
@@ -664,12 +779,13 @@ This version improves readability, adds more examples, and organizes the content
   </details>
 
   <details>
-    <summary>📢 0.11.2</summary>
+    <summary>📢 0.11.3</summary>
     
     - Upgraded Version of Link element now is a Anchor element and ctrl+click will open in a new tab.
     - Link and navigate has typeSafe route path
     - BunextPlugin has onFileSystemChange new key (doc will follow)
-    - update Doc for missing section API endpoints
+    - update Doc for missing section API endpoints and server components
+    - Head component for setting dynamic head data
   </details>
 </details>
 
