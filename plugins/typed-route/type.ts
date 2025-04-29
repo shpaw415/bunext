@@ -1,1 +1,23 @@
-export type RoutesType = `/dynamic` | `/link` | `/other` | `/other/static` | `/serversideprops` | `/serversideprops/static` | `/serversideprops/static/undefined` | `/serversideprops/undefined` | `/showoff` | `/style-page` | `/svg` | `/` | `/dynamic/static/${string}` | `/static/${string}` | `/test/foo/${string}` | `/test/${string}` | `/${string}/other`
+export type RoutesType =
+  | `/dynamic`
+  | `/link`
+  | `/other`
+  | `/other/static`
+  | `/serversideprops`
+  | `/serversideprops/static`
+  | `/serversideprops/static/undefined`
+  | `/serversideprops/undefined`
+  | `/showoff`
+  | `/style-page`
+  | `/svg`
+  | `/`
+  | `/dynamic/static/${string}/`
+  | `/dynamic/static/[module]`
+  | `/static/${string}/`
+  | `/static/[id]`
+  | `/test/foo/${string}/`
+  | `/test/foo/[bar]`
+  | `/test/${string}/`
+  | `/test/[id]`
+  | `/${string}/other`
+  | `/[segment]/other`;

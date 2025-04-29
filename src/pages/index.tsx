@@ -58,6 +58,9 @@ export default async function Page() {
       </Bunext.router.navigate.components.link>
       <IsLogged />
       <DynamicFileImport />
+      <Bunext.router.navigate.components.link href="/dynamic/static/test/">
+        <button>Other page</button>
+      </Bunext.router.navigate.components.link>
     </div>
   );
 }
