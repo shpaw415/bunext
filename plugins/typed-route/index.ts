@@ -4,10 +4,11 @@ import { normalize } from "path";
 
 const regex = /\[[A-Za-z0-9]+\]/g;
 /**
- * Generates a TypeScript union type definition representing all application routes.
+ * Creates a TypeScript union type definition for all application routes based on a JSON route dump.
  *
- * Dynamic route segments (e.g., `[param]`) are replaced with `${string}` template placeholders. Routes associated with layout files are excluded.
+ * Dynamic segments in route paths (e.g., `[param]`) are replaced with `${string}` placeholders. Both normalized and original forms are included for routes with dynamic segments. Routes linked to layout files are excluded.
  *
+ * @param routeDump - A JSON string representing the application's route mapping.
  * @returns A string containing the TypeScript type definition for `RoutesType`.
  */
 export function makeType(routeDump: string) {
