@@ -116,7 +116,6 @@ function tsConfig() {
         "@static/*": ["./static/*"],
       },
     },
-    exclude: ["node_modules"],
-    include: [".bunext/types/custom.d.ts", "src"],
+    include: [".bunext/types/custom.d.ts", "src", "node_modules/bunext-js"],
   };
 }

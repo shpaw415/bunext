@@ -613,7 +613,7 @@ class Builder extends PluginLoader {
       jsxOptimizationInline: true,
       exports: {
         replace: {
-          ...this.ServerActionToTag(fileContent),
+          ...(await this.ServerActionToTag(filePath)),
         },
       },
     });
@@ -772,7 +772,7 @@ class Builder extends PluginLoader {
               ]
             ) as Record<string, string>;
 
-            const serverActionsTags = self.ServerActionToTag(fileContent);
+            const serverActionsTags = await self.ServerActionToTag(path);
 
             const transpiler = new Bun.Transpiler({
               loader: "tsx",
@@ -915,13 +915,11 @@ class Builder extends PluginLoader {
   /**
    * used for transform serverAction to tag for Transpiler
    */
-  private ServerActionToTag(fileContent: string) {
-    let transpiler = new Bun.Transpiler({ loader: "tsx" });
-    const { exports } = transpiler.scan(fileContent);
-    return exports
-      .filter((ex) => ex.startsWith("Server"))
+  private async ServerActionToTag(filePath: string) {
+    return Object.entries(await import(filePath))
+      .filter(([ex, _]) => ex.startsWith("Server"))
       .reduce(
-        (a, ex) => ({
+        (a, [ex, _]) => ({
           ...a,
           [ex]: `<!BUNEXT_ServerAction_${ex}!>`,
         }),
