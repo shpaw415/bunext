@@ -16,7 +16,7 @@ export function makeType(routeDump: string) {
     .map(([key]) => key)
     .map((path) => {
       const pathArray = [normalize(path.replaceAll(regex, "${string}/"))];
-      if (regex.test(path)) pathArray.push(path);
+      if (new RegExp(regex).test(path)) pathArray.push(path);
       return pathArray;
     })
     .flat();
