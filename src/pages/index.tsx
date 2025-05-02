@@ -32,6 +32,13 @@ function DynamicFileImport() {
   return <></>;
 }
 
+/**
+ * Renders the main page with navigation links, session controls, and test components.
+ *
+ * Includes UI elements for navigating to other pages, updating and deleting session data, triggering API calls, printing session information to the server console, and forcing server-side revalidation.
+ *
+ * @returns The main page JSX element.
+ */
 export default async function Page() {
   Bunext.router.revalidate.ssr.every("/", 5);
 
