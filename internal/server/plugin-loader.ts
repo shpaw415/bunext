@@ -14,7 +14,7 @@ export class PluginLoader {
         onlyFiles: true,
         absolute: true,
       })
-    );
+    ).filter((path) => !path.endsWith(".test.ts"));
 
     this.Plugins.push(
       ...(
