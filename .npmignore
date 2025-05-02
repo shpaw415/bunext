@@ -14,3 +14,4 @@ config.dev
 new_css_features
 docker
 ./static
+.bunext/build

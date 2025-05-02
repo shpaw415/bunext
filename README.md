@@ -787,5 +787,14 @@ This version improves readability, adds more examples, and organizes the content
     - update Doc for missing section API endpoints and server components
     - Head component for setting dynamic head data
   </details>
+
+  <details>
+    <summary>📢 0.11.4</summary>
+    
+    - Fix minor init type
+    - Upgrade typed Route paths
+    - other minor improvement
+  </details>
+
 </details>
 
