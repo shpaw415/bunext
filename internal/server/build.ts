@@ -606,20 +606,24 @@ class Builder extends PluginLoader {
       func.name
     )}`;
   }
-  private async ClientSideFeatures(fileContent: string, filePath: string) {
+  private async ClientSideFeatures(
+    fileContent: string,
+    filePath: string,
+    module: Record<string, unknown>
+  ) {
     const transpiler = new Bun.Transpiler({
       loader: "tsx",
       deadCodeElimination: true,
       jsxOptimizationInline: true,
       exports: {
         replace: {
-          ...(await this.ServerActionToTag(filePath)),
+          ...(await this.ServerActionToTag(module)),
         },
       },
     });
 
     return this.ServerActionCompiler(
-      (await import(filePath)) as Record<string, Function>,
+      module,
       transpiler.transformSync(fileContent),
       filePath
     );
@@ -629,6 +633,7 @@ class Builder extends PluginLoader {
     modulePath,
     fileContent,
     serverComponents,
+    module,
   }: {
     modulePath: string;
     fileContent: string;
@@ -638,12 +643,9 @@ class Builder extends PluginLoader {
         reactElement: string;
       };
     };
+    module: Record<string, unknown>;
   }) {
-    fileContent = this.ServerActionCompiler(
-      (await import(modulePath)) as Record<string, Function>,
-      fileContent,
-      modulePath
-    );
+    fileContent = this.ServerActionCompiler(module, fileContent, modulePath);
     fileContent = this.ServerComponentsCompiler(serverComponents, fileContent);
 
     return fileContent;
@@ -672,14 +674,16 @@ class Builder extends PluginLoader {
     return fileContent;
   }
   private ServerActionCompiler(
-    _module: Record<string, Function>,
+    _module: Record<string, unknown>,
     fileContent: string,
     modulePath: string
   ) {
     const ServerActionsExports = Object.keys(_module).filter(
       (k) =>
         k.startsWith("Server") ||
-        (k == "default" && _module[k].name.startsWith("Server"))
+        (k == "default" &&
+          typeof _module[k] == "function" &&
+          _module[k].name.startsWith("Server"))
     );
     // ServerAction
     for (const serverAction of ServerActionsExports) {
@@ -744,6 +748,11 @@ class Builder extends PluginLoader {
           { namespace: "client", filter: /\.tsx$/ },
           async ({ path }) => {
             let fileContent = await Bun.file(path).text();
+            const _module_ = await import(
+              process.env.NODE_ENV == "production"
+                ? path
+                : path + `?${generateRandomString(5)}`
+            );
             if (
               ["layout.tsx"]
                 .map((endsWith) => path.endsWith(endsWith))
@@ -757,11 +766,18 @@ class Builder extends PluginLoader {
 
             if (self.isUseClient(fileContent))
               return {
-                contents: await self.ClientSideFeatures(fileContent, path),
+                contents: await self.ClientSideFeatures(
+                  fileContent,
+                  path,
+                  _module_
+                ),
                 loader: "js",
               };
 
-            const serverComponents = await self.ServerComponentsToTag(path);
+            const serverComponents = await self.ServerComponentsToTag(
+              path,
+              _module_
+            );
 
             const serverComponentsForTranspiler = Object.assign(
               {},
@@ -772,7 +788,7 @@ class Builder extends PluginLoader {
               ]
             ) as Record<string, string>;
 
-            const serverActionsTags = await self.ServerActionToTag(path);
+            const serverActionsTags = await self.ServerActionToTag(_module_);
 
             const transpiler = new Bun.Transpiler({
               loader: "tsx",
@@ -788,6 +804,7 @@ class Builder extends PluginLoader {
               modulePath: path,
               fileContent: fileContent,
               serverComponents: serverComponents,
+              module: _module_,
             });
 
             fileContent = new Bun.Transpiler({
@@ -815,7 +832,12 @@ class Builder extends PluginLoader {
             return {
               contents: await self.ClientSideFeatures(
                 await Bun.file(path).text(),
-                path
+                path,
+                await import(
+                  process.env.NODE_ENV == "production"
+                    ? path
+                    : path + `?${generateRandomString(5)}`
+                )
               ),
               loader: "js",
             };
@@ -879,11 +901,13 @@ class Builder extends PluginLoader {
     } as BunPlugin;
   }
 
-  private async ServerComponentsToTag(modulePath: string) {
+  private async ServerComponentsToTag(
+    modulePath: string,
+    _module: Record<string, unknown>
+  ) {
     // ServerComponent
     const ssrModule = CacheManager.getSSR(modulePath);
-    const _module = await import(modulePath);
-    const defaultName = _module.default?.name as undefined | string;
+    const defaultName = (_module?.default as Function)?.name;
     let replaceServerElement: {
       [key: string]: {
         tag: string;
@@ -915,8 +939,8 @@ class Builder extends PluginLoader {
   /**
    * used for transform serverAction to tag for Transpiler
    */
-  private async ServerActionToTag(filePath: string) {
-    return Object.entries(await import(filePath))
+  private async ServerActionToTag(moduleContent: Record<string, unknown>) {
+    return Object.entries(moduleContent)
       .filter(([ex, _]) => ex.startsWith("Server"))
       .reduce(
         (a, [ex, _]) => ({

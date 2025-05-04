@@ -801,6 +801,8 @@ This version improves readability, adds more examples, and organizes the content
     
     - Fix useSession hook not updating properly after a ServerAction modify the session.
     - fix typo in CLI
+    - remove unnecessary getSession props
+    - fix dev mode serverAction and serverComponents not transpiling correctly
   </details>
 
 </details>

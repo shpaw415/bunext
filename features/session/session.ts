@@ -228,17 +228,13 @@ export const SessionDidUpdateContext = createContext(false);
 /**
  * return the session object
  */
-export function useSession<DataType>(props?: {
-  PreventRenderOnUpdate: boolean;
-}) {
+export function useSession<DataType>() {
   const server_session = useContext(RequestContext);
   const session = useContext(SessionContext);
   const did_update = useContext(SessionDidUpdateContext);
   const [, setState] = useState(false);
 
-  useEffect(() => {
-    if (props?.PreventRenderOnUpdate) setState(did_update);
-  }, [did_update]);
+  useEffect(() => setState(did_update), [did_update]);
 
   return (
     (server_session?.session as InAppSession<DataType>) ??
