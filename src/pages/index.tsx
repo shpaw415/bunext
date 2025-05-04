@@ -77,10 +77,7 @@ function SetSessionButton() {
   const random = generateRandomString(5);
   return (
     <button
-      onClick={async () => {
-        await ServerSetSession();
-        session.update();
-      }}
+      onClick={() => ServerSetSession()}
       className="bg-red-500 border-blue-300 border-4"
     >
       update session

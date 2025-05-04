@@ -63,7 +63,7 @@ function isUnicodeSupported() {
 }
 
 export const StartLog = [
-  "bunext dev",
+  `bunext ${process.env.NODE_ENV}`,
   "",
   ToColor("purple", `${TerminalIcon.play} Bunext ${Bunext.version}`),
   `${TerminalIcon.line} Local:   http://localhost:${serverConfig.HTTPServer.port}`,

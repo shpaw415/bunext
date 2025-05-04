@@ -45,3 +45,7 @@ body {
   display: flex;
   align-items: center;
 }
+
+button {
+  margin: 5px;
+}

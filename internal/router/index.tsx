@@ -20,7 +20,7 @@ import {
   SessionContext,
   SessionDidUpdateContext,
 } from "../../features/session/session";
-import { AddServerActionCallback } from "../globals";
+import { AddServerActionCallback, GetSessionFromResponse } from "../globals";
 import { RequestContext } from "../server/context";
 import type { RoutesType } from "../../plugins/typed-route/type";
 const globalX = globalThis as unknown as _GlobalData;
@@ -231,6 +231,7 @@ export function SessionProvider({ children }: { children: any }) {
   const addToServerActionCallback = useCallback(
     () =>
       AddServerActionCallback((res) => {
+        globalThis.__PUBLIC_SESSION_DATA__ = GetSessionFromResponse(res);
         session.update();
         session.setSessionTimeout(
           JSON.parse(

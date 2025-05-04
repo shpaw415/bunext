@@ -162,7 +162,6 @@ async function ParseServerActionResponse(response: Response) {
     throw new Error(
       "error when Calling server action <!ModulePath!>:<!FuncName!>"
     );
-  globalThis.__PUBLIC_SESSION_DATA__ = GetSessionFromResponse(response);
 
   switch (response.headers.get("dataType") as ServerActionDataTypeHeader) {
     case "json":

@@ -1,1 +1,2 @@
-cache.sqlite-*
+cache.sqlite-shm
+cache.sqlite-wal

@@ -295,7 +295,7 @@ Define HTTP method handlers in files under `src/pages` to automatically create A
 ### 📁 Example: `src/pages/api/v1/index.ts`
 
 ```ts
-import type { BunextRequest } from "bunext-js/features/request";
+import type { BunextRequest } from "bunext-js/internal/server/bunextRequest.ts";
 
 export function POST(request: BunextRequest) {
   request.response = new Response("POST");
@@ -794,6 +794,13 @@ This version improves readability, adds more examples, and organizes the content
     - Fix minor init type
     - Upgrade typed Route paths
     - other minor improvement
+  </details>
+
+  <details>
+    <summary>📢 0.11.5</summary>
+    
+    - Fix useSession hook not updating properly after a ServerAction modify the session.
+    - fix typo in CLI
   </details>
 
 </details>
