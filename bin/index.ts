@@ -3,7 +3,7 @@ import "../internal/server/server_global.ts";
 import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
-import { StartLog } from "../internal/server/logs.ts";
+import { getStartLog } from "../internal/server/logs.ts";
 
 type _cmd =
   | "init"
@@ -118,18 +118,13 @@ function dev() {
 
 function production() {
   process.env.NODE_ENV = "production";
-  console.log(StartLog);
+  console.log(getStartLog());
   const proc = Bun.spawn({
-    cmd: [
-      "bun",
-      "--production",
-      `${paths.bunextDirName}/react-ssr/server.ts`,
-      "production",
-    ],
+    cmd: ["bun", `${paths.bunextDirName}/react-ssr/server.ts`, "production"],
     env: {
       ...process.env,
       __HEAD_DATA__: JSON.stringify(globalThis.head),
-      NODE_ENV: process.env.NODE_ENV,
+      NODE_ENV: "production",
     },
     stdout: "inherit",
     onExit(subprocess, exitCode, signalCode, error) {

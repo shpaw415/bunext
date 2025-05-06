@@ -805,5 +805,11 @@ This version improves readability, adds more examples, and organizes the content
     - fix dev mode serverAction and serverComponents not transpiling correctly
   </details>
 
+  <details>
+    <summary>📢 0.11.6</summary>
+    
+    - fix cli missing NODE_ENV
+  </details>
+
 </details>
 

@@ -70,6 +70,15 @@ export const StartLog = [
   "",
 ].join("\n   ");
 
+export function getStartLog() {
+  return [
+    `bunext ${process.env.NODE_ENV}`,
+    "",
+    ToColor("purple", `${TerminalIcon.play} Bunext ${Bunext.version}`),
+    `${TerminalIcon.line} Local:   http://localhost:${serverConfig.HTTPServer.port}`,
+    "",
+  ].join("\n   ");
+}
 /**
  * time in ms
  */
