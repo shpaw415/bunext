@@ -51,6 +51,7 @@ async function build(
       };
     }
   } catch (e: any) {
+    console.log(e);
     return {
       success: false,
       error: e,

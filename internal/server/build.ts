@@ -387,7 +387,7 @@ class Builder extends PluginLoader {
     });
   }
 
-  isUseClient(fileData: string) {
+  public isUseClient(fileData: string) {
     const line = fileData
       .split("\n")
       .filter((l) => l.trim().length > 0)
@@ -744,6 +744,7 @@ class Builder extends PluginLoader {
             };
           }
         );
+        /*
         build.onLoad(
           { namespace: "client", filter: /\.tsx$/ },
           async ({ path }) => {
@@ -826,23 +827,8 @@ class Builder extends PluginLoader {
             };
           }
         );
-        build.onLoad(
-          { namespace: "client", filter: /\.ts$/ },
-          async ({ path }) => {
-            return {
-              contents: await self.ClientSideFeatures(
-                await Bun.file(path).text(),
-                path,
-                await import(
-                  process.env.NODE_ENV == "production"
-                    ? path
-                    : path + `?${generateRandomString(5)}`
-                )
-              ),
-              loader: "js",
-            };
-          }
-        );
+        */
+        /** remove from build */
         build.onLoad(
           {
             filter: new RegExp(
@@ -897,6 +883,7 @@ class Builder extends PluginLoader {
             };
           }
         );
+        /** END remove from build */
       },
     } as BunPlugin;
   }
@@ -972,7 +959,7 @@ class Builder extends PluginLoader {
     const glob = new Bun.Glob(pattern);
     return glob.scan({ cwd: path, onlyFiles: true, absolute: true });
   }
-  private escapeRegExp(string: string) {
+  public escapeRegExp(string: string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
   }
 }
@@ -980,11 +967,5 @@ const builder: Builder = Boolean(process.env.__INIT__)
   ? (undefined as any)
   : new Builder();
 await builder.Init();
-/*
-if (import.meta.main) {
-  await builder.makeBuild();
-  process.exit(0);
-}
-  */
 
 export { builder, Builder };
