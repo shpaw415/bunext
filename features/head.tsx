@@ -86,19 +86,6 @@ function deepMerge(obj: _Head, assign: _Head): _Head {
   return copy;
 }
 
-function LinkPreloader({ href }: { href: string }) {
-  const [loaded, setLoaded] = useState(false);
-  const setLoad = useCallback(() => setLoaded(true), []);
-  return (
-    <link
-      rel={loaded ? "stylesheet" : "preload"}
-      as="style"
-      onLoad={setLoad}
-      href={href}
-    />
-  );
-}
-
 function setParamOnDevMode() {
   if (process.env.NODE_ENV == "development")
     return `?${generateRandomString(5)}`;
@@ -259,7 +246,9 @@ function HeadElement({
   const getPaths = () =>
     GetCssPaths(
       {
-        value: normalize(`/${router.pageDir}/${path}.js`),
+        value: normalize(
+          `/${router.pageDir}/${path == "/" ? "index" : path}.js`
+        ),
         params: {},
         path: path,
       },
