@@ -1,4 +1,5 @@
 import type { BunextRequest } from "../internal/server/bunextRequest";
+import type { RequestManager } from "../internal/server/router";
 
 export type ServerStart = Partial<{
   /**
@@ -29,7 +30,8 @@ export type AfterBuildMain = () => Promise<any> | any;
 export type BeforeBuild = () => Promise<any> | any;
 
 export type Request_Plugin = (
-  request: BunextRequest
+  request: BunextRequest,
+  manager: RequestManager
 ) =>
   | Promise<void | undefined | BunextRequest>
   | void
@@ -41,7 +43,9 @@ type Build_Plugins = {
   buildOptions?: Partial<Bun.BuildConfig>;
 };
 
-type onFileSystemChangePlugin = (filePath:string|undefined) => void | Promise<void>;
+type onFileSystemChangePlugin = (
+  filePath: string | undefined
+) => void | Promise<void>;
 
 export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
   /**
@@ -58,7 +62,7 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
    */
   before_build_main: BeforeBuild;
   /**
-   * Add plugins and build config 
+   * Add plugins and build config
    */
   build: Build_Plugins;
   /**
@@ -67,17 +71,17 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
   router: Partial<{
     /**
      * parse the entire HTML before sending to the client, and rewrite if needed.
-     * 
+     *
      * The result will be cached if it is
-     *  - SSR page component 
-     *  - static page (use static) 
+     *  - SSR page component
+     *  - static page (use static)
      */
     html_rewrite: HTML_Rewrite_plugin_function<HTMLRewrite>;
     /**
      * bypass the request flow and return a custom BunextResponse to the client.
-     * @example (request: BunextRequest) => { 
-     *  request.response = new Response("custom response"); 
-     *  return request; 
+     * @example (request: BunextRequest) => {
+     *  request.response = new Response("custom response");
+     *  return request;
      * }
      */
     request: Request_Plugin;
@@ -93,7 +97,7 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
   removeFromBuild: Array<string>;
   /**
    * Triggered when a change is made in ./src and ./static, (add, delete, update) a file.
-   * 
+   *
    * **ONLY DEV MODE**
    */
   onFileSystemChange: onFileSystemChangePlugin;

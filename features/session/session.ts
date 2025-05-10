@@ -5,6 +5,7 @@ import { GetSessionByID } from "../../internal/session.ts";
 import { createContext, useContext, useEffect, useState } from "react";
 import { RequestContext } from "../../internal/server/context";
 export { GetSession } from "../request/bunextRequest";
+import { SessionNotInitedWarning } from "../../internal/server/logs.ts";
 
 export type _SessionData<_SessionData> = {
   public: Record<string, _SessionData>;
@@ -30,6 +31,7 @@ export type InAppSession<DataType> = Omit<
   | "updated_id"
   | "setSessionTimeout"
   | "session_expiration_override"
+  | "prevent_session_init"
 >;
 export class _Session<DataType> {
   public __DATA__: _SessionData<any> = {
@@ -43,6 +45,7 @@ export class _Session<DataType> {
   private update_function?: React.Dispatch<React.SetStateAction<boolean>>;
   public updated_id = generateRandomString(5);
   public session_expiration_override?: number;
+  private server_session_inited = false;
 
   constructor({
     data,
@@ -59,35 +62,11 @@ export class _Session<DataType> {
     if (sessionTimeout) this.sessionTimeoutFromNow = sessionTimeout;
     if (request) this.request = request;
     if (update_function) this.update_function = update_function;
-  }
-  /**
-   * override set the session expiration
-   * @param expiration expiration in seconds
-   */
-  setExpiration(expiration: number) {
-    this.session_expiration_override = expiration;
-    return this;
-  }
-  public getSessionTimeout() {
-    return globalThis.__SESSION_TIMEOUT__;
-  }
-  public setSessionTimeout(value: number) {
-    globalThis.__SESSION_TIMEOUT__ = value;
-  }
-  private setPublicData(data: Record<string, any> | DataType) {
-    this.__DATA__.public = {
-      ...this.__DATA__.public,
-      ...data,
-      __SESSION_TIMEOUT__: this.getSessionTimeout(),
-    };
-  }
-  private setPrivateData(data: Record<string, any> | DataType) {
-    this.__DATA__.private = {
-      ...this.__DATA__.private,
-      __BUNEXT_SESSION_CREATED_AT__: this.makeCreatedTime(),
-      ...data,
-    };
-    this.isUpdated = true;
+    if (
+      process.env.__BUILD_MODE__ ||
+      process.env.__SESSION_MUST_NOT_BE_INITED__ == "true"
+    )
+      this.server_session_inited = true;
   }
   /**
    * Server side only
@@ -98,6 +77,10 @@ export class _Session<DataType> {
   setData(data: Partial<DataType>, Public: boolean = false) {
     this.PublicThrow("Session.setData cannot be called in a client context");
     if (!this.request) throw new Error("no request found to set session");
+    else if (!this.server_session_inited) {
+      console.log(SessionNotInitedWarning);
+      return;
+    }
 
     this.isUpdated = true;
 
@@ -106,33 +89,6 @@ export class _Session<DataType> {
       this.setPublicData(data);
     } else {
       this.setPrivateData(data);
-    }
-  }
-  /**
-   * Server side only
-   * @description Reset session data.
-   */
-  reset() {
-    this.PublicThrow("Session.reset cannot be called in a client context");
-
-    this.__DATA__ = {
-      public: {},
-      private: {},
-    };
-    return this;
-  }
-  async initData() {
-    if (!this.request) return;
-    switch (globalThis.serverConfig.session?.type) {
-      case "cookie":
-        const sessionData = this.request.webtoken.session();
-        if (sessionData) this.__DATA__ = sessionData;
-        break;
-      case "database:memory":
-      case "database:hard":
-        const RecData = await GetSessionByID(this.request.SessionID);
-        if (RecData) this.__DATA__ = RecData;
-        break;
     }
   }
   /**
@@ -146,7 +102,10 @@ export class _Session<DataType> {
    * await Session.getData(); // {data: "someData"} | undefined
    */
   getData(getPublic: boolean = false): DataType | undefined {
-    if (typeof window != "undefined") {
+    if (this.request && !this.server_session_inited) {
+      console.log(SessionNotInitedWarning);
+      return;
+    } else if (typeof window != "undefined") {
       if (this.isExpired()) return undefined;
       else return this.__DATA__.public as DataType | undefined;
     }
@@ -176,6 +135,10 @@ export class _Session<DataType> {
         this.update();
       });
     } else {
+      if (this.request && !this.server_session_inited) {
+        console.log(SessionNotInitedWarning);
+        return;
+      }
       this.__DELETE__ = true;
       this.__DATA__ = {
         public: {},
@@ -183,9 +146,59 @@ export class _Session<DataType> {
       };
     }
   }
+  /**
+   * Server side only
+   * @description Reset session data.
+   */
+  reset() {
+    this.PublicThrow("Session.reset cannot be called in a client context");
+
+    this.__DATA__ = {
+      public: {},
+      private: {},
+    };
+    return this;
+  }
+  /**
+   * override set the session expiration
+   * @param expiration expiration in seconds
+   */
+  setExpiration(expiration: number) {
+    this.session_expiration_override = expiration;
+    return this;
+  }
+  getSessionTimeout() {
+    return globalThis.__SESSION_TIMEOUT__;
+  }
+  setSessionTimeout(value: number) {
+    globalThis.__SESSION_TIMEOUT__ = value;
+  }
+
+  /**
+   * need to be inited for using session
+   */
+  async initData() {
+    if (!this.request) return;
+    switch (globalThis.serverConfig.session?.type) {
+      case "cookie":
+        const sessionData = this.request.webtoken.session();
+        if (sessionData) this.__DATA__ = sessionData;
+        break;
+      case "database:memory":
+      case "database:hard":
+        const RecData = await GetSessionByID(this.request.SessionID);
+        if (RecData) this.__DATA__ = RecData;
+        break;
+    }
+    this.server_session_inited = true;
+  }
+
   update() {
     this.__DATA__.public = globalThis.__PUBLIC_SESSION_DATA__;
     this.update_function?.((c) => !c);
+  }
+  prevent_session_init() {
+    this.server_session_inited = true;
   }
   /**
    * Error if client side
@@ -219,6 +232,21 @@ export class _Session<DataType> {
   }
   private makeCreatedTime() {
     return new Date().getTime();
+  }
+  private setPublicData(data: Record<string, any> | DataType) {
+    this.__DATA__.public = {
+      ...this.__DATA__.public,
+      ...data,
+      __SESSION_TIMEOUT__: this.getSessionTimeout(),
+    };
+  }
+  private setPrivateData(data: Record<string, any> | DataType) {
+    this.__DATA__.private = {
+      ...this.__DATA__.private,
+      __BUNEXT_SESSION_CREATED_AT__: this.makeCreatedTime(),
+      ...data,
+    };
+    this.isUpdated = true;
   }
 }
 

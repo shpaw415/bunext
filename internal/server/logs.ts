@@ -62,13 +62,13 @@ function isUnicodeSupported() {
   );
 }
 
-export const StartLog = [
-  `bunext ${process.env.NODE_ENV}`,
-  "",
-  ToColor("purple", `${TerminalIcon.play} Bunext ${Bunext.version}`),
-  `${TerminalIcon.line} Local:   http://localhost:${serverConfig.HTTPServer.port}`,
-  "",
-].join("\n   ");
+export const SessionNotInitedWarning = `${TerminalIcon.error} ${ToColor(
+  "red",
+  "Error! "
+)} ${ToColor(
+  TextColor,
+  "This error occurred because the plugin did not initialized the session before using it.\n await request.session.initData()"
+)}`;
 
 export function getStartLog() {
   return [
