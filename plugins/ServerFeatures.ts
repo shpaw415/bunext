@@ -17,11 +17,12 @@ function isFunction(functionToCheck: any) {
   return typeof functionToCheck == "function";
 }
 
+type AnyFn = (...args: unknown[]) => unknown;
 /**
  * this will set this.ssrElements & this.revalidates and make the build out from
  * a child process to avoid some error while building multiple time from the main process.
  */
-function ServerActionToClient(func: Function, ModulePath: string): string {
+function ServerActionToClient(func: AnyFn, ModulePath: string): string {
   const path = ModulePath.split(builder.options.pageDir as string).at(
     1
   ) as string;
@@ -78,7 +79,7 @@ function ServerActionCompiler(
   );
   // ServerAction
   for (const serverAction of ServerActionsExports) {
-    const SAFunc = _module[serverAction] as Function;
+    const SAFunc = _module[serverAction] as AnyFn;
     const SAString = SAFunc.toString();
     if (!SAString.startsWith("async")) continue;
     fileContent = fileContent.replace(
@@ -130,15 +131,11 @@ async function ServerComponentsToTag(
  * used for transform serverAction to tag for Transpiler
  */
 async function ServerActionToTag(moduleContent: Record<string, unknown>) {
-  return Object.entries(moduleContent)
-    .filter(([ex, _]) => ex.startsWith("Server"))
-    .reduce(
-      (a, [ex, _]) => ({
-        ...a,
-        [ex]: `<!BUNEXT_ServerAction_${ex}!>`,
-      }),
-      {}
-    ) as { [key: string]: string };
+  return Object.fromEntries(
+    Object.keys(moduleContent)
+      .filter((ex) => ex.startsWith("Server"))
+      .map((ex) => [ex, `<!BUNEXT_ServerAction_${ex}!>`])
+  );
 }
 
 async function ClientSideFeatures(
@@ -187,22 +184,28 @@ async function ServerSideFeatures({
 }
 
 function extractPostData(data: FormData) {
-  return (JSON.parse(decodeURI(data.get("props") as string)) as Array<any>).map(
-    (prop) => {
-      if (typeof prop == "string" && prop.startsWith("BUNEXT_FILE_")) {
-        return data.get(prop) as File;
-      } else if (
-        Array.isArray(prop) &&
-        prop.length > 0 &&
-        typeof prop[0] == "string" &&
-        prop[0].startsWith("BUNEXT_BATCH_FILES_")
-      ) {
-        return data.getAll(prop[0]);
-      } else if (typeof prop == "string" && prop == "BUNEXT_FORMDATA") {
-        return data;
-      } else return prop;
-    }
-  );
+  let raw = data.get("props");
+  if (typeof raw != "string") return [];
+  try {
+    raw = decodeURI(raw);
+  } catch {
+    throw new Error("Cannot decode server action payload");
+  }
+
+  return (JSON.parse(raw) as Array<unknown>).map((prop) => {
+    if (typeof prop == "string" && prop.startsWith("BUNEXT_FILE_")) {
+      return data.get(prop) as File;
+    } else if (
+      Array.isArray(prop) &&
+      prop.length > 0 &&
+      typeof prop[0] == "string" &&
+      prop[0].startsWith("BUNEXT_BATCH_FILES_")
+    ) {
+      return data.getAll(prop[0]);
+    } else if (typeof prop == "string" && prop == "BUNEXT_FORMDATA") {
+      return data;
+    } else return prop;
+  });
 }
 
 async function serverActionGetter(manager: RequestManager): Promise<Response> {
