@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "devDependencies": {
-    "@types/bun": "^1.2.8",
+    "@types/bun": "^1.2.12",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.1",
     "@types/web": "^0.0.216",

@@ -360,15 +360,16 @@ export default {
       if (isSSRDefaultExportPath(manager, true)) {
         req.session.prevent_session_init();
         const stringPage = await getSSRDefaultPage(manager);
-        if (stringPage)
+        if (stringPage) {
           return req.__SET_RESPONSE__(
-            new Response(Bun.gzipSync(stringPage), {
+            new Response(Buffer.from(Bun.gzipSync(stringPage)), {
               headers: {
                 "content-type": "text/html; charset=utf-8",
                 "Content-Encoding": "gzip",
               },
             })
           );
+        }
       }
     },
   },
