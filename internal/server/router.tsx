@@ -518,7 +518,7 @@ class RequestManager {
    */
   public async makeStream(jsx: JSX.Element): Promise<Response> {
     return new Response(
-      Bun.gzipSync(await this.formatPage(renderToString(jsx))),
+      Buffer.from(Bun.gzipSync(await this.formatPage(renderToString(jsx)))),
       {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
@@ -786,7 +786,7 @@ class RequestManager {
       const stringPage = await this.getStaticPage();
       if (stringPage)
         return this.bunextReq.__SET_RESPONSE__(
-          new Response(Bun.gzipSync(stringPage || ""), {
+          new Response(Buffer.from(Bun.gzipSync(stringPage || "")), {
             headers: {
               "content-type": "text/html; charset=utf-8",
               "Content-Encoding": "gzip",

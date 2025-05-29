@@ -358,6 +358,7 @@ export default {
       }
       // SSR Page
       if (isSSRDefaultExportPath(manager, true)) {
+        if (!req.request.headers.get("Accept")?.includes("text/html")) return;
         req.session.prevent_session_init();
         const stringPage = await getSSRDefaultPage(manager);
         if (stringPage) {

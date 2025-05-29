@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "devDependencies": {
-    "@types/bun": "^1.2.14",
+    "@types/bun": "^1.2.15",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.1",
     "@types/web": "^0.0.216",
@@ -49,10 +49,9 @@
   "scripts": {
     "test": "bun run build && bun test ./bin/main.test.ts",
     "clear": "rm -rf .bunext/build/* .bunext/build/.bunext config/bunext.* config/session.*",
-    "to:module": "bun bin/to_node_module.ts",
     "dev": "bun ./bin/index.ts dev",
     "start": "bun ./bin/index.ts production",
-    "build": "bun to:module && bun bunext build",
+    "build": "bun ./bin/index.ts build",
     "db:create": "bun ./bin/index.ts database:create"
   },
   "keywords": [

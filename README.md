@@ -6,7 +6,7 @@ Bunext is a **Next.js-inspired framework** designed for the **Bun runtime**, pro
 
 ## 🔧 Compatibility  
 
-- **Bun Version**: `1.1.0 - 1.2.10`  
+- **Bun Version**: `1.1.0 - 1.2.15`  
 - **Supported OS**: Linux, WSL (Windows support in progress)  
 - **Note**: Bun is evolving rapidly. New versions may cause compatibility issues. Watch for breaking changes before version `1.0.0`.  
 
