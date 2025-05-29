@@ -1041,6 +1041,11 @@ class RequestManager {
   }
 }
 
+/**
+ * Initializes the server environment by removing the build node_modules directory and initializing the router.
+ *
+ * @remark This function ensures a clean build environment by deleting `.bunext/build/node_modules` before router initialization.
+ */
 async function Init() {
   await rm(".bunext/build/node_modules", {
     recursive: true,

@@ -67,6 +67,15 @@ class HeadDataClass {
 
 const Head = new HeadDataClass();
 
+/**
+ * Merges two head metadata objects, combining arrays and overwriting scalar fields.
+ *
+ * Overwrites the `author`, `publisher`, and `title` fields from the second object. Concatenates the `link` and `meta` arrays from both objects. Returns a new merged head metadata object.
+ *
+ * @param obj - The base head metadata object.
+ * @param assign - The head metadata object whose values will be merged in.
+ * @returns A new head metadata object with merged values.
+ */
 function deepMerge(obj: _Head, assign: _Head): _Head {
   const copy = structuredClone(obj || {});
   for (const key of Object.keys(assign || {}) as Array<keyof _Head>) {
@@ -86,6 +95,11 @@ function deepMerge(obj: _Head, assign: _Head): _Head {
   return copy;
 }
 
+/**
+ * Returns a cache-busting query parameter in development mode.
+ *
+ * @returns A query string with a random 5-character value if in development mode; otherwise, an empty string.
+ */
 function setParamOnDevMode() {
   if (process.env.NODE_ENV == "development")
     return `?${generateRandomString(5)}`;
@@ -234,6 +248,18 @@ function HeadProvider({
   );
 }
 
+/**
+ * Renders the HTML `<head>` element with metadata and CSS styles for the current route.
+ *
+ * On the server, inlines CSS file contents as `<style>` tags. On the client, renders `<link rel="stylesheet">` tags for stylesheets.
+ *
+ * @param data - Head metadata including title, author, publisher, meta, and link tags.
+ * @param path - The current route path used to resolve associated CSS files.
+ * @param style - Array of link tag properties for stylesheets.
+ *
+ * @remark
+ * On server-side rendering, CSS files are read from disk and injected as inline styles. On the client, stylesheets are linked via `<link>` tags.
+ */
 function HeadElement({
   data,
   path,
