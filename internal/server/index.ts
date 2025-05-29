@@ -31,10 +31,10 @@ import "../caching/fetch.ts";
 import {
   benchmark_console,
   DevConsole,
-  StartLog,
   TerminalIcon,
   TextColor,
   ToColor,
+  getStartLog,
 } from "./logs.ts";
 declare global {
   namespace NodeJS {
@@ -198,7 +198,7 @@ class BunextServer {
   async init() {
     const dry = Boolean(globalThis.dryRun);
     process.env.NODE_ENV == "development" && console.clear();
-    DevConsole(`${StartLog}`);
+    DevConsole(`${getStartLog()}`);
     dry &&
       DevConsole(
         `${ToColor("green", TerminalIcon.success)} ${ToColor(

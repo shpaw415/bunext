@@ -2,10 +2,11 @@ import { TestElement } from "./test";
 import { useSession, GetSession } from "bunext-js/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
-import "@static/index.css";
-import "@static/style.css";
+
 import { Head } from "bunext-js/head";
 import { useEffect } from "react";
+
+import "@static/style.css";
 
 type SessionType = {
   test: boolean;

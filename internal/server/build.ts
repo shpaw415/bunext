@@ -57,7 +57,7 @@ class Builder extends PluginLoader {
     pageDir: "src/pages",
     buildDir: ".bunext/build",
     hydrate: ".bunext/react-ssr/hydrate.ts",
-    baseDir: process.cwd(),
+    baseDir: cwd,
   };
   public preBuildPaths: Array<string> = [];
   public plugins: BunPlugin[] = [];
@@ -84,9 +84,12 @@ class Builder extends PluginLoader {
     "bunext-js/internal/session.ts",
     "bunext-js/internal/caching/index.ts",
     "bunext-js/internal/server/bunext_global.ts",
+    "bunext-js/internal/server/server_global.ts",
+    "bunext-js/database/bunext_object/server.ts",
+    "bunext-js/features/request/bunext_object/server.ts",
   ];
 
-  private dev_remove_file_path = Boolean(process.env.__BUNEXT_DEV__)
+  public dev_remove_file_path = Boolean(process.env.__BUNEXT_DEV__)
     ? [
         `database/index.ts`,
         `internal/server/build.ts`,
@@ -95,6 +98,9 @@ class Builder extends PluginLoader {
         `database/class.ts`,
         `internal/session.ts`,
         `internal/caching/index.ts`,
+        "internal/server/server_global.ts",
+        "database/bunext_object/server.ts",
+        "features/request/bunext_object/server.ts",
       ]
     : [];
 
@@ -266,11 +272,7 @@ class Builder extends PluginLoader {
         ...entrypoints,
         ...(this.BuildPluginsConfig?.entrypoints ?? []),
       ],
-      plugins: [
-        this.NextJsPlugin(),
-        ...this.plugins,
-        ...(this.BuildPluginsConfig?.plugins || []),
-      ],
+      plugins: [...this.plugins, ...(this.BuildPluginsConfig?.plugins || [])],
       define: {
         "process.env.NODE_ENV": JSON.stringify(
           process.env.NODE_ENV || "development"
@@ -582,375 +584,6 @@ class Builder extends PluginLoader {
     }
   }
 
-  /**
-   * this will set this.ssrElements & this.revalidates and make the build out from
-   * a child process to avoid some error while building multiple time from the main process.
-   */
-
-  private ServerActionToClient(func: Function, ModulePath: string): string {
-    const path = ModulePath.split(this.options.pageDir as string).at(
-      1
-    ) as string;
-
-    const ServerActionClient = (ModulePath: string, funcName: string) => {
-      return async function (...props: Array<any>) {
-        return await globalThis.MakeServerActionRequest(props, "TARGET");
-      }
-        .toString()
-        .replace("async function", "")
-        .replace("TARGET", ModulePath + ":" + funcName);
-    };
-
-    return `async function ${func.name}${ServerActionClient(
-      normalize(path),
-      func.name
-    )}`;
-  }
-  private async ClientSideFeatures(
-    fileContent: string,
-    filePath: string,
-    module: Record<string, unknown>
-  ) {
-    const transpiler = new Bun.Transpiler({
-      loader: "tsx",
-      deadCodeElimination: true,
-      jsxOptimizationInline: true,
-      exports: {
-        replace: {
-          ...(await this.ServerActionToTag(module)),
-        },
-      },
-    });
-
-    return this.ServerActionCompiler(
-      module,
-      transpiler.transformSync(fileContent),
-      filePath
-    );
-  }
-
-  private async ServerSideFeatures({
-    modulePath,
-    fileContent,
-    serverComponents,
-    module,
-  }: {
-    modulePath: string;
-    fileContent: string;
-    serverComponents: {
-      [key: string]: {
-        tag: string; // "<!Bunext_Element_FunctionName!>"
-        reactElement: string;
-      };
-    };
-    module: Record<string, unknown>;
-  }) {
-    fileContent = this.ServerActionCompiler(module, fileContent, modulePath);
-    fileContent = this.ServerComponentsCompiler(serverComponents, fileContent);
-
-    return fileContent;
-  }
-  private ServerComponentsCompiler(
-    serverComponents: {
-      [key: string]: {
-        tag: string; // "<!Bunext_Element_FunctionName!>"
-        reactElement: string;
-      };
-    },
-    fileContent: string
-  ) {
-    for (const _component of Object.keys(serverComponents)) {
-      const component = serverComponents[_component] as {
-        tag: string;
-        reactElement: string;
-      };
-
-      fileContent = fileContent.replace(
-        `"${component.tag}"`,
-        `() => (${component.reactElement});`
-      );
-    }
-
-    return fileContent;
-  }
-  private ServerActionCompiler(
-    _module: Record<string, unknown>,
-    fileContent: string,
-    modulePath: string
-  ) {
-    const ServerActionsExports = Object.keys(_module).filter(
-      (k) =>
-        k.startsWith("Server") ||
-        (k == "default" &&
-          typeof _module[k] == "function" &&
-          _module[k].name.startsWith("Server"))
-    );
-    // ServerAction
-    for (const serverAction of ServerActionsExports) {
-      const SAFunc = _module[serverAction] as Function;
-      const SAString = SAFunc.toString();
-      if (!SAString.startsWith("async")) continue;
-      fileContent = fileContent.replace(
-        `"<!BUNEXT_ServerAction_${serverAction}!>"`,
-        this.ServerActionToClient(SAFunc, modulePath)
-      );
-    }
-
-    return fileContent;
-  }
-  private NextJsPlugin() {
-    const self = this;
-    return {
-      name: "NextJsPlugin",
-      target: "browser",
-      setup(build) {
-        build.onLoad(
-          {
-            filter: new RegExp(
-              "^" +
-                self.escapeRegExp(
-                  normalize(
-                    join(self.options.baseDir, self.options.pageDir as string)
-                  )
-                ) +
-                "/.*" +
-                "\\.(ts|tsx|jsx)$"
-            ),
-          },
-          async ({ path, loader, ...props }) => {
-            const fileText = await Bun.file(path).text();
-            const exports = new Bun.Transpiler({
-              loader: loader as "tsx" | "ts",
-              exports: {
-                eliminate: ["getServerSideProps"],
-              },
-            }).scan(fileText).exports;
-
-            return {
-              contents: `export { ${exports.join(", ")} } from 
-              ${JSON.stringify("./" + basename(path) + "?client")}`,
-              loader: "ts",
-            };
-          }
-        );
-        build.onResolve(
-          { filter: /\.(ts|tsx)\?client$/ },
-          async ({ importer, path }) => {
-            const url = Bun.pathToFileURL(importer);
-            const filePath = Bun.fileURLToPath(new URL(path, url));
-            return {
-              path: filePath,
-              namespace: "client",
-            };
-          }
-        );
-        build.onLoad(
-          { namespace: "client", filter: /\.tsx$/ },
-          async ({ path }) => {
-            let fileContent = await Bun.file(path).text();
-            const _module_ = await import(
-              process.env.NODE_ENV == "production"
-                ? path
-                : path + `?${generateRandomString(5)}`
-            );
-            if (
-              ["layout.tsx"]
-                .map((endsWith) => path.endsWith(endsWith))
-                .filter((t) => t == true).length > 0
-            ) {
-              return {
-                contents: fileContent,
-                loader: "tsx",
-              };
-            }
-
-            if (self.isUseClient(fileContent))
-              return {
-                contents: await self.ClientSideFeatures(
-                  fileContent,
-                  path,
-                  _module_
-                ),
-                loader: "js",
-              };
-
-            const serverComponents = await self.ServerComponentsToTag(
-              path,
-              _module_
-            );
-
-            const serverComponentsForTranspiler = Object.assign(
-              {},
-              ...[
-                ...Object.keys(serverComponents).map((component) => ({
-                  [component]: serverComponents[component].tag,
-                })),
-              ]
-            ) as Record<string, string>;
-
-            const serverActionsTags = await self.ServerActionToTag(_module_);
-
-            const transpiler = new Bun.Transpiler({
-              loader: "tsx",
-              exports: {
-                replace: {
-                  ...serverActionsTags,
-                  ...serverComponentsForTranspiler,
-                },
-              },
-            });
-            fileContent = transpiler.transformSync(fileContent);
-            fileContent = await self.ServerSideFeatures({
-              modulePath: path,
-              fileContent: fileContent,
-              serverComponents: serverComponents,
-              module: _module_,
-            });
-
-            fileContent = new Bun.Transpiler({
-              loader: "jsx",
-              jsxOptimizationInline: true,
-              trimUnusedImports: true,
-              treeShaking: true,
-            }).transformSync(fileContent);
-
-            for (const name of Object.keys(serverComponents))
-              fileContent = fileContent.replace(
-                `function ${name}()`,
-                `function _${name}()`
-              );
-
-            return {
-              contents: fileContent,
-              loader: "js",
-            };
-          }
-        );
-        build.onLoad(
-          { namespace: "client", filter: /\.ts$/ },
-          async ({ path }) => {
-            return {
-              contents: await self.ClientSideFeatures(
-                await Bun.file(path).text(),
-                path,
-                await import(
-                  process.env.NODE_ENV == "production"
-                    ? path
-                    : path + `?${generateRandomString(5)}`
-                )
-              ),
-              loader: "js",
-            };
-          }
-        );
-        build.onLoad(
-          {
-            filter: new RegExp(
-              "^" +
-                self.escapeRegExp(normalize(self.options.baseDir)) +
-                "/.*" +
-                "\\.(ts|tsx|jsx)$"
-            ),
-          },
-          async ({ path, loader }) => {
-            const fileText = await Bun.file(path).text();
-            const exports = new Bun.Transpiler({
-              loader: loader as "tsx" | "ts",
-            }).scan(fileText).exports;
-
-            return {
-              contents: `export { ${exports.join(", ")} } from 
-              ${JSON.stringify("./" + basename(path) + "?module")}`,
-              loader: "ts",
-            };
-          }
-        );
-        build.onResolve(
-          { filter: /\.(ts|tsx)\?module$/ },
-          async ({ importer, path }) => {
-            const url = Bun.pathToFileURL(importer);
-            const filePath = Bun.fileURLToPath(new URL(path, url));
-            return {
-              path: filePath,
-              namespace: "module",
-            };
-          }
-        );
-        build.onLoad(
-          { filter: /\.(ts|tsx)$/, namespace: "module" },
-          async ({ path, loader }) => {
-            if (
-              self.remove_node_modules_files_path.includes(
-                path.replace(self.options.baseDir + "/node_modules/", "")
-              ) ||
-              self.dev_remove_file_path.includes(path.replace(cwd + "/", ""))
-            ) {
-              return {
-                contents: "",
-                loader,
-              };
-            }
-
-            return {
-              contents: await Bun.file(path).text(),
-              loader,
-            };
-          }
-        );
-      },
-    } as BunPlugin;
-  }
-
-  private async ServerComponentsToTag(
-    modulePath: string,
-    _module: Record<string, unknown>
-  ) {
-    // ServerComponent
-    const ssrModule = CacheManager.getSSR(modulePath);
-    const defaultName = (_module?.default as Function)?.name;
-    let replaceServerElement: {
-      [key: string]: {
-        tag: string;
-        reactElement: string;
-      };
-    } = {};
-    for await (const exported of Object.keys(_module)) {
-      const Func = _module[exported] as Function;
-
-      if (
-        !this.isFunction(Func) ||
-        Func.name.startsWith("Server") ||
-        Func.name == "getServerSideProps" ||
-        Func.length > 0
-      ) {
-        continue;
-      }
-
-      const ssrElement = ssrModule?.elements.find(
-        (e) => e.tag == `<!Bunext_Element_${Func.name}!>`
-      );
-
-      if (!ssrElement) continue;
-      if (defaultName == Func.name) replaceServerElement.default = ssrElement;
-      else replaceServerElement[Func.name] = ssrElement;
-    }
-    return replaceServerElement;
-  }
-  /**
-   * used for transform serverAction to tag for Transpiler
-   */
-  private async ServerActionToTag(moduleContent: Record<string, unknown>) {
-    return Object.entries(moduleContent)
-      .filter(([ex, _]) => ex.startsWith("Server"))
-      .reduce(
-        (a, [ex, _]) => ({
-          ...a,
-          [ex]: `<!BUNEXT_ServerAction_${ex}!>`,
-        }),
-        {}
-      ) as { [key: string]: string };
-  }
-
   private async afterBuild(build: BuildOutput) {
     const afterBuildPlugins = this.getPlugins()
       .map((p) => p.after_build)
@@ -962,17 +595,14 @@ class Builder extends PluginLoader {
     }
   }
 
-  private isFunction(functionToCheck: any) {
-    return typeof functionToCheck == "function";
-  }
-  private glob(
+  public glob(
     path: string,
     pattern = "**/*.{ts,tsx,js,jsx}"
   ): AsyncIterableIterator<string> {
     const glob = new Bun.Glob(pattern);
     return glob.scan({ cwd: path, onlyFiles: true, absolute: true });
   }
-  private escapeRegExp(string: string) {
+  public escapeRegExp(string: string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
   }
 }
@@ -980,11 +610,5 @@ const builder: Builder = Boolean(process.env.__INIT__)
   ? (undefined as any)
   : new Builder();
 await builder.Init();
-/*
-if (import.meta.main) {
-  await builder.makeBuild();
-  process.exit(0);
-}
-  */
 
 export { builder, Builder };

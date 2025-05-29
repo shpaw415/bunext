@@ -299,7 +299,9 @@ class StaticRouters extends PluginLoader {
   }
 
   /**
-   * Next.js like module stacking
+   * Next.js like layout module stacking
+   * @param route
+   * @param pageElement The JSX Element to wrap layouts around
    */
   async stackLayouts(route: MatchedRoute, pageElement: JSX.Element) {
     type _layout = ({
@@ -458,6 +460,7 @@ class RequestManager {
   }
 
   async make(): Promise<null | BunextRequest> {
+    process.env.__SESSION_MUST_NOT_BE_INITED__ = "false";
     return (
       (await this.checkPluginServing()) ||
       (await this.checkStaticServing()) ||
@@ -472,14 +475,18 @@ class RequestManager {
       .map((p) => p.router?.request)
       .filter((p) => p != undefined);
     for await (const plugin of plugins) {
-      const res = await plugin(this.bunextReq);
+      const res = await plugin(this.bunextReq, this);
       if (res) return res;
     }
     if (process.env.NODE_ENV == "development")
       this.router.cssPathExists = await this.router.getCssPaths();
   }
-
-  private async formatPage(html: string) {
+  /**
+   * Apply HTML rewrite plugins on html
+   * @param html full page html
+   * @returns the transformed html ready to set to a Response
+   */
+  public async formatPage(html: string) {
     const rewriter = new HTMLRewriter();
     const plugins = this.router
       .getPlugins()
@@ -504,10 +511,14 @@ class RequestManager {
 
     return [HTMLDocType, transformedText].join("\n");
   }
-
-  private async makeStream(jsx: JSX.Element): Promise<Response> {
+  /**
+   * Apply HTML rewrite plugins and gZip result
+   * @param jsx the full page JSX (layouts + page)
+   * @returns a Response with Gzipped html string body
+   */
+  public async makeStream(jsx: JSX.Element): Promise<Response> {
     return new Response(
-      Bun.gzipSync(await this.formatPage(renderToString(jsx))),
+      Buffer.from(Bun.gzipSync(await this.formatPage(renderToString(jsx)))),
       {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
@@ -518,10 +529,6 @@ class RequestManager {
     );
   }
 
-  private async serveServerAction() {
-    await this.bunextReq.session.initData();
-    return this.bunextReq.__SET_RESPONSE__(await this.serverActionGetter());
-  }
   private async serveSessionData() {
     await this.bunextReq.session.initData();
     return this.bunextReq.__SET_RESPONSE__(
@@ -771,6 +778,7 @@ class RequestManager {
     );
   }
   private async servePage() {
+    process.env.__SESSION_MUST_NOT_BE_INITED__ = "true";
     if (!this.serverSide) return null;
     else if (this.serverSide.pathname == "/favicon.ico") return null;
 
@@ -778,18 +786,7 @@ class RequestManager {
       const stringPage = await this.getStaticPage();
       if (stringPage)
         return this.bunextReq.__SET_RESPONSE__(
-          new Response(Bun.gzipSync(stringPage || ""), {
-            headers: {
-              "content-type": "text/html; charset=utf-8",
-              "Content-Encoding": "gzip",
-            },
-          })
-        );
-    } else if (this.isSSRDefaultExportPath(true)) {
-      const stringPage = await this.getSSRDefaultPage();
-      if (stringPage)
-        return this.bunextReq.__SET_RESPONSE__(
-          new Response(Bun.gzipSync(stringPage), {
+          new Response(Buffer.from(Bun.gzipSync(stringPage || "")), {
             headers: {
               "content-type": "text/html; charset=utf-8",
               "Content-Encoding": "gzip",
@@ -809,8 +806,6 @@ class RequestManager {
 
   private async checkStaticServing(): Promise<BunextRequest | null> {
     switch (this.pathname as pathNames) {
-      case "/ServerActionGetter":
-        return this.serveServerAction();
       case "/bunextgetSessionData":
         return this.serveSessionData();
       case "/bunextDeleteSession":
@@ -1002,67 +997,12 @@ class RequestManager {
         this.router.staticRoutes.includes(this.serverSide?.name)
     );
   }
-  private async getSSRDefaultPage() {
-    if (!this.isSSRDefaultExportPath(true) || !this.serverSide) return null;
-    const cache = CacheManager.getSSRDefaultPage(this.serverSide.pathname);
-    if (cache) return cache;
-
-    const preRenderedPage = await this.getPreRenderedPage();
-    if (!preRenderedPage) return null;
-
-    const PageWithLayouts = await this.router.stackLayouts(
-      this.serverSide,
-      preRenderedPage
-    );
-
-    const shelledPage = await this.makePage(PageWithLayouts);
-    if (!shelledPage) return null;
-    const stringifiedShelledPage = await this.formatPage(
-      renderToString(shelledPage)
-    );
-
-    CacheManager.addSSRDefaultPage(
-      this.serverSide.pathname,
-      stringifiedShelledPage
-    );
-
-    return stringifiedShelledPage;
-  }
-  private isSSRDefaultExportPath(andProduction?: boolean) {
-    if (andProduction && process.env.NODE_ENV != "production") return false;
-    return Boolean(
-      this.serverSide &&
-        this.router.ssrAsDefaultRoutes.includes(this.serverSide?.name)
-    );
-  }
-
-  private HTMLJSXWrapper(html: string) {
-    return (
-      <div
-        id="BUNEXT_INNER_PAGE_INSERTER"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    );
-  }
-
-  private async getPreRenderedPage() {
-    if (!this.serverSide) throw this.ErrorOnNoServerSideMatch();
-    const module = await import(this.serverSide.filePath);
-    const preBuiledPage = CacheManager.getSSR(
-      this.serverSide.filePath
-    )?.elements.find((e) =>
-      e.tag.endsWith(`${module.default.name}!>`)
-    )?.htmlElement;
-
-    if (!preBuiledPage) return null;
-
-    return await this.router.stackLayouts(
-      this.serverSide,
-      this.HTMLJSXWrapper(preBuiledPage)
-    );
-  }
-
-  private async makePage(page: JSX.Element) {
+  /**
+   * Wrapping Page with the Shell
+   * @param page layouts + page
+   * @returns Shelled Page JSX ( null if no route is found for the request path )
+   */
+  async makePage(page: JSX.Element) {
     if (!this.serverSide) return null;
 
     const preloadScriptObj = await this.MakePreLoadObject();
@@ -1098,82 +1038,6 @@ class RequestManager {
       </RequestContext.Provider>
     );
     return ShellJSX;
-  }
-
-  private async serverActionGetter(): Promise<Response> {
-    const reqData = this.extractServerActionHeader(this.request_header);
-
-    if (!reqData) throw new Error(`no request Data for ServerAction`);
-    const props = this.extractPostData(this.data);
-    const module = this.router.serverActions.find(
-      (s) => s.path === reqData.path.slice(1)
-    );
-    if (!module)
-      throw new Error(`no module found for ServerAction ${reqData.path}`);
-    const call = module.actions.find((f) => f.name === reqData.call);
-    if (!call)
-      throw new Error(
-        `no function founded for ServerAction ${reqData.path}/${reqData.call}`
-      );
-    const fillUndefinedParams = (
-      Array.apply(null, Array(call.length)) as Array<null>
-    ).map(() => undefined);
-    let result: ServerActionDataType = await call(
-      ...[...props, ...fillUndefinedParams, this.bunextReq]
-    );
-
-    let dataType: ServerActionDataTypeHeader = "json";
-    if (result instanceof Blob) {
-      dataType = "blob";
-    } else if (result instanceof File) {
-      dataType = "file";
-    } else {
-      result = JSON.stringify({ props: result });
-    }
-
-    return this.bunextReq.setCookie(
-      new Response(result as Exclude<ServerActionDataType, object>, {
-        headers: {
-          ...this.bunextReq.response.headers,
-          dataType,
-          fileData:
-            result instanceof File
-              ? JSON.stringify({
-                  name: result.name,
-                  lastModified: result.lastModified,
-                })
-              : undefined,
-        },
-      })
-    );
-  }
-  private extractServerActionHeader(header: Record<string, string>) {
-    if (!header.serveractionid) return null;
-    const serverActionData = header.serveractionid.split(":");
-
-    if (!serverActionData) return null;
-    return {
-      path: serverActionData[0],
-      call: serverActionData[1],
-    };
-  }
-  private extractPostData(data: FormData) {
-    return (
-      JSON.parse(decodeURI(data.get("props") as string)) as Array<any>
-    ).map((prop) => {
-      if (typeof prop == "string" && prop.startsWith("BUNEXT_FILE_")) {
-        return data.get(prop) as File;
-      } else if (
-        Array.isArray(prop) &&
-        prop.length > 0 &&
-        typeof prop[0] == "string" &&
-        prop[0].startsWith("BUNEXT_BATCH_FILES_")
-      ) {
-        return data.getAll(prop[0]);
-      } else if (typeof prop == "string" && prop == "BUNEXT_FORMDATA") {
-        return data;
-      } else return prop;
-    });
   }
 }
 
