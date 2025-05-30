@@ -13,14 +13,25 @@ import { createElement } from "react";
 
 const cwd = process.cwd();
 
+/**
+ * Determines whether the provided value is a function.
+ *
+ * @param functionToCheck - The value to check.
+ * @returns `true` if the value is a function; otherwise, `false`.
+ */
 function isFunction(functionToCheck: any) {
   return typeof functionToCheck == "function";
 }
 
 type AnyFn = (...args: unknown[]) => unknown;
 /**
- * this will set this.ssrElements & this.revalidates and make the build out from
- * a child process to avoid some error while building multiple time from the main process.
+ * Generates a client-side async function string that, when called, triggers a server action request for the specified server function.
+ *
+ * The returned function serializes its arguments and invokes a global server action handler with a unique identifier based on the module path and function name.
+ *
+ * @param func - The server action function to be exposed to the client.
+ * @param ModulePath - The absolute path to the module containing the server action.
+ * @returns A string representing an async client-side function that calls the corresponding server action on the server.
  */
 function ServerActionToClient(func: AnyFn, ModulePath: string): string {
   const path = ModulePath.split(builder.options.pageDir as string).at(
@@ -42,6 +53,13 @@ function ServerActionToClient(func: AnyFn, ModulePath: string): string {
   )}`;
 }
 
+/**
+ * Replaces server component placeholder tags in the file content with corresponding React element functions.
+ *
+ * @param serverComponents - An object mapping component names to their placeholder tags and React element strings.
+ * @param fileContent - The source file content containing server component placeholders.
+ * @returns The file content with server component placeholders replaced by React element functions.
+ */
 function ServerComponentsCompiler(
   serverComponents: {
     [key: string]: {
@@ -65,6 +83,16 @@ function ServerComponentsCompiler(
 
   return fileContent;
 }
+/**
+ * Replaces server action placeholders in the file content with client-callable function strings.
+ *
+ * For each exported async server action in the module, finds its corresponding placeholder tag in {@link fileContent} and replaces it with a client-side function that triggers the server action via a remote call.
+ *
+ * @param _module - The module containing exported server actions.
+ * @param fileContent - The source file content with server action placeholders.
+ * @param modulePath - The path to the module, used for generating client stubs.
+ * @returns The file content with server action placeholders replaced by client-callable function strings.
+ */
 function ServerActionCompiler(
   _module: Record<string, unknown>,
   fileContent: string,
@@ -91,6 +119,15 @@ function ServerActionCompiler(
   return fileContent;
 }
 
+/**
+ * Maps exported server component functions in a module to their corresponding SSR element tags and React element strings.
+ *
+ * For each exported function in the module that qualifies as a server component (i.e., is a function, does not start with "Server", is not "getServerSideProps", and takes no parameters), finds the matching SSR element from the cache and returns an object mapping function names to their tag and React element string.
+ *
+ * @param modulePath - The path to the module containing server components.
+ * @param _module - The module's exports.
+ * @returns An object mapping export names to their SSR tag and React element string.
+ */
 async function ServerComponentsToTag(
   modulePath: string,
   _module: Record<string, unknown>
@@ -128,7 +165,10 @@ async function ServerComponentsToTag(
 }
 
 /**
- * used for transform serverAction to tag for Transpiler
+ * Generates a mapping of server action export names to unique placeholder tags for transpiler replacement.
+ *
+ * @param moduleContent - The module's exported members.
+ * @returns An object mapping each server action export (names starting with "Server") to its corresponding placeholder tag.
  */
 async function ServerActionToTag(moduleContent: Record<string, unknown>) {
   return Object.fromEntries(
@@ -138,6 +178,16 @@ async function ServerActionToTag(moduleContent: Record<string, unknown>) {
   );
 }
 
+/**
+ * Transforms file content by replacing server action exports with client-callable stubs for client-side usage.
+ *
+ * Applies Bun's transpiler to substitute server action exports with placeholder tags, then compiles these into client-side async functions that invoke server actions remotely.
+ *
+ * @param fileContent - The source code to transform.
+ * @param filePath - The path of the file being processed.
+ * @param module - The module object containing server action exports.
+ * @returns The transformed file content with server actions replaced by client-callable functions.
+ */
 async function ClientSideFeatures(
   fileContent: string,
   filePath: string,
@@ -161,6 +211,17 @@ async function ClientSideFeatures(
   );
 }
 
+/**
+ * Applies server-side transformations to file content by compiling server actions and server components.
+ *
+ * Replaces server action exports with client-callable stubs and substitutes server component placeholders with their corresponding React element renderers.
+ *
+ * @param modulePath - The path to the module being processed.
+ * @param fileContent - The source code content to transform.
+ * @param serverComponents - Mapping of server component names to their placeholder tags and React element renderers.
+ * @param module - The imported module object containing exports.
+ * @returns The transformed file content with server-side features applied.
+ */
 async function ServerSideFeatures({
   modulePath,
   fileContent,
@@ -183,6 +244,16 @@ async function ServerSideFeatures({
   return fileContent;
 }
 
+/**
+ * Extracts and decodes server action parameters from a FormData object.
+ *
+ * Converts the "props" field from the FormData into an array of arguments, replacing special string markers with corresponding File objects, arrays of files, or the entire FormData as needed.
+ *
+ * @param data - The FormData containing encoded server action parameters.
+ * @returns An array of decoded parameters, with files and FormData objects restored.
+ *
+ * @throws {Error} If the "props" field cannot be decoded as a URI component.
+ */
 function extractPostData(data: FormData) {
   let raw = data.get("props");
   if (typeof raw != "string") return [];
@@ -208,6 +279,16 @@ function extractPostData(data: FormData) {
   });
 }
 
+/**
+ * Handles a server action request by invoking the specified server action function with extracted parameters and returning the result as a Response.
+ *
+ * Extracts the target module and function from the request headers, deserializes parameters from the request body, executes the server action, and serializes the result as JSON, Blob, or File in the response. Sets appropriate headers and cookies on the response.
+ *
+ * @param manager - The request manager containing request headers, data, and context.
+ * @returns A Response containing the result of the server action, with headers indicating the data type.
+ *
+ * @throws {Error} If the request is missing server action metadata, the target module is not found, or the specified function does not exist.
+ */
 async function serverActionGetter(manager: RequestManager): Promise<Response> {
   const reqData = extractServerActionHeader(manager.request_header);
 
@@ -255,6 +336,12 @@ async function serverActionGetter(manager: RequestManager): Promise<Response> {
     })
   );
 }
+/**
+ * Parses the `serveractionid` header value to extract the module path and function call name.
+ *
+ * @param header - An object representing HTTP headers.
+ * @returns An object with `path` and `call` properties if the header is present and valid; otherwise, `null`.
+ */
 function extractServerActionHeader(header: Record<string, string>) {
   if (!header.serveractionid) return null;
   const serverActionData = header.serveractionid.split(":");
@@ -266,6 +353,12 @@ function extractServerActionHeader(header: Record<string, string>) {
   };
 }
 
+/**
+ * Determines whether the current request matches a server-side rendered default export path.
+ *
+ * @param andProduction - If true, only returns true in production environment.
+ * @returns True if the request is for a default SSR route (and, if specified, in production); otherwise, false.
+ */
 function isSSRDefaultExportPath(
   manager: RequestManager,
   andProduction?: boolean
@@ -277,10 +370,23 @@ function isSSRDefaultExportPath(
   );
 }
 
+/**
+ * Creates an error indicating that no server-side script was found for the given request path.
+ *
+ * @returns An {@link Error} with a message specifying the missing server-side script for the request path.
+ */
 function ErrorOnNoServerSideMatch(manager: RequestManager) {
   return new Error(`no serverSideScript found for ${manager.pathname}`);
 }
 
+/**
+ * Wraps an HTML string in a React `<div>` element with a specific ID and sets its inner HTML.
+ *
+ * @param html - The HTML string to be injected.
+ * @returns A React element containing the provided HTML.
+ *
+ * @remark The returned `<div>` uses `dangerouslySetInnerHTML` and has the ID `BUNEXT_INNER_PAGE_INSERTER`.
+ */
 function HTMLJSXWrapper(html: string) {
   return createElement("div", {
     id: "BUNEXT_INNER_PAGE_INSERTER",
@@ -288,6 +394,16 @@ function HTMLJSXWrapper(html: string) {
   });
 }
 
+/**
+ * Retrieves and wraps the pre-rendered SSR page for the given request.
+ *
+ * Imports the server-side module, locates the corresponding pre-built SSR element from cache, wraps it in a JSX container, and applies any stacked layouts defined for the route.
+ *
+ * @param manager - The request manager containing server-side rendering context.
+ * @returns A React element representing the fully wrapped pre-rendered page, or `null` if no pre-built page is found.
+ *
+ * @throws {Error} If the request does not match a server-side route.
+ */
 async function getPreRenderedPage(manager: RequestManager) {
   if (!manager.serverSide) throw ErrorOnNoServerSideMatch(manager);
   const module = await import(manager.serverSide.filePath);
@@ -305,6 +421,14 @@ async function getPreRenderedPage(manager: RequestManager) {
   );
 }
 
+/**
+ * Generates and caches the server-side rendered (SSR) default page HTML for the given request.
+ *
+ * If a cached SSR default page exists for the request path, it is returned immediately. Otherwise, the function renders the page with all layouts, shells it, stringifies the result, caches it, and returns the HTML string. Returns `null` if the request does not match an SSR default export path or if rendering fails.
+ *
+ * @param manager - The request manager containing routing and rendering context.
+ * @returns The SSR default page as an HTML string, or `null` if not applicable.
+ */
 async function getSSRDefaultPage(manager: RequestManager) {
   if (!isSSRDefaultExportPath(manager, true) || !manager.serverSide)
     return null;

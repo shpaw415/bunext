@@ -40,6 +40,11 @@ export function ToColor(color: string, value: string | number) {
   }
 }
 
+/**
+ * Determines whether the current terminal supports Unicode symbols.
+ *
+ * Returns `true` if Unicode is supported based on platform and environment variables, otherwise `false`.
+ */
 function isUnicodeSupported() {
   const { env } = process;
   const { TERM, TERM_PROGRAM } = env;
@@ -70,6 +75,11 @@ export const SessionNotInitedWarning = `${TerminalIcon.error} ${ToColor(
   "This error occurred because the plugin did not initialized the session before using it.\n await request.session.initData()"
 )}`;
 
+/**
+ * Generates a formatted startup log message with Bunext version, environment, and local server URL.
+ *
+ * @returns A multi-line string containing environment information, Bunext version, and the local server address, styled with terminal colors and icons.
+ */
 export function getStartLog() {
   return [
     `bunext ${process.env.NODE_ENV}`,
