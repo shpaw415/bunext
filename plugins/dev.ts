@@ -11,6 +11,7 @@ import {
 } from "../internal/server/logs";
 import type { MatchedRoute } from "bun";
 import { normalize } from "path";
+import type { BunextRequest } from "../internal/server/bunextRequest";
 
 const plugin: BunextPlugin =
   process.env.NODE_ENV == "development"
@@ -18,10 +19,29 @@ const plugin: BunextPlugin =
         router: {
           request: async (request) => {
             await onDevRequest(request.request);
+            return await devtoolsJson(request);
           },
         },
       }
     : {};
+
+async function devtoolsJson(req: BunextRequest) {
+  console.log(req.URL.pathname);
+  if (req.URL.pathname != "/.well-known/appspecific/com.chrome.devtools.json")
+    return;
+
+  return req.__SET_RESPONSE__(
+    new Response(
+      JSON.stringify({
+        name: "Bunext",
+        workspace: {
+          root: process.cwd(),
+          uuid: Bun.randomUUIDv7(),
+        },
+      })
+    )
+  );
+}
 
 async function onDevRequest(request: Request) {
   if (process.env.NODE_ENV != "development") return;

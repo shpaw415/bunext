@@ -809,6 +809,8 @@ This version improves readability, adds more examples, and organizes the content
     <summary>📢 0.11.6</summary>
     
     - fix cli missing NODE_ENV
+    - add chrome dev tool protocol for workspace
+    - refactored server-actions and server-components, moved in a plugin format
   </details>
 
 </details>
