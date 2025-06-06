@@ -1,3 +1,3 @@
 import { normalize, resolve } from "path";
 
-console.log(normalize("/../../hack"));
+console.log(normalize("a/b/"));

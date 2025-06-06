@@ -75,6 +75,8 @@
     "./request": "./internal/server/bunextRequest.ts",
     "./router/*": "./features/router/*",
     "./client/*": "./features/client/*",
-    "./image": "./features/image/index.tsx"
+    "./image": "./features/image/index.tsx",
+    "./link": "./features/router/components.tsx",
+    "./preload": "./internal/router/preload.ts"
   }
 }
