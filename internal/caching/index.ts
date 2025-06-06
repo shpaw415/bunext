@@ -131,8 +131,16 @@ class CacheManagerExtends {
   );
   private dbSchema: DBSchema;
 
-  constructor({ shema }: { shema: DBSchema }) {
+  constructor({ shema, dbPath }: { shema: DBSchema; dbPath?: string }) {
     this.dbSchema = shema;
+    if (dbPath) {
+      this.db = new _Database(
+        new Database(dbPath, {
+          create: true,
+          readwrite: true,
+        })
+      );
+    }
     for (const tab of this.dbSchema) this.db.create(tab);
   }
 

@@ -87,6 +87,7 @@ class Builder extends PluginLoader {
     "bunext-js/internal/server/server_global.ts",
     "bunext-js/database/bunext_object/server.ts",
     "bunext-js/features/request/bunext_object/server.ts",
+    "bunext-js/plugins/image/index.ts",
   ];
 
   public dev_remove_file_path = Boolean(process.env.__BUNEXT_DEV__)
@@ -101,6 +102,7 @@ class Builder extends PluginLoader {
         "internal/server/server_global.ts",
         "database/bunext_object/server.ts",
         "features/request/bunext_object/server.ts",
+        "plugins/image/index.ts",
       ]
     : [];
 

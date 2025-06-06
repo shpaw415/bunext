@@ -26,7 +26,6 @@ const plugin: BunextPlugin =
     : {};
 
 async function devtoolsJson(req: BunextRequest) {
-  console.log(req.URL.pathname);
   if (req.URL.pathname != "/.well-known/appspecific/com.chrome.devtools.json")
     return;
 
