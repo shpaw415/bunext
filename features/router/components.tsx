@@ -39,9 +39,13 @@ function Link({
       { signal: ctrl.signal }
     );
     preloadOnHover &&
-      ref.current?.addEventListener("mouseenter", (ev) => {
-        PreLoadPath(props.href);
-      });
+      ref.current?.addEventListener(
+        "mouseenter",
+        (ev) => {
+          PreLoadPath(props.href);
+        },
+        { signal: ctrl.signal }
+      );
     return () => ctrl.abort();
   }, [props.href]);
 
