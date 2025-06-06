@@ -28,7 +28,7 @@
   ],
   "include": [
     "./.bunext/types/**/*",
-    "src",
+    "src/**/*",
     "internal",
     "plugins",
     "static",

@@ -20,6 +20,7 @@ export class BunextRequest {
   public plugins: FeatureType = {
     globalData: {},
   };
+  public global_data: Record<any, any> = {};
   public URL: URL;
 
   constructor(props: { request: Request; response: Response }) {
@@ -109,6 +110,11 @@ export class BunextRequest {
         console.error(`Failed to serialize value for key "${key}":`, error);
       }
     }
+  }
+  public setGlobalData<key extends string = string, val = any>(
+    setter: (current: Record<key, val>) => Record<any, any>
+  ) {
+    this.global_data = setter(this.global_data);
   }
   encodeSessionData(data: any) {
     return encodeURI(JSON.stringify(data));
