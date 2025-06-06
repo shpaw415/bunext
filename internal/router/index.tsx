@@ -23,6 +23,9 @@ import {
 import { AddServerActionCallback, GetSessionFromResponse } from "../globals";
 import { RequestContext } from "../server/context";
 import type { RoutesType } from "../../plugins/typed-route/type";
+import { generateRandomString } from "../../features/utils";
+import { preloadModule } from "react-dom";
+
 const globalX = globalThis as unknown as _GlobalData;
 
 export const match = globalX.__ROUTES__
@@ -117,6 +120,22 @@ export function useRouteState<T extends {}>(key: string, initial: T) {
   }, (globalThis.history?.state?.[key] ?? initial) as unknown as T);
 }
 
+const preLoaded: Array<string> = [];
+
+/**
+ * Preload path loading the Javascript reducing loading time
+ * @param path the path to preload
+ */
+export function PreLoadPath(path: string) {
+  if (process.env.NODE_ENV == "development" || preLoaded.find((e) => e == path))
+    return;
+  const matched = match(path.split("?").at(0) as string);
+  if (!matched)
+    throw new Error(`PreLoad Error: \n - path "${path}" does not exists`);
+  preloadModule(matched.value, { as: "script" });
+  preLoaded.push(path);
+}
+
 export const RouterHost = ({
   children,
   normalizeUrl = (url: string) => url,
@@ -138,7 +157,10 @@ export const RouterHost = ({
   const reload = useCallback(
     async (target = location.pathname + location.search) => {
       if (typeof target !== "string") throw new Error("invalid target", target);
-      const currentVersion = ++versionRef.current;
+      const currentVersion =
+        process.env.NODE_ENV == "development"
+          ? ++versionRef.current
+          : versionRef.current;
       try {
         const matched = match(target.split("?").at(0) as string);
         if (!matched) throw new Error("no match found");

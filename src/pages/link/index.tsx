@@ -11,13 +11,13 @@ export default function LinkPage() {
 }
 
 /**
- * Renders a button labeled "Test" that navigates to "/dynamic/static/1" when clicked.
+ * Renders a button labeled "Test" that navigates to "/dynamic/static/one" when clicked.
  *
  * The button is wrapped in a {@link Link} component for client-side navigation.
  */
 function Test() {
   return (
-    <Link href="/dynamic/static/1">
+    <Link href="/dynamic/static/one/" preloadOnHover>
       <button>Test</button>
     </Link>
   );
