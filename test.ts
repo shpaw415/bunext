@@ -1,2 +1,3 @@
-import { AfterBunextInitMessage, StartLog } from "./internal/server/logs";
-console.log(StartLog);
+import { normalize, resolve } from "path";
+
+console.log(normalize("/../../hack"));

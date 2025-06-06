@@ -99,12 +99,19 @@ async function transformImage(req: BunextRequest) {
   const h = parseInt(url.searchParams.get("h") || "0");
   const q = parseInt(url.searchParams.get("q") || "75");
 
-  if (!src || isNaN(w) || isNaN(h)) {
+  if (
+    !src ||
+    isNaN(w) ||
+    isNaN(h) ||
+    src.includes("..") ||
+    src.includes("~") ||
+    !src.startsWith("/")
+  ) {
     return new Response("Invalid params", { status: 400 });
   }
 
   try {
-    const imagePath = join(process.cwd(), "static", normalize(src));
+    const imagePath = join(process.cwd(), "static", normalize("/" + src));
     const fileBuffer = await Bun.file(imagePath).arrayBuffer();
 
     const filePath = join(
@@ -157,10 +164,13 @@ export default {
         reWriter.onDocument({
           end(end) {
             const encodedData = cache.get(bunextRequest.URL.pathname);
+
+            const safeJsonString = JSON.stringify(encodedData)
+              .replace(/`/g, "\\`")
+              .replace(/<\/script>/gi, "<\\/script>");
+
             end.append(
-              `<script> globalThis.blurImages = JSON.parse(\`${JSON.stringify(
-                encodedData
-              )}\`); </script>`,
+              `<script> globalThis.blurImages = JSON.parse(\`${safeJsonString}\`); </script>`,
               {
                 html: true,
               }

@@ -47,11 +47,18 @@ function Image({
 
   useEffect(() => {
     if (placeholder != "blur") return;
+    let objURL: string | null = null;
     fetch(optimizedSrc)
       .then((res) => res.blob())
-      .then((img) => setOptimizedSrc(URL.createObjectURL(img)))
+      .then((img) => {
+        objURL = URL.createObjectURL(img);
+        setOptimizedSrc(objURL);
+      })
       .finally(() => setDidLoad(true));
-  }, []);
+    return () => {
+      if (objURL) URL.revokeObjectURL(objURL);
+    };
+  }, [placeholder, src]);
 
   return placeholder == "blur" && !didLoad ? (
     <img
@@ -62,7 +69,6 @@ function Image({
       aria-hidden="true"
       {...props}
       style={{
-        inset: 0,
         filter: "blur(8px)",
         ...props.style,
       }}
