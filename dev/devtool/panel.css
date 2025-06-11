@@ -1,0 +1,60 @@
+#bunext-devtools {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 400px;
+  height: 500px;
+  background: #1e1e1e;
+  color: white;
+  border-top-left-radius: 8px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  overflow: auto;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+}
+
+#bunext-devtools.hidden {
+  display: none;
+}
+
+#bunext-devtools header {
+  padding: 10px;
+  background: #333;
+  cursor: move;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+#bunext-devtools header button {
+  background: #555;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+#bunext-devtools .content {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+}
+.section {
+  margin-bottom: 1rem;
+}
+.section h3 {
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #444;
+  padding-bottom: 4px;
+}
+.route-item {
+  margin-left: 1rem;
+}
+button.action {
+  display: inline-block;
+  margin: 4px;
+  background: #444;
+  border: 1px solid #666;
+  padding: 4px 10px;
+  color: #eee;
+  cursor: pointer;
+}

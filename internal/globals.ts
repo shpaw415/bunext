@@ -57,6 +57,8 @@ declare global {
     callback: (response: Response) => void;
     id: string;
   }[];
+
+  var __ROUTES__: Record<string, string>;
 }
 
 globalThis.React = React;
@@ -69,6 +71,7 @@ globalThis.jsxs = jsxs;
 globalThis.Fragment_8vg9x3sq = Fragment;
 globalThis.Fragment = Fragment;
 globalThis.ServerActionCallbacks ??= [];
+globalThis.__ROUTES__ ??= {};
 
 export const paths = {
   bunextDirName: ".bunext",

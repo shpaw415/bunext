@@ -90,6 +90,10 @@ export type ServerConfig = {
   };
   Dev: {
     hotServerPort: number;
+    /**
+     * Client side DevTool panel showing useful information and action
+     */
+    devtoolPanel?: boolean;
   };
   build: {
     plugins: BunPlugin[];
