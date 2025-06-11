@@ -1,6 +1,6 @@
 import type { DBSchema } from "../../database/schema";
 import { CacheManagerExtends } from "../../internal/caching";
-import type { ServerSideProps, staticPage } from "../../internal/types";
+import type { staticPage } from "../../internal/types";
 import { join } from "node:path";
 import type { BunextPlugin } from "../types";
 import type { RequestManager } from "../../internal/server/router";
@@ -244,8 +244,9 @@ export default {
             })
           );
       } else if (
-        req.request.headers.get("Accept") ==
-          "application/vnd.server-side-props" &&
+        req.request.headers
+          .get("Accept")
+          ?.includes("application/vnd.server-side-props") &&
         isUseStatic &&
         manager.serverSide
       ) {
