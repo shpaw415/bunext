@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+    <div id="bunext-devtools">
+        <header>
+            <span>🛠 Bunext Devtools</span>
+            <button onclick="document.getElementById('devtools').style.display='none'">×</button>
+        </header>
+        <div class="content">
+            <div class="section">
+                <h3>🔍 Routes disponibles</h3>
+                <ul>
+                    <li class="route-item">/ → Static</li>
+                    <li class="route-item">/about → SSR</li>
+                    <li class="route-item">/blog/[slug] → Dynamic</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h3>📍 Page actuelle</h3>
+                <p>/blog/hello-world</p>
+                <p>Type : Dynamic (SSR)</p>
+            </div>
+
+            <div class="section">
+                <h3>⚙️ Actions</h3>
+                <button class="action" onclick="restartServer()">Redémarrer serveur dev</button>
+                <button class="action" onclick="reloadPage()">Recharger la page</button>
+                <button class="action" onclick="clearCache()">Vider cache route</button>
+            </div>
+
+            <div class="section">
+                <h3>📦 Server Props</h3>
+                <pre>{ "title": "Hello World", "content": "Lorem ipsum..." }</pre>
+            </div>
+
+            <div class="section">
+                <h3>⏱ Temps de rendu</h3>
+                <ul>
+                    <li>Server Render: 54ms</li>
+                    <li>Hydration: 38ms</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function restartServer() {
+            alert("[Devtools] Redémarrage du serveur (simulé)...");
+        }
+
+        function reloadPage() {
+            alert("[Devtools] Reload forcé de la page (simulé)");
+            location.reload();
+        }
+
+        function clearCache() {
+            alert("[Devtools] Cache des routes invalidé (simulé)");
+        }
+
+        // Option draggable
+        const devtools = document.getElementById("devtools");
+        const header = devtools.querySelector("header");
+        let isDragging = false, offsetX, offsetY;
+
+        header.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            offsetX = e.clientX - devtools.offsetLeft;
+            offsetY = e.clientY - devtools.offsetTop;
+        });
+
+        document.addEventListener("mouseup", () => {
+            isDragging = false;
+        });
+
+        document.addEventListener("mousemove", (e) => {
+            if (isDragging) {
+                devtools.style.left = e.clientX - offsetX + "px";
+                devtools.style.top = e.clientY - offsetY + "px";
+                devtools.style.bottom = "auto";
+                devtools.style.right = "auto";
+            }
+        });
+    </script>
+</body>
+
+</html>

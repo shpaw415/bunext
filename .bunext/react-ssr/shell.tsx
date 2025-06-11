@@ -15,9 +15,9 @@ export const Shell = ({
     <SessionProvider>
       <html>
         <HeadProvider currentPath={route}>
-          <Dev>
-            <body>{children}</body>
-          </Dev>
+          <body>
+            <Dev>{children}</Dev>
+          </body>
         </HeadProvider>
       </html>
     </SessionProvider>

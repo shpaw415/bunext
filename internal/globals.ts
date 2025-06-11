@@ -57,6 +57,8 @@ declare global {
     callback: (response: Response) => void;
     id: string;
   }[];
+
+  var __ROUTES__: Record<string, string>;
 }
 
 globalThis.React = React;

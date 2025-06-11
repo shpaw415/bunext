@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 import { ReloadContext } from "../internal/router/index";
+import DevToolPanel from "./devtool/panel";
 
 declare global {
   var __BUNEXT_DEV_INIT: boolean;
@@ -61,5 +62,10 @@ export function Dev({ children }: { children?: any }) {
     wsSetInterval(setWs);
   }, []);
 
-  return children;
+  return (
+    <>
+      {children}
+      {globalThis.serverConfig.Dev.devtoolPanel && <DevToolPanel />}
+    </>
+  );
 }

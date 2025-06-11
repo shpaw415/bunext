@@ -152,6 +152,11 @@ class CacheManagerExtends {
       WAL: true,
     });
   }
+  protected isPrimaryError(err: Error, callback?: Function) {
+    const is = (err as any).code == "SQLITE_CONSTRAINT_PRIMARYKEY";
+    callback?.();
+    return is;
+  }
 }
 
 class CacheManager {

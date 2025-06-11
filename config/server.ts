@@ -6,6 +6,7 @@ const Config: ServerConfig = {
   },
   Dev: {
     hotServerPort: 3005,
+    devtoolPanel: true,
   },
   build: {
     plugins: [],

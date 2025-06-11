@@ -680,25 +680,18 @@ class RequestManager {
         );
     }
   }
-  private async MakeServerSideProps(): Promise<{
+
+  async MakeServerSideProps(options?: { disableSession?: boolean }): Promise<{
     value: ServerSideProps;
     toString: () => string | undefined;
   }> {
+    if (options?.disableSession)
+      process.env.__SESSION_MUST_NOT_BE_INITED__ = "true";
+
     if (this.serverSideProps) return this.serverSideProps;
 
     if (!this.serverSide)
       throw new Error(`no serverSide script found for ${this.pathname}`);
-
-    if (this.isUseStaticPath(true)) {
-      const props = CacheManager.getStaticPageProps(this.serverSide.pathname);
-      if (props) {
-        this.serverSideProps = {
-          toString: () => JSON.stringify(props),
-          value: props,
-        };
-        return this.serverSideProps;
-      }
-    }
 
     const module = (await import(this.serverSide.filePath)) as {
       getServerSideProps?: getServerSidePropsFunction;
@@ -782,20 +775,9 @@ class RequestManager {
     if (!this.serverSide) return null;
     else if (this.serverSide.pathname == "/favicon.ico") return null;
 
-    if (this.isUseStaticPath(true)) {
-      const stringPage = await this.getStaticPage();
-      if (stringPage)
-        return this.bunextReq.__SET_RESPONSE__(
-          new Response(Buffer.from(Bun.gzipSync(stringPage || "")), {
-            headers: {
-              "content-type": "text/html; charset=utf-8",
-              "Content-Encoding": "gzip",
-            },
-          })
-        );
-    }
-
-    const pageJSX = await this.MakeDynamicJSXElement();
+    const pageJSX = await this.MakeDynamicJSXElement({
+      serverSideProps: (await this.MakeServerSideProps()).value,
+    });
     if (!pageJSX) return null;
 
     const page = await this.makePage(pageJSX);
@@ -888,12 +870,11 @@ class RequestManager {
       .filter(Boolean);
   }
 
-  private async makeDevDynamicJSXElement() {
+  private async makeDevDynamicJSXElement(serverSideProps: ServerSideProps) {
     let pageString = "";
     let proc: Subprocess<"ignore", "inherit", "inherit"> | undefined =
       undefined as unknown as Subprocess<"ignore", "inherit", "inherit">;
 
-    const serverSideProps = (await this.MakeServerSideProps()).value;
     await new Promise((resolve, reject) => {
       if (!this.serverSide) {
         reject(undefined);
@@ -940,12 +921,14 @@ class RequestManager {
       />
     );
   }
-  private async makeProductionDynamicJSXElement() {
+  private async makeProductionDynamicJSXElement(
+    serverSideProps: ServerSideProps
+  ) {
     if (!this.serverSide) return null;
     return this.router.CreateDynamicPage(
       this.serverSide.filePath,
       {
-        props: (await this.MakeServerSideProps()).value,
+        props: serverSideProps,
         params: this.serverSide.params,
       },
       this.serverSide,
@@ -953,50 +936,18 @@ class RequestManager {
     );
   }
 
-  private MakeDynamicJSXElement() {
+  MakeDynamicJSXElement({
+    serverSideProps,
+  }: {
+    serverSideProps: ServerSideProps;
+  }) {
     if (!this.serverSide) return null;
 
     if (process.env.NODE_ENV == "development")
-      return this.makeDevDynamicJSXElement();
-    else return this.makeProductionDynamicJSXElement();
+      return this.makeDevDynamicJSXElement(serverSideProps);
+    else return this.makeProductionDynamicJSXElement(serverSideProps);
   }
-  /**
-   * get static page or add it to the cache if it does not exists
-   */
-  private async getStaticPage() {
-    if (!this.isUseStaticPath(true) || !this.serverSide) return null;
 
-    const cache = CacheManager.getStaticPage(this.request.url);
-    if (!cache) {
-      const pageJSX = await this.MakeDynamicJSXElement();
-      if (!pageJSX)
-        throw Error(
-          `Error Caching page JSX from path: ${this.serverSide.pathname}`
-        );
-      const PageWithLayouts = await this.router.stackLayouts(
-        this.serverSide,
-        pageJSX
-      );
-      const pageString = await this.formatPage(
-        renderToString(await this.makePage(PageWithLayouts))
-      );
-      CacheManager.addStaticPage(
-        this.serverSide.pathname,
-        pageString,
-        (await this.MakeServerSideProps()).value
-      );
-      return pageString;
-    }
-
-    return cache.page;
-  }
-  private isUseStaticPath(andProduction?: boolean): boolean {
-    if (andProduction && process.env.NODE_ENV != "production") return false;
-    return Boolean(
-      this.serverSide &&
-        this.router.staticRoutes.includes(this.serverSide?.name)
-    );
-  }
   /**
    * Wrapping Page with the Shell
    * @param page layouts + page

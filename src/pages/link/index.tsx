@@ -1,5 +1,6 @@
+"use client";
+
 import { Link } from "../../../features/router/components";
-("use client");
 
 /**
  * Renders the client-side page for the link feature.

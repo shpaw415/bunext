@@ -101,4 +101,9 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
    * **ONLY DEV MODE**
    */
   onFileSystemChange: onFileSystemChangePlugin;
+
+  /**
+   * 0 more priority then 1
+   */
+  priority?: number;
 }>;
