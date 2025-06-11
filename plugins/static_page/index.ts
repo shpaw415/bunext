@@ -1,10 +1,6 @@
 import type { DBSchema } from "../../database/schema";
 import { CacheManagerExtends } from "../../internal/caching";
-import type {
-  getServerSidePropsFunction,
-  ServerSideProps,
-  staticPage,
-} from "../../internal/types";
+import type { ServerSideProps, staticPage } from "../../internal/types";
 import { join } from "node:path";
 import type { BunextPlugin } from "../types";
 import type { RequestManager } from "../../internal/server/router";
@@ -44,7 +40,7 @@ export class StaticPageCache extends CacheManagerExtends {
     });
   }
 
-  addStaticPage(pathname: string, page: string, raw_props?: any) {
+  addStaticPage(pathname: string, page: string, raw_props?: Object) {
     try {
       this.static_page.insert([
         {
@@ -183,7 +179,11 @@ async function getStaticPage(manager: RequestManager) {
       GetServerSideProps(cacheManager, manager) ||
       (await manager.MakeServerSideProps({ disableSession: true }));
 
-    cacheManager.addStaticPage(manager.serverSide.pathname, pageString, props);
+    cacheManager.addStaticPage(
+      manager.serverSide.pathname,
+      pageString,
+      props.value
+    );
     return pageString;
   }
 
@@ -200,7 +200,7 @@ async function MakeStaticPage(manager: RequestManager) {
   const cacheManager = new StaticPageCache();
   const props = await manager.MakeServerSideProps({ disableSession: true });
   const pageJSX = await manager.MakeDynamicJSXElement({
-    serverSideProps: props.value,
+    serverSideProps: props?.value,
   });
   if (!pageJSX)
     throw Error(

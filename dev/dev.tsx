@@ -65,7 +65,8 @@ export function Dev({ children }: { children?: any }) {
   return (
     <>
       {children}
-      {globalThis.serverConfig.Dev.devtoolPanel && <DevToolPanel />}
+      {globalThis.serverConfig?.Dev?.devtoolPanel &&
+        process.env.NODE_ENV == "development" && <DevToolPanel />}
     </>
   );
 }
