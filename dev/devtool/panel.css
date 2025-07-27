@@ -1,60 +1,380 @@
-#bunext-devtools {
+/* --- Theme Variables --- */
+.bunext-theme-dark {
+  --bunext-bg: #1e1e1e;
+  --bunext-bg-alt: #232323;
+  --bunext-bg-hover: #2c2c2c;
+  --bunext-border: #444;
+  --bunext-border-alt: #666;
+  --bunext-text: #eee;
+  --bunext-text-alt: #7ec699;
+  --bunext-btn-bg: #444;
+  --bunext-btn-bg-hover: #555;
+  --bunext-btn-bg-active: #333;
+  --bunext-btn-border: #666;
+  --bunext-btn-border-hover: #888;
+  --bunext-btn-border-active: #aaa;
+  --bunext-scrollbar-bg: #222;
+  --bunext-scrollbar-thumb: #444;
+  --bunext-scrollbar-thumb-hover: #666;
+  --bunext-copy-tooltip-bg: #222;
+  --bunext-copy-tooltip-text: #fff;
+}
+.bunext-theme-light {
+  --bunext-bg: #f7f7f7;
+  --bunext-bg-alt: #eaeaea;
+  --bunext-bg-hover: #e0e0e0;
+  --bunext-border: #ccc;
+  --bunext-border-alt: #bbb;
+  --bunext-text: #222;
+  --bunext-text-alt: #2d7c4a;
+  --bunext-btn-bg: #e0e0e0;
+  --bunext-btn-bg-hover: #d4d4d4;
+  --bunext-btn-bg-active: #c0c0c0;
+  --bunext-btn-border: #bbb;
+  --bunext-btn-border-hover: #888;
+  --bunext-btn-border-active: #aaa;
+  --bunext-scrollbar-bg: #eaeaea;
+  --bunext-scrollbar-thumb: #ccc;
+  --bunext-scrollbar-thumb-hover: #bbb;
+  --bunext-copy-tooltip-bg: #eaeaea;
+  --bunext-copy-tooltip-text: #222;
+}
+
+/* --- Bunext Devtools Panel Layout --- */
+.bunext-devtools-panel {
+  transition: opacity 0.25s, transform 0.25s;
+  opacity: 1;
+  transform: translateY(0);
   position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 400px;
-  height: 500px;
-  background: #1e1e1e;
-  color: white;
+  background: var(--bunext-bg);
+  color: var(--bunext-text);
   border-top-left-radius: 8px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
-  overflow: auto;
+  overflow: hidden;
   z-index: 9999;
   display: flex;
   flex-direction: column;
 }
-
-#bunext-devtools.hidden {
-  display: none;
+.bunext-devtools-panel-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(40px);
 }
-
-#bunext-devtools header {
+.bunext-panel-header {
   padding: 10px;
-  background: #333;
+  background: var(--bunext-bg-alt);
+  color: var(--bunext-text);
   cursor: move;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-#bunext-devtools header button {
-  background: #555;
-  color: white;
+.bunext-panel-close-btn {
+  background: var(--bunext-btn-bg);
+  color: var(--bunext-text);
   border: none;
   padding: 4px 8px;
   cursor: pointer;
 }
-#bunext-devtools .content {
+.bunext-panel-content {
   flex: 1;
   padding: 10px;
   overflow-y: auto;
+  background: var(--bunext-bg);
+  color: var(--bunext-text);
 }
-.section {
+.bunext-panel-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 10;
+  background: transparent;
+  user-select: none;
+}
+
+/* --- Floating Button --- */
+.bunext-toggle-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  background: var(--bunext-btn-bg);
+  color: var(--bunext-text);
+  border: 2px solid var(--bunext-btn-border);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 1.5em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: background 0.2s, border 0.2s;
+}
+.bunext-toggle-btn:hover {
+  background: var(--bunext-btn-bg-hover);
+  border-color: var(--bunext-btn-border-hover);
+}
+
+/* --- Section --- */
+.bunext-section {
   margin-bottom: 1rem;
 }
-.section h3 {
+.bunext-section-title {
   margin-bottom: 0.5rem;
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid var(--bunext-border);
   padding-bottom: 4px;
+  background: var(--bunext-bg-alt);
+  color: var(--bunext-text);
+  font-size: 1.05em;
+  font-weight: 500;
+  padding: 6px 10px 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  transition: background 0.2s;
 }
-.route-item {
+.bunext-section-title:hover {
+  background: var(--bunext-bg-hover);
+}
+.bunext-section-content {
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s;
+  overflow: hidden;
+}
+
+/* --- List & Actions --- */
+.bunext-routes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  background: var(--bunext-bg);
+  color: var(--bunext-text);
+}
+.bunext-route-item {
   margin-left: 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 6px;
+  transition: background 0.18s, color 0.18s;
+  background: transparent;
+  color: var(--bunext-text);
 }
-button.action {
+.bunext-route-item-hover,
+.bunext-route-item:hover,
+.bunext-route-item:focus {
+  background: var(--bunext-bg-hover);
+  color: var(--bunext-text-alt);
+}
+.bunext-action-btn {
   display: inline-block;
   margin: 4px;
-  background: #444;
-  border: 1px solid #666;
+  background: var(--bunext-btn-bg);
+  border: 1px solid var(--bunext-btn-border);
   padding: 4px 10px;
-  color: #eee;
+  color: var(--bunext-text);
   cursor: pointer;
+}
+.bunext-action-btn:hover {
+  background: var(--bunext-btn-bg-hover);
+  border-color: var(--bunext-btn-border-hover);
+}
+
+/* --- Copy Button --- */
+.bunext-copy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px;
+  background: var(--bunext-btn-bg);
+  border: 1px solid var(--bunext-btn-border);
+  padding: 4px 12px;
+  color: var(--bunext-text);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 1em;
+  transition: background 0.2s, border 0.2s;
+}
+.bunext-copy-button:hover {
+  background: var(--bunext-btn-bg-hover);
+  border-color: var(--bunext-btn-border-hover);
+  color: var(--bunext-text);
+}
+.bunext-copy-button:active {
+  background: var(--bunext-btn-bg-active);
+  border-color: var(--bunext-btn-border-active);
+}
+.bunext-copy-tooltip {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bunext-copy-tooltip-bg);
+  color: var(--bunext-copy-tooltip-text);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0.95;
+}
+
+/* --- Filter Input --- */
+.bunext-filter-input {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--bunext-border);
+  background: var(--bunext-bg-alt);
+  color: var(--bunext-text);
+}
+.bunext-filter-clear-btn {
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: none;
+  background: var(--bunext-btn-bg);
+  color: var(--bunext-text);
+  cursor: pointer;
+  font-size: 1em;
+  transition: background 0.2s, filter 0.2s, opacity 0.2s;
+}
+.bunext-filter-clear-btn:hover:enabled {
+  background: var(--bunext-btn-bg-hover);
+}
+.bunext-filter-clear-btn:disabled,
+.bunext-filter-clear-btn-blur {
+  filter: blur(2px);
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: default;
+}
+
+/* --- Code Block Viewer Styles --- */
+.bunext-server-props-pre {
+  background: var(--bunext-bg-alt);
+  color: var(--bunext-text);
+  padding: 4px 6px; /* reduced from 12px */
+  border-radius: 6px;
+  font-size: 0.97em;
+  line-height: 1.6;
+  overflow-x: auto;
+  font-family: "Fira Mono", "Consolas", "Menlo", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  position: relative;
+  margin-bottom: 1rem;
+}
+.bunext-codeblock-viewer {
+  font-family: "Fira Mono", "Consolas", "Menlo", monospace;
+  font-size: 0.97em;
+  background: var(--bunext-bg-alt);
+  color: var(--bunext-text);
+  border-radius: 6px;
+  padding: 4px 6px; /* reduced from 12px */
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+.bunext-codeblock-row {
+  display: flex;
+  align-items: flex-start;
+  min-height: 1.5em;
+}
+.bunext-codeblock-linenum {
+  color: var(--bunext-border-alt);
+  font-size: 0.95em;
+  background: transparent;
+  user-select: none;
+  margin-right: 8px;
+  width: 32px;
+  display: inline-block;
+  text-align: right;
+  opacity: 0.7;
+  vertical-align: top;
+}
+.bunext-codeblock-indent {
+  padding-left: 0;
+  transition: padding-left 0.2s;
+}
+.bunext-json-key {
+  color: #7ec699;
+}
+.bunext-json-string {
+  color: #d7ba7d;
+}
+.bunext-json-number {
+  color: #b5cea8;
+}
+.bunext-json-boolean {
+  color: #569cd6;
+}
+.bunext-json-null {
+  color: #c586c0;
+}
+.bunext-codeblock-toggle {
+  cursor: pointer;
+  color: var(--bunext-text-alt);
+  font-weight: bold;
+  margin-right: 4px;
+  transition: color 0.2s, text-decoration 0.2s;
+  user-select: none;
+}
+.bunext-codeblock-toggle:hover {
+  color: #b5cea8;
+}
+.bunext-codeblock-toggle:active {
+  color: #d7ba7d;
+}
+
+/* --- Custom Scrollbar for Devtools Panel and all scrollable children --- */
+.bunext-devtools-panel,
+.bunext-panel-content,
+.bunext-routes-list,
+.bunext-server-props-pre,
+.bunext-codeblock-viewer {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bunext-scrollbar-thumb) var(--bunext-scrollbar-bg);
+}
+
+/* Chrome, Edge, Safari */
+.bunext-devtools-panel::-webkit-scrollbar,
+.bunext-panel-content::-webkit-scrollbar,
+.bunext-routes-list::-webkit-scrollbar,
+.bunext-server-props-pre::-webkit-scrollbar,
+.bunext-codeblock-viewer::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: var(--bunext-scrollbar-bg);
+  border-radius: 6px;
+}
+
+.bunext-devtools-panel::-webkit-scrollbar-thumb,
+.bunext-panel-content::-webkit-scrollbar-thumb,
+.bunext-routes-list::-webkit-scrollbar-thumb,
+.bunext-server-props-pre::-webkit-scrollbar-thumb,
+.bunext-codeblock-viewer::-webkit-scrollbar-thumb {
+  background: var(--bunext-scrollbar-thumb);
+  border-radius: 6px;
+  border: 2px solid var(--bunext-scrollbar-bg);
+}
+
+.bunext-devtools-panel::-webkit-scrollbar-thumb:hover,
+.bunext-panel-content::-webkit-scrollbar-thumb:hover,
+.bunext-routes-list::-webkit-scrollbar-thumb:hover,
+.bunext-server-props-pre::-webkit-scrollbar-thumb:hover,
+.bunext-codeblock-viewer::-webkit-scrollbar-thumb:hover {
+  background: var(--bunext-scrollbar-thumb-hover);
+}
+
+.bunext-devtools-panel::-webkit-scrollbar-corner,
+.bunext-panel-content::-webkit-scrollbar-corner,
+.bunext-routes-list::-webkit-scrollbar-corner,
+.bunext-server-props-pre::-webkit-scrollbar-corner,
+.bunext-codeblock-viewer::-webkit-scrollbar-corner {
+  background: var(--bunext-scrollbar-bg);
 }

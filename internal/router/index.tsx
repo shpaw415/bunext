@@ -94,7 +94,7 @@ export const useReloadEffect = (
 /**
  * a context that can be used to reload the current page
  */
-export const ReloadContext = createContext(async (): Promise<void> => {});
+export const ReloadContext = createContext(async (): Promise<void> => { });
 
 /**
  * Returns a stateful value which bounded to route, and a function to update it.
@@ -167,11 +167,14 @@ export const RouterHost = ({
         const [props, module] = await Promise.all([
           fetchServerSideProps(target),
           import(
-            `${matched.value}${
-              process.env.NODE_ENV == "development" ? `?${currentVersion}` : ""
+            `${matched.value}${process.env.NODE_ENV == "development" ? `?${currentVersion}` : ""
             }`
           ),
         ]);
+
+        globalThis.__SERVERSIDE_PROPS__ = props;
+
+
         const JsxToDisplay = await NextJsLayoutStacker({
           page: await module.default({
             props,
@@ -197,6 +200,7 @@ export const RouterHost = ({
             });
           }
         }
+
       } catch (e) {
         console.log(e);
       }
@@ -312,10 +316,9 @@ export async function NextJsLayoutStacker({
         (
           await import(
             normalize(
-              `/${globalX.__PAGES_DIR__}${currentPath}/layout.js${
-                process.env.NODE_ENV == "development"
-                  ? "?" + currentVersion
-                  : ""
+              `/${globalX.__PAGES_DIR__}${currentPath}/layout.js${process.env.NODE_ENV == "development"
+                ? "?" + currentVersion
+                : ""
               }`
             )
           )
