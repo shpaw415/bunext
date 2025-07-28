@@ -1,7 +1,26 @@
+/**
+ * Development Plugin for Bunext
+ * 
+ * This plugin handles development-specific features including:
+ * - Hot reloading and rebuild triggers
+ * - Chrome DevTools integration
+ * - Development path tracking
+ * - Automatic compilation of changed routes
+ */
+
+// Core dependencies
 import { builder } from "../internal/server/build";
-import type { BunextPlugin } from "./types";
 import { router } from "../internal/server/router";
-import { relative } from "node:path";
+
+// Types
+import type { BunextPlugin } from "./types";
+import type { MatchedRoute } from "bun";
+import type { BunextRequest } from "../internal/server/bunextRequest";
+
+// Node.js path utilities
+import { relative, normalize } from "node:path";
+
+// Logging utilities
 import {
   benchmark_console,
   DevConsole,
@@ -9,32 +28,39 @@ import {
   TextColor,
   ToColor,
 } from "../internal/server/logs";
-import type { MatchedRoute } from "bun";
-import { normalize } from "path";
-import type { BunextRequest } from "../internal/server/bunextRequest";
 
+// Constants
+const CWD = process.cwd();
+const DEVTOOLS_ENDPOINT = "/.well-known/appspecific/com.chrome.devtools.json";
+const SERVER_SIDE_PROPS_HEADER = "application/vnd.server-side-props";
+
+// Plugin configuration
 const plugin: BunextPlugin =
-  process.env.NODE_ENV == "development"
+  process.env.NODE_ENV === "development"
     ? {
-        router: {
-          request: async (request) => {
-            await onDevRequest(request.request);
-            return await devtoolsJson(request);
-          },
+      router: {
+        request: async (request) => {
+          await handleDevRequest(request.request);
+          return await handleDevtoolsJson(request);
         },
-      }
+      },
+    }
     : {};
 
-async function devtoolsJson(req: BunextRequest) {
-  if (req.URL.pathname != "/.well-known/appspecific/com.chrome.devtools.json")
+/**
+ * Handles devtools JSON endpoint for Chrome DevTools integration
+ */
+async function handleDevtoolsJson(req: BunextRequest) {
+  if (req.URL.pathname !== DEVTOOLS_ENDPOINT) {
     return;
+  }
 
   return req.__SET_RESPONSE__(
     new Response(
       JSON.stringify({
         name: "Bunext",
         workspace: {
-          root: process.cwd(),
+          root: CWD,
           uuid: Bun.randomUUIDv7(),
         },
       })
@@ -42,62 +68,96 @@ async function devtoolsJson(req: BunextRequest) {
   );
 }
 
-async function onDevRequest(request: Request) {
-  if (process.env.NODE_ENV != "development") return;
-  const match = router.server.match(request);
-  if (
+/**
+ * Checks if a route should trigger a rebuild in development mode
+ */
+function shouldRebuildRoute(match: MatchedRoute | null, request: Request): boolean {
+  return !!(
     match &&
     !match.src.endsWith("layout.tsx") &&
-    match.pathname != "/favicon.ico" &&
-    request.headers.get("accept") != "application/vnd.server-side-props" &&
+    match.pathname !== "/favicon.ico" &&
+    request.headers.get("accept") !== SERVER_SIDE_PROPS_HEADER &&
     match.filePath.endsWith(".tsx") &&
-    !isDevCurrentPath(match)
-  ) {
-    await MakeBuild(match);
+    !isCurrentDevPath(match)
+  );
+}
+
+/**
+ * Handles development-specific request processing
+ */
+async function handleDevRequest(request: Request) {
+  if (process.env.NODE_ENV !== "development") return;
+
+  const match = router.server.match(request);
+
+  if (shouldRebuildRoute(match, request)) {
+    await buildRoute(match!);
     return;
   }
 
+  await handleIndexJsRequest(request);
+}
+
+/**
+ * Handles requests for index.js files that might need rebuilding
+ */
+async function handleIndexJsRequest(request: Request) {
   const url = new URL(request.url);
-  if (url.pathname.endsWith("index.js")) {
-    const match = router.server.match(
-      normalize(
-        url.pathname.replace("index.js", "").replace(router.pageDir, "")
-      )
-    );
-    if (match?.filePath?.endsWith("tsx") && !isDevCurrentPath(match)) {
-      await MakeBuild(match);
-      return;
-    }
+
+  if (!url.pathname.endsWith("index.js")) {
+    return;
+  }
+
+  const normalizedPath = normalize(
+    url.pathname.replace("index.js", "").replace(router.pageDir, "")
+  );
+
+  const match = router.server.match(normalizedPath);
+
+  if (match?.filePath?.endsWith("tsx") && !isCurrentDevPath(match)) {
+    await buildRoute(match);
   }
 }
-const cwd = process.cwd();
-function setDevCurrentPath(match: MatchedRoute) {
-  const relativePathFromSrcPath = relative(cwd + "/src", match.filePath);
-  const PathnameArray = relativePathFromSrcPath.split(".");
-  PathnameArray.pop();
+/**
+ * Sets the current development path for tracking active builds
+ */
+function setCurrentDevPath(match: MatchedRoute) {
+  const relativePathFromSrc = relative(CWD + "/src", match.filePath);
+  const pathnameWithoutExtension = relativePathFromSrc.split(".").slice(0, -1).join(".");
 
   globalThis.dev = {
-    current_dev_path: relativePathFromSrcPath,
-    pathname: PathnameArray.join("."),
+    current_dev_path: relativePathFromSrc,
+    pathname: pathnameWithoutExtension,
   };
 }
-function isDevCurrentPath(match: MatchedRoute) {
-  if (globalThis.dev?.current_dev_path) {
-    const relativePathFromSrcPath = relative(cwd + "/src", match.filePath);
-    return globalThis.dev.current_dev_path == relativePathFromSrcPath;
+
+/**
+ * Checks if the given match corresponds to the currently active development path
+ */
+function isCurrentDevPath(match: MatchedRoute): boolean {
+  if (!globalThis.dev?.current_dev_path) {
+    return false;
   }
-  return false;
+
+  const relativePathFromSrc = relative(CWD + "/src", match.filePath);
+  return globalThis.dev.current_dev_path === relativePathFromSrc;
 }
 
-async function MakeBuild(match: MatchedRoute) {
+/**
+ * Builds a specific route with logging and timing
+ */
+async function buildRoute(match: MatchedRoute) {
   await builder.awaitBuildFinish();
+
   DevConsole(
     `${ToColor("blue", TerminalIcon.info)} ${ToColor(
       TextColor,
       `compiling ${match.pathname} ...`
     )}`
   );
-  setDevCurrentPath(match);
+
+  setCurrentDevPath(match);
+
   await benchmark_console(
     (time) =>
       `${ToColor("green", TerminalIcon.success)} ${ToColor(

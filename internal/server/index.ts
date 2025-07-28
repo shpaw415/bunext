@@ -1,18 +1,25 @@
 import "../globals.ts";
 import "./server_global.ts";
 
+// Build and routing
 import { builder } from "./build.ts";
 import { router } from "./router.tsx";
-import { renderToString } from "react-dom/server";
-import { ErrorFallback } from "../../components/fallback.tsx";
 import { doWatchBuild } from "./build-watch.ts";
 import { setRevalidate } from "./server-features.ts";
 
+// React and error handling
+import { renderToString } from "react-dom/server";
+import { ErrorFallback } from "../../components/fallback.tsx";
+
+// Bun and request handling
 import type { Server as _Server } from "bun";
 import { BunextRequest } from "./bunextRequest.ts";
 
+// Node.js modules
 import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
+
+// Features
 import { revalidate } from "../../features/router/revalidate.ts";
 import {
   CleanExpiredSession,
@@ -21,12 +28,16 @@ import {
   InitDatabase,
   SetSessionByID,
 } from "../session.ts";
+
+// Types and server startup
 import type {
   ClusterMessageType,
   OnRequestType,
   ReactShellComponent,
 } from "../types.ts";
 import OnServerStart, { OnServerStartCluster } from "./server-start.ts";
+
+// Caching and logging
 import "../caching/fetch.ts";
 import {
   benchmark_console,
@@ -36,6 +47,8 @@ import {
   ToColor,
   getStartLog,
 } from "./logs.ts";
+import { DevWsMessageHandler, type DevWsMessageTypes } from "../../dev/hotServer.ts";
+import { exit } from "node:process";
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
@@ -44,37 +57,68 @@ declare global {
   }
 }
 
+// Global initialization
 globalThis.clusterStatus ??= false;
 
-const excludesPathToNotLog = [
+// Constants
+const EXCLUDED_PATHS_FROM_LOGGING = [
   "/src/pages",
   "/node_modules/react",
   "/.bunext",
   "/node_modules/scheduler",
   "/chunk-",
-];
+] as const;
 
-function StatusCodeToColor(statusCode: number) {
+const SESSION_CLEANUP_INTERVAL = 1800 * 1000; // 30 minutes
+const SOCKET_CLEANUP_INTERVAL = 10000; // 10 seconds
+
+// Utility functions
+function getStatusCodeColor(statusCode: number): string {
   if (statusCode >= 500) return "red";
-  else if (statusCode >= 400) return "#333";
-  else if (statusCode >= 300) return "yellow";
-  else if (statusCode >= 200) return "green";
+  if (statusCode >= 400) return "#333";
+  if (statusCode >= 300) return "yellow";
+  if (statusCode >= 200) return "green";
   return TextColor;
 }
 
-class BunextServer {
-  onRequest?: OnRequestType;
-  preloadModulePath: string;
-  Shell: ReactShellComponent;
+function shouldLogRequest(url: URL, headers: Record<string, string>): boolean {
+  const isExcludedPath = EXCLUDED_PATHS_FROM_LOGGING.some(path =>
+    url.pathname.startsWith(path)
+  );
+  const isServerSideProps = headers["accept"] === "application/vnd.server-side-props";
 
-  port = globalThis.serverConfig.HTTPServer.port || 3000;
-  server?: _Server;
-  hotServerPort = globalThis.serverConfig.Dev.hotServerPort || 3001;
-  hotServer?: _Server;
-  hostName = "localhost";
-  isClustered = false;
-  waittingBuildFinish: Promise<boolean> | undefined;
-  WaitingBuildFinishResolver:
+  return !isExcludedPath && !isServerSideProps;
+}
+
+function createRequestLogMessage(
+  request: Request,
+  result: Response,
+  time: number
+): string {
+  const url = new URL(request.url);
+  return [
+    ToColor("green", TerminalIcon.success),
+    ToColor(TextColor, request.method.toUpperCase()),
+    ToColor(TextColor, url.pathname),
+    ToColor(getStatusCodeColor(result.status), result.status),
+    ToColor(TextColor, `in ${time}ms`)
+  ].join(" ");
+}
+
+class BunextServer {
+  public onRequest?: OnRequestType;
+  public preloadModulePath: string;
+  public Shell: ReactShellComponent;
+
+  public port = globalThis.serverConfig.HTTPServer.port || 3000;
+  public server?: _Server;
+  public hotServerPort = globalThis.serverConfig.Dev.hotServerPort || 3001;
+  public hotServer?: _Server;
+  public hostName = "localhost";
+  public isClustered = false;
+
+  public waittingBuildFinish: Promise<boolean> | undefined;
+  public WaitingBuildFinishResolver:
     | ((value: boolean | PromiseLike<boolean>) => void)
     | undefined;
 
@@ -92,74 +136,86 @@ class BunextServer {
     this.Shell = Shell;
   }
 
-  RunServer() {
-    const self = this;
+  startServer() {
     this.server = Bun.serve({
       port: this.port,
       ...(globalThis.serverConfig?.HTTPServer.config as any),
-      async fetch(request) {
-        const headerJSON = request.headers.toJSON();
-        return benchmark_console(
-          (time, result) => {
-            const url = new URL(request.url);
-
-            if (
-              excludesPathToNotLog
-                .map((path) => url.pathname.startsWith(path))
-                .includes(true) ||
-              headerJSON["accept"] == "application/vnd.server-side-props"
-            )
-              return undefined;
-            return `${ToColor("green", TerminalIcon.success)} ${ToColor(
-              TextColor,
-              request.method.toUpperCase()
-            )} ${ToColor(TextColor, url.pathname)} ${ToColor(
-              StatusCodeToColor(result.status),
-              result.status
-            )} ${ToColor(TextColor, `in ${time}ms`)}`;
-          },
-          async () => {
-            const res = await self.onRequest?.(request);
-            if (res) return res;
-            try {
-              const response = await self.serve(request);
-              if (response instanceof Response) return response;
-              else if (response instanceof BunextRequest)
-                return response.response;
-            } catch (e) {
-              console.log(e);
-            }
-            return new Response("Not found!!", {
-              status: 404,
-            });
-          }
-        );
-      },
+      fetch: this.createFetchHandler(),
     });
+  }
+
+  Reboot() {
+    DevConsole(
+      `${ToColor("blue", TerminalIcon.info)} ${ToColor(
+        TextColor,
+        "Rebooting server..."
+      )}`
+    );
+    exit(0);
+  }
+
+  private createFetchHandler() {
+    return async (request: Request) => {
+      const headers = request.headers.toJSON();
+      return benchmark_console(
+        (time, result) => {
+          const url = new URL(request.url);
+
+          if (shouldLogRequest(url, headers)) {
+            return createRequestLogMessage(request, result, time);
+          }
+          return undefined;
+        },
+        async () => {
+          const customResponse = await this.onRequest?.(request);
+          if (customResponse) return customResponse;
+
+          try {
+            const response = await this.serve(request);
+            if (response instanceof Response) return response;
+            if (response instanceof BunextRequest) return response.response;
+          } catch (error) {
+            console.error(error);
+          }
+
+          return new Response("Not found!!", { status: 404 });
+        }
+      );
+    };
   }
 
   serveHotServer(port: number) {
     this.hotServerPort = port;
-    const clearSocket = () => {
+
+    const clearInactiveSockets = () => {
       globalThis.socketList = globalThis.socketList.filter(
-        (s) => s.readyState == 0 || s.readyState == 1
+        (socket) => socket.readyState === 0 || socket.readyState === 1
       );
     };
 
     this.hotServer = Bun.serve<undefined, {}>({
       websocket: {
-        message: (ws, message) => {},
+        message: (ws, message) => {
+          DevWsMessageHandler.forEach((handler) => {
+            if (typeof message === "string") {
+              const parsedData = JSON.parse(message) as { type: DevWsMessageTypes, data: any };
+              handler(parsedData.type, parsedData.data, ws);
+            } else {
+              console.warn("Received non-string message in WebSocket:");
+            }
+          });
+        },
         open(ws) {
           ws.send("welcome");
           socketList.push(ws);
-          clearSocket();
+          clearInactiveSockets();
         },
         close(ws) {
-          globalThis.socketList.splice(
-            socketList.findIndex((s) => s == ws),
-            1
-          );
-          clearSocket();
+          const socketIndex = socketList.findIndex((s) => s === ws);
+          if (socketIndex !== -1) {
+            globalThis.socketList.splice(socketIndex, 1);
+          }
+          clearInactiveSockets();
         },
       },
       fetch(req, server) {
@@ -172,15 +228,14 @@ class BunextServer {
       port: port,
     });
 
-    setInterval(() => {
-      clearSocket();
-    }, 10000);
+    // Clean up inactive sockets periodically
+    setInterval(clearInactiveSockets, SOCKET_CLEANUP_INTERVAL);
   }
 
-  async SessionDatabaseIniter() {
+  async initSessionDatabase() {
     const sessionConfigType = globalThis.serverConfig.session?.type;
     const setClearSessionInterval = () =>
-      setInterval(() => CleanExpiredSession(), 1800 * 1000);
+      setInterval(() => CleanExpiredSession(), SESSION_CLEANUP_INTERVAL);
 
     switch (sessionConfigType) {
       case "database:hard":
@@ -222,8 +277,8 @@ class BunextServer {
     const isDryRun = globalThis.dryRun;
     const isMainThread = cluster.isPrimary;
     if (isDryRun) {
-      globalThis.clusterStatus = this.MakeCluster();
-      await this.SessionDatabaseIniter();
+      globalThis.clusterStatus = this.createCluster();
+      await this.initSessionDatabase();
     }
 
     router.server?.reload();
@@ -245,7 +300,7 @@ class BunextServer {
           }
           setRevalidate(buildoutput.revalidates);
         }
-        this.RunServer();
+        this.startServer();
       }
       await router.InitServerActions();
     } else if (isMainThread) {
@@ -264,7 +319,7 @@ class BunextServer {
         }
       }
     } else if (!isMainThread) {
-      if (isDryRun) this.RunServer();
+      if (isDryRun) this.startServer();
       await router.InitServerActions();
       await OnServerStartCluster();
     }
@@ -284,19 +339,22 @@ class BunextServer {
       });
   }
 
-  async serve(request: Request) {
+  async serve(request: Request): Promise<Response | BunextRequest | null> {
     let serverActionData: FormData = new FormData();
-    const JSONHeader = request.headers.toJSON();
+    const headers = request.headers.toJSON();
+
     if (request.url.endsWith("/ServerActionGetter")) {
       serverActionData = await request.formData();
     }
+
     try {
       await this.checkBuildOnDevMode({
         filePath: router.server?.match(request)?.filePath,
       });
-      let response: BunextRequest | null = await router.serve(
+
+      const response = await router.serve(
         request,
-        JSONHeader,
+        headers,
         serverActionData,
         {
           Shell: this.Shell,
@@ -304,50 +362,76 @@ class BunextServer {
       );
 
       return response;
-    } catch (e) {
-      console.log(e);
-      const res = async (error: Error) =>
-        new Response(renderToString(ErrorFallback(error)), {
-          headers: {
-            "Content-Type": "text/html",
-          },
-          status: 500,
-        });
-      if ((e as Error).name == "TypeError") process.exit(1);
-      return res(e as Error);
+    } catch (error) {
+      console.error(error);
+
+      if ((error as Error).name === "TypeError") {
+        process.exit(1);
+      }
+
+      return this.createErrorResponse(error as Error);
     }
   }
 
-  MakeCluster() {
+  private createErrorResponse(error: Error): Response {
+    return new Response(renderToString(ErrorFallback(error)), {
+      headers: {
+        "Content-Type": "text/html",
+      },
+      status: 500,
+    });
+  }
+
+  createCluster(): boolean {
     if (
-      OSType() != "Linux" ||
+      OSType() !== "Linux" ||
       !Bun.semver.satisfies(Bun.version, "1.1.25 - x.x.x") ||
-      process.env.NODE_ENV == "development" ||
+      process.env.NODE_ENV === "development" ||
       !serverConfig.HTTPServer?.threads ||
-      (typeof serverConfig.HTTPServer?.threads == "number" &&
+      (typeof serverConfig.HTTPServer?.threads === "number" &&
         serverConfig.HTTPServer?.threads <= 1)
-    )
+    ) {
       return false;
+    }
 
     this.isClustered = true;
 
     if (cluster.isWorker) {
-      process.on("message", (data) => {
-        if (data == "build_done") return;
-        if (this.WaitingBuildFinishResolver)
-          this.WaitingBuildFinishResolver(true);
-      });
+      this.setupWorkerMessageHandler();
       return true;
     }
 
-    const cpuCoreCount = cpus().length;
+    return this.setupMasterCluster();
+  }
 
+  private setupWorkerMessageHandler() {
+    process.on("message", (data) => {
+      if (data === "build_done") return;
+      if (this.WaitingBuildFinishResolver) {
+        this.WaitingBuildFinishResolver(true);
+      }
+    });
+  }
+
+  private setupMasterCluster(): boolean {
+    const cpuCoreCount = cpus().length;
+    let count = this.calculateWorkerCount(cpuCoreCount);
+
+    this.forkWorkers(count);
+    this.setupClusterMessageHandler();
+
+    return true;
+  }
+
+  private calculateWorkerCount(cpuCoreCount: number): number {
     let count =
-      globalThis.serverConfig.HTTPServer.threads == "all_cpu_core"
+      globalThis.serverConfig.HTTPServer.threads === "all_cpu_core"
         ? cpuCoreCount
         : globalThis.serverConfig.HTTPServer.threads || 1;
 
-    if (count <= 1 || process.env.NODE_ENV == "development") count = 1;
+    if (count <= 1 || process.env.NODE_ENV === "development") {
+      count = 1;
+    }
 
     if (count > cpuCoreCount) {
       console.error(
@@ -356,51 +440,74 @@ class BunextServer {
       count = cpuCoreCount;
     }
 
-    for (let i = 0; i < count; i++)
+    return count;
+  }
+
+  private forkWorkers(count: number) {
+    for (let i = 0; i < count; i++) {
       cluster.fork({
         bun_worker: i.toString(),
       });
+    }
+  }
 
-    cluster.on("message", async (w, _message) => {
+  private setupClusterMessageHandler() {
+    cluster.on("message", async (worker, _message) => {
       const message = _message as ClusterMessageType;
+
       switch (message.task) {
         case "revalidate":
           revalidate(...message.data.path);
           break;
         case "update_build":
-          if (message.data.path) await builder.resetPath(message.data.path);
-          await builder.makeBuild();
-          await this.updateWorkerData();
+          await this.handleUpdateBuild(message.data.path);
           break;
         case "getSession":
-          w.send({
-            data: {
-              data: GetSessionByID(message.data.id) || false,
-              id: message.data.id,
-            },
-            task: "getSession",
-          } as ClusterMessageType);
+          this.handleGetSession(worker, message);
           break;
         case "setSession":
-          SetSessionByID(
-            message.data.type,
-            message.data.id,
-            message.data.sessionData
-          );
+          this.handleSetSession(message);
           break;
         case "deleteSession":
           DeleteSessionByID(message.data.id);
           break;
       }
     });
+  }
 
-    return true;
+  private async handleUpdateBuild(path?: string) {
+    if (path) await builder.resetPath(path);
+    await builder.makeBuild();
+    await this.updateWorkerData();
+  }
+
+  private handleGetSession(worker: any, message: ClusterMessageType) {
+    if (message.task === "getSession" && "id" in message.data) {
+      worker.send({
+        data: {
+          data: GetSessionByID(message.data.id) || false,
+          id: message.data.id,
+        },
+        task: "getSession",
+      } as ClusterMessageType);
+    }
+  }
+
+  private handleSetSession(message: ClusterMessageType) {
+    if (message.task === "setSession" && "type" in message.data && "id" in message.data && "sessionData" in message.data) {
+      SetSessionByID(
+        message.data.type,
+        message.data.id,
+        message.data.sessionData
+      );
+    }
   }
   private makeBuildAwaiter() {
-    this.waittingBuildFinish = new Promise((res) => {
-      this.WaitingBuildFinishResolver = res;
+    this.waittingBuildFinish = new Promise((resolve) => {
+      this.WaitingBuildFinishResolver = resolve;
     });
   }
+
   async updateWorkerData(data?: { path?: string }) {
     if (!this.isClustered) {
       this.WaitingBuildFinishResolver?.(true);

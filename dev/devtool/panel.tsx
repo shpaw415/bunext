@@ -1,6 +1,7 @@
 "use client";
 
 import { navigate } from "../../internal/router";
+import { ClientSendWSMessage } from "../hotServer";
 import "./panel.css";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 
@@ -30,11 +31,15 @@ function usePanelSize() {
 }
 
 // --- Main Panel ---
-export default function DevToolPanel() {
+export default function DevToolPanel({ ws }: { ws?: WebSocket }) {
   const [panelVisible, setPanelVisible] = useState(true);
   // Customization states
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [fontSize, setFontSize] = useState(1);
+
+  const restartServer = useCallback(() => {
+    ClientSendWSMessage({ message: "reboot-server", ws });
+  }, [ws]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -61,6 +66,7 @@ export default function DevToolPanel() {
         fontSize={fontSize}
         setTheme={setTheme}
         setFontSize={setFontSize}
+        restartServer={restartServer}
       />
       {!panelVisible && (
         <FloatingButton onClick={() => setPanelVisible(true)} />
@@ -90,6 +96,7 @@ function Panel({
   fontSize,
   setTheme,
   setFontSize,
+  restartServer
 }: {
   onClose: () => void;
   visible: boolean;
@@ -97,6 +104,7 @@ function Panel({
   fontSize: number;
   setTheme: (t: "dark" | "light") => void;
   setFontSize: (f: number) => void;
+  restartServer: () => void;
 }) {
   const [routes, setRoutes] = useState<Array<string>>([]);
   const [filter, setFilter] = useState("");
@@ -364,7 +372,7 @@ function Panel({
         </CollapsibleSection>
 
         <CollapsibleSection title="⚙️ Actions">
-          <button className="bunext-action-btn" onClick={() => console.log("Reloading server...")}>
+          <button className="bunext-action-btn" onClick={restartServer}>
             Reboot Server
           </button>
         </CollapsibleSection>
