@@ -1,92 +1,218 @@
 import { Database as _BunDB } from "bun:sqlite";
-import type { _DataType, DBSchema, TableSchema } from "./schema";
+import type { _DataType, DBSchema, TableSchema, ColumnsSchema } from "./schema";
+import { resolve } from "node:path";
 
+// Global type declarations
 declare global {
-  var dbShema: DBSchema;
+  var dbSchema: DBSchema;
   var MainDatabase: _BunDB;
 }
-try {
-  globalThis.dbShema ??= (
-    await import(`${process.cwd()}/config/database.ts`)
-  ).default;
 
-  globalThis.MainDatabase ??= new _BunDB("./config/bunext.sqlite", {
-    create: true,
-  });
-  globalThis?.MainDatabase?.exec("PRAGMA journal_mode = WAL;");
-} catch {}
+// Constants
+const DEFAULT_DB_PATH = "./config/bunext.sqlite";
+const DEFAULT_CONFIG_PATH = `${process.cwd()}/config/database.ts`;
 
-export class _Database {
-  databaseInstance: _BunDB;
+/**
+ * Initialize global database schema and instance with proper error handling
+ */
+async function initializeGlobalDatabase(): Promise<void> {
+  try {
+    if (!globalThis.dbSchema) {
+      const configModule = await import(DEFAULT_CONFIG_PATH);
+      globalThis.dbSchema = configModule.default;
+    }
 
-  constructor(db?: _BunDB) {
-    this.databaseInstance = db || globalThis?.MainDatabase || {};
-  }
-
-  create(data: _Create) {
-    let hasPrimary = false;
-    let queryString = `CREATE TABLE IF NOT EXISTS ${data.name} `;
-    queryString +=
-      "(" +
-      data.columns
-        .map((column) => {
-          if (typeof column.primary) hasPrimary = true;
-          let dataType: string;
-          let autoIncrement = "";
-          switch (column.type) {
-            case "number":
-              dataType = "INTEGER";
-              autoIncrement = column.autoIncrement ? "AUTOINCREMENT" : "";
-              break;
-            case "Date":
-            case "boolean":
-              dataType = "INTEGER";
-              break;
-            case "float":
-              dataType = "REAL";
-              break;
-            case "json":
-            case "string":
-              dataType = "TEXT";
-              break;
-          }
-
-          if (
-            Array.isArray(column.default) ||
-            typeof column.default == "object"
-          ) {
-            column.default = `'${JSON.stringify(column.default)}'`;
-          } else if (typeof column.default == "string") {
-            column.default = `'${column.default}'`;
-          } else if (typeof column.default == "boolean") {
-            column.default = column.default == true ? 1 : 0;
-          } else if (column.default instanceof Date) {
-            column.default = column.default.getTime();
-          }
-
-          const StrQuery = `${column.name} ${dataType}${
-            column.primary ? " PRIMARY KEY " : ""
-          }${autoIncrement}${column.nullable ? "" : " NOT NULL"}${
-            column.unique ? " UNIQUE" : ""
-          }${
-            column.default != undefined
-              ? ` DEFAULT ${column.default as string}`
-              : ""
-          }`;
-
-          return StrQuery;
-        })
-        .join(", ") +
-      ")";
-
-    if (!hasPrimary)
-      throw new Error(`Table ${data.name} do not have any Primary key.`, {
-        cause: "PRIMARY KEY",
+    if (!globalThis.MainDatabase) {
+      globalThis.MainDatabase = new _BunDB(DEFAULT_DB_PATH, {
+        create: true,
+        strict: true,
       });
-    const prepare = this.databaseInstance.query(queryString);
-    prepare.run();
+
+      // Enable WAL mode for better performance and concurrency
+      globalThis.MainDatabase.exec("PRAGMA journal_mode = WAL;");
+      globalThis.MainDatabase.exec("PRAGMA foreign_keys = ON;");
+      globalThis.MainDatabase.exec("PRAGMA synchronous = NORMAL;");
+    }
+  } catch (error) {
+    console.warn("Failed to initialize global database:", error);
   }
 }
+
+// Initialize on module load
+initializeGlobalDatabase();
+
+/**
+ * Database utility class for creating tables
+ */
+export class DatabaseManager {
+  public databaseInstance: _BunDB;
+
+  constructor(db?: _BunDB) {
+    this.databaseInstance = db || globalThis.MainDatabase;
+
+    if (!this.databaseInstance) {
+      throw new Error("Database instance is not available. Please ensure the database is properly initialized.");
+    }
+  }
+
+  /**
+   * Creates tables from the provided schema
+   * @param schema - Single table schema or array of table schemas
+   */
+  create(schema: TableSchema | TableSchema[]): void {
+    const schemas = Array.isArray(schema) ? schema : [schema];
+
+    for (const tableSchema of schemas) {
+      this.createTable(tableSchema);
+    }
+  }
+
+  /**
+   * Creates a table based on the provided schema
+   * @param tableSchema - The schema definition for the table
+   */
+  createTable(tableSchema: TableSchema): void {
+    this.validateTableSchema(tableSchema);
+
+    const queryString = this.buildCreateTableQuery(tableSchema);
+
+    try {
+      const query = this.databaseInstance.query(queryString);
+      query.run();
+      query.finalize();
+    } catch (error) {
+      throw new Error(`Failed to create table '${tableSchema.name}': ${error}`);
+    }
+  }
+
+  /**
+   * Validates the table schema before creation
+   */
+  private validateTableSchema(schema: TableSchema): void {
+    if (!schema.name || schema.name.trim() === '') {
+      throw new Error("Table name cannot be empty");
+    }
+
+    if (!schema.columns || schema.columns.length === 0) {
+      throw new Error("Table must have at least one column");
+    }
+
+    const hasPrimaryKey = schema.columns.some(column => column.primary);
+    if (!hasPrimaryKey) {
+      throw new Error(`Table '${schema.name}' must have at least one primary key column`);
+    }
+
+    // Validate column names are unique
+    const columnNames = schema.columns.map(col => col.name);
+    const uniqueNames = new Set(columnNames);
+    if (columnNames.length !== uniqueNames.size) {
+      throw new Error(`Table '${schema.name}' has duplicate column names`);
+    }
+  }
+
+  /**
+   * Builds the CREATE TABLE SQL query string
+   */
+  private buildCreateTableQuery(schema: TableSchema): string {
+    const columns = schema.columns.map(column => this.buildColumnDefinition(column));
+    return `CREATE TABLE IF NOT EXISTS ${schema.name} (${columns.join(", ")})`;
+  }
+
+  /**
+   * Builds individual column definition
+   */
+  private buildColumnDefinition(column: ColumnsSchema): string {
+    const dataType = this.getSQLiteDataType(column);
+    const constraints = this.buildColumnConstraints(column);
+
+    return `${column.name} ${dataType}${constraints}`;
+  }
+
+  /**
+   * Maps schema types to SQLite data types
+   */
+  private getSQLiteDataType(column: ColumnsSchema): string {
+    switch (column.type) {
+      case "number":
+        return "INTEGER";
+      case "float":
+        return "REAL";
+      case "Date":
+      case "boolean":
+        return "INTEGER";
+      case "string":
+      case "json":
+        return "TEXT";
+      default:
+        throw new Error(`Unsupported column type: ${(column as any).type}`);
+    }
+  }
+
+  /**
+   * Builds column constraints (PRIMARY KEY, NOT NULL, etc.)
+   */
+  private buildColumnConstraints(column: ColumnsSchema): string {
+    const constraints: string[] = [];
+
+    if (column.primary) {
+      constraints.push("PRIMARY KEY");
+    }
+
+    if (column.type === "number" && column.autoIncrement) {
+      constraints.push("AUTOINCREMENT");
+    }
+
+    if (!column.nullable && !column.primary) {
+      constraints.push("NOT NULL");
+    }
+
+    if (column.unique && !column.primary) {
+      constraints.push("UNIQUE");
+    }
+
+    if (column.default !== undefined) {
+      const defaultValue = this.formatDefaultValue(column.default, column.type);
+      constraints.push(`DEFAULT ${defaultValue}`);
+    }
+
+    return constraints.length > 0 ? ` ${constraints.join(" ")}` : "";
+  }
+
+  /**
+   * Formats default values for SQL
+   */
+  private formatDefaultValue(defaultValue: any, type: ColumnsSchema["type"]): string {
+    if (defaultValue === null) {
+      return "NULL";
+    }
+
+    switch (type) {
+      case "string":
+      case "json":
+        if (typeof defaultValue === "object") {
+          return `'${JSON.stringify(defaultValue)}'`;
+        }
+        return `'${String(defaultValue)}'`;
+
+      case "boolean":
+        return defaultValue ? "1" : "0";
+
+      case "Date":
+        if (defaultValue instanceof Date) {
+          return String(defaultValue.getTime());
+        }
+        return String(defaultValue);
+
+      case "number":
+      case "float":
+        return String(defaultValue);
+
+      default:
+        return `'${String(defaultValue)}'`;
+    }
+  }
+}
+// Type definitions for database operations
 type OptionsFlags<Type> = {
   [Property in keyof Type]: boolean;
 };
@@ -94,29 +220,30 @@ type OptionsFlags<Type> = {
 type ReservedKeyWords = "LIKE" | "OR";
 type TableExtends = Record<string | ReservedKeyWords, string | number>;
 
-type _Select<Table extends TableExtends> = {
-  where?: _Where<Table>;
+type DatabaseSelectOptions<Table extends TableExtends> = {
+  where?: WhereClause<Table>;
   select?: Partial<OptionsFlags<Table>> | "*";
   limit?: number;
   skip?: number;
 };
 
-type _Insert<Table> = Table;
+type DatabaseInsertData<Table> = Table;
 
-type _Where<Table extends TableExtends> =
+type WhereClause<Table extends TableExtends> =
   | (Partial<Table> & {
-      LIKE?: undefined;
-      OR?: undefined;
-    })
-  | (_WhereOR<Table> & {
-      LIKE?: undefined;
-    })
-  | (_WhereLike<Table> & { OR?: undefined });
+    LIKE?: undefined;
+    OR?: undefined;
+  })
+  | (WhereOR<Table> & {
+    LIKE?: undefined;
+  })
+  | (WhereLike<Table> & { OR?: undefined });
 
-type _WhereWOLike<Table extends TableExtends> =
+type WhereWithoutLike<Table extends TableExtends> =
   | Partial<Table>
-  | _WhereORWOLike<Table>;
-type _WhereORWOLike<Table extends TableExtends> = {
+  | WhereORWithoutLike<Table>;
+
+type WhereORWithoutLike<Table extends TableExtends> = {
   OR: Partial<Table>[];
 };
 
@@ -124,370 +251,441 @@ type FilterStringValues<T extends TableExtends> = {
   [K in keyof T]: T[K] extends string ? K : never;
 }[keyof T];
 
-type FilteredObject<T extends TableExtends> = {
+type FilteredStringObject<T extends TableExtends> = {
   [K in FilterStringValues<T>]: T[K];
 };
 
-type _WhereLike<Table extends TableExtends> =
+type WhereLike<Table extends TableExtends> =
   | {
-      /**
-       * like operator use wild card
-       *  - **_** <-- single char
-       *  - **%** <-- multiple char
-       * @link https://www.sqlitetutorial.net/sqlite-like
-       * @example
-       * db.select({ where: { LIKE: { foo: "lo_" }  } }) // ["lor"]
-       * @example
-       * db.select({ where: { LIKE: { foo: "lo%" }  } }) // ["lor","lorem ipsum", "lorem ipsum dolor"]
-       */
-      LIKE: Partial<FilteredObject<Table>>;
-    } & { [K in Exclude<ReservedKeyWords, "LIKE">]?: undefined };
+    /**
+     * LIKE operator with wildcards:
+     * - **_** <-- single character
+     * - **%** <-- multiple characters
+     * @link https://www.sqlitetutorial.net/sqlite-like
+     * @example
+     * db.select({ where: { LIKE: { foo: "lo_" } } }) // matches "lor"
+     * @example
+     * db.select({ where: { LIKE: { foo: "lo%" } } }) // matches "lor", "lorem ipsum", etc.
+     */
+    LIKE: Partial<FilteredStringObject<Table>>;
+  } & { [K in Exclude<ReservedKeyWords, "LIKE">]?: undefined };
 
-type _WhereOR<Table extends TableExtends> = {
-  OR: Partial<Table | _WhereLike<Table>>[];
+type WhereOR<Table extends TableExtends> = {
+  OR: Partial<Table | WhereLike<Table>>[];
 };
 
-type _Update<Table extends TableExtends> = {
-  where?: _WhereWOLike<Table>;
+type DatabaseUpdateOptions<Table extends TableExtends> = {
+  where?: WhereWithoutLike<Table>;
   values: Partial<Table>;
 };
 
-type _Delete<Table extends TableExtends> = {
-  where: _WhereWOLike<Table>;
+type DatabaseDeleteOptions<Table extends TableExtends> = {
+  where: WhereWithoutLike<Table>;
 };
 
-type _Count<Table extends TableExtends> = {
-  where?: _WhereWOLike<Table>;
+type DatabaseCountOptions<Table extends TableExtends> = {
+  where?: WhereWithoutLike<Table>;
 };
 
-type _Create = TableSchema;
-
-type _FormatString<
+type DatabaseOperationOptions<
   T extends TableExtends,
   SELECT_FORMAT extends TableExtends
-> = _Select<SELECT_FORMAT> | _Update<T> | _Delete<T> | _Count<T>;
+> = DatabaseSelectOptions<SELECT_FORMAT> | DatabaseUpdateOptions<T> | DatabaseDeleteOptions<T> | DatabaseCountOptions<T>;
 
+/**
+ * Enhanced Table class with better type safety and error handling
+ */
 export class Table<
   T extends Omit<TableSchema, "name" | "columns">,
   SELECT_FORMAT extends Omit<TableSchema, "name" | "columns">
 > {
-  private name: string;
-  private debug: boolean;
+  private readonly tableName: string;
+  private readonly isDebugEnabled: boolean;
+  private readonly schema: DBSchema;
+
   /**
-   * direct access to the database instance
+   * Direct access to the database instance
    * @link https://bun.sh/docs/api/sqlite
    */
-  databaseInstance: _BunDB;
-  shema: DBSchema;
+  readonly databaseInstance: _BunDB;
+
   constructor({
     name,
     db,
-    shema,
-    debug,
-    WAL = true,
+    schema,
+    debug = false,
+    enableWAL = true,
   }: {
     name: string;
     db?: _BunDB;
-    shema?: DBSchema;
+    schema?: DBSchema;
     debug?: boolean;
-    WAL?: boolean;
+    enableWAL?: boolean;
   }) {
-    this.name = name;
-    this.databaseInstance = db || globalThis.MainDatabase || {};
-    this.shema = shema || globalThis.dbShema;
-    this.debug = debug || false;
-    if (WAL && db) this.databaseInstance.exec("PRAGMA journal_mode = WAL;");
-  }
-  private extractParams(
-    key: keyof _Where<T> | ReservedKeyWords,
-    where?: Partial<_Where<T>> & Partial<Record<ReservedKeyWords, any>>
-  ) {
-    if (!where) return [];
-    this.Log(() => console.log({ key, where }));
-    return Array.prototype
-      .concat(
-        ...(where[key] as Array<Partial<T>>).map((data) => Object.values(data))
-      )
-      .filter((e) => e != undefined) as string[];
-  }
-  private parseParams(params: any[]) {
-    return params.map((param) => {
-      const passType = ["number", "string"];
-      if (passType.includes(typeof param)) return param;
-      if (typeof param == "boolean") return param ? 1 : 0;
-      return JSON.stringify(param);
-    });
-  }
-  private restoreParams(params: any) {
-    return Object.assign(
-      {},
-      ...Object.keys(params).map((key) => {
-        const column = this.shema
-          .find((schema) => schema.name === this.name)
-          ?.columns.find((c) => c.name === key);
-        switch (column?.type) {
-          case "Date":
-            return { [key]: new Date(params[key]) };
-          case "json":
-            try {
-              return {
-                [key]: JSON.parse(params[key]),
-              };
-            } catch {
-              return {
-                [key]: params[key],
-              };
-            }
-          case "boolean":
-            return { [key]: params[key] == 1 ? true : false };
-          default:
-            return { [key]: params[key] };
-        }
-      })
-    );
-  }
-  private hasOR(data: _FormatString<T, SELECT_FORMAT>) {
-    return data.where && Object.keys(data.where).find((e) => e == "OR")
-      ? true
-      : false;
-  }
-  private hasLIKE(data: _FormatString<T, SELECT_FORMAT>) {
-    return data.where && Object.keys(data.where).find((e) => e == "LIKE")
-      ? true
-      : false;
-  }
-  private extractLikeOrParams(
-    data: _FormatString<T, SELECT_FORMAT> & {
-      where?: Partial<Record<ReservedKeyWords, any>>;
-    }
-  ): string[] {
-    const ReservedArray: Array<ReservedKeyWords> = ["LIKE"];
+    this.tableName = name;
+    this.databaseInstance = db || globalThis.MainDatabase;
+    this.schema = schema || globalThis.dbSchema || [];
+    this.isDebugEnabled = debug;
 
-    if (!data.where) return [];
-
-    if (!this.hasOR(data)) {
-      for (const param of ReservedArray as Array<ReservedKeyWords>) {
-        if (data.where[param])
-          return (
-            Object.values(data.where[param]) as Array<string | undefined>
-          ).filter((e) => e != undefined);
-      }
-      return Object.values(data.where).filter((e) => e != undefined);
-    } else {
-      const datas = (data.where?.OR as _WhereOR<T>["OR"])
-        .map((entry) => {
-          return (Object.keys(entry) as Array<keyof _WhereLike<T>>).map((k) => {
-            if (ReservedArray.includes(k))
-              return Object.values(entry[k as keyof typeof entry] || {});
-            return [entry[k as keyof typeof entry]];
-          });
-        })
-        .reduce((p, n) => [...p, ...n], [])
-        .reduce((p, n) => [...p, ...n], []) as string[];
-
-      this.Log(() => console.log({ whereOR: data.where?.OR, datas }));
-      return datas;
-    }
-  }
-  private formatQueryString(data: _FormatString<T, SELECT_FORMAT>) {
-    let queyString = "";
-
-    const hasOR = this.hasOR(data);
-    const hasLIKE = this.hasLIKE(data);
-
-    const whereKeys = () =>
-      (
-        Object.keys(data.where || {}) as Array<keyof _Select<T>["where"]>
-      ).filter(
-        (k) => (data.where as _Where<T>)[k as keyof _Where<T>] != undefined
-      ) as Array<string>;
-
-    const toLIKE = (keys: Array<string>) =>
-      ` ${keys.map((k) => `${k} LIKE ?`).join(" AND ")}`;
-
-    if (data.where && !hasOR && !hasLIKE) {
-      queyString +=
-        "WHERE " +
-        whereKeys()
-          .map((where) => {
-            return `${where} = ?`;
-          })
-          .join(" AND ");
-    } else if (data.where && hasOR) {
-      const ORlist = (data.where as _WhereOR<T>).OR;
-
-      queyString +=
-        "WHERE " +
-        ORlist.map((or) => {
-          return (Object.keys(or) as Array<keyof T & keyof _WhereLike<T>>)
-            .map((key) => {
-              if (key == "LIKE")
-                return toLIKE(
-                  Object.keys(
-                    (or as _WhereLike<T>).LIKE as Partial<FilteredObject<T>>
-                  )
-                );
-              else return `${key} = ?`;
-            })
-            .join(" AND ");
-        }).join(" OR ");
-    } else if (data.where && hasLIKE) {
-      queyString += `WHERE ${toLIKE(
-        Object.keys((data.where as unknown as _WhereLike<T>).LIKE || {})
-      )}`;
+    if (!this.databaseInstance) {
+      throw new Error("Database instance is not available");
     }
 
-    this.Log(() => console.log({ data, queyString }));
-
-    return queyString;
-  }
-  private Log(callback: Function) {
-    this.debug && callback();
-  }
-  private errorWrapper<T>(callback: () => T): T {
-    try {
-      return callback();
-    } catch (e) {
-      const err = e as Error;
-      if (err.name == "SQLiteError" && err.message == "database is locked") {
-        return this.errorWrapper(callback);
-      } else throw e;
+    if (enableWAL && db) {
+      this.databaseInstance.exec("PRAGMA journal_mode = WAL;");
     }
   }
 
-  select(data: _Select<SELECT_FORMAT>) {
-    if (
-      this.hasOR(data) &&
-      data.where &&
-      (data.where as _WhereOR<SELECT_FORMAT>).OR?.length == 0
-    )
+  // Public API methods
+
+  /**
+   * Select records from the table
+   */
+  select(options: DatabaseSelectOptions<SELECT_FORMAT>): Partial<SELECT_FORMAT>[] {
+    this.validateSelectOptions(options);
+
+    // Handle empty OR conditions
+    if (options.where && 'OR' in options.where &&
+      Array.isArray(options.where.OR) && options.where.OR.length === 0) {
       return [];
-
-    if (data.where) {
-      data.where = Object.assign(
-        {},
-        ...(Object.keys(data.where) as Array<keyof _Where<SELECT_FORMAT>>)
-          .filter((k) => (data.where as _Where<SELECT_FORMAT>)[k] != undefined)
-          .map((k) => {
-            return {
-              [k]: (data.where as _Where<SELECT_FORMAT>)[k],
-            };
-          })
-      );
-      if (Object.values(data.where as any).length == 0) data.where = undefined;
     }
 
-    let queyString = "SELECT ";
-    if (typeof data.select !== "undefined" && data.select != "*") {
-      queyString += Object.keys(data.select)
-        .filter((val) => (data.select as any)[val])
-        .join(", ");
-    } else queyString += "*";
+    const queryString = this.buildSelectQuery(options);
+    const params = this.extractQueryParameters(options);
 
-    queyString += ` FROM ${this.name} ${this.formatQueryString(data)}`;
-    if (data.limit) queyString += ` LIMIT ${data.limit}`;
-    else if (data.skip) queyString += ` LIMIT -1`;
+    this.debugLog("Executing SELECT query", { queryString, params });
 
-    if (data.skip) queyString += ` OFFSET ${data.skip}`;
-
-    this.Log(() => console.log({ full_queryString: queyString }));
-
-    return this.errorWrapper(() => {
-      const query = this.databaseInstance.prepare(queyString);
-      const res = query.all(...this.extractLikeOrParams(data));
-      query.finalize();
-      return res;
-    }).map((row) => this.restoreParams(row)) as Partial<SELECT_FORMAT>[];
-  }
-  insert(data: _Insert<T>[]) {
-    let queryString = `INSERT INTO ${this.name} (${Object.keys(
-      (data as any)[0]
-    ).join(", ")}) VALUES (${Object.keys((data as any)[0]).map(
-      (v) => `$${v}`
-    )})`;
-    let entries: any[] = [];
-
-    return this.errorWrapper(() => {
-      const db = this.databaseInstance.prepare(queryString);
-      const inserter = this.databaseInstance.transaction((entries) => {
-        for (const entry of entries) db.run(entry);
-      });
-      if (entries.length == 0)
-        entries = data.map((entry) =>
-          Object.assign(
-            {},
-            ...Object.keys(entry as any).map((e) => {
-              return {
-                [`$${e}`]: this.parseParams([(entry as any)[e]])[0],
-              };
-            })
-          )
-        );
-      const res = inserter(entries) as void;
-      db.finalize();
-      return res;
-    });
-  }
-  update(data: _Update<T>) {
-    let queryString = `UPDATE ${this.name} SET `;
-
-    let params: string[] = Object.values(data.values);
-    queryString += Object.keys(data.values)
-      .map((key) => `${key} = ?`)
-      .join(", ");
-    queryString += ` ${this.formatQueryString(data)}`;
-
-    if (this.hasOR(data)) params.push(...this.extractParams("OR", data.where));
-    else if (data.where) params.push(...Object.values(data.where));
-
-    return this.errorWrapper(() => {
-      const db = this.databaseInstance.prepare(queryString);
-      const res = db.all(...this.parseParams(params)) as T[];
-      db.finalize();
-      return res;
-    });
-  }
-  delete(data: _Delete<T>) {
-    if (
-      this.hasOR(data) &&
-      data.where &&
-      (data.where as _WhereOR<T>).OR.length == 0
-    )
-      return;
-
-    const queyString = `DELETE FROM ${this.name} ${this.formatQueryString(
-      data
-    )}`;
-    return this.errorWrapper(() => {
-      const query = this.databaseInstance.prepare(queyString);
-      const res = query.all(...this.extractLikeOrParams(data));
-      query.finalize();
-      return res;
-    }) as unknown as void;
-  }
-  count(data?: _Count<T>) {
-    if (
-      data &&
-      this.hasOR(data) &&
-      data.where &&
-      (data.where as _WhereOR<T>).OR.length == 0
-    )
-      return 0;
-
-    const queryString = `SELECT COUNT(*) FROM ${this.name} ${
-      data ? this.formatQueryString(data) : ""
-    }`;
-
-    const res = this.errorWrapper(() => {
+    return this.executeWithErrorWrapper(() => {
       const query = this.databaseInstance.prepare(queryString);
-      const res = query.all(...(data ? this.extractLikeOrParams(data) : []));
+      const results = query.all(...params);
       query.finalize();
-      return res;
+      return results.map(row => this.restoreDataTypes(row)) as Partial<SELECT_FORMAT>[];
+    });
+  }
+
+  /**
+   * Insert records into the table
+   */
+  insert(records: T[]): void {
+    if (!records || records.length === 0) {
+      throw new Error("No records provided for insertion");
+    }
+
+    const sampleRecord = records[0];
+    const columns = Object.keys(sampleRecord);
+    const queryString = `INSERT INTO ${this.tableName} (${columns.join(", ")}) VALUES (${columns.map(col => `$${col}`).join(", ")})`;
+
+    this.debugLog("Executing INSERT query", { queryString, recordCount: records.length });
+
+    return this.executeWithErrorWrapper(() => {
+      const insertStmt = this.databaseInstance.prepare(queryString);
+      const insertTransaction = this.databaseInstance.transaction((records: T[]) => {
+        for (const record of records) {
+          const formattedRecord = this.formatRecordForInsert(record);
+          insertStmt.run(formattedRecord);
+        }
+      });
+
+      insertTransaction(records);
+      insertStmt.finalize();
+    });
+  }
+
+  /**
+   * Update records in the table
+   */
+  update(options: DatabaseUpdateOptions<T>): void {
+    this.validateUpdateOptions(options);
+
+    if (!options.where || Object.keys(options.where).length === 0) {
+      throw new Error("Update operation requires a WHERE clause for safety");
+    }
+
+    let queryString = `UPDATE ${this.tableName} SET `;
+    queryString += Object.keys(options.values).map(key => `${key} = ?`).join(", ");
+    queryString += ` ${this.buildWhereClause(options.where)}`;
+
+    const setParams = this.parseParameters(Object.values(options.values));
+    const whereParams = this.extractWhereParameters(options.where);
+    const allParams = [...setParams, ...whereParams];
+
+    this.debugLog("Executing UPDATE query", { queryString, params: allParams });
+
+    return this.executeWithErrorWrapper(() => {
+      const query = this.databaseInstance.prepare(queryString);
+      query.run(...allParams);
+      query.finalize();
+    });
+  }
+
+  /**
+   * Delete records from the table
+   */
+  delete(options: DatabaseDeleteOptions<T>): void {
+    this.validateDeleteOptions(options);
+
+    // Handle empty OR conditions
+    if (options.where && 'OR' in options.where &&
+      Array.isArray(options.where.OR) && options.where.OR.length === 0) {
+      return;
+    }
+
+    const queryString = `DELETE FROM ${this.tableName} ${this.buildWhereClause(options.where)}`;
+    const params = this.extractWhereParameters(options.where);
+
+    this.debugLog("Executing DELETE query", { queryString, params });
+
+    return this.executeWithErrorWrapper(() => {
+      const query = this.databaseInstance.prepare(queryString);
+      query.run(...params);
+      query.finalize();
+    });
+  }
+
+  /**
+   * Count records in the table
+   */
+  count(options?: DatabaseCountOptions<T>): number {
+    // Handle empty OR conditions
+    if (options?.where && 'OR' in options.where &&
+      Array.isArray(options.where.OR) && options.where.OR.length === 0) {
+      return 0;
+    }
+
+    let queryString = `SELECT COUNT(*) as count FROM ${this.tableName}`;
+    let params: any[] = [];
+
+    if (options?.where) {
+      queryString += ` ${this.buildWhereClause(options.where)}`;
+      params = this.extractWhereParameters(options.where);
+    }
+
+    this.debugLog("Executing COUNT query", { queryString, params });
+
+    const result = this.executeWithErrorWrapper(() => {
+      const query = this.databaseInstance.prepare(queryString);
+      const result = query.get(...params) as { count: number };
+      query.finalize();
+      return result;
     });
 
-    return (res as Array<{ "COUNT(*)": number }>)[0]["COUNT(*)"];
+    return result.count;
+  }
+
+  // Helper methods for validation
+  private validateSelectOptions(options: DatabaseSelectOptions<SELECT_FORMAT>): void {
+    if (options.limit && options.limit < 0) {
+      throw new Error("Limit must be a positive number");
+    }
+    if (options.skip && options.skip < 0) {
+      throw new Error("Skip must be a positive number");
+    }
+  }
+
+  private validateUpdateOptions(options: DatabaseUpdateOptions<T>): void {
+    if (!options.values || Object.keys(options.values).length === 0) {
+      throw new Error("Update values cannot be empty");
+    }
+  }
+
+  private validateDeleteOptions(options: DatabaseDeleteOptions<T>): void {
+    if (!options.where || Object.keys(options.where).length === 0) {
+      throw new Error("Delete operation requires a WHERE clause for safety");
+    }
+  }
+
+  // Helper methods for query building
+  private buildSelectQuery(options: DatabaseSelectOptions<SELECT_FORMAT>): string {
+    let query = "SELECT ";
+
+    if (options.select === "*" || !options.select) {
+      query += "*";
+    } else {
+      const selectedColumns = Object.keys(options.select).filter(
+        col => (options.select as any)[col]
+      );
+      query += selectedColumns.join(", ");
+    }
+
+    query += ` FROM ${this.tableName}`;
+
+    if (options.where) {
+      query += ` ${this.buildWhereClause(options.where)}`;
+    }
+
+    if (options.limit) {
+      query += ` LIMIT ${options.limit}`;
+    }
+
+    if (options.skip) {
+      query += ` OFFSET ${options.skip}`;
+    }
+
+    return query;
+  }
+
+  private buildWhereClause(where: any): string {
+    if (!where || Object.keys(where).length === 0) {
+      return "";
+    }
+
+    // Handle LIKE operator
+    if (where.LIKE) {
+      const likeConditions = Object.keys(where.LIKE).map(key => `${key} LIKE ?`);
+      return `WHERE ${likeConditions.join(" AND ")}`;
+    }
+
+    // Handle OR operator
+    if (where.OR && Array.isArray(where.OR)) {
+      const orConditions = where.OR.map((condition: any) => {
+        if (condition.LIKE) {
+          const likeConditions = Object.keys(condition.LIKE).map(key => `${key} LIKE ?`);
+          return likeConditions.join(" AND ");
+        }
+        const regularConditions = Object.keys(condition).map(key => `${key} = ?`);
+        return regularConditions.join(" AND ");
+      });
+      return `WHERE ${orConditions.join(" OR ")}`;
+    }
+
+    // Handle regular WHERE conditions
+    const conditions = Object.keys(where).map(key => `${key} = ?`);
+    return `WHERE ${conditions.join(" AND ")}`;
+  }
+
+  private extractQueryParameters(options: any): any[] {
+    return this.extractWhereParameters(options.where);
+  }
+
+  private extractWhereParameters(where: any): any[] {
+    if (!where) return [];
+
+    // Handle LIKE operator
+    if (where.LIKE) {
+      return this.parseParameters(Object.values(where.LIKE));
+    }
+
+    // Handle OR operator
+    if (where.OR && Array.isArray(where.OR)) {
+      const parameters: any[] = [];
+      for (const condition of where.OR) {
+        if (condition.LIKE) {
+          parameters.push(...this.parseParameters(Object.values(condition.LIKE)));
+        } else {
+          parameters.push(...this.parseParameters(Object.values(condition)));
+        }
+      }
+      return parameters;
+    }
+
+    // Handle regular WHERE conditions
+    return this.parseParameters(Object.values(where));
+  }
+
+  private parseParameters(params: any[]): any[] {
+    return params.map((param) => {
+      if (typeof param === "number" || typeof param === "string") {
+        return param;
+      }
+      if (typeof param === "boolean") {
+        return param ? 1 : 0;
+      }
+      if (param instanceof Date) {
+        return param.getTime();
+      }
+      if (typeof param === "object") {
+        return JSON.stringify(param);
+      }
+      return param;
+    });
+  }
+
+  private formatRecordForInsert(record: Record<string, any>): Record<string, any> {
+    const formatted: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(record)) {
+      const paramKey = `$${key}`;
+      formatted[paramKey] = this.parseParameters([value])[0];
+    }
+
+    return formatted;
+  }
+
+  private restoreDataTypes(row: any): any {
+    const restored: Record<string, any> = {};
+    const tableSchema = this.schema.find(schema => schema.name === this.tableName);
+
+    if (!tableSchema) {
+      return row;
+    }
+
+    for (const [key, value] of Object.entries(row)) {
+      const column = tableSchema.columns.find(col => col.name === key);
+
+      if (!column) {
+        restored[key] = value;
+        continue;
+      }
+
+      switch (column.type) {
+        case "Date":
+          restored[key] = typeof value === "number" ? new Date(value) : value;
+          break;
+        case "json":
+          try {
+            restored[key] = typeof value === "string" ? JSON.parse(value) : value;
+          } catch {
+            restored[key] = value;
+          }
+          break;
+        case "boolean":
+          restored[key] = value === 1;
+          break;
+        default:
+          restored[key] = value;
+      }
+    }
+
+    return restored;
+  }
+
+  private executeWithErrorWrapper<T>(callback: () => T): T {
+    const maxRetries = 3;
+    let retries = 0;
+
+    while (retries < maxRetries) {
+      try {
+        return callback();
+      } catch (error) {
+        const err = error as Error;
+
+        if (err.name === "SQLiteError" && err.message.includes("database is locked")) {
+          retries++;
+          if (retries >= maxRetries) {
+            throw new Error("Database is locked after multiple retry attempts");
+          }
+          // Wait a bit before retrying
+          const delay = Math.min(100 * Math.pow(2, retries), 1000);
+          Bun.sleepSync(delay);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new Error("Unexpected error in executeWithErrorWrapper");
+  }
+
+  private debugLog(message: string, data?: any): void {
+    if (this.isDebugEnabled) {
+      console.log(`[Table:${this.tableName}] ${message}`, data || "");
+    }
   }
 }
+
+// Backward compatibility export
+export const _Database = DatabaseManager;
 
 export const wild = {
   single: "_",

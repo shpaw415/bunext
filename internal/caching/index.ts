@@ -56,6 +56,7 @@ const dbSchema: DBSchema = [
       {
         name: "path",
         type: "string",
+        primary: true,
       },
       {
         name: "title",
@@ -148,8 +149,8 @@ class CacheManagerExtends {
     return new Table<T1, T2>({
       db: this.db.databaseInstance,
       name: name,
-      shema: this.dbSchema,
-      WAL: true,
+      schema: this.dbSchema,
+      enableWAL: true,
     });
   }
   protected isPrimaryError(err: Error, callback?: Function) {
@@ -176,8 +177,8 @@ class CacheManager {
     return new Table<T1, T2>({
       db: this.db.databaseInstance,
       name: name,
-      shema: dbSchema,
-      WAL: true,
+      schema: dbSchema,
+      enableWAL: true,
     });
   }
 

@@ -4,104 +4,207 @@ import { exitCodes, paths } from "../internal/globals.ts";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { type Subprocess } from "bun";
 import { getStartLog } from "../internal/server/logs.ts";
+import { resolve } from "node:path";
 
-type _cmd =
+// Command types
+type BunextCommand =
   | "init"
   | "build"
   | "dev"
   | "database:create"
   | "database:merge"
-  | "production";
-const cmd = (process.argv[2] as _cmd) ?? "bypass";
-const args = process.argv[3] as undefined | string;
+  | "production"
+  | "help"
+  | "--help"
+  | "-h";
 
-const DBPath = (process.env.DATABASE_NAME || "bunext") + ".sqlite";
-const DBShemaPath = "database.ts";
+// Configuration constants
+const CONFIG = {
+  DATABASE_PATH: (process.env.DATABASE_NAME || "bunext") + ".sqlite",
+  DATABASE_SCHEMA_PATH: "database.ts",
+  SEPARATORS: {
+    IMPORT: '("<Bunext_TypeImposts>");',
+    EXPORT: '("<Bunext_DBExport>");',
+  },
+} as const;
 
+// Global type declarations
 declare global {
   var processes: Subprocess[];
   var __INIT__: boolean | undefined;
 }
+
+// Initialize global variables safely
 globalThis.processes ??= [];
 globalThis.head ??= {};
 
-if (import.meta.main)
-  switch (cmd) {
+/**
+ * Main CLI handler - processes command line arguments and executes appropriate commands
+ */
+async function main(): Promise<void> {
+  if (!import.meta.main) return;
+
+  const command = (process.argv[2] as BunextCommand) ?? "bypass";
+  const args = process.argv[3] as string | undefined;
+
+  try {
+    await executeCommand(command, args);
+  } catch (error) {
+    console.error(`Error executing command '${command}':`, error);
+    process.exit(1);
+  }
+}
+
+/**
+ * Routes commands to their respective handlers
+ */
+async function executeCommand(command: BunextCommand, args?: string): Promise<void> {
+  switch (command) {
     case "init":
-      await init();
+      await handleInit();
       break;
+
     case "build":
-      const builder = (await import("../internal/server/build.ts")).builder;
-      await builder.preBuildAll();
-      const res = await builder.build();
-      console.log(res);
+      await handleBuild();
       break;
+
     case "dev":
-      dev();
+      await handleDev();
       break;
+
     case "production":
-      production();
+      await handleProduction();
       break;
+
     case "database:create":
-      await databaseSchemaMaker();
-      await databaseCreator();
+      await handleDatabaseCreate();
       break;
+
+    case "database:merge":
+      console.warn("Database merge functionality is not yet implemented");
+      break;
+
+    case "help":
+    case "--help":
+    case "-h":
+      showHelp();
+      break;
+
     default:
-      console.log(`Bunext: '${cmd}' is not a function`);
-      break;
+      console.error(`Unknown command: '${command}'.`);
+      showHelp();
+      process.exit(1);
   }
-
-function CheckDbExists() {
-  return Bun.file(`${process.cwd()}/config/${DBPath}`).exists();
 }
 
-async function databaseSchemaMaker() {
-  if (await CheckDbExists()) {
-    console.log(
-      `config/${DBPath} already exists the new Database Schema may not fit\n`,
-      "Database Merging will be in a next release"
-    );
+/**
+ * Displays help information about available commands
+ */
+function showHelp(): void {
+  console.log(`
+Bunext CLI - A modern web framework for Bun
+
+Usage: bun bin/index.ts <command> [options]
+
+Commands:
+  init                Initialize a new Bunext project
+  build               Build the project for production
+  dev                 Start development server with hot reloading
+  production          Start production server
+  database:create     Create database and generate schema types
+  database:merge      Merge database schemas (coming soon)
+  help, --help, -h    Show this help message
+
+Examples:
+  bun bin/index.ts init
+  bun bin/index.ts dev
+  bun bin/index.ts build
+  bun bin/index.ts database:create
+  `);
+}
+
+/**
+ * Command handlers
+ */
+
+/**
+ * Handles the 'init' command - initializes a new Bunext project
+ */
+async function handleInit(): Promise<void> {
+  try {
+    await import("./init");
+  } catch (error) {
+    throw new Error(`Failed to initialize project: ${error}`);
   }
-  const Importseparator = '("<Bunext_TypeImposts>");';
-  const ExportSeparator = '("<Bunext_DBExport>");';
-  const types = ConvertShemaToType(
-    require(`${process.cwd()}/config/${DBShemaPath}`).default
-  );
-  await Bun.write(
-    `${paths.bunextModulePath}/database/database_types.ts`,
-    [...types.types, ...types.typesWithDefaultAsRequired]
-      .map((type) => `export ${type}`)
-      .join("\n")
-  );
-  const dbFile = Bun.file(`${paths.bunextModulePath}/database/index.ts`);
-  let dbFileContent: string | string[] = await dbFile.text();
-
-  dbFileContent = dbFileContent.split(Importseparator);
-  dbFileContent[1] = `\nimport type { ${types.tables
-    .map((t) => `_${t}, SELECT_${t}`)
-    .join(", ")} } from "./database_types.ts";\n`;
-  dbFileContent = dbFileContent.join(Importseparator);
-
-  dbFileContent = dbFileContent.split(ExportSeparator);
-
-  dbFileContent[1] = `\nreturn {\n ${types.tables
-    .map((t) => `${t}: new Table<_${t}, SELECT_${t}>({ name: "${t}" })`)
-    .join(",\n ")} \n} as const;\n`;
-  dbFileContent = dbFileContent.join(ExportSeparator);
-  await Bun.write(dbFile, dbFileContent);
-}
-async function databaseCreator() {
-  const schema = (await import(`${process.cwd()}/config/${DBShemaPath}`))
-    .default as DBSchema;
-  const db = new (await import("../database/class"))._Database();
-  schema.map((table) => {
-    db.create(table);
-  });
 }
 
-function dev() {
-  process.env.NODE_ENV = "development";
-  Bun.spawn({
+/**
+ * Handles the 'build' command - builds the project for production
+ */
+async function handleBuild(): Promise<void> {
+  try {
+    const { builder } = await import("../internal/server/build.ts");
+    await builder.preBuildAll();
+    const result = await builder.build();
+    console.log("Build completed:", result);
+  } catch (error) {
+    throw new Error(`Build failed: ${error}`);
+  }
+}
+
+/**
+ * Handles the 'dev' command - starts development server with hot reloading
+ */
+async function handleDev(): Promise<void> {
+  try {
+    process.env.NODE_ENV = "development";
+    startDevServer();
+  } catch (error) {
+    throw new Error(`Failed to start development server: ${error}`);
+  }
+}
+
+/**
+ * Handles the 'production' command - starts production server
+ */
+async function handleProduction(): Promise<void> {
+  try {
+    process.env.NODE_ENV = "production";
+    console.log(getStartLog());
+    startProductionServer();
+  } catch (error) {
+    throw new Error(`Failed to start production server: ${error}`);
+  }
+}
+
+/**
+ * Handles the 'database:create' command - creates database and schema
+ */
+async function handleDatabaseCreate(): Promise<void> {
+  try {
+    await createDatabaseSchema();
+    await createDatabase();
+    console.log("Database and schema created successfully");
+  } catch (error) {
+    throw new Error(`Database creation failed: ${error}`);
+  }
+}
+
+// Utility functions
+
+/**
+ * Checks if the database file already exists
+ */
+function checkDatabaseExists(): Promise<boolean> {
+  const dbPath = resolve(process.cwd(), "config", CONFIG.DATABASE_PATH);
+  return Bun.file(dbPath).exists();
+}
+
+/**
+ * Starts the development server with hot reloading
+ */
+function startDevServer(): void {
+  const serverProcess = Bun.spawn({
     cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
     stdout: "inherit",
     stderr: "inherit",
@@ -111,15 +214,19 @@ function dev() {
       NODE_ENV: process.env.NODE_ENV,
     },
     onExit() {
-      dev();
+      console.log("Development server restarting...");
+      startDevServer();
     },
   });
+
+  globalThis.processes.push(serverProcess);
 }
 
-function production() {
-  process.env.NODE_ENV = "production";
-  console.log(getStartLog());
-  const proc = Bun.spawn({
+/**
+ * Starts the production server with automatic restart on certain exit codes
+ */
+function startProductionServer(): void {
+  const serverProcess = Bun.spawn({
     cmd: ["bun", `${paths.bunextDirName}/react-ssr/server.ts`, "production"],
     env: {
       ...process.env,
@@ -128,16 +235,144 @@ function production() {
     },
     stdout: "inherit",
     onExit(subprocess, exitCode, signalCode, error) {
-      if (exitCode == exitCodes.runtime || exitCode == exitCodes.build) {
-        production();
+      if (exitCode === exitCodes.runtime || exitCode === exitCodes.build) {
+        console.log("Production server restarting due to runtime/build error...");
+        startProductionServer();
       } else {
-        console.log("Bunext Exited.");
+        console.log("Bunext server exited.");
+        process.exit(exitCode || 0);
       }
     },
   });
-  globalThis.processes.push(proc);
+
+  globalThis.processes.push(serverProcess);
 }
 
-function init() {
-  return import("./init");
+/**
+ * Creates the database schema and type definitions
+ */
+async function createDatabaseSchema(): Promise<void> {
+  if (await checkDatabaseExists()) {
+    console.warn(
+      `config/${CONFIG.DATABASE_PATH} already exists. The new Database Schema may not fit.\n` +
+      "Database merging will be available in a future release."
+    );
+  }
+
+  try {
+    const schemaPath = resolve(process.cwd(), "config", CONFIG.DATABASE_SCHEMA_PATH);
+    const schemaModule = require(schemaPath);
+
+    if (!schemaModule?.default) {
+      throw new Error(`No default export found in ${CONFIG.DATABASE_SCHEMA_PATH}`);
+    }
+
+    const typeDefinitions = ConvertShemaToType(schemaModule.default);
+
+    // Write type definitions
+    const typesContent = [
+      ...typeDefinitions.types,
+      ...typeDefinitions.typesWithDefaultAsRequired
+    ]
+      .map((type) => `export ${type}`)
+      .join("\n");
+
+    await Bun.write(
+      resolve(paths.bunextModulePath, "database", "database_types.ts"),
+      typesContent
+    );
+
+    // Update database index file
+    await updateDatabaseIndexFile(typeDefinitions);
+
+  } catch (error) {
+    throw new Error(`Schema generation failed: ${error}`);
+  }
 }
+
+/**
+ * Updates the database index file with generated types and table exports
+ */
+async function updateDatabaseIndexFile(typeDefinitions: { tables: string[] }): Promise<void> {
+  const dbIndexPath = resolve(paths.bunextModulePath, "database", "index.ts");
+  const dbFile = Bun.file(dbIndexPath);
+
+  if (!await dbFile.exists()) {
+    throw new Error(`Database index file not found: ${dbIndexPath}`);
+  }
+
+  let content = await dbFile.text();
+
+  // Update import section
+  const importContent = `\nimport type { ${typeDefinitions.tables
+    .map((table) => `_${table}, SELECT_${table}`)
+    .join(", ")} } from "./database_types.ts";\n`;
+
+  content = replaceContentBetweenSeparators(
+    content,
+    CONFIG.SEPARATORS.IMPORT,
+    importContent
+  );
+
+  // Update export section
+  const exportContent = `\nreturn {\n ${typeDefinitions.tables
+    .map((table) => `${table}: new Table<_${table}, SELECT_${table}>({ name: "${table}" })`)
+    .join(",\n ")} \n} as const;\n`;
+
+  content = replaceContentBetweenSeparators(
+    content,
+    CONFIG.SEPARATORS.EXPORT,
+    exportContent
+  );
+
+  await Bun.write(dbFile, content);
+}
+
+/**
+ * Helper function to replace content between separators
+ */
+function replaceContentBetweenSeparators(
+  content: string,
+  separator: string,
+  newContent: string
+): string {
+  const parts = content.split(separator);
+
+  if (parts.length !== 2) {
+    throw new Error(`Invalid separator format in database index file: ${separator}`);
+  }
+
+  parts[1] = newContent;
+  return parts.join(separator);
+}
+
+/**
+ * Creates the database tables from the schema
+ */
+async function createDatabase(): Promise<void> {
+  try {
+    const schemaPath = resolve(process.cwd(), "config", CONFIG.DATABASE_SCHEMA_PATH);
+    const schemaModule = await import(schemaPath);
+
+    if (!schemaModule?.default) {
+      throw new Error(`No default export found in ${CONFIG.DATABASE_SCHEMA_PATH}`);
+    }
+
+    const schema = schemaModule.default as DBSchema;
+    const { _Database } = await import("../database/class");
+    const db = new _Database();
+
+    schema.forEach((table) => {
+      db.create(table);
+    });
+
+  } catch (error) {
+    throw new Error(`Database creation failed: ${error}`);
+  }
+}
+
+// Start the application
+main().catch((error) => {
+  console.error("Fatal error:", error);
+  process.exit(1);
+});
