@@ -11,7 +11,7 @@ export default function Page({ props }: any) {
 
 function Test() {
   const [state, setState] = useState("allo1");
-  Bunext.request.hook.useRequest()?.setHead({
+  Bunext.request.hook?.useRequest()?.setHead({
     title: `random-${Math.random()}`,
   });
   return <div>{state}</div>;

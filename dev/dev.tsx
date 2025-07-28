@@ -25,8 +25,7 @@ export function Dev({ children }: { children?: any }) {
     const p = window.location;
     try {
       const ws = new WebSocket(
-        `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${
-          globalThis.serverConfig.Dev.hotServerPort
+        `${p.protocol.includes("https") ? "wss" : "ws"}://${p.hostname}:${globalThis.serverConfig.Dev.hotServerPort
         }`
       );
       ws.addEventListener("message", (ev) => {
@@ -41,7 +40,7 @@ export function Dev({ children }: { children?: any }) {
       ws.addEventListener("error", () => resetWs(setWs));
 
       return ws;
-    } catch {}
+    } catch { }
   }, []);
 
   const wsSetInterval = useCallback(
@@ -66,7 +65,7 @@ export function Dev({ children }: { children?: any }) {
     <>
       {children}
       {globalThis.serverConfig?.Dev?.devtoolPanel &&
-        process.env.NODE_ENV == "development" && <DevToolPanel />}
+        process.env.NODE_ENV == "development" && <DevToolPanel ws={_ws} />}
     </>
   );
 }

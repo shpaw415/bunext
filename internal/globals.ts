@@ -59,6 +59,7 @@ declare global {
   }[];
 
   var __ROUTES__: Record<string, string>;
+  var __SERVERSIDE_PROPS__: {} | undefined;
 }
 
 globalThis.React = React;
