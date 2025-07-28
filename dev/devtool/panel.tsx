@@ -11,22 +11,55 @@ function usePanelPosition(defaultSize: { width: number; height: number }) {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("bunext-panel-position");
       if (saved) {
-        try { return JSON.parse(saved); } catch { }
+        try {
+          const savedPos = JSON.parse(saved);
+          // Validate that saved position is within current viewport
+          const maxX = window.innerWidth - defaultSize.width;
+          const maxY = window.innerHeight - defaultSize.height;
+          return {
+            x: Math.max(0, Math.min(savedPos.x, maxX)),
+            y: Math.max(0, Math.min(savedPos.y, maxY))
+          };
+        } catch { }
       }
       return { x: window.innerWidth - defaultSize.width, y: window.innerHeight - defaultSize.height };
     }
     return { x: 0, y: 0 };
   });
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("bunext-panel-position", JSON.stringify(position));
     }
   }, [position]);
+
   return [position, setPosition] as const;
 }
 
 function usePanelSize() {
-  const [size, setSize] = useState({ width: 400, height: 500 });
+  const [size, setSize] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("bunext-panel-size");
+      if (saved) {
+        try {
+          const savedSize = JSON.parse(saved);
+          // Ensure minimum size constraints
+          return {
+            width: Math.max(320, Math.min(savedSize.width, window.innerWidth - 50)),
+            height: Math.max(200, Math.min(savedSize.height, window.innerHeight - 50))
+          };
+        } catch { }
+      }
+    }
+    return { width: 400, height: 500 };
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("bunext-panel-size", JSON.stringify(size));
+    }
+  }, [size]);
+
   return [size, setSize] as const;
 }
 
@@ -52,6 +85,7 @@ export default function DevToolPanel({ ws }: { ws?: WebSocket }) {
         e.preventDefault();
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [panelVisible]);
@@ -81,7 +115,14 @@ function FloatingButton({ onClick }: { onClick: () => void }) {
     <button
       className="bunext-toggle-btn"
       onClick={onClick}
-      title="Ouvrir Bunext Devtools"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      title="Open Bunext Devtools (Ctrl+Shift+D)"
+      aria-label="Open Bunext Devtools"
     >
       🛠
     </button>
@@ -119,7 +160,32 @@ function Panel({
   const resizing = useRef(false);
   const resizeStart = useRef({ x: 0, y: 0, width: 400, height: 500 });
 
-  const env = useMemo(() => typeof window == "undefined" ? "" : process.env ? process.env : {}, []);
+  const env = useMemo(() => typeof window === "undefined" ? "" : process.env ? process.env : {}, []);
+
+  // Handle window resize to keep panel within viewport
+  useEffect(() => {
+    const handleResize = () => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Adjust panel position if it's outside viewport
+      setPosition(prevPosition => ({
+        x: Math.max(0, Math.min(prevPosition.x, viewportWidth - size.width)),
+        y: Math.max(0, Math.min(prevPosition.y, viewportHeight - size.height))
+      }));
+
+      // Adjust panel size if it's larger than viewport
+      setSize(prevSize => ({
+        width: Math.min(prevSize.width, viewportWidth - 50),
+        height: Math.min(prevSize.height, viewportHeight - 50)
+      }));
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }
+  }, [size.width, size.height, setPosition, setSize]);
 
   const filteredServerProps = useMemo(() => {
     const props = globalThis.__SERVERSIDE_PROPS__;
@@ -180,10 +246,15 @@ function Panel({
     const panelHeight = size.height;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const headerHeight = 40; // Approximate header height
+
     let x = e.clientX - offset.current.x;
     let y = e.clientY - offset.current.y;
-    x = Math.max(0, Math.min(x, viewportWidth - panelWidth));
-    y = Math.max(0, Math.min(y, viewportHeight - panelHeight));
+
+    // Ensure at least part of the header remains visible
+    x = Math.max(-panelWidth + 100, Math.min(x, viewportWidth - 100));
+    y = Math.max(-headerHeight + 10, Math.min(y, viewportHeight - headerHeight));
+
     setPosition({ x, y });
   }, [size, setPosition]);
   const onMouseUp = useCallback(() => {
@@ -202,11 +273,18 @@ function Panel({
     if (!resizing.current) return;
     const dx = e.clientX - resizeStart.current.x;
     const dy = e.clientY - resizeStart.current.y;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Calculate new size with constraints
+    const newWidth = Math.max(320, Math.min(resizeStart.current.width + dx, viewportWidth - position.x - 20));
+    const newHeight = Math.max(200, Math.min(resizeStart.current.height + dy, viewportHeight - position.y - 20));
+
     setSize({
-      width: Math.max(320, resizeStart.current.width + dx),
-      height: Math.max(200, resizeStart.current.height + dy),
+      width: newWidth,
+      height: newHeight,
     });
-  }, [setSize]);
+  }, [setSize, position]);
   const onResizeMouseUp = useCallback(() => {
     resizing.current = false;
     document.removeEventListener("mousemove", onResizeMouseMove);
@@ -216,17 +294,28 @@ function Panel({
   function handleRouteNavigate(route: string) {
     const params = getRouteParams(route);
     let finalRoute = route;
-    let value = "";
-    let canceled = false;
-    for (const param of params) {
-      value = window.prompt(`Enter value for "${param}":`) || "";
-      if (!value) {
-        canceled = true;
-        break;
-      }
-      finalRoute = finalRoute.replace(`[${param}]`, value);
+
+    if (params.length === 0) {
+      // No parameters, navigate directly
+      navigate(finalRoute as any);
+      setRouteHistory(h => [finalRoute, ...h.filter(r => r !== finalRoute)].slice(0, 10));
+      return;
     }
-    if (canceled) return;
+
+    // Handle parameterized routes
+    for (const param of params) {
+      const value = window.prompt(`Enter value for "${param}":`);
+      if (value === null) {
+        // User clicked cancel
+        return;
+      }
+      if (!value.trim()) {
+        alert(`Parameter "${param}" cannot be empty`);
+        return;
+      }
+      finalRoute = finalRoute.replace(`[${param}]`, encodeURIComponent(value.trim()));
+    }
+
     navigate(finalRoute as any);
     setRouteHistory(h => [finalRoute, ...h.filter(r => r !== finalRoute)].slice(0, 10));
   }
@@ -274,6 +363,12 @@ function Panel({
                   key={route}
                   className="bunext-route-item"
                   onClick={() => handleRouteNavigate(route)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleRouteNavigate(route);
+                    }
+                  }}
                   tabIndex={0}
                   onMouseEnter={e => e.currentTarget.classList.add("bunext-route-item-hover")}
                   onMouseLeave={e => e.currentTarget.classList.remove("bunext-route-item-hover")}
@@ -303,6 +398,12 @@ function Panel({
                 key={route}
                 className="bunext-route-item"
                 onClick={() => navigate(route as any)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(route as any);
+                  }
+                }}
                 tabIndex={0}
                 onMouseEnter={e => e.currentTarget.classList.add("bunext-route-item-hover")}
                 onMouseLeave={e => e.currentTarget.classList.remove("bunext-route-item-hover")}
@@ -421,21 +522,47 @@ function Panel({
 /* --- CopyButton --- */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(false);
+
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(text);
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+      }
       setCopied(true);
+      setError(false);
       setTimeout(() => setCopied(false), 1200);
-    } catch { }
+    } catch {
+      setError(true);
+      setTimeout(() => setError(false), 1200);
+    }
   };
+
   return (
-    <button className="bunext-copy-button" onClick={handleCopy} title="Copy to clipboard">
+    <button
+      className={`bunext-copy-button${error ? ' bunext-copy-error' : ''}`}
+      onClick={handleCopy}
+      title={error ? "Copy failed" : "Copy to clipboard"}
+    >
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
         <rect x="5" y="5" width="10" height="12" rx="2" stroke="#ccc" strokeWidth="2" fill="none" />
         <rect x="3" y="3" width="10" height="12" rx="2" stroke="#888" strokeWidth="1" fill="none" />
       </svg>
-      {copied && <span style={{ marginLeft: 6, fontSize: "0.9em" }}>✓</span>}
+      {copied && <span style={{ marginLeft: 6, fontSize: "0.9em", color: "green" }}>✓</span>}
+      {error && <span style={{ marginLeft: 6, fontSize: "0.9em", color: "red" }}>✗</span>}
     </button>
   );
 }
@@ -634,8 +761,8 @@ function CodeBlockViewer({ data }: { data: any }) {
   );
 }
 
-function getRouteParams(route: string) {
-  // Matches [param] in the route
+function getRouteParams(route: string): string[] {
+  // Matches [param] in the route and extracts the parameter name
   const matches = [...route.matchAll(/\[([^\]]+)\]/g)];
-  return matches.map(m => m[1]);
+  return matches.map(m => m[1]).filter(param => param && param.trim());
 }

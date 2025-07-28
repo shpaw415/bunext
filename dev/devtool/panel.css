@@ -1,43 +1,47 @@
 /* --- Theme Variables --- */
 .bunext-theme-dark {
-  --bunext-bg: #1e1e1e;
-  --bunext-bg-alt: #232323;
-  --bunext-bg-hover: #2c2c2c;
-  --bunext-border: #444;
-  --bunext-border-alt: #666;
-  --bunext-text: #eee;
+  --bunext-bg: #1a1a1a;
+  --bunext-bg-alt: #262626;
+  --bunext-bg-hover: #333333;
+  --bunext-border: #404040;
+  --bunext-border-alt: #666666;
+  --bunext-text: #f0f0f0;
   --bunext-text-alt: #7ec699;
-  --bunext-btn-bg: #444;
-  --bunext-btn-bg-hover: #555;
-  --bunext-btn-bg-active: #333;
-  --bunext-btn-border: #666;
-  --bunext-btn-border-hover: #888;
-  --bunext-btn-border-active: #aaa;
-  --bunext-scrollbar-bg: #222;
-  --bunext-scrollbar-thumb: #444;
-  --bunext-scrollbar-thumb-hover: #666;
-  --bunext-copy-tooltip-bg: #222;
-  --bunext-copy-tooltip-text: #fff;
+  --bunext-btn-bg: #404040;
+  --bunext-btn-bg-hover: #4a4a4a;
+  --bunext-btn-bg-active: #353535;
+  --bunext-btn-border: #606060;
+  --bunext-btn-border-hover: #808080;
+  --bunext-btn-border-active: #999999;
+  --bunext-scrollbar-bg: #1a1a1a;
+  --bunext-scrollbar-thumb: #404040;
+  --bunext-scrollbar-thumb-hover: #606060;
+  --bunext-copy-tooltip-bg: #333333;
+  --bunext-copy-tooltip-text: #f0f0f0;
+  --bunext-shadow: rgba(0, 0, 0, 0.7);
+  --bunext-shadow-light: rgba(0, 0, 0, 0.3);
 }
 .bunext-theme-light {
-  --bunext-bg: #f7f7f7;
-  --bunext-bg-alt: #eaeaea;
-  --bunext-bg-hover: #e0e0e0;
-  --bunext-border: #ccc;
-  --bunext-border-alt: #bbb;
-  --bunext-text: #222;
+  --bunext-bg: #ffffff;
+  --bunext-bg-alt: #f5f5f5;
+  --bunext-bg-hover: #e8e8e8;
+  --bunext-border: #d0d0d0;
+  --bunext-border-alt: #a0a0a0;
+  --bunext-text: #1a1a1a;
   --bunext-text-alt: #2d7c4a;
-  --bunext-btn-bg: #e0e0e0;
-  --bunext-btn-bg-hover: #d4d4d4;
-  --bunext-btn-bg-active: #c0c0c0;
-  --bunext-btn-border: #bbb;
-  --bunext-btn-border-hover: #888;
-  --bunext-btn-border-active: #aaa;
-  --bunext-scrollbar-bg: #eaeaea;
-  --bunext-scrollbar-thumb: #ccc;
-  --bunext-scrollbar-thumb-hover: #bbb;
-  --bunext-copy-tooltip-bg: #eaeaea;
-  --bunext-copy-tooltip-text: #222;
+  --bunext-btn-bg: #f0f0f0;
+  --bunext-btn-bg-hover: #e0e0e0;
+  --bunext-btn-bg-active: #d0d0d0;
+  --bunext-btn-border: #c0c0c0;
+  --bunext-btn-border-hover: #999999;
+  --bunext-btn-border-active: #808080;
+  --bunext-scrollbar-bg: #f5f5f5;
+  --bunext-scrollbar-thumb: #d0d0d0;
+  --bunext-scrollbar-thumb-hover: #a0a0a0;
+  --bunext-copy-tooltip-bg: #f5f5f5;
+  --bunext-copy-tooltip-text: #1a1a1a;
+  --bunext-shadow: rgba(0, 0, 0, 0.2);
+  --bunext-shadow-light: rgba(0, 0, 0, 0.1);
 }
 
 /* --- Bunext Devtools Panel Layout --- */
@@ -48,12 +52,15 @@
   position: fixed;
   background: var(--bunext-bg);
   color: var(--bunext-text);
-  border-top-left-radius: 8px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  box-shadow: 0 0 32px var(--bunext-shadow),
+    0 16px 64px var(--bunext-shadow-light), 0 0 0 1px var(--bunext-border);
   overflow: hidden;
   z-index: 9999;
   display: flex;
   flex-direction: column;
+  backdrop-filter: blur(12px);
 }
 .bunext-devtools-panel-hidden {
   opacity: 0;
@@ -61,38 +68,71 @@
   transform: translateY(40px);
 }
 .bunext-panel-header {
-  padding: 10px;
+  padding: 12px 16px;
   background: var(--bunext-bg-alt);
   color: var(--bunext-text);
   cursor: move;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid var(--bunext-border);
+  font-weight: 600;
+  user-select: none;
+  min-height: 40px;
+}
+.bunext-panel-header:hover {
+  background: var(--bunext-bg-hover);
 }
 .bunext-panel-close-btn {
   background: var(--bunext-btn-bg);
   color: var(--bunext-text);
-  border: none;
-  padding: 4px 8px;
+  border: 1px solid var(--bunext-btn-border);
+  border-radius: 4px;
+  padding: 6px 10px;
   cursor: pointer;
+  font-size: 1.1em;
+  font-weight: bold;
+  transition: all 0.2s;
+  line-height: 1;
+}
+.bunext-panel-close-btn:hover {
+  background: var(--bunext-btn-bg-hover);
+  border-color: var(--bunext-btn-border-hover);
+  transform: scale(1.1);
+}
+.bunext-panel-close-btn:active {
+  transform: scale(0.95);
 }
 .bunext-panel-content {
   flex: 1;
-  padding: 10px;
+  padding: 16px;
   overflow-y: auto;
   background: var(--bunext-bg);
   color: var(--bunext-text);
+  max-height: calc(100% - 40px); /* Account for header height */
 }
 .bunext-panel-resize-handle {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   cursor: nwse-resize;
   z-index: 10;
-  background: transparent;
+  background: var(--bunext-bg-alt);
   user-select: none;
+  border-top-left-radius: 4px;
+  transition: background 0.2s;
+}
+.bunext-panel-resize-handle:hover {
+  background: var(--bunext-bg-hover);
+}
+.bunext-panel-resize-handle svg {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.bunext-panel-resize-handle:hover svg {
+  opacity: 1;
 }
 
 /* --- Floating Button --- */
@@ -105,83 +145,151 @@
   color: var(--bunext-text);
   border: 2px solid var(--bunext-btn-border);
   border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  font-size: 1.5em;
+  width: 52px;
+  height: 52px;
+  font-size: 1.6em;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  transition: background 0.2s, border 0.2s;
+  box-shadow: 0 4px 16px var(--bunext-shadow-light);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
 }
 .bunext-toggle-btn:hover {
   background: var(--bunext-btn-bg-hover);
   border-color: var(--bunext-btn-border-hover);
+  transform: scale(1.1);
+  box-shadow: 0 8px 24px var(--bunext-shadow);
+}
+.bunext-toggle-btn:active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px var(--bunext-shadow-light);
+}
+.bunext-toggle-btn:focus {
+  outline: 2px solid var(--bunext-text-alt);
+  outline-offset: 2px;
 }
 
 /* --- Section --- */
 .bunext-section {
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--bunext-border);
 }
 .bunext-section-title {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
   border-bottom: 1px solid var(--bunext-border);
-  padding-bottom: 4px;
+  padding: 12px 16px;
   background: var(--bunext-bg-alt);
   color: var(--bunext-text);
   font-size: 1.05em;
-  font-weight: 500;
-  padding: 6px 10px 4px 10px;
-  border-radius: 4px;
+  font-weight: 600;
   cursor: pointer;
   user-select: none;
   display: flex;
   align-items: center;
-  transition: background 0.2s;
+  transition: all 0.2s;
+  position: relative;
 }
 .bunext-section-title:hover {
   background: var(--bunext-bg-hover);
+  color: var(--bunext-text-alt);
+}
+.bunext-section-title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  background: var(--bunext-text-alt);
+  transition: width 0.3s;
+}
+.bunext-section-title:hover::after {
+  width: 100%;
 }
 .bunext-section-content {
   transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s;
   overflow: hidden;
+  padding: 0 16px 16px 16px;
+  background: var(--bunext-bg);
 }
 
 /* --- List & Actions --- */
 .bunext-routes-list {
   list-style: none;
-  padding: 0;
+  padding: 8px 0;
   margin: 0;
-  max-height: 200px;
+  max-height: 240px;
   overflow: auto;
   background: var(--bunext-bg);
   color: var(--bunext-text);
+  border-radius: 6px;
+  border: 1px solid var(--bunext-border);
+}
+
+/* --- Utility Classes --- */
+.bunext-flex-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .bunext-route-item {
   margin-left: 1rem;
   cursor: pointer;
-  border-radius: 4px;
-  padding: 2px 6px;
-  transition: background 0.18s, color 0.18s;
+  border-radius: 6px;
+  padding: 8px 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   background: transparent;
   color: var(--bunext-text);
+  border: 1px solid transparent;
+  position: relative;
+  font-family: "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace;
+  font-size: 0.95em;
 }
 .bunext-route-item-hover,
 .bunext-route-item:hover,
 .bunext-route-item:focus {
   background: var(--bunext-bg-hover);
   color: var(--bunext-text-alt);
+  border-color: var(--bunext-border);
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.bunext-route-item:focus {
+  outline: 2px solid var(--bunext-text-alt);
+  outline-offset: 1px;
 }
 .bunext-action-btn {
   display: inline-block;
   margin: 4px;
   background: var(--bunext-btn-bg);
   border: 1px solid var(--bunext-btn-border);
-  padding: 4px 10px;
+  border-radius: 6px;
+  padding: 8px 16px;
   color: var(--bunext-text);
   cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: none;
+  font-size: 0.95em;
 }
 .bunext-action-btn:hover {
   background: var(--bunext-btn-bg-hover);
   border-color: var(--bunext-btn-border-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+.bunext-action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.bunext-action-btn:focus {
+  outline: 2px solid var(--bunext-text-alt);
+  outline-offset: 1px;
 }
 
 /* --- Copy Button --- */
@@ -197,7 +305,7 @@
   cursor: pointer;
   border-radius: 4px;
   font-size: 1em;
-  transition: background 0.2s, border 0.2s;
+  transition: background 0.2s, border 0.2s, box-shadow 0.2s;
 }
 .bunext-copy-button:hover {
   background: var(--bunext-btn-bg-hover);
@@ -207,6 +315,19 @@
 .bunext-copy-button:active {
   background: var(--bunext-btn-bg-active);
   border-color: var(--bunext-btn-border-active);
+}
+.bunext-copy-button:focus {
+  outline: 2px solid var(--bunext-text-alt);
+  outline-offset: 1px;
+}
+.bunext-copy-error {
+  background-color: rgba(255, 0, 0, 0.1);
+  border-color: #ff4444;
+  box-shadow: 0 0 8px rgba(255, 68, 68, 0.2);
+}
+.bunext-copy-error:hover {
+  background-color: rgba(255, 0, 0, 0.15);
+  border-color: #ff6666;
 }
 .bunext-copy-tooltip {
   position: absolute;
@@ -227,32 +348,52 @@
 /* --- Filter Input --- */
 .bunext-filter-input {
   width: 100%;
-  margin-bottom: 8px;
-  padding: 4px 8px;
-  border-radius: 4px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
   border: 1px solid var(--bunext-border);
   background: var(--bunext-bg-alt);
   color: var(--bunext-text);
+  font-size: 0.95em;
+  transition: all 0.2s;
+}
+.bunext-filter-input:focus {
+  outline: none;
+  border-color: var(--bunext-text-alt);
+  box-shadow: 0 0 0 2px rgba(126, 198, 153, 0.2);
+  background: var(--bunext-bg);
+}
+.bunext-filter-input::placeholder {
+  color: var(--bunext-border-alt);
+  opacity: 0.7;
 }
 .bunext-filter-clear-btn {
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--bunext-btn-border);
   background: var(--bunext-btn-bg);
   color: var(--bunext-text);
   cursor: pointer;
-  font-size: 1em;
-  transition: background 0.2s, filter 0.2s, opacity 0.2s;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.2s;
+  min-width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .bunext-filter-clear-btn:hover:enabled {
   background: var(--bunext-btn-bg-hover);
+  border-color: var(--bunext-btn-border-hover);
+  transform: scale(1.05);
 }
 .bunext-filter-clear-btn:disabled,
 .bunext-filter-clear-btn-blur {
-  filter: blur(2px);
-  opacity: 0.5;
+  filter: blur(1px);
+  opacity: 0.4;
   pointer-events: none;
   cursor: default;
+  transform: none;
 }
 
 /* --- Code Block Viewer Styles --- */
