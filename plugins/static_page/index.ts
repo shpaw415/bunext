@@ -26,12 +26,23 @@ const staticPageCacheShema: DBSchema = [
         nullable: true,
         DataType: {},
       },
+      {
+        name: "created_at",
+        type: "number",
+      },
+      {
+        name: "etag",
+        type: "string",
+      },
     ],
   },
 ];
 
+// Singleton cache manager for performance
+let globalCacheManager: StaticPageCache | null = null;
+
 export class StaticPageCache extends CacheManagerExtends {
-  private static_page = this.CreateTable<staticPage, staticPage>("static_page");
+  private static_page = this.CreateTable<staticPage & { created_at: number; etag: string }, staticPage & { created_at: number; etag: string }>("static_page");
 
   constructor() {
     super({
@@ -40,13 +51,25 @@ export class StaticPageCache extends CacheManagerExtends {
     });
   }
 
-  addStaticPage(pathname: string, page: string, raw_props?: Object) {
+  static getInstance(): StaticPageCache {
+    if (!globalCacheManager) {
+      globalCacheManager = new StaticPageCache();
+    }
+    return globalCacheManager;
+  }
+
+  addStaticPage(pathname: string, page: string, raw_props?: Object, etag?: string) {
+    const now = Date.now();
+    const pageEtag = etag || this.generateETag(page, raw_props);
+
     try {
       this.static_page.insert([
         {
           pathname,
           page,
           props: raw_props,
+          created_at: now,
+          etag: pageEtag,
         },
       ]);
     } catch (e) {
@@ -59,12 +82,19 @@ export class StaticPageCache extends CacheManagerExtends {
             values: {
               page,
               props: raw_props,
+              created_at: now,
+              etag: pageEtag,
             },
           })
         )
       )
         throw e;
     }
+  }
+
+  private generateETag(page: string, props?: Object): string {
+    const content = page + (props ? JSON.stringify(props) : '');
+    return `"${Bun.hash(content).toString(16)}"`;
   }
   getStaticFromURL(url: string) {
     const _url = new URL(url);
@@ -128,7 +158,7 @@ function isUseStaticPath(
   if (andProduction && process.env.NODE_ENV != "production") return false;
   return Boolean(
     manager.serverSide &&
-      manager.router.staticRoutes.includes(manager.serverSide?.name)
+    manager.router.staticRoutes.includes(manager.serverSide?.name)
   );
 }
 
@@ -160,7 +190,7 @@ async function getStaticPage(manager: RequestManager) {
   if (!cache) {
     const pageJSX = await manager.MakeDynamicJSXElement({
       serverSideProps: (
-        await manager.MakeServerSideProps({ disableSession: true })
+        await manager.makeServerSideProps({ disableSession: true })
       ).value,
     });
     if (!pageJSX)
@@ -177,7 +207,7 @@ async function getStaticPage(manager: RequestManager) {
 
     const props =
       GetServerSideProps(cacheManager, manager) ||
-      (await manager.MakeServerSideProps({ disableSession: true }));
+      (await manager.makeServerSideProps({ disableSession: true }));
 
     cacheManager.addStaticPage(
       manager.serverSide.pathname,
