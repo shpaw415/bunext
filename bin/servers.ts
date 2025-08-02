@@ -31,7 +31,7 @@ function startDevServer(): void {
         }
     });
 
-    OnServerClose[proc.exitCode](proc);
+    OnServerClose[proc.exitCode]?.(proc);
 }
 
 

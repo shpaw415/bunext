@@ -26,7 +26,7 @@ Bunext is a **modern full-stack framework** built specifically for the **Bun run
 
 | Component | Version | Status |
 |-----------|---------|--------|
-| **Bun** | `1.1.0 - 1.2.15` | ✅ Supported |
+| **Bun** | `1.1.0 - 1.2.19` | ✅ Supported |
 | **Node.js** | N/A | ❌ Use Bun runtime |
 | **OS** | Linux, WSL | ✅ Supported |
 | **OS** | Windows | 🚧 In Progress |
@@ -408,8 +408,6 @@ Trigger revalidation programmatically from server actions:
 import { revalidateStatic } from "bunext-js/router/revalidate";
 
 export async function ServerRefreshContent(path: string) {
-  "use server";
-  
   // Revalidate specific static page
   // Example: path = "/products/123" for dynamic route /products/[id]
   revalidateStatic(path);
@@ -600,7 +598,6 @@ import { GetSession } from "bunext-js/session";
 
 // Set session data (server action)
 export async function ServerLogin(credentials: LoginCredentials) {
-  "use server";
   
   const user = await authenticateUser(credentials);
   
@@ -622,7 +619,6 @@ export async function ServerLogin(credentials: LoginCredentials) {
 
 // Update session data
 export async function ServerUpdateProfile(profileData: ProfileData) {
-  "use server";
   
   const session = GetSession(arguments);
   const currentData = session.getData();
@@ -639,7 +635,6 @@ export async function ServerUpdateProfile(profileData: ProfileData) {
 
 // Delete session
 export async function ServerLogout() {
-  "use server";
   
   const session = GetSession(arguments);
   session.delete();
@@ -712,7 +707,6 @@ export default Config;
 
 ```tsx
 export async function ServerExtendSession() {
-  "use server";
   
   const session = GetSession(arguments);
   
@@ -766,7 +760,6 @@ Server actions must follow specific naming and parameter conventions:
 ```tsx
 // File upload server action
 export async function ServerUploadFile(file: File, metadata: string) {
-  "use server";
   
   // Validate file
   if (!file || file.size > 10 * 1024 * 1024) { // 10MB limit
@@ -789,7 +782,6 @@ export async function ServerUploadFile(file: File, metadata: string) {
 
 // Data processing server action
 export async function ServerProcessData(data: ProcessingRequest) {
-  "use server";
   
   try {
     // Validate input
@@ -826,7 +818,6 @@ Use server actions with HTML forms:
 ```tsx
 // Server action for form handling
 export async function ServerCreatePost(title: string, content: string, tags: string[]) {
-  "use server";
   
   // Validate input
   if (!title.trim() || !content.trim()) {
@@ -880,7 +871,6 @@ Handle file uploads with proper validation:
 
 ```tsx
 export async function ServerUploadImages(files: File[], albumId: string) {
-  "use server";
   
   const uploadResults = [];
   
@@ -981,7 +971,6 @@ function ImageUpload({ albumId }: { albumId: string }) {
 
 ```tsx
 export async function ServerWithErrorHandling(data: any) {
-  "use server";
   
   try {
     // Validate input
@@ -1113,7 +1102,6 @@ const db = Database();
 
 // SELECT queries
 export async function ServerGetUsers() {
-  "use server";
   
   // Get all users
   const allUsers = db.Users.select();
@@ -1139,7 +1127,6 @@ export async function ServerGetUsers() {
 
 // INSERT operations
 export async function ServerCreateUser(userData: CreateUserRequest) {
-  "use server";
   
   const newUser = db.Users.insert({
     username: userData.username,
@@ -1157,7 +1144,6 @@ export async function ServerCreateUser(userData: CreateUserRequest) {
 
 // UPDATE operations
 export async function ServerUpdateUser(userId: number, updates: Partial<User>) {
-  "use server";
   
   const updatedUser = db.Users.update({
     where: { id: userId },
@@ -1169,7 +1155,6 @@ export async function ServerUpdateUser(userId: number, updates: Partial<User>) {
 
 // DELETE operations
 export async function ServerDeleteUser(userId: number) {
-  "use server";
   
   const deleted = db.Users.delete({
     where: { id: userId }
@@ -1185,7 +1170,6 @@ Use more complex query patterns:
 
 ```typescript
 export async function ServerGetPostsWithAuthors() {
-  "use server";
   
   const db = Database();
   
@@ -1219,7 +1203,6 @@ export async function ServerGetPostsWithAuthors() {
 
 // LIKE queries for search
 export async function ServerSearchUsers(searchTerm: string) {
-  "use server";
   
   const db = Database();
   
@@ -1238,7 +1221,6 @@ export async function ServerSearchUsers(searchTerm: string) {
 
 // JSON column queries
 export async function ServerGetUsersWithProfile() {
-  "use server";
   
   const db = Database();
   
@@ -1258,7 +1240,6 @@ For complex queries, access the raw database:
 
 ```typescript
 export async function ServerCustomQuery() {
-  "use server";
   
   const db = Database();
   
@@ -1294,7 +1275,6 @@ export async function ServerCustomQuery() {
 ```typescript
 // ✅ Good: Use transactions for related operations
 export async function ServerCreatePostWithTags(postData: CreatePostRequest) {
-  "use server";
   
   const db = Database();
   
@@ -1331,7 +1311,6 @@ export async function ServerCreatePostWithTags(postData: CreatePostRequest) {
 
 // ✅ Good: Validate data before database operations
 export async function ServerCreateUserSafe(userData: any) {
-  "use server";
   
   // Validate required fields
   if (!userData.username || !userData.email) {
@@ -1404,7 +1383,6 @@ export default function ClientComponent() {
 
 // Server-side (all variables available)
 export async function ServerAction() {
-  "use server";
   
   const apiKey = process.env.API_KEY; // Available
   const publicUrl = process.env.PUBLIC_API_URL; // Available
@@ -2282,7 +2260,7 @@ const Config: ServerConfig = {
     port: 3000,
   },
   
-  plugins: [
+  bunext_plugins: [
     analyticsPlugin,
     seoPlugin,
     // Only load dev tools in development
@@ -2367,7 +2345,6 @@ Real-time communication with WebSocket integration:
 ```tsx
 // Server-side WebSocket handler
 export async function ServerHandleWebSocket(data: WebSocketMessage) {
-  "use server";
   
   // Broadcast to all connected clients
   const clients = getWebSocketClients();
@@ -2529,7 +2506,6 @@ export async function CachedComponent() {
 ```tsx
 // Built-in performance tracking
 export async function ServerTrackPerformance() {
-  "use server";
   
   const start = performance.now();
   
