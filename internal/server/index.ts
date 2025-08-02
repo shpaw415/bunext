@@ -49,6 +49,7 @@ import {
 } from "./logs.ts";
 import { DevWsMessageHandler, type DevWsMessageTypes } from "../../dev/hotServer.ts";
 import { exit } from "node:process";
+import { ExitCodeDescription } from "../../bin/exit-codes.ts";
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
@@ -56,6 +57,7 @@ declare global {
     }
   }
 }
+
 
 // Global initialization
 globalThis.clusterStatus ??= false;
@@ -141,6 +143,9 @@ class BunextServer {
       port: this.port,
       ...(globalThis.serverConfig?.HTTPServer.config as any),
       fetch: this.createFetchHandler(),
+      error: (error: Error) => {
+        process.exit(1);
+      }
     });
   }
 
@@ -151,7 +156,7 @@ class BunextServer {
         "Rebooting server..."
       )}`
     );
-    exit(0);
+    process.exit(ExitCodeDescription[3].code);
   }
 
   private createFetchHandler() {
@@ -226,6 +231,9 @@ class BunextServer {
         return new Response("OK");
       },
       port: port,
+      error(error) {
+        process.exit(1);
+      },
     });
 
     // Clean up inactive sockets periodically

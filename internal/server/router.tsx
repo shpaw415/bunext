@@ -5,11 +5,16 @@ import {
   type Subprocess,
 } from "bun";
 import { NJSON } from "next-json";
-import { extname, join, relative, sep } from "node:path";
+import { extname, join, relative, sep, resolve, normalize } from "node:path";
+import { mkdirSync, existsSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import {
   renderToString,
   type RenderToReadableStreamOptions,
 } from "react-dom/server";
+import React, { type JSX } from "react";
+
+// Internal imports
 import type {
   _DisplayMode,
   _GlobalData,
@@ -21,223 +26,437 @@ import type {
   ServerConfig,
   ServerSideProps,
 } from "../types";
-import { normalize } from "path";
-import React, { type JSX } from "react";
-import "./server_global";
-import { mkdirSync, existsSync } from "node:fs";
 import { Head, type _Head } from "../../features/head";
 import { BunextRequest } from "./bunextRequest";
-import "./server_global";
-import { rm } from "node:fs/promises";
-import CacheManager from "../caching";
-import { generateRandomString } from "../../features/utils";
 import { RequestContext } from "./context";
+import { PluginLoader } from "./plugin-loader";
+import { generateRandomString } from "../../features/utils";
+import CacheManager from "../caching";
 
-import "./bunext_global.ts";
-import { PluginLoader } from "./plugin-loader.ts";
+// Global imports
+import "./server_global";
+import "./bunext_global";
 
-class ClientOnlyError extends Error {
-  constructor() {
-    super("client only");
-  }
-}
-
-type pathNames =
+// Types and constants
+type SpecialPathNames =
   | "/bunextgetSessionData"
   | "/ServerActionGetter"
   | "/bunextDeleteSession"
   | "/favicon.ico";
 
-const HTMLDocType = "<!DOCTYPE html>";
+type RouteEntry = [string, string];
 
+interface ServerAction {
+  path: string;
+  actions: Array<Function>;
+}
+
+interface LayoutModule {
+  default: ({
+    children,
+    params,
+  }: {
+    children: JSX.Element;
+    params: Record<string, string>;
+  }) => JSX.Element | Promise<JSX.Element>;
+}
+
+interface PageModule {
+  default?: ({
+    props,
+    params,
+    request,
+  }: {
+    props: any;
+    params: any;
+    request?: BunextRequest;
+  }) => Promise<JSX.Element>;
+  getServerSideProps?: getServerSidePropsFunction;
+}
+
+const HTML_DOCTYPE = "<!DOCTYPE html>";
+const SUPPORTED_FILE_EXTENSIONS = [".tsx", ".ts", ".js", ".jsx"] as const;
+const STATIC_FILE_SUFFIXES = [
+  "",
+  ".html",
+  "index.html",
+  ".js",
+  "/index.js",
+  ".css",
+] as const;
+
+/**
+ * Custom error for client-only components
+ */
+class ClientOnlyError extends Error {
+  constructor(message = "Component can only be rendered on the client side") {
+    super(message);
+    this.name = "ClientOnlyError";
+  }
+}
+
+/**
+ * Base error class for Bunext-specific errors
+ */
+class BunextError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
+
+class RouteNotFoundError extends BunextError { }
+class ComponentNotFoundError extends BunextError { }
+class RenderingError extends BunextError { }
+class ServerSidePropsError extends BunextError { }
+class APIEndpointError extends BunextError { }
+class RedirectError extends BunextError { }
+class FileSystemError extends BunextError { }
+
+/**
+ * Error for missing server-side routes
+ */
+class ServerRouteNotFoundError extends Error {
+  constructor(pathname: string) {
+    super(`No server-side script found for ${pathname}`);
+    this.name = "ServerRouteNotFoundError";
+  }
+}
+
+/**
+ * Main router class that handles static and dynamic routing for Bunext applications
+ * Extends PluginLoader to support routing plugins
+ */
 class StaticRouters extends PluginLoader {
-  server: FileSystemRouter;
-  client: FileSystemRouter;
-  routes_dump: string;
-  serverActions: {
-    path: string;
-    actions: Array<Function>;
-  }[] = [];
-  layoutPaths: string[];
-  cssPaths: string[] = [];
-  cssPathExists: string[] = [];
-  staticRoutes: Array<keyof FileSystemRouter["routes"]> = [];
-  ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
+  // Core routers
+  public server: FileSystemRouter;
+  public client: FileSystemRouter;
 
-  initPromise: Promise<boolean>;
-  initResolver?: (value: boolean | PromiseLike<boolean>) => void;
-  inited = false;
+  // Route configuration
+  public routes_dump: string;
+  public serverActions: ServerAction[] = [];
+  public layoutPaths: string[] = [];
+  public cssPaths: string[] = [];
+  public cssPathExists: string[] = [];
+  public staticRoutes: Array<keyof FileSystemRouter["routes"]> = [];
+  public ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
 
-  baseDir = process.cwd();
-  buildDir = ".bunext/build" as const;
-  pageDir = "src/pages" as const;
-  staticDir = "static" as const;
+  // Initialization state
+  private readonly initPromise: Promise<boolean>;
+  private initResolver?: (value: boolean | PromiseLike<boolean>) => void;
+  private inited = false;
+
+  // Directory configuration
+  public readonly baseDir = process.cwd();
+  public readonly buildDir = ".bunext/build" as const;
+  public readonly pageDir = "src/pages" as const;
+  public readonly staticDir = "static" as const;
 
   constructor() {
     super();
-    this.server = new Bun.FileSystemRouter({
-      dir: join(this.baseDir, this.pageDir),
-      style: "nextjs",
-      fileExtensions: [".tsx", ".ts", ".js", ".jsx"],
-    });
-    this.client = new Bun.FileSystemRouter({
-      dir: join(this.baseDir, this.buildDir, this.pageDir),
-      style: "nextjs",
-    });
-    this.routes_dump = this.getRouteDumpFromServerSide(this.server);
-    this.layoutPaths = this.getlayoutPaths();
-    this.initPromise = new Promise((resolve) => (this.initResolver = resolve));
+
+    try {
+      this.server = this.createFileSystemRouter(this.pageDir, true);
+      this.client = this.createFileSystemRouter(
+        join(this.buildDir, this.pageDir),
+        false
+      );
+
+      this.routes_dump = this.generateServerSideRouteDump(this.server);
+      this.layoutPaths = this.getLayoutPaths();
+
+      this.initPromise = new Promise(
+        (resolve) => (this.initResolver = resolve)
+      );
+    } catch (error) {
+      throw new Error(`Failed to initialize StaticRouters: ${error}`);
+    }
   }
 
-  private getRouteDumpFromServerSide(serverFileRouter: FileSystemRouter) {
-    const routes = Object.fromEntries(
-      Object.entries(serverFileRouter.routes)
-        .filter(([path, filePath]) => {
-          const filename = filePath.split("/").at(-1);
-          if (!filename) return false;
-          if (
-            filename == "index.tsx" ||
-            filename == "layout.tsx" ||
-            /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(filename)
-          )
-            return true;
-          return false;
-        })
-        .map(([path, filePath]) => {
-          const filePathArray = filePath.split(this.baseDir).at(1)?.split(".");
-          filePathArray?.pop();
-          filePathArray?.push("js");
-          return [path, filePathArray?.join(".")];
-        })
+  /**
+   * Creates a FileSystemRouter with proper configuration
+   */
+  private createFileSystemRouter(
+    directory: string,
+    isServerSide: boolean
+  ): FileSystemRouter {
+    const config = {
+      dir: join(this.baseDir, directory),
+      style: "nextjs" as const,
+      ...(isServerSide && { fileExtensions: [...SUPPORTED_FILE_EXTENSIONS] }),
+    };
+
+    return new Bun.FileSystemRouter(config);
+  }
+
+  /**
+   * Generates a route dump from server-side router for client hydration
+   */
+  private generateServerSideRouteDump(serverFileRouter: FileSystemRouter): string {
+    try {
+      const routes = Object.fromEntries(
+        Object.entries(serverFileRouter.routes)
+          .filter(([, filePath]) => this.isValidRouteFile(filePath))
+          .map(([path, filePath]) => this.transformRouteEntry(path, filePath))
+      );
+
+      return NJSON.stringify(routes, { omitStack: true });
+    } catch (error) {
+      throw new Error(`Failed to generate route dump: ${error}`);
+    }
+  }
+
+  /**
+   * Checks if a file path represents a valid route file
+   */
+  private isValidRouteFile(filePath: string): boolean {
+    const filename = filePath.split("/").at(-1);
+    if (!filename) return false;
+
+    return (
+      filename === "index.tsx" ||
+      filename === "layout.tsx" ||
+      /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(filename)
     );
+  }
+
+  /**
+   * Transforms a route entry for client consumption
+   */
+  private transformRouteEntry(path: string, filePath: string): [string, string] {
+    const filePathArray = filePath.split(this.baseDir).at(1)?.split(".");
+    if (!filePathArray) {
+      throw new Error(`Invalid file path: ${filePath}`);
+    }
+
+    filePathArray.pop();
+    filePathArray.push("js");
+
+    return [path, filePathArray.join(".")];
+  }
+
+  /**
+   * Generates client-side route dump
+   */
+  private generateClientSideRouteDump(clientRouter: FileSystemRouter): string {
+    const routes = Object.fromEntries(
+      Object.entries(clientRouter.routes).map(([path, filePath]) => [
+        path,
+        "/" + relative(join(this.baseDir, this.buildDir), filePath),
+      ])
+    );
+
     return NJSON.stringify(routes, { omitStack: true });
   }
-  getRouteDumpFromClient(client: FileSystemRouter) {
-    return NJSON.stringify(
-      Object.fromEntries(
-        Object.entries(client).map(([path, filePath]) => [
-          path,
-          "/" + relative(join(this.baseDir, this.buildDir), filePath),
-        ])
-      ),
-      { omitStack: true }
-    );
+
+  /**
+   * Gets layout paths from the pages directory
+   */
+  private getLayoutPaths(): string[] {
+    try {
+      return this.getFilesFromPageDir()
+        .filter((file) => file.split("/").at(-1)?.includes("layout."))
+        .map((layoutFile) =>
+          normalize(`//${layoutFile}`.split("/").slice(0, -1).join("/"))
+        );
+    } catch (error) {
+      console.warn(`Failed to get layout paths: ${error}`);
+      return [];
+    }
   }
 
-  public async init() {
+  /**
+   * Initializes the router with all necessary data
+   * This method is idempotent and can be safely called multiple times
+   */
+  public async init(): Promise<void> {
     if (this.inited) return;
-    await this.initPlugins();
-    await Promise.all([
-      this.getCssPaths(),
-      this.getUseStaticRoutes(),
-      this.getSSRDefaultRoutes(),
-    ]).then(([css, staticPath, ssr]) => {
-      this.cssPathExists = css;
-      this.staticRoutes = staticPath;
-      this.ssrAsDefaultRoutes = ssr;
+
+    try {
+      await this.initPlugins();
+
+      const [cssPathExists, staticRoutes, ssrAsDefaultRoutes] = await Promise.all([
+        this.getCssPaths(),
+        this.getUseStaticRoutes(),
+        this.getSSRDefaultRoutes(),
+      ]);
+
+      this.cssPathExists = cssPathExists;
+      this.staticRoutes = staticRoutes;
+      this.ssrAsDefaultRoutes = ssrAsDefaultRoutes;
       this.inited = true;
+
       this.initResolver?.(true);
-    });
+    } catch (error) {
+      console.error("Router initialization failed:", error);
+      this.initResolver?.(false);
+      throw error;
+    }
   }
-  public isInited() {
+
+  /**
+   * Returns a promise that resolves when the router is initialized
+   */
+  public isInited(): Promise<boolean> {
     return this.initPromise;
   }
 
-  private getRoutesWithoutLayouts() {
-    type Route = string;
-    type Path = string;
-    return Object.entries(this.server?.routes || {}).filter(
-      ([route]) => !route.endsWith("/layout")
-    ) as [Route, Path][];
-  }
-
-  async getCssPaths(clear: boolean = false) {
-    const cwd = process.cwd();
-    if (clear) this.cssPathExists = [];
-
-    const possible_css_path = Object.values(this.server?.routes || {}).map(
-      (path) => {
-        const trimPath = path.replace(cwd, "").split(".");
-        trimPath.pop();
-        return join(this.buildDir, trimPath.join(".") + ".css");
-      }
-    );
-    const cssFilesPath: string[] = [];
-    for await (const path of possible_css_path) {
-      if (await Bun.file(path).exists()) cssFilesPath.push(path);
+  /**
+   * Gets routes excluding layout files
+   */
+  private getRoutesWithoutLayouts(): RouteEntry[] {
+    try {
+      return Object.entries(this.server?.routes || {}).filter(
+        ([route]) => !route.endsWith("/layout")
+      ) as RouteEntry[];
+    } catch (error) {
+      console.warn("Failed to get routes without layouts:", error);
+      return [];
     }
-    return cssFilesPath.map((path) =>
-      normalize(path.replace(this.buildDir, "/"))
-    );
-  }
-  private async getUseStaticRoutes() {
-    const useStaticRoute: string[] = [];
-    const regex = /(['"])use static\1/;
-    await Promise.all(
-      this.getRoutesWithoutLayouts().map(async ([route, path]) => {
-        const fileContent = await Bun.file(path).text();
-        if (regex.test(fileContent.split("\n").at(0) as string))
-          useStaticRoute.push(route);
-      })
-    );
-    return useStaticRoute;
   }
 
-  private async getSSRDefaultRoutes() {
-    const routes = this.getRoutesWithoutLayouts();
-    const defaultsExports = await Promise.all(
-      routes.map(async ([route, path]) => ({
-        module: (await import(path)) as {
-          default?: () => JSX.Element | Promise<JSX.Element>;
-        },
-        route,
-      }))
-    );
-    return defaultsExports
-      .filter((module) => module.module.default?.length == 0)
-      .map(({ route }) => route);
+  /**
+   * Gets CSS file paths that exist in the build directory
+   * @param clear - Whether to clear existing CSS paths before scanning
+   */
+  async getCssPaths(clear: boolean = false): Promise<string[]> {
+    try {
+      if (clear) this.cssPathExists = [];
+
+      const possibleCssPaths = Object.values(this.server?.routes || {}).map(
+        (path) => {
+          const trimPath = path.replace(process.cwd(), "").split(".");
+          trimPath.pop();
+          return join(this.buildDir, trimPath.join(".") + ".css");
+        }
+      );
+
+      const existingCssFiles: string[] = [];
+
+      for (const path of possibleCssPaths) {
+        try {
+          if (await Bun.file(path).exists()) {
+            existingCssFiles.push(path);
+          }
+        } catch (error) {
+          // Silently skip files that can't be checked
+          continue;
+        }
+      }
+
+      return existingCssFiles.map((path) =>
+        normalize(path.replace(this.buildDir, "/"))
+      );
+    } catch (error) {
+      console.warn("Failed to get CSS paths:", error);
+      return [];
+    }
   }
 
-  public setRoutes() {
-    this.server = new Bun.FileSystemRouter({
-      dir: join(this.baseDir, this.pageDir),
-      style: "nextjs",
-    });
-    this.client = new Bun.FileSystemRouter({
-      dir: join(this.baseDir, this.buildDir, this.pageDir),
-      style: "nextjs",
-    });
-    this.routes_dump = NJSON.stringify(
-      Object.fromEntries(
-        Object.entries(this.client.routes).map(([path, filePath]) => [
-          path,
-          "/" + relative(join(this.baseDir, this.buildDir), filePath),
-        ])
-      ),
-      { omitStack: true }
-    );
+  /**
+   * Identifies routes that use static rendering
+   */
+  private async getUseStaticRoutes(): Promise<string[]> {
+    const staticRoutes: string[] = [];
+    const useStaticRegex = /(['"])use static\1/;
+
+    try {
+      await Promise.all(
+        this.getRoutesWithoutLayouts().map(async ([route, path]) => {
+          try {
+            const fileContent = await Bun.file(path).text();
+            const firstLine = fileContent.split("\n").at(0);
+
+            if (firstLine && useStaticRegex.test(firstLine)) {
+              staticRoutes.push(route);
+            }
+          } catch (error) {
+            console.warn(`Failed to check static route ${route}:`, error);
+          }
+        })
+      );
+    } catch (error) {
+      console.warn("Failed to get static routes:", error);
+    }
+
+    return staticRoutes;
   }
 
+  /**
+   * Identifies routes that should use SSR as default (no props required)
+   */
+  private async getSSRDefaultRoutes(): Promise<string[]> {
+    try {
+      const routes = this.getRoutesWithoutLayouts();
+
+      const moduleChecks = await Promise.all(
+        routes.map(async ([route, path]) => {
+          try {
+            const module = (await import(path)) as PageModule;
+            return {
+              route,
+              hasNoProps: module.default?.length === 0,
+            };
+          } catch (error) {
+            console.warn(`Failed to import module for route ${route}:`, error);
+            return { route, hasNoProps: false };
+          }
+        })
+      );
+
+      return moduleChecks
+        .filter(({ hasNoProps }) => hasNoProps)
+        .map(({ route }) => route);
+    } catch (error) {
+      console.warn("Failed to get SSR default routes:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Recreates and updates router instances
+   * Used for hot reloading in development
+   */
+  public setRoutes(): void {
+    try {
+      this.server = this.createFileSystemRouter(this.pageDir, true);
+      this.client = this.createFileSystemRouter(
+        join(this.buildDir, this.pageDir),
+        false
+      );
+
+      this.routes_dump = this.generateClientSideRouteDump(this.client);
+    } catch (error) {
+      console.error("Failed to update routes:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Main entry point for handling HTTP requests
+   */
   async serve(
     request: Request,
     request_header: Record<string, string>,
     data: FormData,
-    {
-      Shell,
-    }: {
-      Shell: ReactShellComponent;
-    }
+    { Shell }: { Shell: ReactShellComponent }
   ): Promise<BunextRequest | null> {
-    await this.isInited();
-    return new RequestManager({
-      request,
-      client: this.client,
-      server: this.server,
-      data,
-      request_header,
-      router: this,
-      Shell,
-    }).make();
+    try {
+      await this.isInited();
+
+      return new RequestManager({
+        request,
+        client: this.client,
+        server: this.server,
+        data,
+        request_header,
+        router: this,
+        Shell,
+      }).make();
+    } catch (error) {
+      console.error("Request serving failed:", error);
+      throw error;
+    }
   }
 
   async serverPrebuiltPage(
@@ -342,93 +561,159 @@ class StaticRouters extends PluginLoader {
     }
     return currentJsx;
   }
-  public getFilesFromPageDir() {
-    const glob = new Bun.Glob("**/*.{ts,tsx,js,jsx}");
-    return Array.from(
-      glob.scanSync({
-        cwd: this.pageDir,
-        onlyFiles: true,
-      })
-    );
-  }
-  static getFileFromPageDir(pageDir?: string) {
-    const glob = new Bun.Glob("**/*.{ts,tsx,js,jsx}");
-    return Array.from(
-      glob.scanSync({
-        cwd: pageDir,
-        onlyFiles: true,
-      })
-    );
-  }
-  async InitServerActions() {
-    const files = this.getFilesFromPageDir();
-    this.serverActions = [];
-    for await (const f of files) {
-      const filePath = normalize(`${this.pageDir}/${f}`);
-      const _module = await import(normalize(`${process.cwd()}/${filePath}`));
-      const ServerActions = Object.keys(_module).filter((f) =>
-        f.startsWith("Server")
+  /**
+   * Gets all files from the pages directory
+   */
+  public getFilesFromPageDir(): string[] {
+    try {
+      const glob = new Bun.Glob("**/*.{ts,tsx,js,jsx}");
+      return Array.from(
+        glob.scanSync({
+          cwd: this.pageDir,
+          onlyFiles: true,
+        })
       );
-      this.serverActions.push({
-        path: f,
-        actions: ServerActions.map((name) => _module[name]),
-      });
+    } catch (error) {
+      console.warn("Failed to get files from page directory:", error);
+      return [];
     }
-    return this;
   }
 
-  isUseClient(fileData: string) {
-    const line = fileData
-      .split("\n")
-      .filter((l) => l.trim().length > 0)
-      .at(0);
-    if (!line) return false;
-    if (line.startsWith("'use client'") || line.startsWith('"use client"'))
-      return true;
-    return false;
+  /**
+   * Static method to get files from a specific page directory
+   */
+  static getFileFromPageDir(pageDir?: string): string[] {
+    try {
+      const glob = new Bun.Glob("**/*.{ts,tsx,js,jsx}");
+      return Array.from(
+        glob.scanSync({
+          cwd: pageDir,
+          onlyFiles: true,
+        })
+      );
+    } catch (error) {
+      console.warn("Failed to get files from specified page directory:", error);
+      return [];
+    }
   }
 
+  /**
+   * Initializes server actions from page files
+   */
+  async InitServerActions(): Promise<this> {
+    try {
+      const files = this.getFilesFromPageDir();
+      this.serverActions = [];
+
+      for (const file of files) {
+        try {
+          const filePath = normalize(`${this.pageDir}/${file}`);
+          const moduleImport = normalize(`${process.cwd()}/${filePath}`);
+          const moduleExports = await import(moduleImport);
+
+          const serverActionNames = Object.keys(moduleExports).filter((name) =>
+            name.startsWith("Server")
+          );
+
+          if (serverActionNames.length > 0) {
+            this.serverActions.push({
+              path: file,
+              actions: serverActionNames.map((name) => moduleExports[name]),
+            });
+          }
+        } catch (error) {
+          console.warn(`Failed to process server actions for ${file}:`, error);
+        }
+      }
+
+      return this;
+    } catch (error) {
+      console.error("Failed to initialize server actions:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Checks if a file contains 'use client' directive
+   */
+  isUseClient(fileData: string): boolean {
+    try {
+      const firstLine = fileData
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        .at(0);
+
+      if (!firstLine) return false;
+
+      return (
+        firstLine.startsWith("'use client'") ||
+        firstLine.startsWith('"use client"')
+      );
+    } catch (error) {
+      console.warn("Failed to check 'use client' directive:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Serves files from a specified directory with fallback suffixes
+   */
   async serveFromDir(config: {
     directory: string;
     path: string;
     suffixes?: string[];
-  }) {
-    const basePath = join(config.directory, normalize(decodeURI(config.path)));
-    const suffixes = config.suffixes ?? [
-      "",
-      ".html",
-      "index.html",
-      ".js",
-      "/index.js",
-      ".css",
-    ];
-    for await (const suffix of suffixes) {
-      const pathWithSuffix = basePath + suffix;
-      let file = Bun.file(pathWithSuffix);
-      if (await file.exists()) return file;
-    }
+  }): Promise<BunFile | null> {
+    try {
+      const basePath = join(config.directory, normalize(decodeURI(config.path)));
+      const suffixes = config.suffixes ?? [...STATIC_FILE_SUFFIXES];
 
-    return null;
+      for (const suffix of suffixes) {
+        try {
+          const pathWithSuffix = basePath + suffix;
+          const file = Bun.file(pathWithSuffix);
+
+          if (await file.exists()) {
+            return file;
+          }
+        } catch (error) {
+          // Continue to next suffix
+          continue;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn(`Failed to serve from directory ${config.directory}:`, error);
+      return null;
+    }
   }
 }
 
+/**
+ * Manages individual HTTP requests and routes them to appropriate handlers
+ */
 class RequestManager {
-  request: Request;
-  server: FileSystemRouter;
-  serverSide: MatchedRoute | null;
-  client: FileSystemRouter;
-  clientSide: MatchedRoute | null;
-  request_header: Record<string, string>;
-  data: FormData;
-  bunextReq: BunextRequest;
-  pathname: string;
-  search: string;
-  router: StaticRouters;
-  serverSideProps?: {
+  // Request data
+  public readonly request: Request;
+  public readonly pathname: string;
+  public readonly search: string;
+  public readonly request_header: Record<string, string>;
+  public readonly data: FormData;
+
+  // Routing
+  public readonly server: FileSystemRouter;
+  public readonly client: FileSystemRouter;
+  public readonly serverSide: MatchedRoute | null;
+  public readonly clientSide: MatchedRoute | null;
+  public readonly router: StaticRouters;
+
+  // Components and state
+  public readonly Shell: ReactShellComponent;
+  public bunextReq: BunextRequest;
+  public serverSideProps?: {
     value: any;
     toString: () => string;
   };
-  Shell: ReactShellComponent;
 
   constructor(init: {
     request: Request;
@@ -439,47 +724,86 @@ class RequestManager {
     router: StaticRouters;
     Shell: ReactShellComponent;
   }) {
+    // Basic request data
     this.request = init.request;
     this.request_header = init.request_header;
     this.data = init.data;
+
+    // Router configuration
     this.server = init.server;
     this.client = init.client;
     this.router = init.router;
     this.Shell = init.Shell;
 
-    this.serverSide = this.server.match(this.request);
-    this.clientSide = this.client.match(this.request);
-
+    // Parse URL
     const { pathname, search } = new URL(this.request.url);
     this.pathname = pathname;
     this.search = search;
+
+    // Route matching
+    this.serverSide = this.server.match(this.request);
+    this.clientSide = this.client.match(this.request);
+
+    // Initialize Bunext request
     this.bunextReq = new BunextRequest({
       request: this.request,
       response: new Response(),
     });
   }
 
+  /**
+   * Main request processing method that routes requests through the middleware chain
+   */
   async make(): Promise<null | BunextRequest> {
     process.env.__SESSION_MUST_NOT_BE_INITED__ = "false";
-    return (
-      (await this.checkPluginServing()) ||
-      (await this.checkStaticServing()) ||
-      (await this.checkFeatureServing()) ||
-      (await this.servePage())
-    );
+
+    try {
+      return (
+        (await this.checkPluginServing()) ||
+        (await this.checkStaticServing()) ||
+        (await this.checkFeatureServing()) ||
+        (await this.servePage())
+      );
+    } catch (error) {
+      console.error('Error in request processing:', error);
+
+      if (error instanceof BunextError) {
+        throw error;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      throw new RenderingError(`Request processing failed: ${message}`);
+    }
   }
 
-  private async checkPluginServing() {
-    const plugins = this.router
-      .getPlugins()
-      .map((p) => p.router?.request)
-      .filter((p) => p != undefined);
-    for await (const plugin of plugins) {
-      const res = await plugin(this.bunextReq, this);
-      if (res) return res;
+  /**
+   * Checks and applies plugin-based request handling
+   */
+  private async checkPluginServing(): Promise<BunextRequest | null> {
+    try {
+      const plugins = this.router
+        .getPlugins()
+        .map((p) => p.router?.request)
+        .filter((p) => p !== undefined);
+
+      for await (const plugin of plugins) {
+        const res = await plugin(this.bunextReq, this);
+        if (res) {
+          return res;
+        }
+      }
+
+      // Update CSS paths in development mode
+      if (process.env.NODE_ENV === "development") {
+        this.router.cssPathExists = await this.router.getCssPaths();
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in plugin serving:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new RenderingError(`Plugin serving failed: ${message}`);
     }
-    if (process.env.NODE_ENV == "development")
-      this.router.cssPathExists = await this.router.getCssPaths();
   }
   /**
    * Apply HTML rewrite plugins on html
@@ -509,7 +833,7 @@ class RequestManager {
       afters.map(({ context, after }) => after?.(context, this.bunextReq))
     );
 
-    return [HTMLDocType, transformedText].join("\n");
+    return [HTML_DOCTYPE, transformedText].join("\n");
   }
   /**
    * Apply HTML rewrite plugins and gZip result
@@ -539,7 +863,7 @@ class RequestManager {
     await this.bunextReq.session.initData();
     this.bunextReq.session.delete();
     return this.bunextReq.__SET_RESPONSE__(
-      this.bunextReq.setCookie(new Response())
+      await this.bunextReq.setCookie(new Response())
     );
   }
   private async serveStaticAssets() {
@@ -681,113 +1005,221 @@ class RequestManager {
     }
   }
 
-  async MakeServerSideProps(options?: { disableSession?: boolean }): Promise<{
+  /**
+   * Loads and caches server-side props for the matched route
+   */
+  async makeServerSideProps(options?: {
+    disableSession?: boolean
+  }): Promise<{
     value: ServerSideProps;
     toString: () => string | undefined;
   }> {
-    if (options?.disableSession)
+    if (options?.disableSession) {
       process.env.__SESSION_MUST_NOT_BE_INITED__ = "true";
+    }
 
-    if (this.serverSideProps) return this.serverSideProps;
+    // Return cached props if available
+    if (this.serverSideProps) {
+      return this.serverSideProps;
+    }
 
-    if (!this.serverSide)
-      throw new Error(`no serverSide script found for ${this.pathname}`);
+    // Ensure we have a server-side route
+    if (!this.serverSide) {
+      throw new RouteNotFoundError(`No server-side script found for ${this.pathname}`);
+    }
 
-    const module = (await import(this.serverSide.filePath)) as {
-      getServerSideProps?: getServerSidePropsFunction;
-    };
-    if (module?.getServerSideProps == undefined)
-      return {
-        toString: () => undefined,
-        value: undefined,
+    try {
+      const module = (await import(this.serverSide.filePath)) as {
+        getServerSideProps?: getServerSidePropsFunction;
       };
 
-    await this.bunextReq.session.initData();
-    const result = await module?.getServerSideProps?.(
-      {
-        request: this.request,
-        params: this.serverSide.params,
-      },
-      this.bunextReq
-    );
+      // Return empty props if no getServerSideProps function
+      if (!module?.getServerSideProps) {
+        return {
+          toString: () => undefined,
+          value: undefined,
+        };
+      }
 
-    const res = {
-      toString: () => JSON.stringify(result),
-      value: result,
-    };
+      // Initialize session if needed
+      if (!options?.disableSession) {
+        await this.bunextReq.session.initData();
+      }
 
-    this.serverSideProps = res;
-
-    return res;
-  }
-  private async serveServerSideProps(): Promise<null | BunextRequest> {
-    if (this.request_header?.accept != "application/vnd.server-side-props")
-      return null;
-
-    return this.bunextReq.__SET_RESPONSE__(
-      new Response((await this.MakeServerSideProps()).toString(), {
-        headers: {
-          ...this.bunextReq.response.headers,
-          "Content-Type": "application/vnd.server-side-props",
-          "Cache-Control": "no-store",
+      // Call the getServerSideProps function
+      const result = await module.getServerSideProps(
+        {
+          request: this.request,
+          params: this.serverSide.params,
         },
-      })
-    );
-  }
-  private async serveAPIEndpoint(): Promise<null | BunextRequest> {
-    if (this.clientSide || !this.serverSide) return null;
+        this.bunextReq
+      );
 
-    const ApiModule = await import(this.serverSide.filePath);
-    if (
-      typeof ApiModule[this.bunextReq.request.method.toUpperCase()] ==
-      "undefined"
-    )
-      return null;
-    await this.bunextReq.session.initData();
-    const res = (await ApiModule[this.bunextReq.request.method](
-      this.bunextReq
-    )) as BunextRequest | Response | undefined;
-    if (res instanceof BunextRequest) {
-      this.bunextReq = res;
-      this.bunextReq.setCookie(res.response);
-    } else if (res instanceof Response) {
-      this.bunextReq.response = res;
-      this.bunextReq.setCookie(res);
-    } else {
-      throw new Error(
-        `Api Endpoint ${this.serverSide.filePath} did not returned a BunextRequest or Response Object`
+      // Cache and return the result
+      const props = {
+        toString: () => result ? JSON.stringify(result) : "",
+        value: result,
+      };
+
+      this.serverSideProps = props;
+      return props;
+
+    } catch (error) {
+      console.error('Error in makeServerSideProps:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ServerSidePropsError(
+        `Failed to load server-side props for ${this.pathname}: ${message}`
       );
     }
-    return this.bunextReq;
   }
-  private async serveRedirectFromServerSideProps() {
-    const props = await this.MakeServerSideProps();
-    if (typeof props.value != "object" || !props.value?.redirect) return null;
-    return this.bunextReq.__SET_RESPONSE__(
-      new Response(null, {
-        status: 302,
-        headers: { Location: props.value.redirect },
-      })
-    );
+
+  /**
+   * @deprecated Use makeServerSideProps instead
+   * Backward compatibility method for external plugins
+   */
+  async MakeServerSideProps(options?: {
+    disableSession?: boolean
+  }): Promise<{
+    value: ServerSideProps;
+    toString: () => string | undefined;
+  }> {
+    return this.makeServerSideProps(options);
   }
-  private async servePage() {
+
+  /**
+   * Serves server-side props as a JSON response
+   */
+  private async serveServerSideProps(): Promise<null | BunextRequest> {
+    if (this.request_header?.accept !== "application/vnd.server-side-props") {
+      return null;
+    }
+
+    try {
+      const props = await this.makeServerSideProps();
+      return this.bunextReq.__SET_RESPONSE__(
+        new Response(props.toString(), {
+          headers: {
+            ...this.bunextReq.response.headers,
+            "Content-Type": "application/vnd.server-side-props",
+            "Cache-Control": "no-store",
+          },
+        })
+      );
+    } catch (error) {
+      console.error('Error serving server-side props:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ServerSidePropsError(`Failed to serve server-side props: ${message}`);
+    }
+  }
+
+  /**
+   * Serves API endpoint responses
+   */
+  private async serveAPIEndpoint(): Promise<null | BunextRequest> {
+    if (this.clientSide || !this.serverSide) {
+      return null;
+    }
+
+    try {
+      const ApiModule = await import(this.serverSide.filePath);
+      const method = this.bunextReq.request.method.toUpperCase();
+
+      if (typeof ApiModule[method] === "undefined") {
+        return null;
+      }
+
+      await this.bunextReq.session.initData();
+
+      const res = await ApiModule[method](this.bunextReq) as
+        BunextRequest | Response | undefined;
+
+      if (res instanceof BunextRequest) {
+        this.bunextReq = res;
+        await this.bunextReq.setCookie(res.response);
+      } else if (res instanceof Response) {
+        this.bunextReq.response = res;
+        await this.bunextReq.setCookie(res);
+      } else {
+        throw new APIEndpointError(
+          `API Endpoint ${this.serverSide.filePath} did not return a BunextRequest or Response object`
+        );
+      }
+
+      return this.bunextReq;
+    } catch (error) {
+      if (error instanceof BunextError) {
+        throw error;
+      }
+      console.error('Error serving API endpoint:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new APIEndpointError(`Failed to serve API endpoint: ${message}`);
+    }
+  }
+
+  /**
+   * Handles redirects from server-side props
+   */
+  private async serveRedirectFromServerSideProps(): Promise<null | BunextRequest> {
+    try {
+      const props = await this.makeServerSideProps();
+
+      if (typeof props.value !== "object" || !props.value?.redirect) {
+        return null;
+      }
+
+      return this.bunextReq.__SET_RESPONSE__(
+        new Response(null, {
+          status: 302,
+          headers: { Location: props.value.redirect },
+        })
+      );
+    } catch (error) {
+      console.error('Error processing redirect:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new RedirectError(`Failed to process redirect: ${message}`);
+    }
+  }
+  /**
+   * Serves a complete page with server-side rendering
+   */
+  private async servePage(): Promise<BunextRequest | null> {
     process.env.__SESSION_MUST_NOT_BE_INITED__ = "true";
-    if (!this.serverSide) return null;
-    else if (this.serverSide.pathname == "/favicon.ico") return null;
 
-    const pageJSX = await this.MakeDynamicJSXElement({
-      serverSideProps: (await this.MakeServerSideProps()).value,
-    });
-    if (!pageJSX) return null;
+    if (!this.serverSide) {
+      return null;
+    }
 
-    const page = await this.makePage(pageJSX);
-    if (!page) return null;
+    // Skip favicon requests
+    if (this.serverSide.pathname === "/favicon.ico") {
+      return null;
+    }
 
-    return this.bunextReq.__SET_RESPONSE__(await this.makeStream(page));
+    try {
+      const serverSideProps = (await this.makeServerSideProps()).value;
+      const pageJSX = await this.MakeDynamicJSXElement({ serverSideProps });
+
+      if (!pageJSX) {
+        return null;
+      }
+
+      const page = await this.makePage(pageJSX);
+      if (!page) {
+        return null;
+      }
+
+      return this.bunextReq.__SET_RESPONSE__(await this.makeStream(page));
+    } catch (error) {
+      console.error('Error serving page:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new RenderingError(`Failed to serve page: ${message}`);
+    }
   }
 
+  /**
+   * Checks and serves static content and special routes
+   */
   private async checkStaticServing(): Promise<BunextRequest | null> {
-    switch (this.pathname as pathNames) {
+    switch (this.pathname as SpecialPathNames) {
       case "/bunextgetSessionData":
         return this.serveSessionData();
       case "/bunextDeleteSession":
@@ -800,8 +1232,14 @@ class RequestManager {
         );
     }
   }
+
+  /**
+   * Checks and serves feature-specific content (SSR, API, redirects)
+   */
   private async checkFeatureServing(): Promise<BunextRequest | null> {
-    if (!this.serverSide) return null;
+    if (!this.serverSide) {
+      return null;
+    }
 
     return (
       (await this.serveServerSideProps()) ||
@@ -810,61 +1248,75 @@ class RequestManager {
     );
   }
 
-  private ErrorOnNoServerSideMatch() {
-    return new Error(`no serverSideScript found for ${this.pathname}`);
+  /**
+   * Creates an error for missing server-side routes
+   */
+  private createNoServerSideMatchError(): RouteNotFoundError {
+    return new RouteNotFoundError(`No server-side script found for ${this.pathname}`);
   }
 
-  private async MakePreLoadObject(): Promise<
-    Record<keyof _GlobalData, string>
-  > {
-    if (!this.serverSide) throw this.ErrorOnNoServerSideMatch();
-    await this.bunextReq.session.initData();
-    const CreatedAt =
-      this.bunextReq.session.__DATA__.private?.__BUNEXT_SESSION_CREATED_AT__ ||
-      0;
+  /**
+   * Creates the preload object for client-side hydration
+   */
+  private async makePreLoadObject(): Promise<Record<keyof _GlobalData, string>> {
+    if (!this.serverSide) {
+      throw this.createNoServerSideMatchError();
+    }
 
-    const sessionTimeout =
-      CreatedAt == 0
-        ? 0
-        : CreatedAt +
+    try {
+      await this.bunextReq.session.initData();
+
+      const createdAt =
+        this.bunextReq.session.__DATA__.private?.__BUNEXT_SESSION_CREATED_AT__ || 0;
+
+      const sessionTimeout =
+        createdAt === 0
+          ? 0
+          : createdAt +
           this.bunextReq.session.sessionTimeoutFromNow * 1000 -
-          (new Date().getTime() - CreatedAt);
+          (new Date().getTime() - createdAt);
 
-    return {
-      __DEV_ROUTE_PREFETCH__: "[]",
-      __PAGES_DIR__: JSON.stringify(this.router.pageDir),
-      __INITIAL_ROUTE__: JSON.stringify(this.serverSide.pathname + this.search),
-      __ROUTES__: this.router.routes_dump,
-      __SERVERSIDE_PROPS__:
-        (await this.MakeServerSideProps()).toString() ?? "undefined",
-      __LAYOUT_ROUTE__: JSON.stringify(this.router.layoutPaths),
-      __HEAD_DATA__: JSON.stringify(Head.head),
-      __PUBLIC_SESSION_DATA__: JSON.stringify(
-        this.bunextReq.session.getData(true)
-      ),
-      __SESSION_TIMEOUT__: JSON.stringify(sessionTimeout),
-      serverConfig: JSON.stringify({
-        Dev: globalThis.serverConfig.Dev,
-        HTTPServer: globalThis.serverConfig.HTTPServer,
-      } as Partial<ServerConfig>),
-      __PROCESS_ENV__: JSON.stringify({
-        NODE_ENV: process.env.NODE_ENV,
-        ...Object.assign(
-          {},
-          ...Object.entries(process.env)
-            .filter(([key]) => key.startsWith("PUBLIC"))
-            .map(([key, value]) => {
-              return { [key]: value };
-            })
+      return {
+        __DEV_ROUTE_PREFETCH__: "[]",
+        __PAGES_DIR__: JSON.stringify(this.router.pageDir),
+        __INITIAL_ROUTE__: JSON.stringify(this.serverSide.pathname + this.search),
+        __ROUTES__: this.router.routes_dump,
+        __SERVERSIDE_PROPS__:
+          (await this.makeServerSideProps()).toString() ?? "undefined",
+        __LAYOUT_ROUTE__: JSON.stringify(this.router.layoutPaths),
+        __HEAD_DATA__: JSON.stringify(Head.head),
+        __PUBLIC_SESSION_DATA__: JSON.stringify(
+          this.bunextReq.session.getData(true)
         ),
-      }),
-      __CSS_PATHS__: JSON.stringify(this.router.cssPathExists),
-    };
+        __SESSION_TIMEOUT__: JSON.stringify(sessionTimeout),
+        serverConfig: JSON.stringify({
+          Dev: globalThis.serverConfig.Dev,
+          HTTPServer: globalThis.serverConfig.HTTPServer,
+        } as Partial<ServerConfig>),
+        __PROCESS_ENV__: JSON.stringify({
+          NODE_ENV: process.env.NODE_ENV,
+          ...Object.assign(
+            {},
+            ...Object.entries(process.env)
+              .filter(([key]) => key.startsWith("PUBLIC"))
+              .map(([key, value]) => ({ [key]: value }))
+          ),
+        }),
+        __CSS_PATHS__: JSON.stringify(this.router.cssPathExists),
+      };
+    } catch (error) {
+      console.error('Error creating preload object:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new RenderingError(`Failed to create preload object: ${message}`);
+    }
   }
 
+  /**
+   * Converts preload object to string array for script injection
+   */
   private preloadToStringArray(
     preload: Record<keyof _GlobalData & string, string>
-  ) {
+  ): string[] {
     return Object.entries(preload)
       .map(([key, value]) => `${key}=${value}`)
       .filter(Boolean);
@@ -878,7 +1330,7 @@ class RequestManager {
     await new Promise((resolve, reject) => {
       if (!this.serverSide) {
         reject(undefined);
-        throw this.ErrorOnNoServerSideMatch();
+        throw this.createNoServerSideMatchError();
       }
       proc = Bun.spawn({
         env: {
@@ -956,7 +1408,7 @@ class RequestManager {
   async makePage(page: JSX.Element) {
     if (!this.serverSide) return null;
 
-    const preloadScriptObj = await this.MakePreLoadObject();
+    const preloadScriptObj = await this.makePreLoadObject();
     const preloadSriptsStrList = [
       ...this.preloadToStringArray(preloadScriptObj),
       "process={env: __PROCESS_ENV__};",
@@ -976,7 +1428,7 @@ class RequestManager {
       <RequestContext.Provider value={this.bunextReq}>
         <this.Shell
           route={this.serverSide?.pathname + this.search}
-          {...(await this.MakeServerSideProps()).value}
+          {...(await this.makeServerSideProps()).value}
         >
           {page}
           <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>

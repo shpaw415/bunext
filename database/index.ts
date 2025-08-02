@@ -6,8 +6,7 @@ import type { _Users, SELECT_Users, _purchase, SELECT_purchase } from "./databas
 import { Table } from "./class";
 
 export function Database() {
-  if (typeof window !== "undefined")
-    throw new Error(`you cannot call database in a Client Context`);
+
   ("<Bunext_DBExport>");
   return {
     Users: new Table<_Users, SELECT_Users>({ name: "Users" }),

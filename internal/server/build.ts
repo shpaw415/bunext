@@ -13,7 +13,7 @@ import reactElementToJSXString from "../jsxToString/index";
 import { mkdirSync, rmSync, unlinkSync } from "node:fs";
 import { renderToString } from "react-dom/server";
 import type { ssrElement } from "../types";
-import { exitCodes } from "../globals";
+import "../globals";
 import { Head, type _Head } from "../../features/head";
 import { BuildServerComponentWithHooksWarning } from "./logs";
 import CacheManager from "../caching";
@@ -26,6 +26,7 @@ import type {
   BuildWorkerResponse,
 } from "./build-worker.ts";
 import { generateRandomString } from "../../features/utils/index.ts";
+import { ExitCodeDescription } from "../../bin/exit-codes.ts";
 
 globalThis.React = React;
 
@@ -72,7 +73,7 @@ class Builder extends PluginLoader {
   private inited = false;
   public BuilderWorker?: Bun.Subprocess<"ignore", "inherit", "inherit">;
   public BuildWorkerAwaiter: Promise<void> = Promise.resolve();
-  private BuildWorkerResolver: () => void = () => {};
+  private BuildWorkerResolver: () => void = () => { };
 
   public remove_node_modules_files_path = [
     "bunext-js/database/index.ts",
@@ -92,18 +93,20 @@ class Builder extends PluginLoader {
 
   public dev_remove_file_path = Boolean(process.env.__BUNEXT_DEV__)
     ? [
-        `database/index.ts`,
-        `internal/server/build.ts`,
-        `internal/server/router.tsx`,
-        `internal/server/bunextRequest.ts`,
-        `database/class.ts`,
-        `internal/session.ts`,
-        `internal/caching/index.ts`,
-        "internal/server/server_global.ts",
-        "database/bunext_object/server.ts",
-        "features/request/bunext_object/server.ts",
-        "plugins/image/index.ts",
-      ]
+      "database/index.ts",
+      "internal/server/build.ts",
+      "internal/server/router.tsx",
+      "internal/server/bunextRequest.ts",
+      "@bunpmjs/json-webtoken/index.ts",
+      "database/class.ts",
+      "internal/session.ts",
+      "internal/caching/index.ts",
+      "internal/server/bunext_global.ts",
+      "internal/server/server_global.ts",
+      "database/bunext_object/server.ts",
+      "features/request/bunext_object/server.ts",
+      "plugins/image/index.ts",
+    ]
     : [];
 
   constructor() {
@@ -116,7 +119,7 @@ class Builder extends PluginLoader {
         recursive: true,
         force: true,
       });
-    } catch {}
+    } catch { }
     mkdirSync(
       normalize(`${this.options.buildDir as string}/${this.options.pageDir}`),
       { recursive: true }
@@ -248,10 +251,10 @@ class Builder extends PluginLoader {
     const entrypoints =
       onlyPath && process.env.NODE_ENV == "development"
         ? [
-            join(baseDir, hydrate),
-            onlyPath,
-            ...(await this.getLayoutEntryPoints(onlyPath)),
-          ]
+          join(baseDir, hydrate),
+          onlyPath,
+          ...(await this.getLayoutEntryPoints(onlyPath)),
+        ]
         : await this.getEntryPoints();
 
     const build = await Bun.build({
@@ -316,9 +319,9 @@ class Builder extends PluginLoader {
     const moduleContent = await Bun.file(modulePath).text();
     const _module = await import(
       modulePath +
-        (process.env.NODE_ENV == "development"
-          ? `?${generateRandomString(5)}`
-          : "")
+      (process.env.NODE_ENV == "development"
+        ? `?${generateRandomString(5)}`
+        : "")
     );
     const isServer = !this.isUseClient(moduleContent);
     const { exports } = new Bun.Transpiler({ loader: "tsx" }).scan(
@@ -449,7 +452,7 @@ class Builder extends PluginLoader {
           type: "error",
           error: e,
         });
-      process.exit(exitCodes.build);
+      process.exit(ExitCodeDescription[2].code)
     }
     try {
       const output = await this.build(BuildPath);
@@ -460,7 +463,7 @@ class Builder extends PluginLoader {
     } catch (e: any) {
       console.log("Build Error");
       console.log(e);
-      process.exitCode = exitCodes.build;
+      process.exitCode = ExitCodeDescription[2].code;
 
       if (process.send)
         process.send({
@@ -468,7 +471,7 @@ class Builder extends PluginLoader {
           error: e,
         });
 
-      process.exit(exitCodes.build);
+      process.exit(ExitCodeDescription[2].code);
     }
 
     const data = {

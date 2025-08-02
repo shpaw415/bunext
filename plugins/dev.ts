@@ -33,6 +33,7 @@ import {
 const CWD = process.cwd();
 const DEVTOOLS_ENDPOINT = "/.well-known/appspecific/com.chrome.devtools.json";
 const SERVER_SIDE_PROPS_HEADER = "application/vnd.server-side-props";
+const GETCSSPATH_PATHNAME = "/GetCssPaths";
 
 // Plugin configuration
 const plugin: BunextPlugin =
@@ -41,11 +42,25 @@ const plugin: BunextPlugin =
       router: {
         request: async (request) => {
           await handleDevRequest(request.request);
-          return await handleDevtoolsJson(request);
+          return (await handleDevtoolsJson(request)) || (await handleCssPaths(request));
         },
       },
     }
     : {};
+
+
+/**
+ * handle css paths
+ * This function collects CSS paths for the current route and returns them.
+ */
+async function handleCssPaths(req: BunextRequest) {
+  if (!req.URL.pathname.startsWith(GETCSSPATH_PATHNAME)) return;
+  return req.__SET_RESPONSE__(new Response(JSON.stringify(await router.getCssPaths()), {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  }));
+}
 
 /**
  * Handles devtools JSON endpoint for Chrome DevTools integration

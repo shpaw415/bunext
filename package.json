@@ -15,16 +15,17 @@
   ],
   "type": "module",
   "devDependencies": {
-    "@types/bun": "^1.2.15",
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.1",
-    "@types/web": "^0.0.216",
-    "tailwindcss": "^4.1.4",
-    "@tailwindcss/postcss": "4.1.4",
+    "@happy-dom/global-registrator": "^18.0.1",
     "@tailwindcss/cli": "4.1.4",
+    "@tailwindcss/postcss": "4.1.4",
+    "@types/bun": "latest",
+    "@types/react": "^19.1.9",
+    "@types/react-dom": "^19.1.7",
+    "@types/web": "^0.0.216",
+    "cssjson": "2.1.3",
     "tailwind-bunext-plugin": "0.1.0",
-    "typed-css-modules": "0.9.1",
-    "cssjson": "2.1.3"
+    "tailwindcss": "^4.1.11",
+    "typed-css-modules": "0.9.1"
   },
   "peerDependencies": {
     "react": "^19.1.0",
@@ -42,7 +43,7 @@
     "json-beautify": "1.1.1",
     "next-json": "0.3.2",
     "react-is": "18.2.0",
-    "sharp": "^0.34.2"
+    "sharp": "^0.34.3"
   },
   "bin": {
     "bunext": "bin/index.ts"
@@ -67,16 +68,66 @@
   ],
   "exports": {
     "./*": "./*",
-    "./head": "./features/head.tsx",
+    
+    "./types": "./internal/types.ts",
+    "./globals": "./internal/globals.ts",
+    
     "./database": "./database/index.ts",
+    "./database/schema": "./database/schema.ts",
     "./database/types": "./database/database_types.ts",
+    "./database/class": "./database/class.ts",
+    
     "./session": "./features/session/session.ts",
-    "./utils": "./features/utils/index.ts",
-    "./request": "./internal/server/bunextRequest.ts",
-    "./router/*": "./features/router/*",
-    "./client/*": "./features/client/*",
+    "./session/server": "./features/session/bunext_object/server.ts",
+    "./session/client": "./features/session/bunext_object/client.ts",
+    "./session/types": "./features/session/bunext_object/types.ts",
+    
+    "./router": "./internal/router/index.tsx",
+    "./router/navigate": "./features/router/revalidate.ts",
+    "./router/revalidate": "./features/router/revalidate.ts",
+    "./router/components": "./features/router/components.tsx",
+    "./router/preload": "./internal/router/preload.ts",
+    "./router/link": "./features/router/components.tsx",
+    
+    "./head": "./features/head.tsx",
     "./image": "./features/image/index.tsx",
     "./link": "./features/router/components.tsx",
+    "./components": "./features/components/index.tsx",
+    
+    "./request": "./internal/server/bunextRequest.ts",
+    "./request/types": "./features/request/bunext_object/types.ts",
+    "./request/hooks": "./features/request/hooks.ts",
+    
+    "./utils": "./features/utils/index.ts",
+    "./utils/types": "./features/utils/types.ts",
+    
+    "./cache": "./internal/caching/index.ts",
+    "./cache/fetch": "./internal/caching/fetch.ts",
+    "./cache/server": "./features/cache/bunext_object/bunext_server.ts",
+    "./cache/client": "./features/cache/bunext_object/bunext_client.ts",
+    "./cache/types": "./features/cache/bunext_object/types.ts",
+    
+    "./plugins": "./plugins/types.ts",
+    "./plugins/types": "./plugins/types.ts",
+    "./plugins/image": "./plugins/image/index.ts",
+    "./plugins/svg": "./plugins/svg/index.ts",
+    "./plugins/static-page": "./plugins/static-page.ts",
+    "./plugins/dev": "./plugins/dev.ts",
+    "./plugins/typed-route": "./plugins/typed-route/index.ts",
+    
+    "./server/request": "./internal/server/bunextRequest.ts",
+    "./server/router": "./internal/server/router.ts",
+    "./server/build": "./internal/server/build.ts",
+    "./server/context": "./internal/server/context.ts",
+    "./server/global": "./internal/server/bunext_global.ts",
+    
+    "./client/global": "./internal/client/bunext_global.ts",
+    "./client/hydrate": "./internal/hydrate.tsx",
+    
+    "./dev/jsx-to-string": "./internal/dev/jsxToString.tsx",
+    
+    "./router/*": "./features/router/*",
+    "./client/*": "./features/client/*",
     "./preload": "./internal/router/preload.ts"
   }
 }

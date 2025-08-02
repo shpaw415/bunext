@@ -18,7 +18,7 @@ globalThis.SVGCache ??= new Table<cacheType, cacheType>({
     readwrite: true,
     create: true,
   }),
-  shema: [
+  schema: [
     {
       name: "svg_cache",
       columns: [

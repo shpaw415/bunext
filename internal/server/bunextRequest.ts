@@ -1,7 +1,7 @@
-import { _Session, type _SessionData } from "../../features/session/session";
+import { BunextSession, type SessionData } from "../../features/session/session";
 import { webToken } from "@bunpmjs/json-webtoken";
 import "./server_global";
-import { DeleteSessionByID, SetSessionByID } from "../session";
+import { deleteSessionById, setSessionById } from "../session";
 import { generateRandomString } from "../../features/utils";
 import { Head, type _Head } from "../../features/head";
 import { type FeatureType } from "./server-features";
@@ -9,7 +9,7 @@ import { type FeatureType } from "./server-features";
 export class BunextRequest {
   public request: Request;
   public response: Response;
-  public session: _Session<any>;
+  private _session?: BunextSession<any>;
   public webtoken: webToken<any>;
   public headData?: Record<string, _Head>;
   public path: string = "";
@@ -29,14 +29,23 @@ export class BunextRequest {
     this.webtoken = new webToken<any>(this.request, {
       cookieName: "bunext_session_token",
     });
-    this.session = new _Session({
-      sessionTimeout: globalThis?.serverConfig?.session?.timeout,
-      request: this as any,
-    });
     this.SessionID = (
       this.webtoken.session() as undefined | { id: string }
     )?.id;
     this.URL = new URL(this.request.url);
+  }
+
+  /**
+   * Lazy getter for session - only creates session when accessed
+   */
+  public get session(): BunextSession<any> {
+    if (!this._session) {
+      this._session = new BunextSession({
+        sessionTimeout: globalThis?.serverConfig?.session?.timeout,
+        request: this as any,
+      });
+    }
+    return this._session;
   }
   public __SET_RESPONSE__(response: Response) {
     this.response = response;
@@ -48,7 +57,7 @@ export class BunextRequest {
       [this.path]: data,
     };
   }
-  public setCookie(response: Response) {
+  public async setCookie(response: Response) {
     switch (globalThis.serverConfig.session?.type) {
       case "database:hard":
       case "database:memory":
@@ -56,28 +65,28 @@ export class BunextRequest {
         this.webtoken.setData({
           id: correctID,
         });
-        if (this.session.isUpdated) {
-          SetSessionByID(
+        if (this.session.isSessionUpdated()) {
+          await setSessionById(
             this.SessionID ? "update" : "insert",
             correctID,
-            this.session.__DATA__
+            this.session.getRawSessionData()
           );
         }
-        if (this.session.__DELETE__) {
-          DeleteSessionByID(correctID);
+        if (this.session.isSessionDeleted()) {
+          await deleteSessionById(correctID);
         }
         break;
       case "cookie":
       case undefined:
-        this.webtoken.setData(this.session.__DATA__);
+        this.webtoken.setData(this.session.getRawSessionData());
         break;
     }
-    if (this.session.__DELETE__) {
+    if (this.session.isSessionDeleted()) {
       this.webtoken.setData({});
       this.session.reset();
     }
     const setExpire = () => {
-      if (this.session.__DELETE__) return -100000;
+      if (this.session.isSessionDeleted()) return -100000;
       return (
         this.session?.session_expiration_override ??
         globalThis.serverConfig.session?.timeout ??
@@ -87,7 +96,7 @@ export class BunextRequest {
 
     response.headers.append(
       "session",
-      this.encodeSessionData(this.session.__DATA__?.public || {})
+      this.encodeSessionData(this.session.getPublicSessionData() || {})
     );
     response.headers.append(
       "__bunext_session_timeout__",

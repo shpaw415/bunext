@@ -108,12 +108,14 @@ function IsLogged() {
 }
 
 export async function ServerSetSession() {
-  GetSession(arguments).setData(
+  const session = GetSession(arguments);
+  session.setData(
     {
       test: true,
     },
     true
   );
+  session.setData({ private: true }, false);
 }
 
 export async function ServerPrintSession() {
