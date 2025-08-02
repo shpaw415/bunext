@@ -146,12 +146,16 @@ class CacheManagerExtends {
   }
 
   protected CreateTable<T1 extends {}, T2 extends {}>(name: string) {
-    return new Table<T1, T2>({
+    const table = new Table<T1, T2>({
       db: this.db.databaseInstance,
       name: name,
       schema: this.dbSchema,
       enableWAL: true,
     });
+
+    table.createTable();
+
+    return table;
   }
   protected isPrimaryError(err: Error, callback?: Function) {
     const is = (err as any).code == "SQLITE_CONSTRAINT_PRIMARYKEY";

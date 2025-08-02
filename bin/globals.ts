@@ -1,14 +1,10 @@
-import { type Subprocess } from "bun";
-
 
 // Global type declarations
 declare global {
-    var processes: Subprocess[];
     var __INIT__: boolean | undefined;
 }
 
 // Initialize global variables safely
-globalThis.processes ??= [];
 globalThis.head ??= {};
 
 // Configuration constants

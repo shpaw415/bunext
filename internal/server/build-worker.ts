@@ -25,6 +25,7 @@ function init() {
       } as BuildWorkerResponse);
     }
   });
+  process.on("disconnect", () => process.exit(0))
 }
 
 async function build(

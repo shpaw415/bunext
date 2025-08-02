@@ -1,55 +1,9 @@
 import "./globals.ts";
-import { exitCodes, paths } from "../internal/globals";
+import { paths } from "../internal/globals";
 import { getStartLog } from "../internal/server/logs.ts";
+import { OnServerClose } from "./onServerClose.ts";
 
 
-/**
- * Starts the development server with hot reloading
- */
-export function startDevServer(): void {
-    const serverProcess = Bun.spawn({
-        cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
-        stdout: "inherit",
-        stderr: "inherit",
-        env: {
-            ...process.env,
-            __HEAD_DATA__: JSON.stringify(globalThis.head),
-            NODE_ENV: process.env.NODE_ENV,
-        },
-        onExit() {
-            console.log("Development server restarting...");
-            startDevServer();
-        },
-    });
-
-    globalThis.processes.push(serverProcess);
-}
-
-/**
- * Starts the production server with automatic restart on certain exit codes
- */
-export function startProductionServer(): void {
-    const serverProcess = Bun.spawn({
-        cmd: ["bun", `${paths.bunextDirName}/react-ssr/server.ts`, "production"],
-        env: {
-            ...process.env,
-            __HEAD_DATA__: JSON.stringify(globalThis.head),
-            NODE_ENV: "production",
-        },
-        stdout: "inherit",
-        onExit(subprocess, exitCode, signalCode, error) {
-            if (exitCode === exitCodes.runtime || exitCode === exitCodes.build) {
-                console.log("Production server restarting due to runtime/build error...");
-                startProductionServer();
-            } else {
-                console.log("Bunext server exited.");
-                process.exit(exitCode || 0);
-            }
-        },
-    });
-
-    globalThis.processes.push(serverProcess);
-}
 
 /**
  * Handles the 'dev' command - starts development server with hot reloading
@@ -62,6 +16,47 @@ export async function handleDev(): Promise<void> {
         throw new Error(`Failed to start development server: ${error}`);
     }
 }
+
+/**
+ * Starts the development server with hot reloading
+ */
+function startDevServer(): void {
+    const proc = Bun.spawnSync({
+        cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
+        stdout: "inherit",
+        env: {
+            ...process.env,
+            __HEAD_DATA__: JSON.stringify(globalThis.head),
+            NODE_ENV: process.env.NODE_ENV,
+        }
+    });
+
+    OnServerClose[proc.exitCode](proc);
+}
+
+
+
+/**
+ * Starts the production server with automatic restart on certain exit codes
+ */
+export function startProductionServer(): void {
+    console.log("Starting production server...");
+
+    const serverProcess = Bun.spawnSync({
+        cmd: ["bun", `${paths.bunextDirName}/react-ssr/server.ts`, "production"],
+        env: {
+            ...process.env,
+            __HEAD_DATA__: JSON.stringify(globalThis.head),
+            NODE_ENV: "production",
+        },
+        stdout: "inherit",
+        stderr: "inherit",
+    });
+
+    OnServerClose[serverProcess.exitCode](serverProcess);
+
+}
+
 
 /**
  * Handles the 'production' command - starts production server

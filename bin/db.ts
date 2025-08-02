@@ -1,7 +1,8 @@
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { paths } from "../internal/globals";
-import { CONFIG } from "./globals";
 import { resolve } from "node:path";
+import { CONFIG } from "./globals";
+
 
 
 /**

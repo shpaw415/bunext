@@ -1,5 +1,5 @@
 import type { BunFile, BunPlugin } from "bun";
-import type { _Head } from "../features/head";
+import type { _Head, HeadData } from "../features/head";
 import type { BunextRequest } from "./server/bunextRequest.ts";
 import type { revalidate } from "../features/router/revalidate.ts";
 import type { Plugins } from "../plugins/bunext_object/type.ts";
@@ -12,8 +12,8 @@ import type { ComponentType } from "../features/components/bunext_global/types.t
 
 export type ServerSideProps =
   | {
-      redirect?: string;
-    }
+    redirect?: string;
+  }
   | Record<string, any>
   | undefined;
 
@@ -30,16 +30,16 @@ export const URLpaths = {
 };
 
 export type _GlobalData = {
+  __ROUTES__: Record<string, string>;
+  __SERVERSIDE_PROPS__: unknown | undefined;
   __DEV_ROUTE_PREFETCH__: Array<string>;
   __PAGES_DIR__: string;
   __INITIAL_ROUTE__: string;
-  __ROUTES__: Record<string, string>;
-  __SERVERSIDE_PROPS__?: any;
   __LAYOUT_ROUTE__: string[];
   __CSS_PATHS__: string[];
-  __HEAD_DATA__: string;
-  __PUBLIC_SESSION_DATA__: string;
-  __SESSION_TIMEOUT__: string;
+  __HEAD_DATA__: Record<string, HeadData>;
+  __PUBLIC_SESSION_DATA__: unknown | undefined;
+  __SESSION_TIMEOUT__: number;
   serverConfig: {
     Dev: {
       hotServerPort: number;
@@ -48,6 +48,10 @@ export type _GlobalData = {
       port: number;
       threads: number;
     };
+    session?: {
+      type: "cookie" | "database:hard" | "database:memory";
+      timeout: number;
+    }
   };
   __PROCESS_ENV__: Record<string, string>;
 };
@@ -149,38 +153,38 @@ export type ServerActionDataTypeHeader = "json" | "file" | "blob";
 
 export type ClusterMessageType =
   | {
-      task: "revalidate";
-      data: {
-        path: string[];
-      };
-    }
-  | {
-      task: "update_build";
-      data: {
-        path?: string;
-      };
-    }
-  | {
-      task: "getSession";
-      data: {
-        id: string;
-        data?: any;
-      };
-    }
-  | {
-      task: "setSession";
-      data: {
-        id: string;
-        sessionData: any;
-        type: "insert" | "update";
-      };
-    }
-  | {
-      task: "deleteSession";
-      data: {
-        id: string;
-      };
+    task: "revalidate";
+    data: {
+      path: string[];
     };
+  }
+  | {
+    task: "update_build";
+    data: {
+      path?: string;
+    };
+  }
+  | {
+    task: "getSession";
+    data: {
+      id: string;
+      data?: any;
+    };
+  }
+  | {
+    task: "setSession";
+    data: {
+      id: string;
+      sessionData: any;
+      type: "insert" | "update";
+    };
+  }
+  | {
+    task: "deleteSession";
+    data: {
+      id: string;
+    };
+  };
 
 export type getServerSidePropsFunction = (
   request_data: { params: Record<string, string>; request: Request },

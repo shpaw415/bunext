@@ -121,6 +121,26 @@ class RouterLogger {
 
 const globalX = globalThis as unknown as _GlobalData;
 
+/**
+ * Route matcher function that matches URL paths against defined routes.
+ * Returns route information including matched parameters and module path.
+ * 
+ * @param path - The URL path to match against routes
+ * @returns Match object with route details or null if no match found
+ * 
+ * @example
+ * // Match a simple route
+ * const result = match('/dashboard');
+ * // Returns: { path: '/dashboard', params: {}, value: '/pages/dashboard/index.js' }
+ * 
+ * // Match a dynamic route
+ * const userResult = match('/users/123');
+ * // Returns: { path: '/users/[id]', params: { id: '123' }, value: '/pages/users/[id]/index.js' }
+ * 
+ * // No match returns null
+ * const noMatch = match('/nonexistent');
+ * // Returns: null
+ */
 export const match = globalX.__ROUTES__
   ? getRouteMatcher(globalX.__ROUTES__)
   : () => null;
@@ -195,7 +215,26 @@ async function fetchServerSideProps(
 }
 
 /**
- * Enhanced props parser with validation and better error handling
+ * Parses server-side props from a JSON string with validation and error handling.
+ * Used internally by the router to deserialize props sent from the server.
+ * 
+ * @param props - JSON string containing server-side props
+ * @returns Parsed props object or undefined if parsing fails
+ * 
+ * @example
+ * // Parse props from server response
+ * const props = ParseServerSideProps('{"userId": "123", "theme": "dark"}');
+ * console.log(props); // { userId: "123", theme: "dark" }
+ * 
+ * // Handle redirect props  
+ * const redirectProps = ParseServerSideProps('{"redirect": "/login"}');
+ * if (redirectProps?.redirect) {
+ *   // Router will automatically navigate to redirect URL
+ * }
+ * 
+ * // Invalid JSON returns undefined
+ * const invalid = ParseServerSideProps('invalid json');
+ * console.log(invalid); // undefined
  */
 export function ParseServerSideProps(props: string): ServerSideProps | undefined {
   if (!props?.trim()) return undefined;
@@ -219,15 +258,37 @@ export function ParseServerSideProps(props: string): ServerSideProps | undefined
 const VersionContext = createContext(0);
 
 /**
- * a hook that returns a version number that is incremented on each route change or reload
- * @returns the current version (incremented on each route change or reload)
+ * Hook that returns a version number incremented on each route change or reload.
+ * Useful for tracking route transitions and triggering side effects based on navigation.
+ * 
+ * @returns The current version number (incremented on each route change or reload)
+ * 
+ * @example
+ * function MyComponent() {
+ *   const version = useLoadingVersion();
+ *   return React.createElement('div', null, `Current route version: ${version}`);
+ * }
  */
 export const useLoadingVersion = () => useContext(VersionContext);
 
 /**
- * a hook that runs an effect when the version changes, which is incremented on each route change or reload
- * @param effect the effect to run
- * @param deps the dependencies
+ * Hook that runs an effect when the route version changes (on navigation or reload).
+ * Similar to useEffect but automatically includes the loading version as a dependency.
+ * 
+ * @param effect - The effect callback to run when version changes
+ * @param deps - Additional dependencies for the effect
+ * 
+ * @example
+ * function Analytics() {
+ *   const pathname = usePathname();
+ *   
+ *   useLoadingEffect(() => {
+ *     // Track page view on every route change
+ *     analytics.track('page_view', { path: pathname });
+ *   }, [pathname]);
+ *   
+ *   return null;
+ * }
  */
 export const useLoadingEffect = (
   effect: React.EffectCallback,
@@ -237,10 +298,22 @@ export const useLoadingEffect = (
 };
 
 /**
- * a hook that runs an effect when the version changes, which is incremented on each route change or reload.
- * and skips the first run.
- * @param effect the effect to run
- * @param deps the dependencies
+ * Hook that runs an effect when the route version changes, but skips the first run.
+ * Useful for handling navigation changes without triggering on initial mount.
+ * 
+ * @param effect - The effect callback to run when version changes
+ * @param deps - Additional dependencies for the effect
+ * 
+ * @example
+ * function NavigationTracker() {
+ *   useReloadEffect(() => {
+ *     // This won't run on initial mount, only on navigation
+ *     console.log('User navigated to a new page');
+ *     // Send analytics event, update breadcrumbs, etc.
+ *   });
+ *   
+ *   return null;
+ * }
  */
 export const useReloadEffect = (
   effect: React.EffectCallback,
@@ -257,26 +330,58 @@ export const useReloadEffect = (
 };
 
 /**
- * a context that can be used to reload the current page
+ * Context that provides a function to programmatically reload the current page.
+ * Used internally by the router to trigger page reloads and navigation.
+ * Access this via the useReload() hook instead of using directly.
  */
 export const ReloadContext = createContext(async (): Promise<void> => { });
 
 /**
- * Returns a stateful value which bounded to route, and a function to update it.
- * Note that the value won't be updated across components.
- * So you should use this only in top-most component
- * @param key unique key
- * @param initial initial value
- * @returns value and setter
+ * Hook that provides a function to programmatically reload the current page.
+ * Uses the ReloadContext to access the router's reload functionality.
+ * 
+ * @returns A function that reloads the current page or navigates to a specific path
+ * 
+ * @example
+ * // Basic page reload
+ * function RefreshButton() {
+ *   const reload = useReload();
+ *   return React.createElement('button', { onClick: () => reload() }, 'Refresh Page');
+ * }
+ * 
+ * // Navigate to specific path
+ * function NavigateButton() {
+ *   const reload = useReload();
+ *   const handleClick = async () => {
+ *     await reload('/dashboard'); // Navigate to specific route
+ *   };
+ *   return React.createElement('button', { onClick: handleClick }, 'Go to Dashboard');
+ * }
  */
-
 export function useReload() {
   const reload = useContext(ReloadContext);
   return reload;
 }
 
 /**
- * Enhanced route state management with better type safety
+ * Hook that maintains state tied to the current route using browser history state.
+ * The state persists across page reloads but is scoped to the current route.
+ * Note: The value won't be synchronized across different components.
+ * Use this hook only in top-level components to avoid state inconsistencies.
+ * 
+ * @param key - Unique identifier for the state value in history
+ * @param initial - Initial value to use if no state exists
+ * @returns A tuple containing [current value, setter function]
+ * 
+ * @example
+ * function ProductPage() {
+ *   const [selectedTab, setSelectedTab] = useRouteState('selectedTab', 'details');
+ *   const [filters, setFilters] = useRouteState('filters', { category: 'all' });
+ *   
+ *   // State will persist when user navigates back/forward
+ *   // State is automatically cleaned up when navigating to different routes
+ *   return ProductPageContent({ selectedTab, setSelectedTab, filters, setFilters });
+ * }
  */
 export function useRouteState<T extends Record<string, any>>(key: string, initial: T): [T, (value: T) => void] {
   return useReducer((_old: T, newvalue: T) => {
@@ -294,6 +399,33 @@ export function useRouteState<T extends Record<string, any>>(key: string, initia
 const preloadedPaths = new Set<string>();
 const preloadPromises = new Map<string, Promise<void>>();
 
+/**
+ * Preloads a route module for faster navigation performance.
+ * Intelligently caches preloaded modules and prevents duplicate requests.
+ * Only works in production - skipped in development for hot reloading.
+ * 
+ * @param path - The route path to preload
+ * @returns Promise that resolves when the module is preloaded
+ * 
+ * @example
+ * function ProductLink({ productId }) {
+ *   const handleMouseEnter = () => {
+ *     // Preload the product page when user hovers over the link
+ *     PreLoadPath(`/products/${productId}`);
+ *   };
+ *   
+ *   return createElement('a', { 
+ *     href: `/products/${productId}`,
+ *     onMouseEnter: handleMouseEnter 
+ *   }, 'View Product');
+ * }
+ * 
+ * // Preload critical routes on app startup
+ * useEffect(() => {
+ *   PreLoadPath('/dashboard');
+ *   PreLoadPath('/profile');
+ * }, []);
+ */
 export function PreLoadPath(path: string): Promise<void> {
   if (process.env.NODE_ENV === "development") {
     return Promise.resolve();
@@ -331,33 +463,69 @@ export function PreLoadPath(path: string): Promise<void> {
 }
 
 /**
- * Batch preload multiple paths for better performance
+ * Batch preload multiple paths for better performance.
+ * Preloads multiple route modules concurrently and returns settled promises.
+ * 
+ * @param paths - Array of route paths to preload
+ * @returns Promise that resolves with results of all preload attempts
+ * 
+ * @example
+ * // Preload multiple related routes
+ * const preloadResults = await PreLoadPaths([
+ *   '/products',
+ *   '/products/featured',
+ *   '/cart'
+ * ]);
+ * 
+ * // Check which preloads succeeded
+ * preloadResults.forEach((result, index) => {
+ *   if (result.status === 'fulfilled') {
+ *     console.log(`Preloaded ${paths[index]} successfully`);
+ *   } else {
+ *     console.warn(`Failed to preload ${paths[index]}:`, result.reason);
+ *   }
+ * });
  */
 export function PreLoadPaths(paths: string[]): Promise<PromiseSettledResult<void>[]> {
   return Promise.allSettled(paths.map(PreLoadPath));
 }
 
 /**
- * Get related paths for intelligent preloading
- */
-function getRelatedPaths(currentPath: string): string[] {
-  const segments = currentPath.split('/').filter(Boolean);
-  const related: string[] = [];
-
-  // Add parent path
-  if (segments.length > 1) {
-    related.push('/' + segments.slice(0, -1).join('/'));
-  }
-
-  // Add common child paths (if they exist in routes)
-  const commonChildPaths = ['/', '/about', '/contact'];
-  related.push(...commonChildPaths.filter(path => path !== currentPath));
-
-  return related.slice(0, 3); // Limit to prevent excessive preloading
-}
-
-/**
- * Enhanced RouterHost with comprehensive features and optimizations
+ * Main router component that manages application routing and navigation.
+ * Provides comprehensive features including error boundaries, loading states,
+ * server-side props fetching, and preloading capabilities.
+ * 
+ * @param children - Initial children to render
+ * @param normalizeUrl - Function to normalize URLs (optional)
+ * @param Shell - Component that wraps each page (required)
+ * @param onRouteUpdated - Callback when route changes (optional)
+ * @param errorBoundary - Error boundary component for route errors (optional)
+ * @param loadingComponent - Component to show during navigation (optional)
+ * @param enablePreloading - Whether to enable route preloading (default: true)
+ * 
+ * @example
+ * // Basic setup
+ * function App() {
+ *   return (
+ *     <RouterHost Shell={AppShell}>
+ *       <HomePage />
+ *     </RouterHost>
+ *   );
+ * }
+ * 
+ * // With error handling and loading
+ * function AppWithFeatures() {
+ *   return (
+ *     <RouterHost
+ *       Shell={AppShell}
+ *       errorBoundary={ErrorPage}
+ *       loadingComponent={LoadingSpinner}
+ *       onRouteUpdated={(path) => analytics.track('route_change', { path })}
+ *     >
+ *       <HomePage />
+ *     </RouterHost>
+ *   );
+ * }
  */
 export const RouterHost = ({
   children,
@@ -506,6 +674,16 @@ export const RouterHost = ({
   );
 };
 
+const onDevRouteUpdateCallbacks: Map<string, () => Promise<void> | void> = new Map();
+
+export function AddOnDevRouteUpdateCallback(callback: () => Promise<void> | void, id: string): void {
+  if (process.env.NODE_ENV !== "development") return;
+  if (typeof callback !== "function") {
+    throw new TypeError("Callback must be a function");
+  }
+  onDevRouteUpdateCallbacks.set(id, callback);
+}
+
 /**
  * Enhanced development router update with better error handling
  */
@@ -518,10 +696,48 @@ async function OnDevRouterUpdate(matched: Exclude<Match, null>): Promise<void> {
   } catch (error) {
     console.warn("Failed to update dev router:", error);
   }
+  const callbacks = Array.from(onDevRouteUpdateCallbacks.values());
+  if (callbacks.length === 0) return;
+  await Promise.all(callbacks.map((cb) => cb()?.catch((err) => {
+    console.warn("Error in onDevRouteUpdate callback:", err);
+  })));
+
 }
 
 /**
- * Enhanced SessionProvider with intelligent session management and performance optimizations
+ * Enhanced SessionProvider with intelligent session management and performance optimizations.
+ * Manages user sessions with automatic cleanup, timeout handling, and sync across server actions.
+ * 
+ * @param children - React components to wrap with session context
+ * @param config - Configuration options for session management
+ * @param config.enableLogging - Enable debug logging (default: true in development)
+ * @param config.autoCleanup - Automatically clean up expired sessions (default: true)
+ * @param config.syncInterval - Interval for checking session updates in ms (default: 1000)
+ * 
+ * @example
+ * // Basic usage
+ * function App() {
+ *   return (
+ *     <SessionProvider>
+ *       <RouterHost Shell={AppShell}>
+ *         <HomePage />
+ *       </RouterHost>
+ *     </SessionProvider>
+ *   );
+ * }
+ * 
+ * // With custom configuration
+ * function AppWithCustomSession() {
+ *   return (
+ *     <SessionProvider config={{
+ *       enableLogging: false,
+ *       autoCleanup: true,
+ *       syncInterval: 2000
+ *     }}>
+ *       <App />
+ *     </SessionProvider>
+ *   );
+ * }
  */
 export function SessionProvider({
   children,
@@ -879,7 +1095,22 @@ export function SessionProvider({
 }
 
 /**
- * Enhanced layout stacker with better error handling and type safety
+ * Enhanced layout stacker with better error handling and type safety.
+ * Stacks layout components from parent directories to wrap the current page.
+ * 
+ * @param page - The page JSX element to wrap with layouts
+ * @param currentVersion - Version number for cache busting in development
+ * @param match - The matched route object containing path and params
+ * @returns Promise that resolves to the final JSX element with all layouts applied
+ * 
+ * @example
+ * // This function is used internally by RouterHost
+ * const wrappedPage = await NextJsLayoutStacker({
+ *   page: <MyPage />,
+ *   currentVersion: 1,
+ *   match: { path: '/dashboard/users', params: {} }
+ * });
+ * // Result: <RootLayout><DashboardLayout><MyPage /></DashboardLayout></RootLayout>
  */
 export async function NextJsLayoutStacker({
   page,
@@ -1003,7 +1234,25 @@ const subscribeToLocationUpdates = (callback: () => void) => {
 };
 
 /**
- * Enhanced location property hook with better SSR support
+ * Hook that synchronizes with browser location changes for accessing location properties.
+ * Uses React's useSyncExternalStore for efficient location state management.
+ * 
+ * @param fn - Function that extracts a property from the location object
+ * @param ssrFn - Optional function for server-side rendering fallback
+ * @returns The current value of the location property
+ * 
+ * @example
+ * // Get current pathname
+ * const pathname = useLocationProperty(() => location.pathname);
+ * 
+ * // Get search params with SSR fallback
+ * const search = useLocationProperty(
+ *   () => location.search,
+ *   () => ''
+ * );
+ * 
+ * // Get full URL
+ * const fullUrl = useLocationProperty(() => location.href);
  */
 export function useLocationProperty<S extends Location[keyof Location]>(
   fn: () => S,
@@ -1013,7 +1262,34 @@ export function useLocationProperty<S extends Location[keyof Location]>(
 }
 
 /**
- * Enhanced pathname hook with better error handling
+ * Hook that returns the current pathname from the URL.
+ * Works both on client-side (using window.location) and server-side (using request context).
+ * 
+ * @returns The current pathname (e.g., '/dashboard/users')
+ * 
+ * @example
+ * function MyComponent() {
+ *   const pathname = usePathname();
+ *   
+ *   return (
+ *     <div>
+ *       <p>Current path: {pathname}</p>
+ *       {pathname.startsWith('/admin') && <AdminToolbar />}
+ *     </div>
+ *   );
+ * }
+ * 
+ * // Use in conditional rendering
+ * function Navigation() {
+ *   const pathname = usePathname();
+ *   
+ *   return (
+ *     <nav>
+ *       <Link href="/" className={pathname === '/' ? 'active' : ''}>Home</Link>
+ *       <Link href="/about" className={pathname === '/about' ? 'active' : ''}>About</Link>
+ *     </nav>
+ *   );
+ * }
  */
 export function usePathname(): string {
   const requestContext = useContext(RequestContext);
@@ -1035,7 +1311,32 @@ export function usePathname(): string {
 }
 
 /**
- * Enhanced navigation function with better type safety
+ * Programmatically navigate to a different route with type safety.
+ * Updates browser history and triggers route changes in the application.
+ * 
+ * @param to - The route path to navigate to (typed with RoutesType)
+ * @param options - Navigation options
+ * @param options.replace - Whether to replace current history entry instead of pushing new one
+ * 
+ * @example
+ * // Basic navigation
+ * navigate('/dashboard');
+ * 
+ * // Replace current history entry
+ * navigate('/login', { replace: true });
+ * 
+ * // Navigate with query parameters
+ * navigate('/search?q=react');
+ * 
+ * // Navigate in event handlers
+ * function LoginButton() {
+ *   const handleLogin = async () => {
+ *     await loginUser();
+ *     navigate('/dashboard');
+ *   };
+ *   
+ *   return <button onClick={handleLogin}>Login</button>;
+ * }
  */
 export const navigate = (
   to: RoutesType,

@@ -1,5 +1,5 @@
 "use client";
-import { match, useReloadEffect } from "../internal/router/index";
+import { AddOnDevRouteUpdateCallback, match, useReloadEffect } from "../internal/router/index";
 import type { _GlobalData, _globalThis } from "../internal/types";
 import { router } from "../internal/server/router";
 import {
@@ -10,6 +10,7 @@ import {
   useMemo,
   useState,
   Component,
+  useRef,
 } from "react";
 import type { ErrorInfo } from "react";
 import type { Match } from "../internal/router/utils/get-route-matcher";
@@ -195,7 +196,7 @@ function GlobalDataFromServerSide(): _GlobalData {
     __CSS_PATHS__: router.cssPathExists,
     __LAYOUT_ROUTE__: router.layoutPaths,
     __PAGES_DIR__: router.pageDir,
-  } as any;
+  } as unknown as _GlobalData;
 }
 
 // CSS path cache for performance optimization
@@ -216,7 +217,7 @@ function GetCssPaths(match: Match, options?: { onlyFilePath?: boolean }): string
   const globalX =
     typeof window !== "undefined"
       ? (globalThis as unknown as _GlobalData)
-      : (GlobalDataFromServerSide() as _GlobalData);
+      : GlobalDataFromServerSide();
 
   let currentPath = "/";
   const cssPaths: Array<string> = [];
@@ -278,6 +279,16 @@ function HeadProvider({
   const [reload, setReload] = useState(false);
   const request = useContext(RequestContext);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || process.env.NODE_ENV !== "development") {
+      return;
+    }
+    AddOnDevRouteUpdateCallback(async () => {
+      const paths = await (await fetch("/GetCssPaths")).json() as string[];
+      globalX.__CSS_PATHS__ = paths;
+    }, "__CSS_PATHS_UPDATE__");
+  });
+
   useReloadEffect(() => {
     if (process.env.NODE_ENV === "development") {
       setReload(true);
@@ -287,6 +298,7 @@ function HeadProvider({
   useEffect(() => {
     setReload(false);
   }, [reload]);
+
 
   // Clean up query parameters from the path
   const cleanPath = useMemo(() => currentPath.split("?")[0], [currentPath]);
@@ -391,6 +403,27 @@ function HeadElement({
   path: string;
   style: HeadData["link"];
 }) {
+  const [clearSSRStyle, setClearSSRStyle] = useState(false);
+  const [loadedLinksCount, setLoadedLinksCount] = useState(0);
+  const totalLinksCount = useMemo(() => (style?.length || 0), [style]);
+
+  // Reset loaded count when data changes
+  useEffect(() => {
+    setLoadedLinksCount(0);
+    setClearSSRStyle(false);
+  }, []);
+
+  // Clear SSR styles when all links are loaded
+  useEffect(() => {
+    if (totalLinksCount > 0 && loadedLinksCount >= totalLinksCount && !clearSSRStyle) {
+      setClearSSRStyle(true);
+    }
+  }, [loadedLinksCount, totalLinksCount, clearSSRStyle]);
+
+  const handleLinkLoad = useCallback(() => {
+    setLoadedLinksCount(prev => prev + 1);
+  }, []);
+
   const getPaths = () => {
     try {
       return GetCssPaths(
@@ -426,6 +459,42 @@ function HeadElement({
     }
   };
 
+  const SSRStyle = useMemo(() => {
+    const stylesElements = typeof window === "undefined" && getPaths().map((cssPath, i) => {
+      const cssContent = getStringData(cssPath);
+      return cssContent ? (
+        <style
+          key={i}
+          dangerouslySetInnerHTML={{
+            __html: cssContent,
+          }}
+          className="bunext-ssr-style"
+        />
+      ) : null;
+    }).filter((v) => v !== null);
+
+    if (stylesElements) {
+      return stylesElements;
+    }
+
+    else {
+      return undefined;
+    }
+
+  }, [path]);
+
+  const clearSSRStyleElements = useCallback(() => {
+    const styles = document.querySelectorAll(".bunext-ssr-style");
+    styles.forEach((style) => style.remove());
+  }, []);
+
+  // Clear SSR styles when clearSSRStyle becomes true
+  useEffect(() => {
+    if (clearSSRStyle && typeof window !== "undefined") {
+      clearSSRStyleElements();
+    }
+  }, [clearSSRStyle, clearSSRStyleElements]);
+
   return (
     <head suppressHydrationWarning>
       {data?.title && <title>{data.title}</title>}
@@ -437,23 +506,13 @@ function HeadElement({
       {data?.link?.map((e, index) => (
         <link key={index} {...e} />
       ))}
-      {typeof window === "undefined" &&
-        getPaths().map((cssPath, i) => {
-          const cssContent = getStringData(cssPath);
-          return cssContent ? (
-            <style
-              key={i}
-              dangerouslySetInnerHTML={{
-                __html: cssContent,
-              }}
-            />
-          ) : null;
-        })}
+      {SSRStyle}
       {typeof window !== "undefined" &&
-        style?.map((props, i) => <link key={i} rel="stylesheet" {...props} />)}
+        style?.map((props, i) => <link key={i} rel="stylesheet" onLoad={handleLinkLoad} {...props} />)}
     </head>
   );
 }
+
 /**
  * Utility functions for head management
  */

@@ -439,7 +439,7 @@ function Panel({
           </pre>
         </CollapsibleSection>
 
-        {globalThis.__SERVERSIDE_PROPS__ && (
+        {globalThis.__SERVERSIDE_PROPS__ as any && (
           <CollapsibleSection title="📦 Server Props">
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input

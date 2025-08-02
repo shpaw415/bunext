@@ -228,7 +228,7 @@ async function MakeStaticPage(manager: RequestManager) {
     throw new Error(`no serverSide path found for ${manager.pathname}`);
   process.env.__SESSION_MUST_NOT_BE_INITED__ = "true";
   const cacheManager = new StaticPageCache();
-  const props = await manager.MakeServerSideProps({ disableSession: true });
+  const props = await manager.makeServerSideProps({ disableSession: true });
   const pageJSX = await manager.MakeDynamicJSXElement({
     serverSideProps: props?.value,
   });

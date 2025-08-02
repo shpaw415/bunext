@@ -8,7 +8,7 @@ import React, { type JSX } from "react";
 const globalX = globalThis as unknown as _GlobalData;
 
 const match =
-  typeof window == "undefined" ? () => {} : getRouteMatcher(globalX.__ROUTES__);
+  typeof window == "undefined" ? () => { } : getRouteMatcher(globalX.__ROUTES__);
 
 export async function hydrate(
   Shell: React.ComponentType<
@@ -40,7 +40,7 @@ export async function hydrate(
     <RouterHost Shell={Shell} {...options}>
       <Shell
         route={globalX.__INITIAL_ROUTE__}
-        {...globalX.__SERVERSIDE_PROPS__}
+        {...globalX.__SERVERSIDE_PROPS__ as ServerSideProps}
       >
         {JsxToDisplay}
       </Shell>

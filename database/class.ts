@@ -1,6 +1,5 @@
 import { Database as _BunDB } from "bun:sqlite";
 import type { _DataType, DBSchema, TableSchema, ColumnsSchema } from "./schema";
-import { resolve } from "node:path";
 
 // Global type declarations
 declare global {
@@ -104,7 +103,7 @@ async function initializeGlobalDatabase(): Promise<void> {
 }
 
 // Initialize on module load
-initializeGlobalDatabase();
+await initializeGlobalDatabase();
 
 /**
  * Database utility class for creating tables
@@ -1182,14 +1181,14 @@ export class Table<
   constructor(config: {
     name: string;
     db?: _BunDB;
-    schema: DBSchema;
+    schema?: DBSchema;
     debug?: boolean;
     enableWAL?: boolean;
   }) {
 
     this.tableName = config.name;
     this.databaseInstance = config.db || globalThis.MainDatabase;
-    this.schema = (config.schema ?? globalThis.dbSchema)?.find(s => s.name === config.name)?.columns || [];
+    this.schema = (config?.schema ?? globalThis.dbSchema)?.find(s => s.name === config.name)?.columns || [];
     this.isDebugEnabled = config.debug || false;
 
     if (!this.databaseInstance) {

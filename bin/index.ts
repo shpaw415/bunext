@@ -1,10 +1,8 @@
 #!/bin/env bun
 import "../internal/server/server_global.ts";
-import "./globals.ts";
-
 import { exit } from "node:process";
-import { handleDatabaseBackup, handleDatabaseCreate, handleDatabaseMerge, handleDatabaseRestore } from "./db.ts";
 import { handleDev, handleProduction } from "./servers.ts";
+import { handleDatabaseBackup, handleDatabaseCreate, handleDatabaseMerge, handleDatabaseRestore } from "./db.ts";
 
 // Command types
 type BunextCommand =
@@ -20,6 +18,15 @@ type BunextCommand =
   | "--help"
   | "-h";
 
+
+
+// Global type declarations
+declare global {
+  var __INIT__: boolean | undefined;
+}
+
+// Initialize global variables safely
+globalThis.head ??= {};
 
 /**
  * Main CLI handler - processes command line arguments and executes appropriate commands
@@ -156,9 +163,8 @@ async function handleBuild(): Promise<void> {
   }
 }
 
-
 // Start the application
 main().catch((error) => {
   console.error("Fatal error:", error);
   process.exit(1);
-}).finally(() => exit(0));
+});

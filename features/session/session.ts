@@ -10,7 +10,7 @@ import { SessionNotInitedWarning } from "../../internal/server/logs.ts";
 /**
  * Session data structure with improved type safety
  */
-export interface SessionData<T = any> {
+export interface SessionData<T = unknown> {
   public: Record<string, T>;
   private: Record<string, T> & {
     __BUNEXT_SESSION_CREATED_AT__?: number;
@@ -29,6 +29,7 @@ export interface SessionOptions<T = any> {
   updateFunction?: React.Dispatch<React.SetStateAction<boolean>>;
   autoCleanup?: boolean;
   enableLogging?: boolean;
+  preventSessionInit?: boolean;
 }
 
 /**
@@ -63,9 +64,8 @@ const isServerSide = (): boolean => typeof window === "undefined";
  * Global type declarations with better typing
  */
 declare global {
-  var __PUBLIC_SESSION_DATA__: Record<string, any>;
   var __SESSION_TIMEOUT__: number;
-  var __BUNEXT_SESSION__: BunextSession<any>;
+  var __BUNEXT_SESSION__: BunextSession<unknown>;
 }
 
 /**
@@ -254,6 +254,7 @@ export class BunextSession<DataType = any> {
       // We need to calculate when the session was likely created
       const sessionDurationSeconds = this._sessionTimeout; // Default session duration
       const estimatedCreationTime = globalThis.__SESSION_TIMEOUT__ - (sessionDurationSeconds * 1000);
+
 
       this._internalData.private.__BUNEXT_SESSION_CREATED_AT__ = Math.max(estimatedCreationTime, Date.now() - (sessionDurationSeconds * 1000));
       this._internalData.private.__BUNEXT_SESSION_LAST_ACCESSED__ = Date.now();
@@ -689,7 +690,7 @@ export class BunextSession<DataType = any> {
   }
 
   private _triggerUpdate(): void {
-    this._internalData.public = globalThis.__PUBLIC_SESSION_DATA__;
+    this._internalData.public = (globalThis.__PUBLIC_SESSION_DATA__ as Record<string, DataType>) || {};
     this._updateFunction?.((prev) => !prev);
   }
 
@@ -732,7 +733,7 @@ export class BunextSession<DataType = any> {
   }
 
   prevent_session_init(): void {
-    console.warn("prevent_session_init() is deprecated, use constructor options instead");
+    //console.warn("prevent_session_init() is deprecated, use constructor options instead");
     this._serverSessionInitialized = true;
   }
 
