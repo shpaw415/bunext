@@ -3,7 +3,7 @@ import type { BunextPlugin } from "./types";
 import { builder } from "../internal/server/build";
 import { normalize, basename, join } from "path";
 import { generateRandomString } from "../features/utils";
-import { RequestManager } from "../internal/server/router";
+import { RequestManager, router } from "../internal/server/router";
 import type {
   ServerActionDataType,
   ServerActionDataTypeHeader,
@@ -247,9 +247,9 @@ async function serverActionGetter(manager: RequestManager): Promise<Response> {
         fileData:
           result instanceof File
             ? JSON.stringify({
-                name: result.name,
-                lastModified: result.lastModified,
-              })
+              name: result.name,
+              lastModified: result.lastModified,
+            })
             : undefined,
       },
     })
@@ -273,7 +273,7 @@ function isSSRDefaultExportPath(
   if (andProduction && process.env.NODE_ENV != "production") return false;
   return Boolean(
     manager.serverSide &&
-      manager.router.ssrAsDefaultRoutes.includes(manager.serverSide?.name)
+    manager.router.ssrAsDefaultRoutes.includes(manager.serverSide?.name)
   );
 }
 
@@ -372,8 +372,10 @@ export default {
           );
         }
       }
+
     },
   },
+
   build: {
     plugin: {
       name: "server-features",
@@ -383,16 +385,16 @@ export default {
           {
             filter: new RegExp(
               "^" +
-                builder.escapeRegExp(
-                  normalize(
-                    join(
-                      builder.options.baseDir,
-                      builder.options.pageDir as string
-                    )
+              builder.escapeRegExp(
+                normalize(
+                  join(
+                    builder.options.baseDir,
+                    builder.options.pageDir as string
                   )
-                ) +
-                "/.*" +
-                "\\.(ts|tsx|jsx)$"
+                )
+              ) +
+              "/.*" +
+              "\\.(ts|tsx|jsx)$"
             ),
           },
           async ({ path, loader, ...props }) => {
@@ -521,9 +523,9 @@ export default {
           {
             filter: new RegExp(
               "^" +
-                builder.escapeRegExp(normalize(builder.options.baseDir)) +
-                "/.*" +
-                "\\.(ts|tsx|jsx)$"
+              builder.escapeRegExp(normalize(builder.options.baseDir)) +
+              "/.*" +
+              "\\.(ts|tsx)$"
             ),
           },
           async ({ path, loader }) => {
@@ -573,5 +575,8 @@ export default {
         );
       },
     },
+  },
+  onFileSystemChange() {
+    router.InitServerActions();
   },
 } as BunextPlugin;

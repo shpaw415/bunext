@@ -37,6 +37,6 @@
     "bin",
     "config",
     "database",
-    "dev/**/*"
+    "dev/**/*",
   ]
 }

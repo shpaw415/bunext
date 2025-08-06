@@ -1,5 +1,6 @@
 import type { ServerConfig } from "bunext-js/internal/types.ts";
 import tailwindPlugin from "../external-plugins/tailwind";
+
 const Config: ServerConfig = {
   HTTPServer: {
     port: 3010,
@@ -10,8 +11,7 @@ const Config: ServerConfig = {
     devtoolPanel: true,
   },
   build: {
-    plugins: [
-    ],
+    plugins: [],
   },
   session: {
     timeout: 3600,
@@ -21,7 +21,6 @@ const Config: ServerConfig = {
     dynamicPaths: ["src/dynamic"],
   },
   bunext_plugins: [
-    tailwindPlugin
   ],
 };
 

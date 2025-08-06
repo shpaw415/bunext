@@ -2,11 +2,12 @@ import { renderToString } from "react-dom/server";
 import { router } from "../../internal/server/router";
 import type { JSX } from "react";
 import { BunextRequest } from "../server/bunextRequest";
+import type { JsxToStringWorkerMessage } from "./types";
 
 const modulePath = process.env.module_path as string;
 const props = JSON.parse(process.env.props as string) as {
   props: any;
-  params: Record<string, string>;
+  params: Record<string, unknown>;
 };
 const url = process.env.url as string;
 
@@ -22,11 +23,25 @@ const req = new BunextRequest({
 });
 req.path = match.name;
 
-jsx = await router.CreateDynamicPage(modulePath, props, match, req);
+try {
 
-process.send?.({
-  jsx: renderToString(jsx),
-  head: req.headData,
-});
+  jsx = await router.CreateDynamicPage(modulePath, props, match, req);
+  process.send?.({
+    type: "jsxToString",
+    jsx: renderToString(jsx),
+    head: req.headData,
+  } as JsxToStringWorkerMessage);
+
+} catch (error) {
+  Log(`Error creating dynamic page: `, error as Error);
+}
+
+function Log(message: string, error?: Error) {
+  process.send?.({
+    type: "error",
+    error: error || new Error(message),
+    message,
+  } as JsxToStringWorkerMessage);
+}
 
 process.exit();

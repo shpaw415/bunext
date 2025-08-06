@@ -690,10 +690,8 @@ import type { ServerConfig } from "bunext-js";
 
 const Config: ServerConfig = {
   session: {
-    type: "database:hard", // or "memory", "database:soft"
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-    secure: true, // HTTPS only in production
-    sameSite: "strict",
+    type: "database:hard", // or "database:memory", "cookie"
+    timeout: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
   },
   // ... other config
 };
@@ -711,7 +709,7 @@ export async function ServerExtendSession() {
   const session = GetSession(arguments);
   
   // Extend session by 2 hours
-  session.setExpiration(Date.now() + (2 * 60 * 60 * 1000));
+  session.setExpiration(3600 * 2);
   
   return { success: true };
 }
@@ -744,9 +742,7 @@ function AdminPanel() {
 
 | Feature | Description | Implementation |
 |---------|-------------|----------------|
-| **Secure Cookies** | HTTPS-only transmission | `secure: true` in config |
-| **SameSite Protection** | CSRF protection | `sameSite: "strict"` |
-| **Automatic Expiration** | Configurable session timeout | `maxAge` setting |
+| **Automatic Expiration** | Configurable session timeout | `timeout` setting |
 | **Server-Side Validation** | Session verification on each request | Built-in middleware |
 
 ## 🔄 Server Actions
@@ -962,7 +958,6 @@ function ImageUpload({ albumId }: { albumId: string }) {
 | Rule | Description | Example |
 |------|-------------|---------|
 | **Naming** | Must start with "Server" | `ServerUploadFile`, `ServerProcessData` |
-| **Directive** | Must include `"use server"` | First line of function |
 | **File Parameters** | File/File[] must be first-level params | `(file: File, data: string)` |
 | **Serializable** | All params must be serializable | No functions, classes, etc. |
 | **FormData** | Supported without other params | `action={async (formData) => {}}` |

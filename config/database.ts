@@ -44,6 +44,11 @@ const MyDatabaseShema: DBSchema = [
           ],
         },
       },
+      {
+        name: "createdAt",
+        type: "Date",
+        default: new Date(),
+      }
     ],
   },
 ];

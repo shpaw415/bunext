@@ -1,11 +1,11 @@
 declare module "*.module.css" {
-  const classes: { [key: string]: string };
+  const classes: Record<string, string>;
   export default classes;
 }
 
 declare module "*.css" {
-  const Style: string;
-  export default Style;
+  const style: string;
+  export default style;
 }
 
 declare module "*.svg" {
@@ -15,5 +15,5 @@ declare module "*.svg" {
 }
 
 declare module "node_modules/@types/bun/node_modules/bun-types/extensions.d.ts" {
-  export {}; // Empty export to shadow the original module
+  export { }; // Empty export to shadow the original module
 }

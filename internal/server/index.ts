@@ -22,11 +22,11 @@ import cluster from "node:cluster";
 // Features
 import { revalidate } from "../../features/router/revalidate.ts";
 import {
-  CleanExpiredSession,
-  DeleteSessionByID,
-  GetSessionByID,
-  InitDatabase,
-  SetSessionByID,
+  cleanExpiredSessions,
+  deleteSessionById,
+  getSessionById,
+  initializeSessionDatabase,
+  setSessionById,
 } from "../session.ts";
 
 // Types and server startup
@@ -42,14 +42,16 @@ import "../caching/fetch.ts";
 import {
   benchmark_console,
   DevConsole,
+  DevConsoleInfo,
   TerminalIcon,
   TextColor,
   ToColor,
-  getStartLog,
+  initializeDevConsole,
 } from "./logs.ts";
 import { DevWsMessageHandler, type DevWsMessageTypes } from "../../dev/hotServer.ts";
-import { exit } from "node:process";
 import { ExitCodeDescription } from "../../bin/exit-codes.ts";
+
+
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
@@ -150,12 +152,7 @@ class BunextServer {
   }
 
   Reboot() {
-    DevConsole(
-      `${ToColor("blue", TerminalIcon.info)} ${ToColor(
-        TextColor,
-        "Rebooting server..."
-      )}`
-    );
+    DevConsoleInfo("Rebooting server...");
     process.exit(ExitCodeDescription[3].code);
   }
 
@@ -243,16 +240,16 @@ class BunextServer {
   async initSessionDatabase() {
     const sessionConfigType = globalThis.serverConfig.session?.type;
     const setClearSessionInterval = () =>
-      setInterval(() => CleanExpiredSession(), SESSION_CLEANUP_INTERVAL);
+      setInterval(() => cleanExpiredSessions(), SESSION_CLEANUP_INTERVAL);
 
     switch (sessionConfigType) {
       case "database:hard":
-        await InitDatabase();
+        await initializeSessionDatabase();
         setClearSessionInterval();
         break;
       case "database:memory":
         if (cluster.isWorker) break;
-        await InitDatabase();
+        await initializeSessionDatabase();
         setClearSessionInterval();
         break;
     }
@@ -260,22 +257,14 @@ class BunextServer {
 
   async init() {
     const dry = Boolean(globalThis.dryRun);
-    process.env.NODE_ENV == "development" && console.clear();
-    DevConsole(`${getStartLog()}`);
-    dry &&
-      DevConsole(
-        `${ToColor("green", TerminalIcon.success)} ${ToColor(
-          TextColor,
-          "Starting..."
-        )}`
-      );
-    return benchmark_console(
+
+    // Initialize the enhanced terminal console
+    initializeDevConsole();
+    dry && DevConsole().info("Starting...");
+
+    dry && benchmark_console(
       (time) =>
-        dry &&
-        `${ToColor("green", TerminalIcon.success)} ${ToColor(
-          TextColor,
-          `Ready in ${time}ms`
-        )}`,
+        dry && `Ready in ${time}ms`,
       () => this._init()
     );
   }
@@ -303,7 +292,7 @@ class BunextServer {
         } else {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) {
-            console.log(buildoutput);
+            DevConsole(buildoutput);
             throw new Error("Production build failed");
           }
           setRevalidate(buildoutput.revalidates);
@@ -335,7 +324,7 @@ class BunextServer {
     if (isDryRun) globalThis.dryRun = false;
 
     if (this.isClustered && !isDev && isMainThread)
-      console.log("Starting Bunext in Multi-threaded mode");
+      DevConsole().info("Starting Bunext in Multi-threaded mode");
 
     return this;
   }
@@ -477,7 +466,7 @@ class BunextServer {
           this.handleSetSession(message);
           break;
         case "deleteSession":
-          DeleteSessionByID(message.data.id);
+          deleteSessionById(message.data.id);
           break;
       }
     });
@@ -493,7 +482,7 @@ class BunextServer {
     if (message.task === "getSession" && "id" in message.data) {
       worker.send({
         data: {
-          data: GetSessionByID(message.data.id) || false,
+          data: getSessionById(message.data.id) || false,
           id: message.data.id,
         },
         task: "getSession",
@@ -503,7 +492,7 @@ class BunextServer {
 
   private handleSetSession(message: ClusterMessageType) {
     if (message.task === "setSession" && "type" in message.data && "id" in message.data && "sessionData" in message.data) {
-      SetSessionByID(
+      setSessionById(
         message.data.type,
         message.data.id,
         message.data.sessionData

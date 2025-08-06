@@ -186,15 +186,17 @@ export type ClusterMessageType =
     };
   };
 
+export type Params = Record<string, unknown>;
+
 export type getServerSidePropsFunction = (
-  request_data: { params: Record<string, string>; request: Request },
+  request_data: { params: Params; request: Request },
   bunextRequest: BunextRequest
 ) => Promise<undefined | {}> | undefined | {};
 
 export type ReactShellComponent = React.ComponentType<{
   children: Array<React.ReactElement>;
   props?: ServerSideProps;
-  params?: Record<string, string>;
+  params?: Params;
   route: string;
 }>;
 

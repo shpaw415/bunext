@@ -35,6 +35,7 @@ const DEVTOOLS_ENDPOINT = "/.well-known/appspecific/com.chrome.devtools.json";
 const SERVER_SIDE_PROPS_HEADER = "application/vnd.server-side-props";
 const GETCSSPATH_PATHNAME = "/GetCssPaths";
 
+
 // Plugin configuration
 const plugin: BunextPlugin =
   process.env.NODE_ENV === "development"
@@ -164,11 +165,11 @@ function isCurrentDevPath(match: MatchedRoute): boolean {
 async function buildRoute(match: MatchedRoute) {
   await builder.awaitBuildFinish();
 
-  DevConsole(
-    `${ToColor("blue", TerminalIcon.info)} ${ToColor(
+  DevConsole().info(
+    ToColor(
       TextColor,
       `compiling ${match.pathname} ...`
-    )}`
+    ).toString()
   );
 
   setCurrentDevPath(match);

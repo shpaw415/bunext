@@ -3,6 +3,7 @@ import { _Database, Table } from "../database/class";
 import type { TableSchema } from "../database/schema";
 import type { Database } from "bun:sqlite";
 import cluster from "node:cluster";
+import { DevConsole } from "./server/logs";
 
 /**
  * Session configuration types
@@ -456,11 +457,10 @@ export async function deleteSessionById(id: string): Promise<void> {
     }
 
     const table = getSessionTable();
-    const result = table.delete({
+    table.delete({
       where: { id },
     });
 
-    console.log(`Session ${id} deleted successfully`);
   } catch (error) {
     console.error(`Error deleting session ${id}:`, error);
     if (error instanceof SessionError) {
@@ -603,30 +603,3 @@ export async function sessionExists(id: string): Promise<boolean> {
     return false;
   }
 }
-
-/**
- * Backward compatibility exports (deprecated)
- */
-/** @deprecated Use initializeSessionDatabase instead */
-export const InitDatabase = initializeSessionDatabase;
-
-/** @deprecated Use getSessionById instead */
-export const GetSessionByID = getSessionById;
-
-/** @deprecated Use setSessionById instead */
-export const SetSessionByID = (type: "insert" | "update", id: string, data?: any) => {
-  console.warn("SetSessionByID is deprecated, use setSessionById instead");
-  return setSessionById(type, id, data);
-};
-
-/** @deprecated Use deleteSessionById instead */
-export const DeleteSessionByID = (id: string) => {
-  console.warn("DeleteSessionByID is deprecated, use deleteSessionById instead");
-  return deleteSessionById(id);
-};
-
-/** @deprecated Use cleanExpiredSessions instead */
-export const CleanExpiredSession = () => {
-  console.warn("CleanExpiredSession is deprecated, use cleanExpiredSessions instead");
-  return cleanExpiredSessions();
-};

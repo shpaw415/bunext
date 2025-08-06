@@ -2,7 +2,16 @@
 
 import { router } from "./router";
 
+declare global {
+  var __BUNEXT_SERVER_START_PLUGIN_DRY__: boolean;
+}
+globalThis.__BUNEXT_SERVER_START_PLUGIN_DRY__ ??= false;
+
 export default async function Make() {
+  if (globalThis.__BUNEXT_SERVER_START_PLUGIN_DRY__) {
+    return;
+  }
+  globalThis.__BUNEXT_SERVER_START_PLUGIN_DRY__ = true;
   await router.initPlugins();
   const plugins = router
     .getPlugins()

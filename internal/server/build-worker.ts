@@ -7,12 +7,24 @@ export type BuildWorkerMessage = {
   BuildPath?: string;
 };
 export type BuildWorkerResponse = {
-  type: "build";
+  type: "build" | "log";
   success: boolean;
   data?: BuildOuts;
   error?: Error;
   message?: string;
 };
+
+function Log(message: string | Object, error?: Error) {
+  process.send?.({
+    type: "log",
+    message:
+      typeof message === "string"
+        ? message
+        : JSON.stringify(message, null, 2),
+    error
+  } as BuildWorkerResponse);
+}
+
 
 function init() {
   process.on("message", async (_message) => {

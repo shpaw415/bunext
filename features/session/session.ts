@@ -5,7 +5,7 @@ import { getSessionById } from "../../internal/session.ts";
 import { createContext, useContext, useEffect, useState } from "react";
 import { RequestContext } from "../../internal/server/context";
 export { GetSession } from "../request/bunextRequest";
-import { SessionNotInitedWarning } from "../../internal/server/logs.ts";
+import { DevConsole, SessionNotInitedWarning } from "../../internal/server/logs.ts";
 
 /**
  * Session data structure with improved type safety
@@ -95,6 +95,7 @@ export type InAppSession<DataType = any> = Omit<
   | "_clearData"
   | "_clearClientData"
   | "_triggerUpdate"
+  | "__DATA__"
 >;
 
 /**
@@ -355,10 +356,11 @@ export class BunextSession<DataType = any> {
   /**
    * Get session data (works on both server and client)
    */
-  getData(getPublic = false): DataType | undefined {
+  getData(): DataType | undefined {
     try {
       // Server-side handling
       if (this._request && !this._serverSessionInitialized) {
+        DevConsole().warning("Session not initialized on server");
         this._log("Session not initialized on server", undefined, "warn");
         return undefined;
       }
@@ -383,9 +385,7 @@ export class BunextSession<DataType = any> {
 
       this._updateLastAccessed();
 
-      return getPublic
-        ? (this._internalData.public as DataType | undefined)
-        : (this._internalData.private as DataType | undefined);
+      return ({ ...this._internalData.public, ...this._internalData.private } as DataType | undefined);
     } catch (error) {
       this._log(`Error getting session data: ${error}`, undefined, "error");
       return undefined;
@@ -546,8 +546,8 @@ export class BunextSession<DataType = any> {
   /**
    * Get session data (modern API)
    */
-  getSessionData(getPublic = false): any {
-    return this.getData(getPublic);
+  getSessionData(): any {
+    return this.getData();
   }
   /**
    * Get raw session data (for internal use)
@@ -682,8 +682,11 @@ export class BunextSession<DataType = any> {
         __BUNEXT_SESSION_ID__?: string;
       },
     };
+    if (globalThis.__PUBLIC_SESSION_DATA__) globalThis.__PUBLIC_SESSION_DATA__ = undefined;
   }
-
+  clearData(): void {
+    this._clearData();
+  }
   private _clearClientData(): void {
     this._internalData.public = {} as Record<string, DataType>;
     globalThis.__PUBLIC_SESSION_DATA__ = {};
@@ -733,7 +736,6 @@ export class BunextSession<DataType = any> {
   }
 
   prevent_session_init(): void {
-    //console.warn("prevent_session_init() is deprecated, use constructor options instead");
     this._serverSessionInitialized = true;
   }
 
@@ -785,8 +787,8 @@ export class _Session<DataType = any> extends BunextSession<DataType> {
     return this._isDeleted;
   }
 
-  getSessionData(getPublic = false): any {
-    return this.getData(getPublic);
+  getSessionData(): any {
+    return this.getData();
   }
 
   getPublicSessionData(): any {

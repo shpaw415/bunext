@@ -49,9 +49,9 @@ async function install(total: boolean) {
   packageJson.scripts = {
     bunext: "bunext",
     build: "bunext build",
-    dev: "bunext dev",
+    dev: "bunext --hot .bunext/react-ssr/server.ts dev",
     "db:create": "bunext database:create",
-    start: "bunext production",
+    start: "bunext .bunext/react-ssr/server.ts production",
     ...packageJson.scripts,
   };
   packageJson.dependencies = {

@@ -892,7 +892,12 @@ export function SessionProvider({
                 currentTime: Date.now()
               });
             }
-          } else {
+          }
+          else if (sessionData && Object.keys(sessionData).length === 0) {
+            RouterLogger.log("Received empty session data from server, clearing session");
+            session.clearData();
+          }
+          else {
             RouterLogger.log("No session data received from server action");
           }
 

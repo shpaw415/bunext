@@ -2,6 +2,7 @@ import "./globals.ts";
 import { paths } from "../internal/globals";
 import { getStartLog } from "../internal/server/logs.ts";
 import { OnServerClose } from "./onServerClose.ts";
+import { $ } from "bun";
 
 
 
@@ -20,18 +21,18 @@ export async function handleDev(): Promise<void> {
 /**
  * Starts the development server with hot reloading
  */
-function startDevServer(): void {
-    const proc = Bun.spawnSync({
-        cmd: ["bun", "--hot", `${paths.bunextDirName}/react-ssr/server.ts`],
-        stdout: "inherit",
-        env: {
-            ...process.env,
-            __HEAD_DATA__: JSON.stringify(globalThis.head),
-            NODE_ENV: process.env.NODE_ENV,
-        }
-    });
+async function startDevServer(): Promise<void> {
+    const proc = $`bun --hot ${paths.bunextDirName}/react-ssr/server.ts`.env({
+        ...process.env,
+        __HEAD_DATA__: JSON.stringify(globalThis.head),
+        NODE_ENV: process.env.NODE_ENV,
+    })
 
-    OnServerClose[proc.exitCode]?.(proc);
+    for await (const line of proc.lines()) {
+        console.log(line);
+    }
+
+    //if (proc.exitCode) OnServerClose[proc.exitCode]?.(proc);
 }
 
 
@@ -40,7 +41,6 @@ function startDevServer(): void {
  * Starts the production server with automatic restart on certain exit codes
  */
 export function startProductionServer(): void {
-    console.log("Starting production server...");
 
     const serverProcess = Bun.spawnSync({
         cmd: ["bun", `${paths.bunextDirName}/react-ssr/server.ts`, "production"],
@@ -53,7 +53,7 @@ export function startProductionServer(): void {
         stderr: "inherit",
     });
 
-    OnServerClose[serverProcess.exitCode](serverProcess);
+    if (serverProcess.exitCode) OnServerClose[serverProcess.exitCode]?.(serverProcess);
 
 }
 

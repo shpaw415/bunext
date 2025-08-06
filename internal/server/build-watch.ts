@@ -17,7 +17,7 @@ type initFunction = (path?: string) => Promise<any>;
 class SingleTaskPool {
   stopped = true;
   pending = false;
-  constructor(public init: initFunction) {}
+  constructor(public init: initFunction) { }
 
   #stop() {
     this.stopped = true;

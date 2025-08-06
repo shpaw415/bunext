@@ -15,7 +15,7 @@ import { renderToString } from "react-dom/server";
 import type { ssrElement } from "../types";
 import "../globals";
 import { Head, type _Head } from "../../features/head";
-import { BuildServerComponentWithHooksWarning } from "./logs";
+import { BuildServerComponentWithHooksWarning, DevConsole } from "./logs";
 import CacheManager from "../caching";
 import { router } from "./router";
 import * as React from "react";
@@ -89,6 +89,7 @@ class Builder extends PluginLoader {
     "bunext-js/database/bunext_object/server.ts",
     "bunext-js/features/request/bunext_object/server.ts",
     "bunext-js/plugins/image/index.ts",
+    "bunext-js/internal/server/logs.ts",
   ];
 
   public dev_remove_file_path = Boolean(process.env.__BUNEXT_DEV__)
@@ -103,6 +104,7 @@ class Builder extends PluginLoader {
       "internal/caching/index.ts",
       "internal/server/bunext_global.ts",
       "internal/server/server_global.ts",
+      "internal/server/logs.ts",
       "database/bunext_object/server.ts",
       "features/request/bunext_object/server.ts",
       "plugins/image/index.ts",
@@ -145,7 +147,8 @@ class Builder extends PluginLoader {
     try {
       this.InitGetPlugins();
     } catch (e) {
-      console.log("Plugin has not loaded correctly!\n", (e as Error).stack);
+      DevConsole()?.error("Plugin has not loaded correctly!\n");
+      DevConsole((e as Error).stack);
     }
     return this;
   }
@@ -256,12 +259,11 @@ class Builder extends PluginLoader {
           ...(await this.getLayoutEntryPoints(onlyPath)),
         ]
         : await this.getEntryPoints();
-
     const build = await Bun.build({
       env: Bun.semver.satisfies(Bun.version, "1.1.39 - x.x.x")
         ? "PUBLIC_*"
         : "*",
-      minify: Bun.env.NODE_ENV == "production",
+      minify: process.env.NODE_ENV == "production",
       sourcemap: "none",
       ...this.BuildPluginsConfig,
       outdir: join(baseDir, buildDir as string),
@@ -297,7 +299,6 @@ class Builder extends PluginLoader {
       ],
     });
     await this.afterBuild(build);
-
     this.cleanBuildDir(build);
     process.env.__BUILD_MODE__ = "false";
 
@@ -310,11 +311,14 @@ class Builder extends PluginLoader {
         try {
           unlinkSync(file);
         } catch {
-          console.log(file, "not found for deletion");
+          DevConsole()?.error(`${file} not found for deletion`);
         }
     }
   }
-  async preBuild(modulePath: string) {
+  async preBuild(modulePath: string): Promise<void> {
+
+    if (modulePath.endsWith(".d.ts")) return;
+
     Head._setCurrentPath(modulePath);
     const moduleContent = await Bun.file(modulePath).text();
     const _module = await import(
@@ -343,14 +347,15 @@ class Builder extends PluginLoader {
       } catch (e) {
         if (e instanceof Error) {
           if (e.message.startsWith("Cannot call a class constructor")) continue;
-          console.log(e);
+          DevConsole(e);
           if (
             e.message.startsWith(
               "null is not an object (evaluating 'dispatcher.use"
             )
           ) {
-            console.log(BuildServerComponentWithHooksWarning);
+            DevConsole(BuildServerComponentWithHooksWarning);
           }
+
         }
       }
       if (!isValidElement(element)) continue;
@@ -445,7 +450,7 @@ class Builder extends PluginLoader {
         ? await this.preBuild(BuildPath)
         : await this.preBuildAll(CacheManager.getAllSSR());
     } catch (e) {
-      console.log("PreBuild Error");
+      DevConsole()?.error("PreBuild Error");
 
       if (process.send)
         process.send({
@@ -457,12 +462,12 @@ class Builder extends PluginLoader {
     try {
       const output = await this.build(BuildPath);
       if (!output.success) {
-        console.log(output);
+        DevConsole(output);
         throw new Error("Build Error");
       }
     } catch (e: any) {
-      console.log("Build Error");
-      console.log(e);
+      DevConsole()?.error("Build Error");
+      DevConsole(e);
       process.exitCode = ExitCodeDescription[2].code;
 
       if (process.send)
@@ -512,7 +517,6 @@ class Builder extends PluginLoader {
 
   private makeBuildWorker() {
     const self = this;
-
     return Bun.spawn({
       cmd: ["bun", join(import.meta.dirname, "build-worker.ts")],
       cwd: process.cwd(),
@@ -529,12 +533,11 @@ class Builder extends PluginLoader {
       },
       ipc(_message) {
         const message = _message as BuildWorkerResponse;
-
         switch (message.type) {
           case "build":
             if (!message.success) {
-              message.message && console.log(message.message);
-              message.error && console.error(message.error);
+              message.message && DevConsole().error(message.message);
+              message.error && DevConsole(message.error);
               self.BuildWorkerResolver();
               break;
             }
@@ -544,6 +547,11 @@ class Builder extends PluginLoader {
               });
               break;
             }
+            break;
+          case "log":
+            message.message && DevConsole().info(message.message);
+            message.error && DevConsole().error("Error From Build Worker: ", message.error);
+            break;
         }
       },
     });
@@ -566,7 +574,7 @@ class Builder extends PluginLoader {
       } as BuildWorkerMessage);
       await this.awaitBuildFinish();
       if (this.BuilderWorker.exitCode) {
-        console.log("BuilderWorker exited");
+        DevConsole("BuilderWorker exited");
         this.createBuildWorker();
       }
       strRes = {
@@ -576,9 +584,7 @@ class Builder extends PluginLoader {
 
       return strRes;
     } else {
-      console.log(
-        "BuilderWorker not found, using the main process to build.\nThis may cause some errors."
-      );
+      DevConsole().warning("BuilderWorker not found, using the main process to build.\nThis may cause some errors.");
       strRes = await this._makeBuild(path);
       if (strRes) {
         this.revalidates = strRes.revalidates;

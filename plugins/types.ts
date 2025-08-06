@@ -44,7 +44,7 @@ type Build_Plugins = {
 };
 
 type onFileSystemChangePlugin = (
-  filePath: string | undefined
+  filePath: string | undefined,
 ) => void | Promise<void>;
 
 export type BunextPlugin<HTMLRewrite = unknown> = Partial<{

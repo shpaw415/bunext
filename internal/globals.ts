@@ -80,6 +80,13 @@ declare global {
     }
   }
 }
+if (typeof window === "undefined" && !process.env.NODE_ENV) {
+  if (process.argv[2] === "dev") {
+    process.env.NODE_ENV = "development";
+  } else {
+    process.env.NODE_ENV = "production";
+  }
+}
 
 globalThis.React = React;
 globalThis.jsx_w77yafs4 = jsx;
@@ -95,7 +102,7 @@ globalThis.__ROUTES__ ??= {};
 
 export const paths = {
   bunextDirName: ".bunext",
-  bunextModulePath: "node_modules/bunext-js",
+  bunextModulePath: process.env.__BUNEXT_DEV__ ? "" : "node_modules/bunext-js",
   basePagePath: "src/pages",
   basePath: "src",
   staticPath: "static",

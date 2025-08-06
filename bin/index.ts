@@ -3,7 +3,7 @@ import "../internal/server/server_global.ts";
 import { exit } from "node:process";
 import { handleDev, handleProduction } from "./servers.ts";
 import { handleDatabaseBackup, handleDatabaseCreate, handleDatabaseMerge, handleDatabaseRestore } from "./db.ts";
-
+import { builder } from "../internal/server/build.ts";
 // Command types
 type BunextCommand =
   | "init"
@@ -108,8 +108,6 @@ Usage: bun bunext <command> [options]
 Commands:
   init                      Initialize a new Bunext project
   build                     Build the project for production
-  dev                       Start development server with hot reloading
-  production                Start production server
   database:create           Create database and generate schema types
   database:backup <path>    Create a backup of the current database
   database:restore <path>   Restore database from a backup file
@@ -118,7 +116,6 @@ Commands:
 
 Examples:
   bun bunext init
-  bun bunext dev
   bun bunext build
   bun bunext database:create
   bun bunext database:backup ./backups/my-backup.db.gz
@@ -154,12 +151,12 @@ async function handleInit(): Promise<void> {
  */
 async function handleBuild(): Promise<void> {
   try {
-    const { builder } = await import("../internal/server/build.ts");
     await builder.preBuildAll();
     const result = await builder.build();
     console.log("Build completed successfully:", result);
   } catch (error) {
-    throw new Error(`Build failed: ${error}`);
+    console.error("Build failed");
+    throw error;
   }
 }
 

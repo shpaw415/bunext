@@ -1,3 +1,4 @@
+import { DevConsole } from "../internal/server/logs";
 import type { BunextPlugin } from "../plugins/types";
 import { join } from "path";
 
@@ -61,7 +62,7 @@ export const tailwindPlugin: BunextPlugin = {
     },
     async main() {
       // Main server start logic, if needed
-      console.log("🌟 Tailwind CSS plugin initialized in main server mode");
+      DevConsole("🌟 Tailwind CSS plugin initialized in main server mode");
       await compileTailwindCSS(DEFAULT_CONFIG);
     }
   },
@@ -73,7 +74,7 @@ export const tailwindPlugin: BunextPlugin = {
   onFileSystemChange: async (filePath?: string) => {
     // Watch for Tailwind config changes and recompile
     if (filePath && DEFAULT_CONFIG.configFiles?.some(config => filePath.includes(config))) {
-      console.log("🎨 Tailwind config changed, recompiling...");
+      DevConsole("🎨 Tailwind config changed, recompiling...");
       await compileTailwindCSS(DEFAULT_CONFIG);
     }
   }
@@ -93,13 +94,13 @@ async function initializeTailwind(config: TailwindConfig): Promise<void> {
 
       if (await Bun.file(configPath).exists()) {
         tailwindConfigFound = true;
-        console.log(`✅ Found Tailwind config: ${configFile}`);
+        DevConsole(`✅ Found Tailwind config: ${configFile}`);
         break;
       }
     }
 
     if (!tailwindConfigFound) {
-      console.log("⚠️ No Tailwind config found, skipping Tailwind initialization");
+      DevConsole("⚠️ No Tailwind config found, skipping Tailwind initialization");
       return;
     }
 
@@ -109,7 +110,7 @@ async function initializeTailwind(config: TailwindConfig): Promise<void> {
     // Ensure input CSS file exists
     await ensureInputFile(config);
 
-    console.log("🎨 Tailwind CSS plugin initialized successfully");
+    DevConsole("🎨 Tailwind CSS plugin initialized successfully");
 
   } catch (error) {
     console.error("❌ Failed to initialize Tailwind:", error);
@@ -132,7 +133,7 @@ async function ensureInputFile(config: TailwindConfig): Promise<void> {
 /* Custom styles can be added here */`;
 
     await inputFile.write(defaultContent);
-    console.log(`✅ Created Tailwind input file: ${inputPath}`);
+    DevConsole(`✅ Created Tailwind input file: ${inputPath}`);
   }
 }
 
@@ -141,7 +142,7 @@ async function ensureInputFile(config: TailwindConfig): Promise<void> {
  */
 async function compileTailwindCSS(config: TailwindConfig): Promise<void> {
   if (!globalThis.tailwind_enabled) {
-    console.log("⚠️ Tailwind not enabled, skipping compilation");
+    DevConsole("⚠️ Tailwind not enabled, skipping compilation");
     return;
   }
 
@@ -153,7 +154,7 @@ async function compileTailwindCSS(config: TailwindConfig): Promise<void> {
     // Ensure input file exists before compilation
     await ensureInputFile(config);
 
-    console.log("🔄 Compiling Tailwind CSS...");
+    DevConsole("🔄 Compiling Tailwind CSS...");
 
     const buildArgs = [
       "@tailwindcss/cli",
@@ -164,7 +165,7 @@ async function compileTailwindCSS(config: TailwindConfig): Promise<void> {
     // Add minification for production builds
     if (process.env.NODE_ENV === "production") {
       buildArgs.push("--minify");
-      console.log("🗜️ Production mode: minifying CSS");
+      DevConsole("🗜️ Production mode: minifying CSS");
     }
 
     // Check if output directory exists, create if not
@@ -176,7 +177,7 @@ async function compileTailwindCSS(config: TailwindConfig): Promise<void> {
     const result = await Bun.$`bunx ${buildArgs}`.cwd(cwd);
 
     if (result.exitCode === 0) {
-      console.log("✅ Tailwind CSS compiled successfully");
+      DevConsole("✅ Tailwind CSS compiled successfully");
 
       // Log file sizes in development
       if (process.env.NODE_ENV === "development") {
@@ -184,7 +185,7 @@ async function compileTailwindCSS(config: TailwindConfig): Promise<void> {
           const outputFile = Bun.file(outputPath);
           if (await outputFile.exists()) {
             const stats = outputFile.size;
-            console.log(`📊 Generated CSS size: ${(stats / 1024).toFixed(2)} KB`);
+            DevConsole(`📊 Generated CSS size: ${(stats / 1024).toFixed(2)} KB`);
           }
         } catch (error) {
           // Ignore file size errors
@@ -199,7 +200,7 @@ async function compileTailwindCSS(config: TailwindConfig): Promise<void> {
 
     // In development, don't throw - just log the error
     if (process.env.NODE_ENV === "development") {
-      console.log("🔄 Will retry on next file change...");
+      DevConsole("🔄 Will retry on next file change...");
     } else {
       throw error;
     }
@@ -221,7 +222,7 @@ export function createTailwindPlugin(userConfig: Partial<TailwindConfig> = {}): 
       },
       async main() {
         // Main server start logic, if needed
-        console.log("🌟 Tailwind CSS plugin initialized in main server mode");
+        DevConsole("🌟 Tailwind CSS plugin initialized in main server mode");
         await compileTailwindCSS(config);
       }
     },
@@ -233,7 +234,7 @@ export function createTailwindPlugin(userConfig: Partial<TailwindConfig> = {}): 
     onFileSystemChange: async (filePath?: string) => {
       // Watch for Tailwind config changes and recompile
       if (filePath && config.configFiles?.some(configFile => filePath.includes(configFile))) {
-        console.log("🎨 Tailwind config changed, recompiling...");
+        DevConsole("🎨 Tailwind config changed, recompiling...");
         await compileTailwindCSS(config);
       }
     }

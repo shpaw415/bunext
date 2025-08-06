@@ -36,6 +36,8 @@ import CacheManager from "../caching";
 // Global imports
 import "./server_global";
 import "./bunext_global";
+import { DevConsole } from "./logs";
+import type { JsxToStringWorkerMessage } from "../dev/types";
 
 // Types and constants
 type SpecialPathNames =
@@ -216,7 +218,8 @@ class StaticRouters extends PluginLoader {
     return (
       filename === "index.tsx" ||
       filename === "layout.tsx" ||
-      /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(filename)
+      /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(filename) ||
+      /\[\.\.\..*\]\.[A-Za-z]sx/.test(filename)
     );
   }
 
@@ -307,7 +310,7 @@ class StaticRouters extends PluginLoader {
   private getRoutesWithoutLayouts(): RouteEntry[] {
     try {
       return Object.entries(this.server?.routes || {}).filter(
-        ([route]) => !route.endsWith("/layout")
+        ([route]) => !route.endsWith("/layout") && !route.endsWith(".d")
       ) as RouteEntry[];
     } catch (error) {
       console.warn("Failed to get routes without layouts:", error);
@@ -482,7 +485,7 @@ class StaticRouters extends PluginLoader {
 
   public async CreateDynamicPage(
     module: string,
-    props: { props: any; params: Record<string, string> },
+    props: { props: any; params: Record<string, unknown> },
     serverSide: MatchedRoute,
     bunextRequest: BunextRequest
   ): Promise<JSX.Element> {
@@ -528,7 +531,7 @@ class StaticRouters extends PluginLoader {
       params,
     }: {
       children: JSX.Element;
-      params: Record<string, string>;
+      params: Record<string, unknown>;
     }) => JSX.Element | Promise<JSX.Element>;
 
     const layouts = route.name == "/" ? [""] : route.name.split("/");
@@ -556,7 +559,7 @@ class StaticRouters extends PluginLoader {
       else
         currentJsx = await Layout({
           children: currentJsx,
-          params: route.params,
+          params: formatParams(route.params),
         });
     }
     return currentJsx;
@@ -602,14 +605,14 @@ class StaticRouters extends PluginLoader {
    */
   async InitServerActions(): Promise<this> {
     try {
-      const files = this.getFilesFromPageDir();
+      const files = this.getFilesFromPageDir().filter((file) => !file.endsWith("d.ts"));
       this.serverActions = [];
 
       for (const file of files) {
         try {
           const filePath = normalize(`${this.pageDir}/${file}`);
           const moduleImport = normalize(`${process.cwd()}/${filePath}`);
-          const moduleExports = await import(moduleImport);
+          const moduleExports = await import(process.env.NODE_ENV == "development" ? `${moduleImport}?${Bun.randomUUIDv7()}` : moduleImport);
 
           const serverActionNames = Object.keys(moduleExports).filter((name) =>
             name.startsWith("Server")
@@ -1050,7 +1053,7 @@ class RequestManager {
       const result = await module.getServerSideProps(
         {
           request: this.request,
-          params: this.serverSide.params,
+          params: formatParams(this.serverSide.params),
         },
         this.bunextReq
       );
@@ -1285,9 +1288,9 @@ class RequestManager {
           (await this.makeServerSideProps()).toString() ?? "undefined",
         __LAYOUT_ROUTE__: JSON.stringify(this.router.layoutPaths),
         __HEAD_DATA__: JSON.stringify(Head.head),
-        __PUBLIC_SESSION_DATA__: JSON.stringify(
-          this.bunextReq.session.getData(true)
-        ),
+        __PUBLIC_SESSION_DATA__: this.bunextReq.session.exists() ? JSON.stringify(
+          this.bunextReq.session.getPublicData()
+        ) : "undefined",
         __SESSION_TIMEOUT__: JSON.stringify(sessionTimeout),
         serverConfig: JSON.stringify({
           Dev: globalThis.serverConfig.Dev,
@@ -1338,7 +1341,7 @@ class RequestManager {
           module_path: this.serverSide.filePath,
           props: JSON.stringify({
             props: serverSideProps,
-            params: this.serverSide.params,
+            params: formatParams(this.serverSide.params),
           }),
           url: this.request.url,
         },
@@ -1346,18 +1349,13 @@ class RequestManager {
         cmd: ["bun", `${import.meta.dirname}/../dev/jsxToString.tsx`],
         stdout: "inherit",
         stderr: "inherit",
-        ipc: ({
-          jsx,
-          head,
-          error,
-        }: {
-          jsx?: string;
-          head?: Record<string, _Head>;
-          error?: Error;
-        }) => {
-          if (jsx) pageString = jsx;
-          if (head) this.bunextReq.headData = head;
-          if (error) throw error;
+        ipc: (message: JsxToStringWorkerMessage) => {
+          if (message.type == "jsxToString") {
+            pageString = message.jsx;
+            if (message.head) this.bunextReq.headData = message.head;
+          } else if (message.type == "error") {
+            DevConsole().error("Dynamic page error:", message?.error);
+          }
 
           resolve(true);
         },
@@ -1381,7 +1379,7 @@ class RequestManager {
       this.serverSide.filePath,
       {
         props: serverSideProps,
-        params: this.serverSide.params,
+        params: formatParams(this.serverSide.params),
       },
       this.serverSide,
       this.bunextReq
@@ -1443,6 +1441,20 @@ class RequestManager {
     return ShellJSX;
   }
 }
+
+function formatParams(match: MatchedRoute["params"]): Record<string, unknown> {
+  const params =
+    Object.entries(match).map(([key, value]) => {
+      const val = value.split("/");
+      if (val.length > 1) {
+        return [key, val];
+      }
+      return [key, val[0]];
+    }) || [];
+
+  return Object.fromEntries(params);
+}
+
 
 async function Init() {
   await rm(".bunext/build/node_modules", {

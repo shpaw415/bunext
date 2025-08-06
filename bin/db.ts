@@ -2,7 +2,7 @@ import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { paths } from "../internal/globals";
 import { resolve } from "node:path";
 import { CONFIG } from "./globals";
-
+import { terminal } from "terminal-kit";
 
 
 /**
@@ -261,14 +261,403 @@ export async function handleDatabaseRestore(backupPath?: string): Promise<void> 
 
 /**
  * Handles the 'database:create' command - creates database and schema
+ * Enhanced to handle existing tables with backup, recreation, and merge functionality
  */
 export async function handleDatabaseCreate(): Promise<void> {
     try {
+        // Animated header
+        terminal.clear();
+        terminal.magenta.bold('\n🚀 Bunext Database Creator\n');
+        terminal('═'.repeat(50) + '\n\n');
+
+        const progressBar = terminal.progressBar({
+            width: 40,
+            title: 'Initializing...',
+            eta: true,
+            percent: true
+        });
+
+        progressBar.update(0.1);
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const dbExists = await checkDatabaseExists();
+        progressBar.update(0.3);
+        const hasExistingTables = dbExists ? await checkExistingTables() : false;
+        progressBar.update(0.5);
+
+        if (hasExistingTables) {
+            progressBar.stop();
+            terminal('\n');
+            terminal.yellow.bold('⚠️  Warning: Database already exists with tables.\n');
+            terminal.cyan('To ensure compatibility with the new schema, the following process will occur:\n\n');
+
+            const steps = [
+                '📦 Create a temporary backup of existing data',
+                '🗑️  Drop existing tables and recreate with new schema',
+                '🔄 Attempt to merge back compatible data',
+                '⚙️  Handle any conflicts with configurable resolution'
+            ];
+
+            steps.forEach((step, index) => {
+                terminal.dim(`${index + 1}. `);
+                terminal.cyan(step + '\n');
+            });
+
+            terminal('\n');
+            const shouldProceed = await promptForConfirmation(
+                "Do you want to proceed with schema migration? This will modify your database.",
+                false
+            );
+
+            if (!shouldProceed) {
+                terminal.red('❌ Database creation cancelled.\n');
+                return;
+            }
+
+            // Ask for conflict resolution strategy upfront
+            const conflictResolution = await promptForConflictResolution();
+
+            // Ask if user wants to keep a permanent backup
+            const shouldKeepBackup = await promptForConfirmation(
+                "Create a permanent backup before migration? (recommended)",
+                true
+            );
+
+            await performDatabaseMigration(conflictResolution, shouldKeepBackup);
+        } else {
+            progressBar.update(0.8);
+            await createDatabaseSchema();
+            progressBar.update(0.9);
+            await createDatabase();
+            progressBar.update(1.0);
+            progressBar.stop();
+
+            terminal('\n');
+            terminal.green.bold('✅ Database and schema created successfully!\n');
+            terminal.cyan('🎉 Your database is ready to use!\n');
+        }
+    } catch (error) {
+        terminal.red(`\n❌ Database creation failed: ${error}\n`);
+        throw new Error(`Database creation failed: ${error}`);
+    }
+}
+
+/**
+ * Checks if the database has existing user tables
+ */
+async function checkExistingTables(): Promise<boolean> {
+    try {
+        const { DatabaseManager } = await import("../database/class");
+        const dbManager = new DatabaseManager();
+        const tables = dbManager.listTables();
+        return tables.length > 0;
+    } catch (error) {
+        // If we can't check tables, assume none exist
+        return false;
+    }
+}
+
+/**
+ * Performs the complete database migration process with animated progress
+ */
+async function performDatabaseMigration(
+    conflictResolution: 'replace' | 'ignore' | 'fail',
+    shouldKeepBackup: boolean
+): Promise<void> {
+    const { DatabaseManager } = await import("../database/class");
+    const dbManager = new DatabaseManager();
+
+    // Step 1: Create temporary backup
+    const tempBackupPath = `./config/temp-migration-backup-${Date.now()}.db.gz`;
+    const permanentBackupPath = shouldKeepBackup
+        ? `./config/pre-migration-backup-${new Date().toISOString().split('T')[0]}-${Date.now()}.db.gz`
+        : null;
+
+    terminal('\n');
+    terminal.cyan('📦 Creating temporary backup of existing data...\n');
+
+    try {
+        dbManager.backup(tempBackupPath, { compress: true, includeData: true });
+
+        if (permanentBackupPath) {
+            terminal.cyan(`📦 Creating permanent backup: ${permanentBackupPath}\n`);
+            dbManager.backup(permanentBackupPath, { compress: true, includeData: true });
+        }
+
+        terminal.green('✅ Backup created successfully\n');
+
+        // Step 2: Get statistics before migration
+        const existingTables = dbManager.listTables();
+        const existingStats = dbManager.getDatabaseStats();
+
+        terminal.blue(`📊 Current database: ${existingStats.tables} tables, ${existingStats.totalRecords} total records\n`);
+
+        // Progress bar for migration steps
+        const migrationProgress = terminal.progressBar({
+            width: 50,
+            title: 'Migration Progress',
+            eta: true,
+            percent: true
+        });
+
+        // Step 3: Drop existing tables
+        migrationProgress.update(0.2);
+        terminal.yellow('🗑️  Dropping existing tables...\n');
+        for (const tableName of existingTables) {
+            dbManager.databaseInstance.exec(`DROP TABLE IF EXISTS ${tableName}`);
+        }
+
+        // Step 4: Create new schema and database
+        migrationProgress.update(0.5);
+        terminal.blue('🔨 Creating new database schema...\n');
         await createDatabaseSchema();
         await createDatabase();
-        console.log("Database and schema created successfully");
+
+        // Step 5: Attempt to merge back data from backup
+        migrationProgress.update(0.7);
+        terminal.cyan('🔄 Analyzing backup data for compatibility...\n');
+
+        const newTables = dbManager.listTables();
+        const mergeableData = await analyzeMergeableData(tempBackupPath, newTables);
+
+        migrationProgress.update(0.9);
+
+        if (mergeableData.compatibleTables.length > 0) {
+            migrationProgress.stop();
+            terminal('\n');
+            terminal.green.bold(`📋 Found ${mergeableData.compatibleTables.length} compatible tables to merge:\n`);
+
+            mergeableData.compatibleTables.forEach(table => {
+                terminal.cyan(`   📊 ${table.name} `);
+                terminal.green(`(${table.compatibleColumns}/${table.totalColumns} columns compatible)\n`);
+            });
+
+            const shouldMergeData = await promptForConfirmation(
+                "\nProceed with merging compatible data?",
+                true
+            );
+
+            if (shouldMergeData) {
+                terminal('\n');
+                const mergeProgress = terminal.progressBar({
+                    width: 40,
+                    title: 'Merging Data',
+                    eta: true,
+                    percent: true
+                });
+
+                await performSelectiveMerge(tempBackupPath, mergeableData.compatibleTables, conflictResolution);
+                mergeProgress.update(1.0);
+                mergeProgress.stop();
+
+                // Show final statistics
+                const finalStats = dbManager.getDatabaseStats();
+                terminal('\n');
+                terminal.green.bold(`📊 Final database: ${finalStats.tables} tables, ${finalStats.totalRecords} total records\n`);
+
+                if (mergeableData.incompatibleTables.length > 0) {
+                    terminal('\n');
+                    terminal.yellow.bold('⚠️  The following tables had incompatible schemas and were not merged:\n');
+                    mergeableData.incompatibleTables.forEach(table => {
+                        terminal.red(`   ❌ ${table} `);
+                        terminal.dim('(check backup for this data)\n');
+                    });
+                }
+            } else {
+                terminal.yellow('⏭️  Data merge skipped. Your backup contains the original data.\n');
+            }
+        } else {
+            migrationProgress.stop();
+            terminal('\n');
+            terminal.yellow.bold('⚠️  No compatible tables found for automatic merging.\n');
+            terminal.cyan('Your original data is preserved in the backup file.\n');
+        }
+
+        terminal('\n');
+        terminal.green.bold('🎉 Database migration completed successfully!\n');
+
+        if (permanentBackupPath) {
+            terminal.cyan(`📁 Permanent backup saved: ${permanentBackupPath}\n`);
+        }
+
+        terminal.cyan(`📁 Temporary backup: ${tempBackupPath} `);
+        terminal.dim('(you can delete this after verifying)\n');
+
     } catch (error) {
-        throw new Error(`Database creation failed: ${error}`);
+        terminal('\n');
+        terminal.red.bold('❌ Migration failed! Attempting to restore from backup...\n');
+
+        try {
+            // Restore from backup on failure
+            dbManager.restore(tempBackupPath);
+            terminal.green('✅ Database restored from backup\n');
+        } catch (restoreError) {
+            terminal.red(`❌ Failed to restore from backup: ${restoreError}\n`);
+            terminal.yellow(`Your backup is available at: ${tempBackupPath}\n`);
+        }
+
+        throw error;
+    } finally {
+        // Clean up temporary backup if not needed
+        try {
+            const fs = require('fs');
+            if (!shouldKeepBackup && fs.existsSync(tempBackupPath)) {
+                const shouldDeleteTemp = await promptForConfirmation(
+                    `Delete temporary backup file ${tempBackupPath}?`,
+                    false
+                );
+                if (shouldDeleteTemp) {
+                    fs.unlinkSync(tempBackupPath);
+                    terminal.green('🗑️  Temporary backup file deleted\n');
+                }
+            }
+        } catch (error) {
+            terminal.yellow(`⚠️  Could not clean up temporary backup file: ${error}\n`);
+        }
+    }
+}
+
+/**
+ * Analyzes which tables can be merged between backup and new schema
+ */
+async function analyzeMergeableData(backupPath: string, newTables: string[]): Promise<{
+    compatibleTables: Array<{ name: string; compatibleColumns: number; totalColumns: number; }>;
+    incompatibleTables: string[];
+}> {
+    try {
+        const fs = require('fs');
+        const { Database: BunDB } = require('bun:sqlite');
+
+        // Decompress and read backup
+        const compressedData = fs.readFileSync(backupPath);
+        const decompressed = Bun.gunzipSync(compressedData);
+        const tempBackupPath = backupPath.replace('.gz', '.tmp');
+        fs.writeFileSync(tempBackupPath, decompressed);
+
+        const backupDb = new BunDB(tempBackupPath, { readonly: true });
+        const { DatabaseManager } = await import("../database/class");
+        const dbManager = new DatabaseManager();
+
+        const compatibleTables: Array<{ name: string; compatibleColumns: number; totalColumns: number; }> = [];
+        const incompatibleTables: string[] = [];
+
+        try {
+            // Get tables from backup
+            const backupTables = backupDb.prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).all() as { name: string }[];
+
+            for (const { name: tableName } of backupTables) {
+                if (newTables.includes(tableName)) {
+                    // Compare schemas
+                    const backupSchema = backupDb.prepare(`PRAGMA table_info(${tableName})`).all();
+                    const currentSchema = dbManager.databaseInstance.prepare(`PRAGMA table_info(${tableName})`).all();
+
+                    const backupColumns = new Set(backupSchema.map((col: any) => col.name));
+                    const currentColumns = new Set(currentSchema.map((col: any) => col.name));
+
+                    // Find compatible columns (intersection)
+                    const compatibleColumns = [...backupColumns].filter(col => currentColumns.has(col));
+
+                    if (compatibleColumns.length > 0) {
+                        compatibleTables.push({
+                            name: tableName,
+                            compatibleColumns: compatibleColumns.length,
+                            totalColumns: backupColumns.size
+                        });
+                    } else {
+                        incompatibleTables.push(tableName);
+                    }
+                } else {
+                    incompatibleTables.push(tableName);
+                }
+            }
+        } finally {
+            backupDb.close();
+            fs.unlinkSync(tempBackupPath);
+        }
+
+        return { compatibleTables, incompatibleTables };
+    } catch (error) {
+        console.warn("Could not analyze backup data:", error);
+        return { compatibleTables: [], incompatibleTables: [] };
+    }
+}
+
+/**
+ * Performs selective merge of compatible tables
+ */
+async function performSelectiveMerge(
+    backupPath: string,
+    compatibleTables: Array<{ name: string; compatibleColumns: number; totalColumns: number; }>,
+    conflictResolution: 'replace' | 'ignore' | 'fail'
+): Promise<void> {
+    try {
+        const fs = require('fs');
+        const { Database: BunDB } = require('bun:sqlite');
+        const { DatabaseManager } = await import("../database/class");
+
+        // Decompress backup
+        const compressedData = fs.readFileSync(backupPath);
+        const decompressed = Bun.gunzipSync(compressedData);
+        const tempBackupPath = backupPath.replace('.gz', '.merge-tmp');
+        fs.writeFileSync(tempBackupPath, decompressed);
+
+        const dbManager = new DatabaseManager();
+
+        try {
+            // Attach backup database
+            dbManager.databaseInstance.exec(`ATTACH DATABASE '${tempBackupPath}' AS backup_db`);
+
+            for (const table of compatibleTables) {
+                console.log(`🔄 Merging table: ${table.name}...`);
+
+                // Get compatible columns for both databases
+                const currentSchema = dbManager.databaseInstance.prepare(`PRAGMA table_info(${table.name})`).all();
+                const backupSchema = dbManager.databaseInstance.prepare(`PRAGMA backup_db.table_info(${table.name})`).all();
+
+                const currentColumns = new Set(currentSchema.map((col: any) => col.name));
+                const backupColumns = new Set(backupSchema.map((col: any) => col.name));
+                const compatibleColumns = [...backupColumns].filter(col => currentColumns.has(col));
+
+                if (compatibleColumns.length > 0) {
+                    const columnsList = compatibleColumns.join(', ');
+                    const conflictAction = conflictResolution === 'replace' ? 'REPLACE' :
+                        conflictResolution === 'ignore' ? 'IGNORE' : 'ABORT';
+
+                    try {
+                        const query = `INSERT OR ${conflictAction} INTO ${table.name} (${columnsList}) 
+                                     SELECT ${columnsList} FROM backup_db.${table.name}`;
+                        dbManager.databaseInstance.exec(query);
+
+                        // Count merged records
+                        const count = dbManager.databaseInstance.prepare(`SELECT COUNT(*) as count FROM ${table.name}`).get() as { count: number };
+                        console.log(`   ✅ Merged ${table.name}: ${count.count} records`);
+
+                        if (table.compatibleColumns < table.totalColumns) {
+                            console.log(`   ⚠️  Note: ${table.totalColumns - table.compatibleColumns} columns were not compatible and were skipped`);
+                        }
+                    } catch (error) {
+                        if (conflictResolution === 'fail') {
+                            throw new Error(`Merge conflict in table ${table.name}: ${error}`);
+                        }
+                        console.warn(`   ⚠️  Warning: Some records in ${table.name} were skipped due to conflicts`);
+                    }
+                }
+            }
+
+        } finally {
+            try {
+                dbManager.databaseInstance.exec("DETACH DATABASE backup_db");
+            } catch { }
+
+            if (fs.existsSync(tempBackupPath)) {
+                fs.unlinkSync(tempBackupPath);
+            }
+        }
+
+    } catch (error) {
+        throw new Error(`Selective merge failed: ${error}`);
     }
 }
 
@@ -286,20 +675,19 @@ function checkDatabaseExists(): Promise<boolean> {
 async function createDatabaseSchema(): Promise<void> {
     if (await checkDatabaseExists()) {
         console.warn(
-            `config/${CONFIG.DATABASE_PATH} already exists. The new Database Schema may not fit.\n` +
-            "Database merging will be available in a future release."
+            `config/${CONFIG.DATABASE_PATH} already exists. The new Database Schema may not fit.\n`
         );
     }
 
     try {
         const schemaPath = resolve(process.cwd(), "config", CONFIG.DATABASE_SCHEMA_PATH);
-        const schemaModule = require(schemaPath);
+        const schemaModule = (await import(schemaPath))?.default as DBSchema | undefined;
 
-        if (!schemaModule?.default) {
+        if (!schemaModule) {
             throw new Error(`No default export found in ${CONFIG.DATABASE_SCHEMA_PATH}`);
         }
 
-        const typeDefinitions = ConvertShemaToType(schemaModule.default);
+        const typeDefinitions = ConvertShemaToType(schemaModule);
 
         // Write type definitions
         const typesContent = [
@@ -339,23 +727,20 @@ async function updateDatabaseIndexFile(typeDefinitions: { tables: string[] }): P
     const importContent = `\nimport type { ${typeDefinitions.tables
         .map((table) => `_${table}, SELECT_${table}`)
         .join(", ")} } from "./database_types.ts";\n`;
-
-    content = replaceContentBetweenSeparators(
-        content,
-        CONFIG.SEPARATORS.IMPORT,
-        importContent
-    );
-
     // Update export section
+
     const exportContent = `\nreturn {\n ${typeDefinitions.tables
         .map((table) => `${table}: new Table<_${table}, SELECT_${table}>({ name: "${table}" })`)
         .join(",\n ")} \n} as const;\n`;
 
-    content = replaceContentBetweenSeparators(
-        content,
-        CONFIG.SEPARATORS.EXPORT,
-        exportContent
-    );
+    content = `"use client";
+        ${importContent}
+        import { Table } from "./class";
+
+        export function Database() {
+            ${exportContent}
+        };
+    `
 
     await Bun.write(dbFile, content);
 }
@@ -404,63 +789,67 @@ async function createDatabase(): Promise<void> {
 }
 
 /**
- * Prompts user for confirmation with y/N input
+ * Prompts user for confirmation with beautiful terminal-kit UI
  */
-async function promptForConfirmation(message: string): Promise<boolean> {
-    process.stdout.write(message);
+async function promptForConfirmation(message: string, defaultValue: boolean = false): Promise<boolean> {
+    terminal('\n');
+    terminal.cyan(message);
+    terminal(' ');
 
-    for await (const line of console) {
-        const input = line.toString().trim().toLowerCase();
-        if (input === 'y' || input === 'yes') {
-            return true;
-        } else if (input === 'n' || input === 'no' || input === '') {
-            return false;
-        } else {
-            process.stdout.write("Please enter 'y' for yes or 'n' for no: ");
-        }
+    if (defaultValue) {
+        terminal.dim('(Y/n)');
+    } else {
+        terminal.dim('(y/N)');
     }
 
-    return false;
+    terminal(' ');
+
+    const result = await terminal.yesOrNo({
+        yes: ['y', 'yes', 'Y', 'YES'],
+        no: ['n', 'no', 'N', 'NO']
+    }).promise;
+
+    terminal('\n');
+    return result ?? defaultValue;
 }
 
 /**
- * Prompts user to select conflict resolution strategy
+ * Prompts user to select conflict resolution strategy with beautiful terminal-kit UI
  */
 async function promptForConflictResolution(): Promise<'replace' | 'ignore' | 'fail'> {
-    console.log("\nConflict Resolution Strategy:");
-    console.log("1. replace - Overwrite existing records with new data");
-    console.log("2. ignore  - Keep existing records, skip conflicting new data");
-    console.log("3. fail    - Stop merge operation on first conflict");
+    terminal('\n');
+    terminal.magenta.bold('🔧 Conflict Resolution Strategy\n');
+    terminal.cyan('When merging data back after schema changes, conflicts may occur.\n');
+    terminal.cyan('Choose how to handle records that conflict:\n\n');
 
-    process.stdout.write("Choose strategy (1-3) [default: 2]: ");
+    const items = [
+        '🔄 Replace - Overwrite existing records with backup data (recommended for most cases)',
+        '⏭️  Ignore - Keep new schema records, skip conflicting backup data',
+        '🛑 Fail - Stop migration on first conflict (safest, but may require manual intervention)'
+    ];
 
-    for await (const line of console) {
-        const input = line.toString().trim();
+    const result = await terminal.singleColumnMenu(items, {
+        selectedIndex: 0,
+        style: terminal.cyan,
+        selectedStyle: terminal.green.bold,
+        cancelable: false,
+        exitOnUnexpectedKey: false
+    }).promise;
 
-        switch (input) {
-            case '1':
-                return 'replace';
-            case '2':
-            case '':
-                return 'ignore';
-            case '3':
-                return 'fail';
-            default:
-                process.stdout.write("Please enter 1, 2, or 3: ");
-        }
-    }
+    const strategies: ('replace' | 'ignore' | 'fail')[] = ['replace', 'ignore', 'fail'];
+    const selectedStrategy = strategies[result.selectedIndex];
 
-    return 'ignore'; // Default fallback
+    terminal('\n');
+    terminal.green(`📝 Selected: ${items[result.selectedIndex]}\n`);
+
+    return selectedStrategy;
 }
 
 /**
- * Prompts user to select which tables to merge from the source database
+ * Prompts user to select which tables to merge with interactive terminal-kit UI
  */
 async function promptForTableSelection(sourcePath: string): Promise<string[]> {
     try {
-        // Get list of tables from source database
-        const { DatabaseManager } = await import("../database/class");
-
         // Create a temporary connection to the source database to list tables
         const tempDb = new (await import("bun:sqlite")).Database(sourcePath, { readonly: true });
         const tables = tempDb.prepare(
@@ -469,46 +858,38 @@ async function promptForTableSelection(sourcePath: string): Promise<string[]> {
         tempDb.close();
 
         if (tables.length === 0) {
-            console.log("No user tables found in source database.");
+            terminal.yellow('\n⚠️  No user tables found in source database.\n');
             return [];
         }
 
-        console.log("\nAvailable tables in source database:");
-        tables.forEach((table, index) => {
-            console.log(`${index + 1}. ${table.name}`);
-        });
+        terminal('\n');
+        terminal.magenta.bold('📋 Table Selection\n');
+        terminal.cyan('Available tables in source database:\n\n');
 
-        console.log("\nEnter table numbers to merge (comma-separated), or 'all' for all tables:");
-        process.stdout.write("Tables to merge [all]: ");
+        const menuItems = [
+            '✅ All tables (merge everything)',
+            ...tables.map(table => `📊 ${table.name}`)
+        ];
 
-        for await (const line of console) {
-            const input = line.toString().trim();
+        const result = await terminal.singleColumnMenu(menuItems, {
+            style: terminal.cyan,
+            selectedStyle: terminal.green.bold,
+            cancelable: false,
+            exitOnUnexpectedKey: false,
+            leftPadding: '  '
+        }).promise;
 
-            if (input === '' || input.toLowerCase() === 'all') {
-                return tables.map(t => t.name);
-            }
-
-            try {
-                const selectedIndices = input.split(',').map(s => parseInt(s.trim()) - 1);
-                const invalidIndices = selectedIndices.filter(i => i < 0 || i >= tables.length);
-
-                if (invalidIndices.length > 0) {
-                    process.stdout.write(`Invalid table numbers. Please enter numbers 1-${tables.length}: `);
-                    continue;
-                }
-
-                const selectedTables = selectedIndices.map(i => tables[i].name);
-                console.log(`Selected tables: ${selectedTables.join(', ')}`);
-                return selectedTables;
-
-            } catch (error) {
-                process.stdout.write("Invalid input. Please enter comma-separated numbers or 'all': ");
-            }
+        if (result.selectedIndex === 0) {
+            terminal.green('\n📝 Selected: All tables\n');
+            return tables.map(t => t.name);
+        } else {
+            const selectedTable = tables[result.selectedIndex - 1];
+            terminal.green(`\n📝 Selected: ${selectedTable.name}\n`);
+            return [selectedTable.name];
         }
 
-        return tables.map(t => t.name); // Default fallback
     } catch (error) {
-        console.warn(`Could not list tables from source database: ${error}`);
+        terminal.red(`\n❌ Could not list tables from source database: ${error}\n`);
         return [];
     }
 }
