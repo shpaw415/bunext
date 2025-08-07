@@ -1069,104 +1069,73 @@ export class DatabaseManager {
     }
   }
 }
-// Type definitions for database operations
+// Clean type definitions for database operations
 type OptionsFlags<Type> = {
   [Property in keyof Type]?: true;
 };
 
-type ReservedKeyWords = "LIKE" | "OR";
-type TableExtends = Record<string | ReservedKeyWords, string | number>;
 
-// Helper type to get only the keys that are set to true
-type TrueKeys<T> = {
-  [K in keyof T]: T[K] extends true ? K : never;
-}[keyof T];
+// Select field options that work with autocomplete
+type SelectFields<T> = {
+  [K in keyof T]?: true;
+};
 
-// More precise selected type
-type PreciseSelectedType<T, S> = S extends "*"
+type PreciseReturnType<T, S> = { [K in keyof S as S[K] extends true ? K : never]: K extends keyof T ? T[K] : never }
+
+// Precise type selection for return values
+type PreciseSelectedType<T, S> = S extends undefined
   ? T
-  : Pick<T, Extract<TrueKeys<S>, keyof T>>;
+  : S extends Record<string, any>
+  ? { [K in keyof T as K extends keyof S ? (S[K] extends true ? K : never) : never]: T[K] }
+  : never;
 
-type DatabaseSelectOptions<Table extends TableExtends> = {
-  where?: WhereClause<Table>;
-  select?: Partial<OptionsFlags<Table>> | "*";
+// Optional select fields for flexibility
+type OptionalSelectFields<T> = {
+  [K in keyof T]?: true;
+};
+
+// Database operation options
+type DatabaseSelectOptions<T, S = undefined> = {
+  where?: Partial<T> | { LIKE?: Partial<T>; OR?: Partial<T>[] };
+  select?: S;
   limit?: number;
   skip?: number;
 };
 
-type DatabaseInsertData<Table> = Table;
 
-type WhereClause<Table extends TableExtends> =
-  | (Partial<Table> & {
-    LIKE?: undefined;
-    OR?: undefined;
-  })
-  | (WhereOR<Table> & {
-    LIKE?: undefined;
-  })
-  | (WhereLike<Table> & { OR?: undefined });
-
-type WhereWithoutLike<Table extends TableExtends> =
-  | Partial<Table>
-  | WhereORWithoutLike<Table>;
-
-type WhereORWithoutLike<Table extends TableExtends> = {
-  OR: Partial<Table>[];
+type DatabaseUpdateOptions<T> = {
+  where: Partial<T> | { OR?: Partial<T>[] };
+  values: Partial<T>;
 };
 
-type FilterStringValues<T extends TableExtends> = {
-  [K in keyof T]: T[K] extends string ? K : never;
-}[keyof T];
-
-type FilteredStringObject<T extends TableExtends> = {
-  [K in FilterStringValues<T>]: T[K];
+type DatabaseDeleteOptions<T> = {
+  where: Partial<T> | { OR?: Partial<T>[] };
 };
 
-type WhereLike<Table extends TableExtends> =
-  | {
-    /**
-     * LIKE operator with wildcards:
-     * - **_** <-- single character
-     * - **%** <-- multiple characters
-     * @link https://www.sqlitetutorial.net/sqlite-like
-     * @example
-     * db.select({ where: { LIKE: { foo: "lo_" } } }) // matches "lor"
-     * @example
-     * db.select({ where: { LIKE: { foo: "lo%" } } }) // matches "lor", "lorem ipsum", etc.
-     */
-    LIKE: Partial<FilteredStringObject<Table>>;
-  } & { [K in Exclude<ReservedKeyWords, "LIKE">]?: undefined };
-
-type WhereOR<Table extends TableExtends> = {
-  OR: Partial<Table | WhereLike<Table>>[];
+type DatabaseCountOptions<T> = {
+  where?: Partial<T> | { LIKE?: Partial<T>; OR?: Partial<T>[] };
 };
 
-type DatabaseUpdateOptions<Table extends TableExtends> = {
-  where?: WhereWithoutLike<Table>;
-  values: Partial<Table>;
+// Query builder types
+type SelectQuery<T> = {
+  select?: SelectFields<T>;
+  where?: Partial<T> | { LIKE?: Partial<T>; OR?: Partial<T>[] };
+  limit?: number;
+  skip?: number;
+  orderBy?: {
+    column: keyof T;
+    direction?: 'ASC' | 'DESC';
+  };
 };
-
-type DatabaseDeleteOptions<Table extends TableExtends> = {
-  where: WhereWithoutLike<Table>;
-};
-
-type DatabaseCountOptions<Table extends TableExtends> = {
-  where?: WhereWithoutLike<Table>;
-};
-
-type DatabaseOperationOptions<
-  T extends TableExtends,
-  SELECT_FORMAT extends TableExtends
-> = DatabaseSelectOptions<SELECT_FORMAT> | DatabaseUpdateOptions<T> | DatabaseDeleteOptions<T> | DatabaseCountOptions<T>;
 
 
 
 /**
  * Enhanced Table class with better type safety and error handling
  */
-export class Table<
-  T extends Omit<TableSchema, "name" | "columns">,
-  SELECT_FORMAT extends Omit<TableSchema, "name" | "columns">
+class Table<
+  T extends Record<string, unknown>,
+  SELECT_FORMAT extends Record<string, unknown>
 > {
   private readonly tableName: string;
   private readonly isDebugEnabled: boolean;
@@ -1295,85 +1264,42 @@ export class Table<
    * 
    * const db = Database();
    * 
-   * // Get all users
+   * // Get all users - returns all fields
    * const allUsers = db.Users.select();
    * 
-   * // Get users with conditions
+   * // Get users with conditions - returns all fields
    * const activeUsers = db.Users.select({
    *   where: { isActive: true }
    * });
    * 
-   * // Complex query with LIKE and pagination
+   * // Complex query with LIKE and pagination - returns all fields
    * const searchResults = db.Users.select({
    *   where: { LIKE: { name: 'John%' } },
    *   limit: 10,
    *   skip: 0
    * });
    * 
-   * // OR conditions
+   * // OR conditions - returns all fields
    * const specificUsers = db.Users.select({
    *   where: { OR: [{ id: 1 }, { id: 2 }, { email: 'admin@example.com' }] }
    * });
    * ```
    */
-  select(options: Omit<DatabaseSelectOptions<SELECT_FORMAT>, 'select'> & { select?: "*" }): SELECT_FORMAT[];
 
-  /**
-   * Selects specific fields from the table with precise TypeScript type inference
-   * Returns only the specified columns, reducing memory usage and improving performance
-   * 
-   * @param options - Query options with specific field selection
-   * @param options.select - Object specifying which fields to include (field: true)
-   * @param options.where - WHERE clause conditions
-   * @param options.limit - Maximum number of records to return
-   * @param options.skip - Number of records to skip
-   * @returns Array of records containing only the selected fields with precise typing
-   * 
-   * @example
-   * ```typescript
-   * import { Database } from "bunext-js/database";
-   * 
-   * const db = Database();
-   * 
-   * // Select only specific fields - TypeScript knows exact return type
-   * const usernames = db.Users.select({
-   *   select: { id: true, name: true },
-   *   where: { isActive: true }
-   * });
-   * // Type: Array<{ id: number; name: string }>
-   * 
-   * // Select single field
-   * const emails = db.Users.select({
-   *   select: { email: true }
-   * });
-   * // Type: Array<{ email: string }>
-   * 
-   * // Complex selection with conditions
-   * const userProfiles = db.Users.select({
-   *   select: { id: true, name: true, email: true, createdAt: true },
-   *   where: { LIKE: { email: '%@company.com' } },
-   *   limit: 50
-   * });
-   * ```
-   */
-  select<TSelect extends OptionsFlags<SELECT_FORMAT>>(
-    options: Omit<DatabaseSelectOptions<SELECT_FORMAT>, 'select'> & { select: TSelect }
-  ): PreciseSelectedType<SELECT_FORMAT, TSelect>[];
-
-  /**
-   * Select records from the table (implementation)
-   */
-  select(options: DatabaseSelectOptions<SELECT_FORMAT> = {}): SELECT_FORMAT[] {
-    this.validateSelectOptions(options);
+  // Implementation
+  select<TSelect extends { [K in keyof T]?: true } | undefined>(
+    options?: DatabaseSelectOptions<T, TSelect>
+  ): Array<Exclude<PreciseSelectedType<T, TSelect>, Record<string, never>>> {
+    this.validateSelectOptions(options as any);
 
     // Handle empty OR conditions
-    if (options.where && 'OR' in options.where &&
+    if (options?.where && 'OR' in options.where &&
       Array.isArray(options.where.OR) && options.where.OR.length === 0) {
       return [];
     }
 
-    const queryString = this.buildSelectQuery(options);
-    const params = this.extractQueryParameters(options);
+    const queryString = this.buildSelectQuery(options as any);
+    const params = this.extractQueryParameters(options as any);
 
     this.debugLog("Executing SELECT query", { queryString, params });
 
@@ -1381,8 +1307,8 @@ export class Table<
       const query = this.databaseInstance.prepare(queryString);
       const results = query.all(...params) as Record<string, unknown>[];
       query.finalize();
-      return results.map(row => this.restoreDataTypes(row)) as SELECT_FORMAT[];
-    });
+      return results.map(row => this.restoreDataTypes(row));
+    }) as any;
   }
 
   /**
@@ -1429,7 +1355,7 @@ export class Table<
 
     const sampleRecord = records[0];
     const columns = Object.keys(sampleRecord);
-    const queryString = `INSERT INTO ${this.tableName} (${columns.join(", ")}) VALUES (${columns.map(col => `$${col}`).join(", ")})`;
+    const queryString = `INSERT INTO ${this.tableName} (${columns.join(", ")}) VALUES (${columns.map(() => '?').join(", ")})`;
 
     this.debugLog("Executing INSERT query", { queryString, recordCount: records.length });
 
@@ -1437,8 +1363,8 @@ export class Table<
       const insertStmt = this.databaseInstance.prepare(queryString);
       const insertTransaction = this.databaseInstance.transaction((records: T[]) => {
         for (const record of records) {
-          const formattedRecord = this.formatRecordForInsert(record);
-          insertStmt.run(formattedRecord);
+          const formattedValues = this.formatRecordValuesForInsert(record, columns);
+          const result = insertStmt.run(...formattedValues);
         }
       });
 
@@ -1490,13 +1416,13 @@ export class Table<
     return this.executeWithErrorWrapper(() => {
       const sampleRecord = records[0];
       const columns = Object.keys(sampleRecord);
-      const queryString = `INSERT INTO ${this.tableName} (${columns.join(", ")}) VALUES (${columns.map(col => `$${col}`).join(", ")})`;
+      const queryString = `INSERT INTO ${this.tableName} (${columns.join(", ")}) VALUES (${columns.map(() => '?').join(", ")})`;
 
       const insertStmt = this.databaseInstance.prepare(queryString);
       const bulkTransaction = this.databaseInstance.transaction((batch: T[]) => {
         for (const record of batch) {
-          const formattedRecord = this.formatRecordForInsert(record);
-          const result = insertStmt.run(formattedRecord);
+          const formattedValues = this.formatRecordValuesForInsert(record, columns);
+          const result = insertStmt.run(...formattedValues);
           insertedIds.push(result.lastInsertRowid as number);
         }
       });
@@ -1564,7 +1490,7 @@ export class Table<
 
     const queryString = `
       INSERT INTO ${this.tableName} (${columns.join(", ")})
-      VALUES (${columns.map(col => `$${col}`).join(", ")})
+      VALUES (${columns.map(() => '?').join(", ")})
       ON CONFLICT(${conflictCols}) DO UPDATE SET ${updateCols}
     `;
 
@@ -1574,8 +1500,8 @@ export class Table<
       const upsertStmt = this.databaseInstance.prepare(queryString);
       const upsertTransaction = this.databaseInstance.transaction((records: T[]) => {
         for (const record of records) {
-          const formattedRecord = this.formatRecordForInsert(record);
-          upsertStmt.run(formattedRecord);
+          const formattedValues = this.formatRecordValuesForInsert(record, columns);
+          upsertStmt.run(...formattedValues);
         }
       });
 
@@ -1806,7 +1732,7 @@ export class Table<
    * 
    * const db = Database();
    * 
-   * // Find user by email
+   * // Find user by email - returns full user object or null
    * const user = db.Users.findFirst({
    *   where: { email: 'john@example.com' }
    * });
@@ -1814,11 +1740,12 @@ export class Table<
    *   console.log(`Found user: ${user.name}`);
    * }
    * 
-   * // Find with specific field selection
+   * // Find with specific field selection - returns only selected fields or null
    * const userProfile = db.Users.findFirst({
    *   where: { id: 1 },
    *   select: { id: true, name: true, email: true }
    * });
+   * // Type: { id: number; name: string; email: string } | null
    * 
    * // Find active admin
    * const admin = db.Users.findFirst({
@@ -1835,23 +1762,32 @@ export class Table<
    * console.log(maybeUser?.name ?? 'User not found');
    * ```
    */
+  findFirst(): SELECT_FORMAT | null;
+  findFirst(options: { where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] } }): SELECT_FORMAT | null;
+
+  // Overload 2: Specific field selection - returns partial record or null with enhanced autocomplete
+  findFirst<TSelect extends { [K in keyof SELECT_FORMAT]?: true }>(
+    options: { where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] }; select: TSelect }
+  ): PreciseSelectedType<SELECT_FORMAT, TSelect> | null;
+
+  // Implementation
   findFirst(options?: {
-    where?: WhereClause<SELECT_FORMAT>;
-    select?: Partial<OptionsFlags<SELECT_FORMAT>> | "*";
-  }): SELECT_FORMAT | null {
-    if (!options?.select || options.select === "*") {
+    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    select?: SelectFields<SELECT_FORMAT>;
+  }): any {
+    if (!options?.select) {
       const results = this.select({
-        where: options?.where,
+        where: options?.where as any,
         limit: 1
       });
       return results.length > 0 ? results[0] : null;
     } else {
       const results = this.select({
-        where: options.where,
-        select: options.select as OptionsFlags<SELECT_FORMAT>,
+        where: options.where as any,
+        select: options.select as any,
         limit: 1
       });
-      return results.length > 0 ? results[0] as SELECT_FORMAT : null;
+      return results.length > 0 ? results[0] : null;
     }
   }
 
@@ -1901,7 +1837,7 @@ export class Table<
    * ```
    */
   exists(options?: {
-    where?: WhereClause<SELECT_FORMAT>;
+    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
   }): boolean {
     let query = `SELECT 1 FROM ${this.tableName}`;
     let params: (string | number)[] = [];
@@ -1971,7 +1907,7 @@ export class Table<
    */
   distinct<K extends keyof SELECT_FORMAT>(options: {
     column: K;
-    where?: WhereClause<SELECT_FORMAT>;
+    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
     limit?: number;
   }): SELECT_FORMAT[K][] {
     const { column, where, limit } = options;
@@ -2052,7 +1988,7 @@ export class Table<
   aggregate<K extends keyof SELECT_FORMAT>(options: {
     column: K;
     functions: Array<'SUM' | 'AVG' | 'MIN' | 'MAX' | 'COUNT'>;
-    where?: WhereClause<SELECT_FORMAT>;
+    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
   }): Record<string, number> {
     const { column, functions, where } = options;
     const selectClauses = functions.map(fn => `${fn}(${String(column)}) as ${fn}`).join(', ');
@@ -2134,8 +2070,8 @@ export class Table<
   paginate(options: {
     page: number;
     pageSize: number;
-    where?: WhereClause<SELECT_FORMAT>;
-    select?: Partial<OptionsFlags<SELECT_FORMAT>> | "*";
+    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    select?: Partial<OptionsFlags<SELECT_FORMAT>>;
     orderBy?: {
       column: keyof SELECT_FORMAT;
       direction?: 'ASC' | 'DESC';
@@ -2167,7 +2103,7 @@ export class Table<
     });
 
     // Build paginated query
-    const selectOptions = { where: whereClause, select: selectClause };
+    const selectOptions: any = { where: whereClause, select: selectClause };
     let query = this.buildSelectQuery(selectOptions);
 
     if (orderBy) {
@@ -2197,11 +2133,11 @@ export class Table<
   }
 
   // Helper methods for validation
-  private validateSelectOptions(options: DatabaseSelectOptions<SELECT_FORMAT>): void {
-    if (options.limit && options.limit < 0) {
+  private validateSelectOptions(options?: DatabaseSelectOptions<T, any>): void {
+    if (options?.limit && options.limit < 0) {
       throw new Error("Limit must be a positive number");
     }
-    if (options.skip && options.skip < 0) {
+    if (options?.skip && options.skip < 0) {
       throw new Error("Skip must be a positive number");
     }
   }
@@ -2219,13 +2155,13 @@ export class Table<
   }
 
   // Helper methods for query building
-  private buildSelectQuery(options: DatabaseSelectOptions<SELECT_FORMAT>): string {
+  private buildSelectQuery(options?: DatabaseSelectOptions<T, any>): string {
     let query = "SELECT ";
 
-    if (options.select === "*" || !options.select) {
+    if (!options?.select) {
       query += "*";
     } else {
-      const selectedColumns = Object.keys(options.select).filter(
+      const selectedColumns = Object.keys(options.select as Record<string, any>).filter(
         col => Boolean(options.select && (options.select as Record<string, boolean>)[col])
       );
       query += selectedColumns.join(", ");
@@ -2233,24 +2169,24 @@ export class Table<
 
     query += ` FROM ${this.tableName}`;
 
-    if (options.where) {
+    if (options?.where) {
       query += ` ${this.buildWhereClause(options.where)}`;
     }
 
-    if (options.limit) {
+    if (options?.limit) {
       query += ` LIMIT ${options.limit}`;
     }
 
-    if (options.skip) {
+    if (options?.skip) {
       query += ` OFFSET ${options.skip}`;
     }
 
     return query;
   }
 
-  private buildWhereClause(where: WhereClause<SELECT_FORMAT>): string;
-  private buildWhereClause(where: WhereWithoutLike<T>): string;
-  private buildWhereClause(where: WhereClause<SELECT_FORMAT> | WhereWithoutLike<T>): string {
+  private buildWhereClause(where: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] }): string;
+  private buildWhereClause(where: Partial<T> | { OR?: Partial<T>[] }): string;
+  private buildWhereClause(where: any): string {
     if (!where || Object.keys(where).length === 0) {
       return "";
     }
@@ -2263,7 +2199,7 @@ export class Table<
 
     // Handle OR operator
     if ('OR' in where && where.OR && Array.isArray(where.OR)) {
-      const orConditions = where.OR.map((condition) => {
+      const orConditions = where.OR.map((condition: any) => {
         if (typeof condition === 'object' && condition !== null && 'LIKE' in condition && condition.LIKE) {
           const likeConditions = Object.keys(condition.LIKE).map(key => `${key} LIKE ?`);
           return likeConditions.join(" AND ");
@@ -2279,14 +2215,14 @@ export class Table<
     return `WHERE ${conditions.join(" AND ")}`;
   }
 
-  private extractQueryParameters(options: DatabaseSelectOptions<SELECT_FORMAT>): (string | number)[] {
-    if (!options.where) return [];
+  private extractQueryParameters(options?: DatabaseSelectOptions<T, any>): (string | number)[] {
+    if (!options?.where) return [];
     return this.extractWhereParameters(options.where);
   }
 
-  private extractWhereParameters(where: WhereClause<SELECT_FORMAT>): (string | number)[];
-  private extractWhereParameters(where: WhereWithoutLike<T>): (string | number)[];
-  private extractWhereParameters(where: WhereClause<SELECT_FORMAT> | WhereWithoutLike<T> | undefined): (string | number)[] {
+  private extractWhereParameters(where: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] }): (string | number)[];
+  private extractWhereParameters(where: Partial<T> | { OR?: Partial<T>[] }): (string | number)[];
+  private extractWhereParameters(where: any): (string | number)[] {
     if (!where) return [];
 
     // Handle LIKE operator
@@ -2342,6 +2278,14 @@ export class Table<
     }
 
     return formatted;
+  }
+
+  private formatRecordValuesForInsert(record: Record<string, unknown>, columns: string[]): (string | number)[] {
+    return columns.map(column => {
+      const value = record[column];
+      const [parsedValue] = this.parseParameters([value]);
+      return parsedValue;
+    });
   }
 
   private restoreDataTypes(row: Record<string, unknown>): Record<string, unknown> {
@@ -2487,7 +2431,7 @@ export class Table<
       keyColumn: String(keyColumn)
     });
 
-    const sourceData = sourceTable.select({ select: "*" }) as U[];
+    const sourceData = sourceTable.select({}) as U[];
     const stats = { inserted: 0, updated: 0, skipped: 0 };
 
     const batches = this.chunk(sourceData, batchSize);
@@ -2602,8 +2546,8 @@ export class Table<
    * ```
    */
   exportToJson(options: {
-    where?: WhereClause<SELECT_FORMAT>;
-    select?: Partial<OptionsFlags<SELECT_FORMAT>> | "*";
+    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    select?: Partial<OptionsFlags<SELECT_FORMAT>>;
     filePath?: string;
     pretty?: boolean;
   } = {}): string | void {
@@ -3039,6 +2983,153 @@ export class Table<
       return results as TResult[];
     });
   }
+
+  /**
+   * Creates a type-safe query builder for more complex queries
+   * Provides a fluent interface for building SELECT queries with method chaining
+   * Maintains full type safety throughout the building process
+   * 
+   * @returns A query builder instance with fluent interface
+   * 
+   * @example
+   * ```typescript
+   * const userTable = new Table<User, User>({ name: 'users' });
+   * 
+   * // Fluent query building with full type safety
+   * const activeUsers = userTable
+   *   .query()
+   *   .where({ isActive: true })
+   *   .select({ id: true, name: true, email: true })
+   *   .limit(10)
+   *   .execute();
+   * 
+   * // Complex filtering with method chaining
+   * const premiumUsers = userTable
+   *   .query()
+   *   .where({ status: 'premium' })
+   *   .whereLike({ email: '%@company.com' })
+   *   .selectAll()
+   *   .limit(50)
+   *   .skip(0)
+   *   .execute();
+   * 
+   * // Count with filters
+   * const activeUserCount = userTable
+   *   .query()
+   *   .where({ isActive: true })
+   *   .count();
+   * 
+   * // Check existence
+   * const hasAdmins = userTable
+   *   .query()
+   *   .where({ role: 'admin' })
+   *   .exists();
+   * ```
+   */
+  query(): QueryBuilder<SELECT_FORMAT> {
+    return new QueryBuilder<SELECT_FORMAT>(this);
+  }
+}
+
+/**
+ * Type-safe query builder for fluent query construction
+ * Provides method chaining with full TypeScript type inference
+ * Ensures type safety throughout the query building process
+ */
+class QueryBuilder<T extends Record<string, any>> {
+  private options: DatabaseSelectOptions<T, any> = {};
+
+  constructor(private table: Table<any, T>) { }
+
+  /**
+   * Add WHERE conditions to the query
+   */
+  where(conditions: Partial<T>): this {
+    this.options.where = conditions;
+    return this;
+  }
+
+  /**
+   * Add LIKE conditions to the query
+   */
+  whereLike(conditions: Partial<T>): this {
+    this.options.where = { LIKE: conditions };
+    return this;
+  }
+
+  /**
+   * Add OR conditions to the query
+   */
+  whereOr(conditions: Partial<T>[]): this {
+    this.options.where = { OR: conditions };
+    return this;
+  }
+
+  /**
+   * Select specific fields with type safety and enhanced autocomplete
+   */
+  select<TSelect extends Record<keyof T, true>>(
+    fields: TSelect
+  ): QueryBuilder<T>;
+  select<TSelect extends OptionalSelectFields<T>>(
+    fields: TSelect
+  ): QueryBuilder<T>;
+  select(fields: any): QueryBuilder<T> {
+    this.options.select = fields as any;
+    return this;
+  }
+
+  /**
+   * Select all fields (explicit)
+   */
+  selectAll(): this {
+    this.options.select = undefined;
+    return this;
+  }
+
+  /**
+   * Set the limit for results
+   */
+  limit(count: number): this {
+    this.options.limit = count;
+    return this;
+  }
+
+  /**
+   * Set the skip/offset for results
+   */
+  skip(count: number): this {
+    this.options.skip = count;
+    return this;
+  }
+
+  /**
+   * Execute the query and return results
+   */
+  execute(): any[] {
+    return (this.table as any).select(this.options);
+  }
+
+  /**
+   * Execute as findFirst and return first result or null
+   */
+  first(): any {
+    return (this.table as any).findFirst(this.options);
+  }
+
+  /**
+   * Count matching records
+   */
+  count(): number {
+    return (this.table as any).count({ where: this.options.where });
+  }
+
+  /**
+   * Check if any matching records exist
+   */
+  exists(): boolean {
+    return (this.table as any).exists({ where: this.options.where });
+  }
 }
 
 
@@ -3050,3 +3141,6 @@ export const wild = {
   single: "_",
   multiple: "%",
 } as const;
+
+
+export { Table };
