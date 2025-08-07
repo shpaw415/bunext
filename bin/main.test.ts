@@ -4,7 +4,6 @@ import "../database/class.ts";
 
 import "bunext-js/internal/server/server_global.ts";
 import { router } from "bunext-js/internal/server/router.tsx";
-import "../.bunext/react-ssr/server.ts";
 import { Shell } from "../.bunext/react-ssr/shell.tsx";
 import { ParseServerSideProps } from "../internal/router/index.tsx";
 
@@ -17,6 +16,7 @@ import {
 } from "../internal/session.ts";
 import CacheManager from "../internal/caching/index.ts";
 import { BunextRequest } from "../internal/server/bunextRequest.ts";
+import { BunextServer } from "../internal/server/index.ts";
 // Add custom matcher for toBeOneOf
 expect.extend({
   toBeOneOf(received: any, expected: any[]) {
@@ -63,8 +63,18 @@ async function initializeTestDatabase() {
 await initializeTestDatabase();
 
 
+const cwd = process.cwd();
+let Server: BunextServer | undefined = undefined;
 
-const Server = globalThis.Server;
+
+beforeAll(async () => {
+  Server = await BunextServer.getInitedInstance({
+    onRequest: undefined,
+    preloadModulePath: `${cwd}/config/preload.ts`,
+    Shell: () => null,
+    preventDevConsole: true,
+  });
+});
 
 // Test configuration and constants
 const TEST_TIMEOUT = 30000; // 30 seconds for slower operations
@@ -200,11 +210,16 @@ describe("Bunext Framework Test Suite", () => {
   describe("Session Management", () => {
     let testSession: BunextSession;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       testSession = new BunextSession({
         sessionTimeout: 3600,
-        enableLogging: false
+        enableLogging: false,
+        request: new BunextRequest({
+          request: new Request("http://localhost:3010/"),
+          response: new Response(),
+        }),
       });
+      return testSession.initData();
     });
 
     test("session initialization and database setup", async () => {
@@ -223,18 +238,19 @@ describe("Bunext Framework Test Suite", () => {
     test("session data operations", () => {
       // Test setting and getting session data
       testSession.setData(testSessionData, true);
-      const retrievedData = testSession.getData(true);
+      const retrievedData = testSession.getData();
 
       expect(retrievedData).toEqual(expect.objectContaining(testSessionData));
     });
 
-    test("session expiration handling", () => {
+    test("session expiration handling", async () => {
       const shortLivedSession = new BunextSession({
         sessionTimeout: 1, request: new BunextRequest({
           request: new Request("http://localhost:3010/"),
           response: new Response(),
         }),
       }); // 1 second
+      await shortLivedSession.initData();
       shortLivedSession.setData({ test: "data" }, true);
 
       expect(shortLivedSession.exists()).toBe(true);
@@ -243,7 +259,8 @@ describe("Bunext Framework Test Suite", () => {
       const metadata = shortLivedSession.getMetadata();
       expect(metadata.id).toBeDefined();
       expect(metadata.created).toBeDefined();
-      expect(metadata.isInitialized).toBe(false); // Server-side not initialized in test
+      await Bun.sleep(1500);
+      expect(shortLivedSession.isExpired()).toBe(true);
     });
 
     test("session security and validation", () => {
@@ -251,9 +268,8 @@ describe("Bunext Framework Test Suite", () => {
       testSession.setData({ secretKey: "secret123" }, false); // Private data
       testSession.setData({ publicInfo: "public123" }, true);  // Public data
 
-      const publicData = testSession.getData(true);
-      expect(publicData).toHaveProperty('publicInfo');
-      expect(publicData).not.toHaveProperty('secretKey');
+      expect(testSession.getPublicData()).toHaveProperty('publicInfo');
+      expect(testSession.getPublicData()).not.toHaveProperty('secretKey');
     });
 
     test("session cleanup and statistics", async () => {

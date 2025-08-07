@@ -1,3 +1,5 @@
+"server only";
+
 import { BunextRequest } from "../../../internal/server/bunextRequest";
 import { GetRequest } from "../bunextRequest";
 import { useRequest } from "../hooks";

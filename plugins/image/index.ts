@@ -1,3 +1,5 @@
+"server only";
+
 import sharp from "sharp";
 import type { BunextRequest } from "../../internal/server/bunextRequest";
 import type { BunextPlugin } from "../types";

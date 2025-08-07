@@ -8,6 +8,5 @@ export default function StyleTestPage() {
 
 
 function StyleTestPageElement() {
-  return <div className={moduleCss.test}>Test</div>;
+  return <div className={moduleCss.test}>Test 3</div>;
 }
-

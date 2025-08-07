@@ -1,3 +1,5 @@
+"server only";
+
 import "./bunext_global.ts";
 import { terminal } from 'terminal-kit';
 
@@ -194,7 +196,7 @@ class ScrollingConsole {
 
   initialize() {
     if (this.isInitialized) {
-      console.clear();
+      //console.clear();
       this.render();
       return;
     }
@@ -564,23 +566,21 @@ globalThis.BunextConsole ??= ScrollingConsole.getInstance();
 
 // Initialize the console (call this on server startup)
 export function initializeDevConsole() {
-  if (process.env.NODE_ENV === "development") {
-    globalThis.BunextConsole.initialize();
-    globalThis.BunextConsole.redirectConsole();
+  globalThis.BunextConsole.initialize();
+  globalThis.BunextConsole.redirectConsole();
 
-    // Handle graceful shutdown
-    process.on('SIGINT', () => {
-      console.log('\nReceived SIGINT, cleaning up...');
-      globalThis.BunextConsole.destroy();
-      process.exit(0);
-    });
+  // Handle graceful shutdown
+  process.on('SIGINT', () => {
+    console.log('\nReceived SIGINT, cleaning up...');
+    globalThis.BunextConsole.destroy();
+    process.exit(0);
+  });
 
-    process.on('SIGTERM', () => {
-      console.log('\nReceived SIGTERM, cleaning up...');
-      globalThis.BunextConsole.destroy();
-      process.exit(0);
-    });
-  }
+  process.on('SIGTERM', () => {
+    console.log('\nReceived SIGTERM, cleaning up...');
+    globalThis.BunextConsole.destroy();
+    process.exit(0);
+  });
 }
 
 // Enhanced DevConsole that uses scrolling

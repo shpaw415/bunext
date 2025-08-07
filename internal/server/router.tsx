@@ -1,3 +1,5 @@
+"server only";
+
 import {
   type BunFile,
   type FileSystemRouter,
@@ -21,8 +23,6 @@ import type {
   _SsrMode,
   getServerSidePropsFunction,
   ReactShellComponent,
-  ServerActionDataType,
-  ServerActionDataTypeHeader,
   ServerConfig,
   ServerSideProps,
 } from "../types";
@@ -53,7 +53,7 @@ interface ServerAction {
   actions: Array<Function>;
 }
 
-interface LayoutModule {
+type LayoutModule = {
   default: ({
     children,
     params,
@@ -63,7 +63,7 @@ interface LayoutModule {
   }) => JSX.Element | Promise<JSX.Element>;
 }
 
-interface PageModule {
+type PageModule = {
   default?: ({
     props,
     params,
@@ -625,6 +625,7 @@ class StaticRouters extends PluginLoader {
             });
           }
         } catch (error) {
+          if ((error as Error)?.message == "Requested module is not instantiated yet.") continue;
           console.warn(`Failed to process server actions for ${file}:`, error);
         }
       }

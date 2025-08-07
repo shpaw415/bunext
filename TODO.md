@@ -8,11 +8,6 @@
 - Fix usePathName
 - Add serverComponent Hooks
 - Add request url containing @static mapped to the static assets
-- Gzip html response 
-  - https://developer.chrome.com/docs/lighthouse/performance/uses-text-compression?utm_source=lighthouse&utm_medium=devtools&hl=fr
-
-- csspurge for head element
-  
 
 # Priority 2
 

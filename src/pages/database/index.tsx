@@ -28,20 +28,9 @@ export async function ServerhandleDatabaseDelete() {
 }
 
 export async function ServerhandleDatabaseQuery() {
-    // This will now return only the username field with proper typing
     const res = Database().Users.select({
         where: { username: "testuser" },
+        select: { id: true, username: true }
     });
-
-    res[0]
-
-
-    const res2 = Database().Users.select({
-        where: { username: "testuser" },
-        select: { username: true }  // Specify only the fields you want
-    });
-
-    res2[0]
-
     return res;
 }

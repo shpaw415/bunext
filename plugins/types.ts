@@ -45,6 +45,11 @@ type Build_Plugins = {
 
 type onFileSystemChangePlugin = (
   filePath: string | undefined,
+  /**
+   * prevent the build from running <br />
+   * this is useful if you want to prevent the build from running when a file is changed
+   */
+  preventBuild: () => void,
 ) => void | Promise<void>;
 
 export type BunextPlugin<HTMLRewrite = unknown> = Partial<{

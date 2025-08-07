@@ -1,3 +1,5 @@
+"server only";
+
 import "./server_global.ts";
 import "./bunext_global";
 import { join, basename } from "node:path";
@@ -75,41 +77,7 @@ class Builder extends PluginLoader {
   public BuildWorkerAwaiter: Promise<void> = Promise.resolve();
   private BuildWorkerResolver: () => void = () => { };
 
-  public remove_node_modules_files_path = [
-    "bunext-js/database/index.ts",
-    "bunext-js/internal/server/build.ts",
-    "bunext-js/internal/server/router.tsx",
-    "bunext-js/internal/server/bunextRequest.ts",
-    "@bunpmjs/json-webtoken/index.ts",
-    "bunext-js/database/class.ts",
-    "bunext-js/internal/session.ts",
-    "bunext-js/internal/caching/index.ts",
-    "bunext-js/internal/server/bunext_global.ts",
-    "bunext-js/internal/server/server_global.ts",
-    "bunext-js/database/bunext_object/server.ts",
-    "bunext-js/features/request/bunext_object/server.ts",
-    "bunext-js/plugins/image/index.ts",
-    "bunext-js/internal/server/logs.ts",
-  ];
-
-  public dev_remove_file_path = Boolean(process.env.__BUNEXT_DEV__)
-    ? [
-      "database/index.ts",
-      "internal/server/build.ts",
-      "internal/server/router.tsx",
-      "internal/server/bunextRequest.ts",
-      "@bunpmjs/json-webtoken/index.ts",
-      "database/class.ts",
-      "internal/session.ts",
-      "internal/caching/index.ts",
-      "internal/server/bunext_global.ts",
-      "internal/server/server_global.ts",
-      "internal/server/logs.ts",
-      "database/bunext_object/server.ts",
-      "features/request/bunext_object/server.ts",
-      "plugins/image/index.ts",
-    ]
-    : [];
+  public remove_node_modules_files_path: string[] = [];
 
   constructor() {
     super();

@@ -1,3 +1,5 @@
+"server only";
+
 import Database from "bun:sqlite";
 import { _Database, Table } from "../../database/class";
 import type {

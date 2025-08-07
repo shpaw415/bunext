@@ -1,9 +1,10 @@
+"server only";
+
 import type { ClusterMessageType } from "./types";
 import { _Database, Table } from "../database/class";
 import type { TableSchema } from "../database/schema";
 import type { Database } from "bun:sqlite";
 import cluster from "node:cluster";
-import { DevConsole } from "./server/logs";
 
 /**
  * Session configuration types

@@ -1,3 +1,5 @@
+"server only";
+
 import { Database as _BunDB } from "bun:sqlite";
 import type { _DataType, DBSchema, TableSchema, ColumnsSchema } from "./schema";
 
@@ -1080,13 +1082,12 @@ type SelectFields<T> = {
   [K in keyof T]?: true;
 };
 
-type PreciseReturnType<T, S> = { [K in keyof S as S[K] extends true ? K : never]: K extends keyof T ? T[K] : never }
 
 // Precise type selection for return values
 type PreciseSelectedType<T, S> = S extends undefined
-  ? T
-  : S extends Record<string, any>
-  ? { [K in keyof T as K extends keyof S ? (S[K] extends true ? K : never) : never]: T[K] }
+  ? { [K in keyof T]: T[K] }
+  : S extends Record<string, unknown>
+  ? Exclude<{ [K in keyof T as K extends keyof S ? (S[K] extends true ? K : never) : never]: T[K] }, Record<string, never>>
   : never;
 
 // Optional select fields for flexibility
@@ -1095,8 +1096,20 @@ type OptionalSelectFields<T> = {
 };
 
 // Database operation options
+type WhereClause<T> = Partial<T> | {
+  LIKE?: Partial<T>;
+  OR?: Partial<T>[];
+  greaterThan?: Partial<T>;
+  lessThan?: Partial<T>;
+  notEqual?: Partial<T>;
+  greaterThanOrEqual?: Partial<T>;
+  lessThanOrEqual?: Partial<T>;
+};
+
+type SelectWhereClause<T> = WhereClause<T>;
+
 type DatabaseSelectOptions<T, S = undefined> = {
-  where?: Partial<T> | { LIKE?: Partial<T>; OR?: Partial<T>[] };
+  where?: WhereClause<T>;
   select?: S;
   limit?: number;
   skip?: number;
@@ -1104,22 +1117,22 @@ type DatabaseSelectOptions<T, S = undefined> = {
 
 
 type DatabaseUpdateOptions<T> = {
-  where: Partial<T> | { OR?: Partial<T>[] };
+  where: WhereClause<T>;
   values: Partial<T>;
 };
 
 type DatabaseDeleteOptions<T> = {
-  where: Partial<T> | { OR?: Partial<T>[] };
+  where: WhereClause<T>;
 };
 
 type DatabaseCountOptions<T> = {
-  where?: Partial<T> | { LIKE?: Partial<T>; OR?: Partial<T>[] };
+  where?: WhereClause<T>;
 };
 
 // Query builder types
 type SelectQuery<T> = {
   select?: SelectFields<T>;
-  where?: Partial<T> | { LIKE?: Partial<T>; OR?: Partial<T>[] };
+  where?: WhereClause<T>;
   limit?: number;
   skip?: number;
   orderBy?: {
@@ -1134,8 +1147,8 @@ type SelectQuery<T> = {
  * Enhanced Table class with better type safety and error handling
  */
 class Table<
-  T extends Record<string, unknown>,
-  SELECT_FORMAT extends Record<string, unknown>
+  T extends Record<string, any>,
+  SELECT_FORMAT extends Record<string, any>
 > {
   private readonly tableName: string;
   private readonly isDebugEnabled: boolean;
@@ -1253,7 +1266,7 @@ class Table<
    * Returns all columns when no specific selection is provided
    * 
    * @param options - Query options excluding specific column selection
-   * @param options.where - WHERE clause conditions with support for LIKE and OR operations
+   * @param options.where - WHERE clause conditions with support for LIKE, OR, and comparison operations
    * @param options.limit - Maximum number of records to return
    * @param options.skip - Number of records to skip (for pagination)
    * @returns Array of complete records with all fields
@@ -1283,14 +1296,37 @@ class Table<
    * const specificUsers = db.Users.select({
    *   where: { OR: [{ id: 1 }, { id: 2 }, { email: 'admin@example.com' }] }
    * });
+   * 
+   * // Comparison operators - greater than, less than, etc.
+   * const adultUsers = db.Users.select({
+   *   where: { greaterThanOrEqual: { age: 18 } }
+   * });
+   * 
+   * const youngUsers = db.Users.select({
+   *   where: { lessThan: { age: 25 } }
+   * });
+   * 
+   * const recentUsers = db.Users.select({
+   *   where: { greaterThan: { createdAt: Date.now() - (7 * 24 * 60 * 60 * 1000) } } // Last 7 days
+   * });
+   * 
+   * // Complex combined conditions
+   * const complexQuery = db.Users.select({
+   *   where: { 
+   *     isActive: true,
+   *     greaterThanOrEqual: { age: 18 },
+   *     lessThan: { age: 65 },
+   *     notEqual: { status: 'banned' }
+   *   }
+   * });
    * ```
    */
 
   // Implementation
   select<TSelect extends { [K in keyof T]?: true } | undefined>(
     options?: DatabaseSelectOptions<T, TSelect>
-  ): Array<Exclude<PreciseSelectedType<T, TSelect>, Record<string, never>>> {
-    this.validateSelectOptions(options as any);
+  ): Array<PreciseSelectedType<T, TSelect>> {
+    this.validateSelectOptions(options);
 
     // Handle empty OR conditions
     if (options?.where && 'OR' in options.where &&
@@ -1298,8 +1334,8 @@ class Table<
       return [];
     }
 
-    const queryString = this.buildSelectQuery(options as any);
-    const params = this.extractQueryParameters(options as any);
+    const queryString = this.buildSelectQuery(options);
+    const params = this.extractQueryParameters(options);
 
     this.debugLog("Executing SELECT query", { queryString, params });
 
@@ -1308,7 +1344,7 @@ class Table<
       const results = query.all(...params) as Record<string, unknown>[];
       query.finalize();
       return results.map(row => this.restoreDataTypes(row));
-    }) as any;
+    }) as Array<Exclude<PreciseSelectedType<T, TSelect>, Record<string, never>>>;
   }
 
   /**
@@ -1559,10 +1595,6 @@ class Table<
   update(options: DatabaseUpdateOptions<T>): void {
     this.validateUpdateOptions(options);
 
-    if (!options.where || Object.keys(options.where).length === 0) {
-      throw new Error("Update operation requires a WHERE clause for safety");
-    }
-
     let queryString = `UPDATE ${this.tableName} SET `;
     queryString += Object.keys(options.values).map(key => `${key} = ?`).join(", ");
     queryString += ` ${this.buildWhereClause(options.where)}`;
@@ -1763,16 +1795,16 @@ class Table<
    * ```
    */
   findFirst(): SELECT_FORMAT | null;
-  findFirst(options: { where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] } }): SELECT_FORMAT | null;
+  findFirst(options: { where?: SelectWhereClause<SELECT_FORMAT> }): SELECT_FORMAT | null;
 
   // Overload 2: Specific field selection - returns partial record or null with enhanced autocomplete
   findFirst<TSelect extends { [K in keyof SELECT_FORMAT]?: true }>(
-    options: { where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] }; select: TSelect }
+    options: { where?: SelectWhereClause<SELECT_FORMAT>; select: TSelect }
   ): PreciseSelectedType<SELECT_FORMAT, TSelect> | null;
 
   // Implementation
   findFirst(options?: {
-    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    where?: SelectWhereClause<SELECT_FORMAT>;
     select?: SelectFields<SELECT_FORMAT>;
   }): any {
     if (!options?.select) {
@@ -1837,7 +1869,7 @@ class Table<
    * ```
    */
   exists(options?: {
-    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    where?: SelectWhereClause<SELECT_FORMAT>;
   }): boolean {
     let query = `SELECT 1 FROM ${this.tableName}`;
     let params: (string | number)[] = [];
@@ -1907,7 +1939,7 @@ class Table<
    */
   distinct<K extends keyof SELECT_FORMAT>(options: {
     column: K;
-    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    where?: SelectWhereClause<SELECT_FORMAT>;
     limit?: number;
   }): SELECT_FORMAT[K][] {
     const { column, where, limit } = options;
@@ -1988,7 +2020,7 @@ class Table<
   aggregate<K extends keyof SELECT_FORMAT>(options: {
     column: K;
     functions: Array<'SUM' | 'AVG' | 'MIN' | 'MAX' | 'COUNT'>;
-    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    where?: SelectWhereClause<SELECT_FORMAT>;
   }): Record<string, number> {
     const { column, functions, where } = options;
     const selectClauses = functions.map(fn => `${fn}(${String(column)}) as ${fn}`).join(', ');
@@ -2070,7 +2102,7 @@ class Table<
   paginate(options: {
     page: number;
     pageSize: number;
-    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    where?: SelectWhereClause<SELECT_FORMAT>;
     select?: Partial<OptionsFlags<SELECT_FORMAT>>;
     orderBy?: {
       column: keyof SELECT_FORMAT;
@@ -2146,12 +2178,52 @@ class Table<
     if (!options.values || Object.keys(options.values).length === 0) {
       throw new Error("Update values cannot be empty");
     }
+
+    if (!options.where) {
+      throw new Error("Update operation requires a WHERE clause for safety");
+    }
+
+    // Check if WhereClause has any meaningful conditions
+    const hasConditions = this.hasValidWhereConditions(options.where);
+    if (!hasConditions) {
+      throw new Error("Update operation requires a non-empty WHERE clause for safety");
+    }
   }
 
   private validateDeleteOptions(options: DatabaseDeleteOptions<T>): void {
-    if (!options.where || Object.keys(options.where).length === 0) {
+    if (!options.where) {
       throw new Error("Delete operation requires a WHERE clause for safety");
     }
+
+    // Check if WhereClause has any meaningful conditions
+    const hasConditions = this.hasValidWhereConditions(options.where);
+    if (!hasConditions) {
+      throw new Error("Delete operation requires a non-empty WHERE clause for safety");
+    }
+  }
+
+  private hasValidWhereConditions(where: WhereClause<T>): boolean {
+    // Check if the where clause is an empty object
+    if (Object.keys(where).length === 0) {
+      return false;
+    }
+
+    // Check if it's a simple Partial<T> with values
+    const directKeys = Object.keys(where).filter(key =>
+      !['LIKE', 'OR', 'greaterThan', 'lessThan', 'notEqual', 'greaterThanOrEqual', 'lessThanOrEqual'].includes(key)
+    );
+    if (directKeys.length > 0) return true;
+
+    // Check structured conditions
+    if ('LIKE' in where && where.LIKE && Object.keys(where.LIKE).length > 0) return true;
+    if ('OR' in where && where.OR && Array.isArray(where.OR) && where.OR.length > 0) return true;
+    if ('greaterThan' in where && where.greaterThan && Object.keys(where.greaterThan).length > 0) return true;
+    if ('lessThan' in where && where.lessThan && Object.keys(where.lessThan).length > 0) return true;
+    if ('notEqual' in where && where.notEqual && Object.keys(where.notEqual).length > 0) return true;
+    if ('greaterThanOrEqual' in where && where.greaterThanOrEqual && Object.keys(where.greaterThanOrEqual).length > 0) return true;
+    if ('lessThanOrEqual' in where && where.lessThanOrEqual && Object.keys(where.lessThanOrEqual).length > 0) return true;
+
+    return false;
   }
 
   // Helper methods for query building
@@ -2184,17 +2256,45 @@ class Table<
     return query;
   }
 
-  private buildWhereClause(where: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] }): string;
+  private buildWhereClause(where: SelectWhereClause<SELECT_FORMAT>): string;
   private buildWhereClause(where: Partial<T> | { OR?: Partial<T>[] }): string;
   private buildWhereClause(where: any): string {
     if (!where || Object.keys(where).length === 0) {
       return "";
     }
 
+    const conditions: string[] = [];
+
     // Handle LIKE operator
     if ('LIKE' in where && where.LIKE) {
       const likeConditions = Object.keys(where.LIKE).map(key => `${key} LIKE ?`);
-      return `WHERE ${likeConditions.join(" AND ")}`;
+      conditions.push(...likeConditions);
+    }
+
+    // Handle comparison operators
+    if ('greaterThan' in where && where.greaterThan) {
+      const gtConditions = Object.keys(where.greaterThan).map(key => `${key} > ?`);
+      conditions.push(...gtConditions);
+    }
+
+    if ('lessThan' in where && where.lessThan) {
+      const ltConditions = Object.keys(where.lessThan).map(key => `${key} < ?`);
+      conditions.push(...ltConditions);
+    }
+
+    if ('notEqual' in where && where.notEqual) {
+      const neConditions = Object.keys(where.notEqual).map(key => `${key} != ?`);
+      conditions.push(...neConditions);
+    }
+
+    if ('greaterThanOrEqual' in where && where.greaterThanOrEqual) {
+      const gteConditions = Object.keys(where.greaterThanOrEqual).map(key => `${key} >= ?`);
+      conditions.push(...gteConditions);
+    }
+
+    if ('lessThanOrEqual' in where && where.lessThanOrEqual) {
+      const lteConditions = Object.keys(where.lessThanOrEqual).map(key => `${key} <= ?`);
+      conditions.push(...lteConditions);
     }
 
     // Handle OR operator
@@ -2207,12 +2307,19 @@ class Table<
         const regularConditions = Object.keys(condition).map(key => `${key} = ?`);
         return regularConditions.join(" AND ");
       });
-      return `WHERE ${orConditions.join(" OR ")}`;
+      conditions.push(`(${orConditions.join(" OR ")})`);
     }
 
-    // Handle regular WHERE conditions
-    const conditions = Object.keys(where).map(key => `${key} = ?`);
-    return `WHERE ${conditions.join(" AND ")}`;
+    // Handle regular WHERE conditions (equality)
+    const regularFields = Object.keys(where).filter(key =>
+      !['LIKE', 'OR', 'greaterThan', 'lessThan', 'notEqual', 'greaterThanOrEqual', 'lessThanOrEqual'].includes(key)
+    );
+    if (regularFields.length > 0) {
+      const equalityConditions = regularFields.map(key => `${key} = ?`);
+      conditions.push(...equalityConditions);
+    }
+
+    return conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   }
 
   private extractQueryParameters(options?: DatabaseSelectOptions<T, any>): (string | number)[] {
@@ -2220,19 +2327,41 @@ class Table<
     return this.extractWhereParameters(options.where);
   }
 
-  private extractWhereParameters(where: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] }): (string | number)[];
+  private extractWhereParameters(where: SelectWhereClause<SELECT_FORMAT>): (string | number)[];
   private extractWhereParameters(where: Partial<T> | { OR?: Partial<T>[] }): (string | number)[];
   private extractWhereParameters(where: any): (string | number)[] {
     if (!where) return [];
 
+    const parameters: (string | number)[] = [];
+
     // Handle LIKE operator
     if ('LIKE' in where && where.LIKE) {
-      return this.parseParameters(Object.values(where.LIKE));
+      parameters.push(...this.parseParameters(Object.values(where.LIKE)));
+    }
+
+    // Handle comparison operators
+    if ('greaterThan' in where && where.greaterThan) {
+      parameters.push(...this.parseParameters(Object.values(where.greaterThan)));
+    }
+
+    if ('lessThan' in where && where.lessThan) {
+      parameters.push(...this.parseParameters(Object.values(where.lessThan)));
+    }
+
+    if ('notEqual' in where && where.notEqual) {
+      parameters.push(...this.parseParameters(Object.values(where.notEqual)));
+    }
+
+    if ('greaterThanOrEqual' in where && where.greaterThanOrEqual) {
+      parameters.push(...this.parseParameters(Object.values(where.greaterThanOrEqual)));
+    }
+
+    if ('lessThanOrEqual' in where && where.lessThanOrEqual) {
+      parameters.push(...this.parseParameters(Object.values(where.lessThanOrEqual)));
     }
 
     // Handle OR operator
     if ('OR' in where && where.OR && Array.isArray(where.OR)) {
-      const parameters: (string | number)[] = [];
       for (const condition of where.OR) {
         if (typeof condition === 'object' && condition !== null && 'LIKE' in condition && condition.LIKE) {
           parameters.push(...this.parseParameters(Object.values(condition.LIKE)));
@@ -2240,11 +2369,18 @@ class Table<
           parameters.push(...this.parseParameters(Object.values(condition)));
         }
       }
-      return parameters;
     }
 
-    // Handle regular WHERE conditions
-    return this.parseParameters(Object.values(where));
+    // Handle regular WHERE conditions (equality)
+    const regularFields = Object.keys(where).filter(key =>
+      !['LIKE', 'OR', 'greaterThan', 'lessThan', 'notEqual', 'greaterThanOrEqual', 'lessThanOrEqual'].includes(key)
+    );
+    if (regularFields.length > 0) {
+      const regularValues = regularFields.map(key => where[key]);
+      parameters.push(...this.parseParameters(regularValues));
+    }
+
+    return parameters;
   }
 
   private parseParameters(params: unknown[]): (string | number)[] {
@@ -2546,7 +2682,7 @@ class Table<
    * ```
    */
   exportToJson(options: {
-    where?: Partial<SELECT_FORMAT> | { LIKE?: Partial<SELECT_FORMAT>; OR?: Partial<SELECT_FORMAT>[] };
+    where?: SelectWhereClause<SELECT_FORMAT>;
     select?: Partial<OptionsFlags<SELECT_FORMAT>>;
     filePath?: string;
     pretty?: boolean;

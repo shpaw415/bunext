@@ -60,11 +60,13 @@ const cwd = process.cwd();
 export const doWatchBuild = () =>
   watchBuild(
     async (path) => {
+      let isBuildPrevented = false;
+      const preventBuildFn = () => { isBuildPrevented = true; };
       await Promise.all(
         builder.getPlugins().map(async (p) => {
           try {
             if (p.onFileSystemChange) {
-              await p.onFileSystemChange(path);
+              await p.onFileSystemChange(path, preventBuildFn);
             }
           } catch (error) {
             console.error(`Error in plugin's onFileSystemChange hook:`, error);
@@ -100,12 +102,13 @@ export const doWatchBuild = () =>
               `compiled ${pathname} in ${time}ms`
             )}`,
           async () => {
+            if (isBuildPrevented) return;
             await builder.resetPath(probablePath);
             await builder.makeBuild(probablePath);
           }
         );
       }
-      sendSignal();
+      if (!isBuildPrevented) sendSignal();
     },
     [paths.staticPath, paths.basePath]
   );

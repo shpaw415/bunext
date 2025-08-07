@@ -109,6 +109,20 @@ function createRequestLogMessage(
   ].join(" ");
 }
 
+type BunextServerProps = {
+  onRequest?: OnRequestType;
+  preloadModulePath: string;
+  Shell: ReactShellComponent;
+  preventDevConsole?: boolean;
+};
+
+const DEFAULT_PROPS: BunextServerProps = {
+  onRequest: undefined,
+  preloadModulePath: "./preload.ts",
+  Shell: () => null,
+  preventDevConsole: false,
+};
+
 class BunextServer {
   public onRequest?: OnRequestType;
   public preloadModulePath: string;
@@ -126,18 +140,24 @@ class BunextServer {
     | ((value: boolean | PromiseLike<boolean>) => void)
     | undefined;
 
+  private preventDevConsole: boolean;
+
   constructor({
     onRequest,
     preloadModulePath,
     Shell,
-  }: {
-    onRequest?: OnRequestType;
-    preloadModulePath: string;
-    Shell: ReactShellComponent;
-  }) {
+    preventDevConsole
+  }: BunextServerProps) {
     this.onRequest = onRequest;
     this.preloadModulePath = preloadModulePath;
     this.Shell = Shell;
+    this.preventDevConsole = preventDevConsole ?? false;
+  }
+
+  static async getInitedInstance(props: BunextServerProps = DEFAULT_PROPS): Promise<BunextServer> {
+    const instance = new BunextServer(props);
+    await instance.init();
+    return instance;
   }
 
   startServer() {
@@ -259,10 +279,10 @@ class BunextServer {
     const dry = Boolean(globalThis.dryRun);
 
     // Initialize the enhanced terminal console
-    initializeDevConsole();
+    !this.preventDevConsole && initializeDevConsole();
     dry && DevConsole().info("Starting...");
 
-    dry && benchmark_console(
+    dry && await benchmark_console(
       (time) =>
         dry && `Ready in ${time}ms`,
       () => this._init()

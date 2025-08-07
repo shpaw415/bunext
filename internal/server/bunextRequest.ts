@@ -1,3 +1,5 @@
+"server only";
+
 import { BunextSession, type SessionData } from "../../features/session/session";
 import { webToken } from "@bunpmjs/json-webtoken";
 import "./server_global";

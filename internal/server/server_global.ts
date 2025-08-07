@@ -1,3 +1,5 @@
+"server only";
+
 import type { ServerWebSocket } from "bun";
 import type { BunextType, ServerConfig } from "../types.ts";
 import type { BunextServer } from "./index.ts";

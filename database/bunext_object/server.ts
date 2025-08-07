@@ -1,3 +1,5 @@
+"server only";
+
 import { type Database } from "./types";
 import { Database as db } from "..";
 

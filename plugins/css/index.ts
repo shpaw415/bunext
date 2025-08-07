@@ -15,18 +15,15 @@ export const cssModulesTypesPlugin: BunextPlugin = {
     priority: 0,
 
     serverStart: {
-        async dev() {
-            //DevConsole("🎨 Generating CSS Module types...");
-            await generateAllCSSModuleTypes(DEFAULT_CONFIG);
-        },
         async main() {
             await generateAllCSSModuleTypes(DEFAULT_CONFIG);
         }
     },
 
-    onFileSystemChange: async (filePath?: string) => {
+    onFileSystemChange: async (filePath, preventBuild) => {
 
         if (filePath?.endsWith('.module.css')) {
+            preventBuild();
             await generateAllCSSModuleTypes(DEFAULT_CONFIG);
             DevConsole(`🔄 Updating CSS Module types for: ${filePath}`);
         }

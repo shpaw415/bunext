@@ -13,6 +13,8 @@ import { createElement } from "react";
 
 const cwd = process.cwd();
 
+const serverOnlyFilePaths: string[] = [];
+
 function isFunction(functionToCheck: any) {
   return typeof functionToCheck == "function";
 }
@@ -428,6 +430,12 @@ export default {
           { namespace: "client", filter: /\.tsx$/ },
           async ({ path }) => {
             let fileContent = await Bun.file(path).text();
+            if (isServerOnly(fileContent)) {
+              return {
+                contents: "",
+                loader: "js",
+              };
+            }
             const _module_ = await import(
               process.env.NODE_ENV == "production"
                 ? path
@@ -505,9 +513,18 @@ export default {
         build.onLoad(
           { namespace: "client", filter: /\.ts$/ },
           async ({ path }) => {
+
+            const fileContent = await Bun.file(path).text();
+            if (isServerOnly(fileContent)) {
+              return {
+                contents: "",
+                loader: "js",
+              };
+            }
+
             return {
               contents: await ClientSideFeatures(
-                await Bun.file(path).text(),
+                fileContent,
                 path,
                 await import(
                   process.env.NODE_ENV == "production"
@@ -555,20 +572,24 @@ export default {
         build.onLoad(
           { filter: /\.(ts|tsx)$/, namespace: "module" },
           async ({ path, loader }) => {
+
             if (
               builder.remove_node_modules_files_path.includes(
                 path.replace(builder.options.baseDir + "/node_modules/", "")
-              ) ||
-              builder.dev_remove_file_path.includes(path.replace(cwd + "/", ""))
+              )
             ) {
-              return {
-                contents: "",
-                loader,
-              };
+              return returnEmptyFile(loader);
+            }
+            const fileText = await Bun.file(path).text();
+            if (serverOnlyFilePaths.includes(path)) {
+              return returnEmptyFile(loader);
+            } else if (isServerOnly(fileText)) {
+              serverOnlyFilePaths.push(path);
+              return returnEmptyFile(loader);
             }
 
             return {
-              contents: await Bun.file(path).text(),
+              contents: fileText,
               loader,
             };
           }
@@ -580,3 +601,31 @@ export default {
     router.InitServerActions();
   },
 } as BunextPlugin;
+
+function returnEmptyFile(loader: Bun.Loader) {
+  return {
+    contents: "",
+    loader,
+  };
+}
+
+function isServerOnly(fileContent: string): boolean {
+  // Trim whitespace and get the first few lines
+  const trimmedContent = fileContent.trim();
+
+  // Check for various "server only" directive formats
+  const serverOnlyPatterns = [
+    /^["']server only["'];?\s*$/m,           // "server only" or 'server only'
+    /^\/\*\s*server only\s*\*\/\s*$/m,      // /* server only */
+    /^\/\/\s*server only\s*$/m,             // // server only
+    /^["']use server only["'];?\s*$/m,      // "use server only"
+    /^\/\*\s*@server-only\s*\*\/\s*$/m,     // /* @server-only */
+    /^\/\/\s*@server-only\s*$/m             // // @server-only
+  ];
+
+  // Check if any of the patterns match at the beginning of the file
+  return serverOnlyPatterns.some(pattern => {
+    const match = trimmedContent.match(pattern);
+    return match && match.index === 0;
+  });
+}

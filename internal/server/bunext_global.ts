@@ -1,3 +1,5 @@
+"server only";
+
 import "./server_global.ts";
 import packageJson from "../../package.json";
 import BunextGlobalDatabaseInit from "../../database/bunext_object/server";
