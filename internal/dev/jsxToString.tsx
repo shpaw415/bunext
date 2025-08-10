@@ -5,6 +5,60 @@ import { BunextRequest } from "../server/bunextRequest";
 import type { JsxToStringWorkerMessage } from "./types";
 import { ErrorFallback } from "../../components/fallback";
 
+// Redirect all console methods to send process messages
+function createConsoleRedirect(methodName: keyof typeof console) {
+  return (...args: any[]) => {
+    // Serialize arguments to handle class objects and other complex types
+    const serializedArgs = args.map(arg => {
+      try {
+        // For objects and class instances, use JSON.stringify with a replacer
+        if (typeof arg === 'object' && arg !== null) {
+          return JSON.parse(JSON.stringify(arg, (key, value) => {
+            // Handle class instances by including constructor name
+            if (typeof value === 'object' && value !== null && value.constructor !== Object) {
+              return {
+                __className: value.constructor.name,
+                ...value
+              };
+            }
+            return value;
+          }));
+        }
+        return arg;
+      } catch (error) {
+        // Fallback for non-serializable objects
+        return String(arg);
+      }
+    });
+
+    process.send?.({
+      type: methodName,
+      message: serializedArgs,
+    } as JsxToStringWorkerMessage);
+  };
+}
+
+// Override all console methods
+console.log = createConsoleRedirect('log');
+console.error = createConsoleRedirect('error');
+console.warn = createConsoleRedirect('warn');
+console.info = createConsoleRedirect('info');
+console.debug = createConsoleRedirect('debug');
+console.trace = createConsoleRedirect('trace');
+console.table = createConsoleRedirect('table');
+console.dir = createConsoleRedirect('dir');
+console.dirxml = createConsoleRedirect('dirxml');
+console.group = createConsoleRedirect('group');
+console.groupCollapsed = createConsoleRedirect('groupCollapsed');
+console.groupEnd = createConsoleRedirect('groupEnd');
+console.count = createConsoleRedirect('count');
+console.countReset = createConsoleRedirect('countReset');
+console.time = createConsoleRedirect('time');
+console.timeEnd = createConsoleRedirect('timeEnd');
+console.timeLog = createConsoleRedirect('timeLog');
+console.clear = createConsoleRedirect('clear');
+console.assert = createConsoleRedirect('assert');
+
 const modulePath = process.env.module_path as string;
 const props = JSON.parse(process.env.props as string) as {
   props: any;
@@ -34,7 +88,7 @@ try {
   } as JsxToStringWorkerMessage);
 
 } catch (error) {
-  Log(`Error creating dynamic page: `, error as Error);
+  console.error(`Error creating dynamic page: `, error);
   process.send?.({
     type: "jsxToString",
     jsx: renderToString(<ErrorFallback error={error as Error} />),
@@ -43,12 +97,7 @@ try {
 
 }
 
-function Log(message: string, error?: Error) {
-  process.send?.({
-    type: "error",
-    error: error || new Error(message),
-    message,
-  } as JsxToStringWorkerMessage);
-}
+
+
 
 process.exit();

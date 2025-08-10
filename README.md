@@ -101,7 +101,6 @@ Bunext uses **file-based routing** similar to Next.js, making navigation intuiti
 | File Path | Route | Description |
 |-----------|-------|-------------|
 | `src/pages/index.tsx` | `/` | Home page |
-| `src/pages/about.tsx` | `/about` | Static route |
 | `src/pages/[id].tsx` | `/123` | Dynamic route |
 | `src/pages/user/[id].tsx` | `/user/123` | Nested dynamic route |
 | `src/pages/[...slug].tsx` | `/a/b/c` | Catch-all route |

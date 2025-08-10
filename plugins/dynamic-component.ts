@@ -76,9 +76,13 @@ export default {
 
             // Import the module and retrieve the component
             const mod = await import(absPath);
-            const Component = mod[elementName] as (
+            const Component = mod?.[elementName] as (
               props: unknown
             ) => JSX.Element;
+
+            if (!Component) {
+              throw new Error(`Component ${elementName} not found in module ${pathName}`);
+            }
 
             // Render the component
             const JSXElement = Component(props) as JSX.Element;

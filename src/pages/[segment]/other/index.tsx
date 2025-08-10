@@ -1,16 +1,17 @@
 "use static";
 import "@static/style.css";
+import { Head, useHead } from "public/head";
 
 type Params = {
   segment: string;
 };
 
-function Head() {
-  const req = Bunext.request.hook.useRequest();
-  req?.setHead({
-    title: "super-title",
+function CustomHead() {
+  useHead({
+    data: {
+      title: "super-title",
+    },
   });
-
   return <></>;
 }
 
@@ -23,7 +24,7 @@ export default function Page({
 }) {
   return (
     <p>
-      <Head />
+      <CustomHead />
       {params.segment}
       test
     </p>

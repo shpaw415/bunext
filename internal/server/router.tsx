@@ -849,16 +849,25 @@ class RequestManager {
    * @returns a Response with Gzipped html string body
    */
   public async makeStream(jsx: JSX.Element): Promise<Response> {
-    return new Response(
-      Buffer.from(Bun.gzipSync(await this.formatPage(renderToString(jsx)))),
-      {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-store",
-          "Content-Encoding": "gzip",
-        },
-      }
-    );
+    try {
+      const html = await this.formatPage(renderToString(jsx));
+      return new Response(
+        Buffer.from(Bun.gzipSync(html)),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+            "Content-Encoding": "gzip",
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Error in makeStream:', error);
+      return new Response("", {
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
+    }
   }
 
   private async serveSessionData() {
@@ -1311,6 +1320,17 @@ class RequestManager {
           this.bunextReq.session.sessionTimeoutFromNow * 1000 -
           (new Date().getTime() - createdAt);
 
+
+
+      if (this.bunextReq.headData) {
+        Object.entries(this.bunextReq.headData).forEach(([path, data]) => {
+          Head.setHead({
+            path,
+            data
+          });
+        });
+      }
+
       return {
         __DEV_ROUTE_PREFETCH__: "[]",
         __PAGES_DIR__: JSON.stringify(this.router.pageDir),
@@ -1319,7 +1339,7 @@ class RequestManager {
         __SERVERSIDE_PROPS__:
           (await this.makeServerSideProps()).toString() ?? "undefined",
         __LAYOUT_ROUTE__: JSON.stringify(this.router.layoutPaths),
-        __HEAD_DATA__: JSON.stringify(Head.head),
+        __HEAD_DATA__: JSON.stringify({ ...Head.head }),
         __PUBLIC_SESSION_DATA__: this.bunextReq.session.exists() ? JSON.stringify(
           this.bunextReq.session.getPublicData()
         ) : "undefined",
@@ -1388,9 +1408,7 @@ class RequestManager {
             if (message.head) this.bunextReq.headData = message.head;
             resolve(true);
 
-          } else if (message.type == "error") {
-            console.error("Dynamic page error:", message?.error);
-          }
+          } else (console[message.type] as any)(...message.message);
 
         },
       });

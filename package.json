@@ -78,6 +78,7 @@
   "./router/navigate": "./public/router/navigate.ts",
   "./router/revalidate": "./public/router/revalidate.ts",
   "./router/components": "./public/router/components.tsx",
+  "./router/hooks": "./public/router/hooks.ts",
   "./router/link": "./public/router/link.ts",
   "./head": "./public/head.tsx",
   "./image": "./public/image/index.tsx",

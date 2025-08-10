@@ -8,6 +8,8 @@ import { Head } from "bunext-js/head";
 import { useEffect } from "react";
 
 import "@static/style.css";
+import { revalidateEvery } from "bunext-js/router/revalidate";
+import type { BunextRequest } from "bunext-js/request";
 
 type SessionType = {
   test: boolean;

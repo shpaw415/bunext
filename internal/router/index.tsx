@@ -15,7 +15,7 @@ import React, {
 } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher, type Match } from "./utils/get-route-matcher";
-import type { _GlobalData, ReactShellComponent } from "../types";
+import type { _GlobalData, ReactShellComponent, ServerSideProps } from "../types";
 import {
   BunextSession,
   SessionContext,
@@ -25,7 +25,6 @@ import { AddServerActionCallback, GetSessionFromResponse } from "../globals";
 import { RequestContext } from "../server/context";
 import type { RoutesType } from "../../plugins/typed-route/type";
 import { preloadModule } from "react-dom";
-import { ErrorFallback } from "../../components/fallback";
 import ErrorBoundary from "../../components/ErrorBoundary";
 
 /**
@@ -45,11 +44,6 @@ interface RouterConfig {
 
 interface RouteParams {
   [key: string]: string | string[];
-}
-
-interface ServerSideProps {
-  redirect?: string;
-  [key: string]: any;
 }
 
 interface LayoutComponent {
@@ -246,7 +240,7 @@ export function ParseServerSideProps(props: string): ServerSideProps | undefined
     const parsed = JSON.parse(props) as ServerSideProps;
 
     // Basic validation
-    if (typeof parsed !== 'object' || parsed === null) {
+    if (parsed === null) {
       RouterLogger.warn("Invalid server-side props format", { props });
       return undefined;
     }
@@ -596,7 +590,7 @@ export const RouterHost = ({
         });
 
         if (currentVersion === versionRef.current) {
-          if (props?.redirect) {
+          if (typeof props == "object" && props?.redirect) {
             navigate(props.redirect as RoutesType);
           } else {
             startTransition(() => {
@@ -604,7 +598,7 @@ export const RouterHost = ({
               setVersion(currentVersion);
               setIsLoading(false);
               setCurrent(
-                <Shell route={target} {...props}>
+                <Shell route={target} props={props}>
                   {JsxToDisplay}
                 </Shell>
               );

@@ -45,7 +45,7 @@ export class BunextRequest {
     if (!this._session) {
       this._session = new BunextSession({
         sessionTimeout: globalThis?.serverConfig?.session?.timeout,
-        request: this as any,
+        request: this,
       });
     }
     return this._session;

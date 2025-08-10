@@ -6,7 +6,6 @@ export type JsxToStringWorkerMessage = {
     jsx: string;
     head: Record<string, HeadData>;
 } | {
-    type: "error";
-    error: Error;
-    message: string;
+    type: keyof typeof console;
+    message: Array<any>;
 };

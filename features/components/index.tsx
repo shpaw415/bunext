@@ -6,9 +6,12 @@ import { makeDocURL } from "../../internal/documentation/paths";
 /**
  * @dev this is related with plugins/router/html_rewrite/dynamic_components.ts
  * @param id must be unique in page and cannot be random **Required to make it SSR**
+ * @param pathName path to the module
+ * @param elementName exported name of the element from the module to render
+ * @param bootStrap optional styles to load array<filePath>
  * @returns
  */
-export function DynamicComponent<T extends {}>({
+export function DynamicComponent<Props extends {}, ElementName extends string>({
   pathName,
   elementName,
   bootStrap,
@@ -18,11 +21,11 @@ export function DynamicComponent<T extends {}>({
   id,
 }: {
   pathName: string;
-  elementName: string;
+  elementName: ElementName;
   bootStrap?: Partial<{
     style: string[];
   }>;
-  props?: T;
+  props?: Props;
   onError?: () => void;
   fallback?: JSX.Element;
   id?: string;
@@ -52,11 +55,15 @@ export function DynamicComponent<T extends {}>({
   });
   const version = useLoadingVersion();
   const devKey = process.env.NODE_ENV == "development" ? `?${version}` : "";
-
+  console.log(pathName, devKey);
   useEffect(() => {
     import(`${pathName}${devKey}`)
       .then((module) => {
         const Component = module[elementName];
+        if (!Component) {
+          console.error(`Component not found: ${elementName}`);
+          throw new Error(`Component ${elementName} not found in module ${pathName}`);
+        }
         setEl(<Component {...props} />);
       })
       .catch((error) => {

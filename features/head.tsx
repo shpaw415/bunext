@@ -345,15 +345,21 @@ function HeadProvider({
   );
 
   const [data, setData] = useState<HeadData>({});
+  const [onHold, setOnHold] = useState<HeadData>({});
 
   // Reset data when path changes - use useEffect instead of useMemo for side effects
   useEffect(() => {
-    setData({});
-  }, [path]);
+    if (JSON.stringify(onHold) == JSON.stringify(data) && Object.keys(onHold).length > 0) {
+      setData({});
+      setOnHold({});
+    } else {
+      setData(onHold);
+    }
+  }, [path, onHold]);
 
   const dataSetter = useCallback(
     (data: HeadData) => {
-      setData(
+      setOnHold(
         typeof window !== "undefined"
           ? deepMerge(globalX.__HEAD_DATA__["*"] || {}, {
             ...globalX.__HEAD_DATA__[path],
@@ -379,7 +385,10 @@ function HeadProvider({
             data={{
               ...PreloadedHeadData,
               ...data,
-              link: [...(data?.link ?? [])],
+              link: [
+                ...(data?.link ?? []),
+                ...(PreloadedHeadData.link ?? [])
+              ],
             }}
             style={cssPaths.map((link) => ({
               rel: "stylesheet",
@@ -593,15 +602,13 @@ function useHead({ data }: { data?: HeadData } = {}) {
   }, [data]);
 
   // Set head data on server-side request if available
-  useEffect(() => {
-    if (request && validatedData) {
-      try {
-        request.setHead(validatedData);
-      } catch (error) {
-        console.error('[Bunext Head] Error setting head data on request:', error);
-      }
+  if (request && validatedData) {
+    try {
+      request.setHead(validatedData);
+    } catch (error) {
+      console.error('[Bunext Head] Error setting head data on request:', error);
     }
-  }, [request, validatedData]);
+  }
 
   // Update head data on client-side
   useEffect(() => {
@@ -627,6 +634,10 @@ function useHead({ data }: { data?: HeadData } = {}) {
       console.error('[Bunext Head] Error in head updater:', error);
     }
   }, [updater]);
+
+  useEffect(() => {
+    updater(validatedData || {});
+  }, []);
 
   return safeUpdater;
 }

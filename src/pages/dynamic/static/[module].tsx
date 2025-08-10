@@ -12,12 +12,13 @@ export default function DynamicImport({
   params,
   props,
 }: {
-  params: { module: string };
-  props: { path: string };
+  params: { module: "one" | "two" };
+  props: { path: string; session: Record<string, any> };
 }) {
+  console.log("session data:", props.session);
   return (
     <>
-      <Bunext.components.DynamicComponent
+      <Bunext.components.DynamicComponent<{}, "one" | "two">
         pathName={`/src/dynamic/component`}
         elementName={params.module}
         bootStrap={{
