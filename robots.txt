@@ -1,0 +1,63 @@
+# Robots.txt for bunext-js framework
+# High-performance Next.js-inspired framework for Bun runtime
+
+User-agent: *
+
+# Allow main content and documentation
+Allow: /
+Allow: /public/
+Allow: /static/
+
+# Block development and internal directories
+Disallow: /bin/
+Disallow: /config/
+Disallow: /config.dev/
+Disallow: /dev/
+Disallow: /internal/
+Disallow: /log/
+Disallow: /database/
+Disallow: /.git/
+Disallow: /node_modules/
+
+# Block build artifacts and temporary files
+Disallow: /tsconfig.tsbuildinfo
+Disallow: *.sqlite
+Disallow: *.sqlite-shm
+Disallow: *.sqlite-wal
+Disallow: *.lock
+Disallow: /benchmark/
+
+# Block source maps and development files
+Disallow: *.map
+Disallow: *.test.ts
+Disallow: *.test.js
+Disallow: /test.json
+
+# Block configuration files
+Disallow: /bunfig.toml
+Disallow: /tsconfig.json
+Disallow: /package.json
+Disallow: /bun.lock
+
+# Block Docker and deployment files
+Disallow: /docker/
+Disallow: /dockerfile
+Disallow: /docker-compose.yml
+
+# Block documentation that might be work-in-progress
+Disallow: /DEV.md
+Disallow: /TODO.md
+Disallow: /README.old.md
+
+# Allow robots to crawl public assets
+Allow: *.css
+Allow: *.js
+Allow: *.png
+Allow: *.svg
+Allow: *.ico
+
+# Crawl delay (optional - adjust based on your server capacity)
+Crawl-delay: 1
+
+# Sitemap location (add this when you have a sitemap)
+# Sitemap: https://yourdomain.com/sitemap.xml

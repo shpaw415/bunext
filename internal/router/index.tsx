@@ -15,7 +15,7 @@ import React, {
 } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher, type Match } from "./utils/get-route-matcher";
-import type { _GlobalData } from "../types";
+import type { _GlobalData, ReactShellComponent } from "../types";
 import {
   BunextSession,
   SessionContext,
@@ -25,6 +25,8 @@ import { AddServerActionCallback, GetSessionFromResponse } from "../globals";
 import { RequestContext } from "../server/context";
 import type { RoutesType } from "../../plugins/typed-route/type";
 import { preloadModule } from "react-dom";
+import { ErrorFallback } from "../../components/fallback";
+import ErrorBoundary from "../../components/ErrorBoundary";
 
 /**
  * Enhanced type definitions for better type safety
@@ -96,6 +98,7 @@ class NetworkError extends RouteError {
 class RouterLogger {
   private static shouldLog(): boolean {
     // Only log when development environment variables are set
+    if (process.env.NODE_ENV == "production" && typeof window != "undefined") return false;
     return typeof window !== "undefined"
       ? process.env.PUBLIC_BUNEXT_DEV === "true"
       : process.env.__BUNEXT_DEV__ === "true";
@@ -534,11 +537,10 @@ export const RouterHost = ({
   onRouteUpdated,
   errorBoundary: ErrorBoundary,
   loadingComponent: LoadingComponent,
-  enablePreloading = true,
 }: {
   children: React.ReactElement;
   normalizeUrl?: (url: string) => string;
-  Shell: React.ComponentType<{ children: React.ReactElement; route?: string }>;
+  Shell: ReactShellComponent;
   onRouteUpdated?: (path: string) => void;
   errorBoundary?: ComponentType<{ error: Error; retry: () => void }>;
   loadingComponent?: ComponentType;
@@ -586,15 +588,11 @@ export const RouterHost = ({
           ),
         ]);
 
-        globalThis.__SERVERSIDE_PROPS__ = props;
-
-        const JsxToDisplay = await NextJsLayoutStacker({
-          page: await module.default({
-            props,
-            params: matched.params,
-          }),
+        const JsxToDisplay = await CreatePage({
+          module,
+          props,
           currentVersion,
-          match: matched,
+          matched,
         });
 
         if (currentVersion === versionRef.current) {
@@ -605,7 +603,6 @@ export const RouterHost = ({
               onRouteUpdated?.(target);
               setVersion(currentVersion);
               setIsLoading(false);
-
               setCurrent(
                 <Shell route={target} {...props}>
                   {JsxToDisplay}
@@ -1362,6 +1359,33 @@ export const navigate = (
     }
   }
 };
+
+export async function CreatePage({
+  matched,
+  props,
+  module,
+  currentVersion
+}: {
+  matched: Exclude<Match, null>,
+  props: unknown,
+  currentVersion: number,
+  module: { default: (args: { props: unknown; params: Record<string, unknown> }) => JSX.Element }
+}): Promise<JSX.Element> {
+
+  if (typeof window != "undefined") globalThis.__SERVERSIDE_PROPS__ = props;
+
+  return <ErrorBoundary resetOnPropsChange={true}>
+    {
+      NextJsLayoutStacker({
+        page: module.default({
+          props,
+          params: matched.params,
+        }),
+        currentVersion,
+        match: matched,
+      })
+    }</ErrorBoundary>
+}
 
 // Event constants for better maintainability
 const eventPopstate = "popstate" as const;

@@ -10,7 +10,6 @@ import {
   useMemo,
   useState,
   Component,
-  useRef,
 } from "react";
 import type { ErrorInfo } from "react";
 import type { Match } from "../internal/router/utils/get-route-matcher";

@@ -2,77 +2,34 @@
 
 import { navigate } from "../../internal/router";
 import { ClientSendWSMessage } from "../hotServer";
+import { DevWebSocketContext } from "../dev";
 import "./panel.css";
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback, useContext } from "react";
 
-// --- Utility hooks ---
-function usePanelPosition(defaultSize: { width: number; height: number }) {
-  const [position, setPosition] = useState(() => {
+
+// --- Utility: persist width ---
+function usePanelWidth(defaultWidth = 420) {
+  const [width, setWidth] = useState(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("bunext-panel-position");
-      if (saved) {
-        try {
-          const savedPos = JSON.parse(saved);
-          // Validate that saved position is within current viewport
-          const maxX = window.innerWidth - defaultSize.width;
-          const maxY = window.innerHeight - defaultSize.height;
-          return {
-            x: Math.max(0, Math.min(savedPos.x, maxX)),
-            y: Math.max(0, Math.min(savedPos.y, maxY))
-          };
-        } catch { }
-      }
-      return { x: window.innerWidth - defaultSize.width, y: window.innerHeight - defaultSize.height };
+      const saved = Number(localStorage.getItem("bunext-panel-width"));
+      if (!Number.isNaN(saved) && saved > 240) return saved;
     }
-    return { x: 0, y: 0 };
+    return defaultWidth;
   });
-
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("bunext-panel-position", JSON.stringify(position));
+      localStorage.setItem("bunext-panel-width", String(width));
     }
-  }, [position]);
-
-  return [position, setPosition] as const;
-}
-
-function usePanelSize() {
-  const [size, setSize] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("bunext-panel-size");
-      if (saved) {
-        try {
-          const savedSize = JSON.parse(saved);
-          // Ensure minimum size constraints
-          return {
-            width: Math.max(320, Math.min(savedSize.width, window.innerWidth - 50)),
-            height: Math.max(200, Math.min(savedSize.height, window.innerHeight - 50))
-          };
-        } catch { }
-      }
-    }
-    return { width: 400, height: 500 };
-  });
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("bunext-panel-size", JSON.stringify(size));
-    }
-  }, [size]);
-
-  return [size, setSize] as const;
+  }, [width]);
+  return [width, setWidth] as const;
 }
 
 // --- Main Panel ---
-export default function DevToolPanel({ ws }: { ws?: WebSocket }) {
+export default function DevToolPanel() {
   const [panelVisible, setPanelVisible] = useState(true);
   // Customization states
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [fontSize, setFontSize] = useState(1);
-
-  const restartServer = useCallback(() => {
-    ClientSendWSMessage({ message: "reboot-server", ws });
-  }, [ws]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -100,7 +57,6 @@ export default function DevToolPanel({ ws }: { ws?: WebSocket }) {
         fontSize={fontSize}
         setTheme={setTheme}
         setFontSize={setFontSize}
-        restartServer={restartServer}
       />
       {!panelVisible && (
         <FloatingButton onClick={() => setPanelVisible(true)} />
@@ -137,7 +93,6 @@ function Panel({
   fontSize,
   setTheme,
   setFontSize,
-  restartServer
 }: {
   onClose: () => void;
   visible: boolean;
@@ -145,47 +100,28 @@ function Panel({
   fontSize: number;
   setTheme: (t: "dark" | "light") => void;
   setFontSize: (f: number) => void;
-  restartServer: () => void;
 }) {
   const [routes, setRoutes] = useState<Array<string>>([]);
   const [filter, setFilter] = useState("");
   const [serverPropsFilter, setServerPropsFilter] = useState("");
   const [perf, setPerf] = useState<{ render?: number; hydration?: number }>({});
-  const [position, setPosition] = usePanelPosition({ width: 400, height: 500 });
-  const [size, setSize] = usePanelSize();
+  const [panelWidth, setPanelWidth] = usePanelWidth(420);
   const [envFilter, setEnvFilter] = useState("");
   const [routeHistory, setRouteHistory] = useState<string[]>([]);
-  const dragging = useRef(false);
-  const offset = useRef({ x: 0, y: 0 });
   const resizing = useRef(false);
-  const resizeStart = useRef({ x: 0, y: 0, width: 400, height: 500 });
+  const resizeStart = useRef({ x: 0, width: 420 });
 
   const env = useMemo(() => typeof window === "undefined" ? "" : process.env ? process.env : {}, []);
 
-  // Handle window resize to keep panel within viewport
+  // Clamp width on window resize
   useEffect(() => {
     const handleResize = () => {
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      // Adjust panel position if it's outside viewport
-      setPosition(prevPosition => ({
-        x: Math.max(0, Math.min(prevPosition.x, viewportWidth - size.width)),
-        y: Math.max(0, Math.min(prevPosition.y, viewportHeight - size.height))
-      }));
-
-      // Adjust panel size if it's larger than viewport
-      setSize(prevSize => ({
-        width: Math.min(prevSize.width, viewportWidth - 50),
-        height: Math.min(prevSize.height, viewportHeight - 50)
-      }));
+      const vw = window.innerWidth;
+      setPanelWidth(w => Math.max(280, Math.min(w, Math.floor(vw * 0.9))));
     };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    }
-  }, [size.width, size.height, setPosition, setSize]);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const filteredServerProps = useMemo(() => {
     const props = globalThis.__SERVERSIDE_PROPS__;
@@ -233,58 +169,23 @@ function Panel({
     }
   }, []);
 
-  // --- Drag and Resize Handlers ---
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    dragging.current = true;
-    offset.current = { x: e.clientX - position.x, y: e.clientY - position.y };
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [position]);
-  const onMouseMove = useCallback((e: MouseEvent) => {
-    if (!dragging.current) return;
-    const panelWidth = size.width;
-    const panelHeight = size.height;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const headerHeight = 40; // Approximate header height
-
-    let x = e.clientX - offset.current.x;
-    let y = e.clientY - offset.current.y;
-
-    // Ensure at least part of the header remains visible
-    x = Math.max(-panelWidth + 100, Math.min(x, viewportWidth - 100));
-    y = Math.max(-headerHeight + 10, Math.min(y, viewportHeight - headerHeight));
-
-    setPosition({ x, y });
-  }, [size, setPosition]);
-  const onMouseUp = useCallback(() => {
-    dragging.current = false;
-    document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
-  }, [onMouseMove]);
+  // --- Horizontal Resize (left edge) ---
   const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     resizing.current = true;
-    resizeStart.current = { x: e.clientX, y: e.clientY, width: size.width, height: size.height };
+    resizeStart.current = { x: e.clientX, width: panelWidth };
     document.addEventListener("mousemove", onResizeMouseMove);
     document.addEventListener("mouseup", onResizeMouseUp);
-  }, [size]);
+  }, [panelWidth]);
   const onResizeMouseMove = useCallback((e: MouseEvent) => {
     if (!resizing.current) return;
-    const dx = e.clientX - resizeStart.current.x;
-    const dy = e.clientY - resizeStart.current.y;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // Calculate new size with constraints
-    const newWidth = Math.max(320, Math.min(resizeStart.current.width + dx, viewportWidth - position.x - 20));
-    const newHeight = Math.max(200, Math.min(resizeStart.current.height + dy, viewportHeight - position.y - 20));
-
-    setSize({
-      width: newWidth,
-      height: newHeight,
-    });
-  }, [setSize, position]);
+    const dx = resizeStart.current.x - e.clientX; // dragging left increases width
+    const vw = window.innerWidth;
+    const min = 280;
+    const max = Math.floor(vw * 0.95);
+    const next = Math.max(min, Math.min(resizeStart.current.width + dx, max));
+    setPanelWidth(next);
+  }, [setPanelWidth]);
   const onResizeMouseUp = useCallback(() => {
     resizing.current = false;
     document.removeEventListener("mousemove", onResizeMouseMove);
@@ -324,14 +225,12 @@ function Panel({
     <div
       className={`bunext-devtools-panel bunext-theme-${theme}${visible ? "" : " bunext-devtools-panel-hidden"}`}
       style={{
-        left: position.x,
-        top: position.y,
-        width: size.width,
-        height: size.height,
+        width: panelWidth,
+        height: "100vh",
         fontSize: `${fontSize}em`,
       }}
     >
-      <header className="bunext-panel-header" onMouseDown={onMouseDown}>
+      <header className="bunext-panel-header">
         <span>🛠 Bunext Devtools</span>
         <button className="bunext-panel-close-btn" onClick={onClose}>×</button>
       </header>
@@ -472,12 +371,6 @@ function Panel({
           </ul>
         </CollapsibleSection>
 
-        <CollapsibleSection title="⚙️ Actions">
-          <button className="bunext-action-btn" onClick={restartServer}>
-            Reboot Server
-          </button>
-        </CollapsibleSection>
-
         <CollapsibleSection title="⚙️ Settings">
           <div className="bunext-flex-row" style={{ gap: 16 }}>
             <label>
@@ -507,12 +400,10 @@ function Panel({
           </div>
         </CollapsibleSection>
       </div>
-      <div
-        className="bunext-panel-resize-handle"
-        onMouseDown={onResizeMouseDown}
-      >
-        <svg width="16" height="16">
-          <polyline points="0,16 16,16 16,0" stroke="#888" strokeWidth="2" fill="none" />
+      <div className="bunext-panel-resize-handle" onMouseDown={onResizeMouseDown}>
+        <svg width="10" height="40" viewBox="0 0 10 40">
+          <rect x="3" y="8" width="2" height="24" fill="#888" />
+          <rect x="6" y="8" width="2" height="24" fill="#888" />
         </svg>
       </div>
     </div>
@@ -765,4 +656,17 @@ function getRouteParams(route: string): string[] {
   // Matches [param] in the route and extracts the parameter name
   const matches = [...route.matchAll(/\[([^\]]+)\]/g)];
   return matches.map(m => m[1]).filter(param => param && param.trim());
+}
+
+function ActionSection() {
+  const ws = useContext(DevWebSocketContext);
+  const restartServer = useCallback(() => {
+    ws && ClientSendWSMessage({ message: "reboot-server", ws });
+  }, [ws]);
+
+  return <CollapsibleSection title="⚙️ Actions">
+    <button className="bunext-action-btn" onClick={restartServer}>
+      Reboot Server
+    </button>
+  </CollapsibleSection>
 }

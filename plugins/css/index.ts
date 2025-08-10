@@ -25,7 +25,6 @@ export const cssModulesTypesPlugin: BunextPlugin = {
         if (filePath?.endsWith('.module.css')) {
             preventBuild();
             await generateAllCSSModuleTypes(DEFAULT_CONFIG);
-            DevConsole(`🔄 Updating CSS Module types for: ${filePath}`);
         }
     }
 };
@@ -38,16 +37,15 @@ async function generateAllCSSModuleTypes(config: CSSModulesConfig) {
                 await generateSingleCSSModuleType(filePath);
             }
         });
-        DevConsole("✅ CSS Module types generated successfully!");
     } catch (error) {
-        DevConsole().error("❌ Failed to generate CSS Module types:");
-        DevConsole(error);
+        console.error("❌ Failed to generate CSS Module types:");
+        console.error(error);
     }
 }
 
 async function generateSingleCSSModuleType(filePath: string) {
     try {
-        const cssContent = await readFile(filePath, 'utf-8');
+        const cssContent = await Bun.file(filePath).text();
         const classNames = extractClassNames(cssContent);
 
         if (classNames.length === 0) {
@@ -57,9 +55,8 @@ async function generateSingleCSSModuleType(filePath: string) {
         const typeDefinition = generateTypeDefinition(classNames);
         const typeFilePath = `${filePath}.d.ts`;
         await Bun.file(typeFilePath).write(typeDefinition);
-        DevConsole(`  ✨ Generated types for: ${filePath}`);
     } catch (error) {
-        DevConsole().error(`❌ Failed to generate types for ${filePath}:`, error);
+        console.error(`❌ Failed to generate types for ${filePath}:`, error);
     }
 }
 

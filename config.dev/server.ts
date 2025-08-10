@@ -1,4 +1,4 @@
-import type { ServerConfig } from "bunext-js/internal/types.ts";
+import type { ServerConfig } from "bunext-js/types";
 import tailwindPlugin from "../external-plugins/tailwind";
 
 const Config: ServerConfig = {
@@ -22,6 +22,9 @@ const Config: ServerConfig = {
   },
   bunext_plugins: [
   ],
+  html_lang(request) {
+    return "fr"
+  },
 };
 
 export default Config;

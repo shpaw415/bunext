@@ -28,6 +28,7 @@
         "@types/web": "^0.0.216",
         "tailwind-bunext-plugin": "0.1.0",
         "tailwindcss": "^4.1.11",
+        "typescript": "^5.8.3",
       },
       "peerDependencies": {
         "react": "^19.1.0",

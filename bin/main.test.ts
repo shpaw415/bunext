@@ -2,21 +2,21 @@ import "../internal/server/bunext_global.ts";
 import { test, expect, describe, afterAll, beforeAll, beforeEach } from "bun:test";
 import "../database/class.ts";
 
-import "bunext-js/internal/server/server_global.ts";
-import { router } from "bunext-js/internal/server/router.tsx";
-import { Shell } from "../.bunext/react-ssr/shell.tsx";
-import { ParseServerSideProps } from "../internal/router/index.tsx";
+import "internal/server/server_global.ts";
+import { router } from "internal/server/router";
+import { Shell } from "internal/client/shell.tsx";
+import { ParseServerSideProps } from "internal/router/index.tsx";
 
 // Additional imports for enhanced testing
-import { BunextSession } from "../features/session/session.ts";
+import { BunextSession } from "features/session/session.ts";
 import {
   initializeSessionDatabase,
   cleanExpiredSessions,
   getSessionStats
-} from "../internal/session.ts";
-import CacheManager from "../internal/caching/index.ts";
-import { BunextRequest } from "../internal/server/bunextRequest.ts";
-import { BunextServer } from "../internal/server/index.ts";
+} from "internal/session.ts";
+import CacheManager from "internal/caching/index.ts";
+import { BunextRequest } from "internal/server/bunextRequest.ts";
+import { BunextServer } from "internal/server/index.ts";
 // Add custom matcher for toBeOneOf
 expect.extend({
   toBeOneOf(received: any, expected: any[]) {
@@ -304,7 +304,7 @@ describe("Bunext Framework Test Suite", () => {
     });
 
     test("revalidation system", async () => {
-      const { revalidate } = await import("bunext-js/features/router/revalidate.ts");
+      const { revalidate } = await import("features/router/revalidate.ts");
 
       // Test revalidation functionality
       expect(revalidate).toBeDefined();
@@ -312,7 +312,7 @@ describe("Bunext Framework Test Suite", () => {
     });
 
     test("head data management", async () => {
-      const { Head } = await import("bunext-js/features/head.tsx");
+      const { Head } = await import("features/head.tsx");
 
       expect(Head).toBeDefined();
       expect(Head.head).toBeDefined();
@@ -347,7 +347,8 @@ describe("Bunext Framework Test Suite", () => {
       const testElements = [{
         tag: "test",
         reactElement: "<div>test</div>",
-        htmlElement: "<div>test</div>"
+        htmlElement: "<div>test</div>",
+        name: "Test Element"
       }];
 
       CacheManager.addSSR(testPath, testElements);

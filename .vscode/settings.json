@@ -1,4 +1,20 @@
 {
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // Prefer extensionless auto-imports (avoid adding .js endings)
+  "typescript.preferences.importModuleSpecifierEnding": "minimal",
+  "javascript.preferences.importModuleSpecifierEnding": "minimal",
+
+  // Keep imports as short as possible
+  "typescript.preferences.importModuleSpecifier": "shortest",
+  "javascript.preferences.importModuleSpecifier": "shortest",
+
+  // Avoid suggesting from build outputs
+  "typescript.preferences.autoImportFileExcludePatterns": [
+    "**/.bunext/**",
+  ],
+
   "cSpell.words": [
     "ansi",
     "AUTOINCREMENT",

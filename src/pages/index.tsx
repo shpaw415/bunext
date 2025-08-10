@@ -16,6 +16,12 @@ type SessionType = {
 Head.setHead({
   data: {
     title: "Main page",
+    meta: [
+      {
+        name: "description",
+        content: "This is the main page"
+      }
+    ]
   },
   path: "/",
 });
@@ -43,7 +49,6 @@ function DynamicFileImport() {
  */
 export default async function Page() {
   Bunext.router.revalidate.ssr.every("/", 5);
-
   return (
     <div>
       <TestElement />

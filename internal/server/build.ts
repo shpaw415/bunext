@@ -341,6 +341,7 @@ class Builder extends PluginLoader {
           tag: `<!Bunext_Element_${exported.name}!>`,
           reactElement: this.toJSX(element),
           htmlElement: renderToString(element as JSX.Element),
+          name: exported.name
         });
       }
       CacheManager.addSSR(modulePath, moduleSSR.elements);

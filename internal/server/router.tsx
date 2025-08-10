@@ -18,9 +18,8 @@ import React, { type JSX } from "react";
 
 // Internal imports
 import type {
-  _DisplayMode,
   _GlobalData,
-  _SsrMode,
+  ErrorFallbackComponent,
   getServerSidePropsFunction,
   ReactShellComponent,
   ServerConfig,
@@ -36,8 +35,9 @@ import CacheManager from "../caching";
 // Global imports
 import "./server_global";
 import "./bunext_global";
-import { DevConsole } from "./logs";
 import type { JsxToStringWorkerMessage } from "../dev/types";
+import { SEPARATOR_REGEX } from "../utils";
+import { ErrorFallback } from "../../components/fallback";
 
 // Types and constants
 type SpecialPathNames =
@@ -52,6 +52,7 @@ interface ServerAction {
   path: string;
   actions: Array<Function>;
 }
+
 
 type LayoutModule = {
   default: ({
@@ -69,8 +70,8 @@ type PageModule = {
     params,
     request,
   }: {
-    props: any;
-    params: any;
+    props?: unknown;
+    params?: unknown;
     request?: BunextRequest;
   }) => Promise<JSX.Element>;
   getServerSideProps?: getServerSidePropsFunction;
@@ -704,6 +705,9 @@ class RequestManager {
   public readonly request_header: Record<string, string>;
   public readonly data: FormData;
 
+  //cache
+  private buildFileCache: Map<string, Uint8Array<ArrayBufferLike>> = new Map();
+
   // Routing
   public readonly server: FileSystemRouter;
   public readonly client: FileSystemRouter;
@@ -907,14 +911,20 @@ class RequestManager {
     const ProductionHeader = {
       "Cache-Control": "public max-age=3600",
     };
-
+    const cacheKey = this.pathname;
+    if (!this.buildFileCache.has(cacheKey)) {
+      const compressedFile = Bun.gzipSync(await staticResponse.text());
+      this.buildFileCache.set(cacheKey, compressedFile);
+    }
+    const compressedFile = this.buildFileCache.get(cacheKey);
     return this.bunextReq.__SET_RESPONSE__(
-      new Response(staticResponse, {
+      new Response(compressedFile, {
         headers: {
           "Content-Type": staticResponse.type,
           ...(process.env.NODE_ENV == "production"
             ? ProductionHeader
             : DevHeader),
+          "Content-Encoding": "gzip",
         },
       })
     );
@@ -1069,7 +1079,7 @@ class RequestManager {
       return props;
 
     } catch (error) {
-      console.error('Error in makeServerSideProps:', error);
+      //console.error('Error in makeServerSideProps:', error);
       const message = error instanceof Error ? error.message : String(error);
       throw new ServerSidePropsError(
         `Failed to load server-side props for ${this.pathname}: ${message}`
@@ -1200,7 +1210,13 @@ class RequestManager {
 
     try {
       const serverSideProps = (await this.makeServerSideProps()).value;
-      const pageJSX = await this.MakeDynamicJSXElement({ serverSideProps });
+      let pageJSX: JSX.Element | null = null;
+      try {
+        pageJSX = await this.MakeDynamicJSXElement({ serverSideProps });
+      } catch (error) {
+        console.error('Error creating dynamic JSX element:', error);
+        pageJSX = await this.getErrorFallbackComponent(error as Error);
+      }
 
       if (!pageJSX) {
         return null;
@@ -1217,6 +1233,21 @@ class RequestManager {
       const message = error instanceof Error ? error.message : String(error);
       throw new RenderingError(`Failed to serve page: ${message}`);
     }
+  }
+
+  private async getErrorFallbackComponent(e: Error): Promise<JSX.Element> {
+
+    const fileNameArray = this.serverSide?.filePath.split(SEPARATOR_REGEX);
+    fileNameArray?.pop();
+    fileNameArray?.push("error.tsx");
+    const errorFilePath = normalize(fileNameArray?.join("/") || "");
+    if (await Bun.file(errorFilePath).exists()) {
+      const errorModule = await import(errorFilePath) as { default: ErrorFallbackComponent };
+      if (errorModule?.default) {
+        return await errorModule.default({ error: e, requestManager: this });
+      }
+    }
+    return ErrorFallback({ error: e }) as JSX.Element;
   }
 
   /**
@@ -1307,6 +1338,7 @@ class RequestManager {
           ),
         }),
         __CSS_PATHS__: JSON.stringify(this.router.cssPathExists),
+        ...(this.bunextReq.plugins.globalData)
       };
     } catch (error) {
       console.error('Error creating preload object:', error);
@@ -1354,11 +1386,12 @@ class RequestManager {
           if (message.type == "jsxToString") {
             pageString = message.jsx;
             if (message.head) this.bunextReq.headData = message.head;
+            resolve(true);
+
           } else if (message.type == "error") {
-            DevConsole().error("Dynamic page error:", message?.error);
+            console.error("Dynamic page error:", message?.error);
           }
 
-          resolve(true);
         },
       });
     });

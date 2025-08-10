@@ -10,7 +10,7 @@ declare global {
   var __BUNEXT_DEV_INIT: boolean;
   var webSocket: undefined | WebSocket;
   //@ts-ignore
-  var Server: undefined | BunextServer;
+  var Server: void | BunextServer;
   var clusterStatus: boolean;
   //@ts-ignore
   var serverConfig: ServerConfig;

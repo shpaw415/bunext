@@ -4,6 +4,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
+    "baseUrl": ".",
     "jsx": "react-jsx",
     "allowJs": true,
     "moduleResolution": "bundler",
@@ -38,5 +39,6 @@
     "config",
     "database",
     "dev/**/*",
+    "public/**/*"
   ]
 }

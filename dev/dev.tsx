@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { ReloadContext } from "../internal/router/index";
 import DevToolPanel from "./devtool/panel";
 
@@ -7,9 +7,11 @@ declare global {
 }
 globalThis.__BUNEXT_DEV_INIT ??= true;
 
+export const DevWebSocketContext = createContext<WebSocket | undefined>(undefined);
+
 export function Dev({ children }: { children?: any }) {
   const reload = useContext(ReloadContext);
-  const [_ws, setWs] = useState<WebSocket>();
+  const [_ws, setWs] = useState<WebSocket | undefined>(undefined);
 
   const resetWs = useCallback(
     (setter: React.Dispatch<React.SetStateAction<WebSocket | undefined>>) => {
@@ -62,10 +64,10 @@ export function Dev({ children }: { children?: any }) {
   }, []);
 
   return (
-    <>
+    <DevWebSocketContext.Provider value={_ws}>
       {children}
       {globalThis.serverConfig?.Dev?.devtoolPanel &&
-        process.env.NODE_ENV == "development" && <DevToolPanel ws={_ws} />}
-    </>
+        process.env.NODE_ENV == "development" && <DevToolPanel />}
+    </DevWebSocketContext.Provider>
   );
 }

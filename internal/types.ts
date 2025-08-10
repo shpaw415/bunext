@@ -9,21 +9,17 @@ import type { Session } from "../features/session/bunext_object/types.ts";
 import type { _Request } from "../features/request/bunext_object/types.ts";
 import type { BunextPlugin } from "../plugins/types.ts";
 import type { ComponentType } from "../features/components/bunext_global/types.ts";
+import type { RequestManager } from "./server/router.tsx";
+import type { JSX } from "react";
+import type React from "react";
 
-export type ServerSideProps =
-  | {
+export type ServerSideProps<T extends Record<string, unknown> = {}> =
+  {
     redirect?: string;
-  }
-  | Record<string, any>
+  } & T
   | undefined;
 
-export type _DisplayMode = {
-  nextjs?: {
-    layout: string;
-  };
-  none?: "none";
-};
-export type _SsrMode = "nextjs" | "none";
+export type ErrorFallbackComponent = ({ error, requestManager }: { error: Error, requestManager: RequestManager }) => JSX.Element | Promise<JSX.Element>;
 
 export const URLpaths = {
   serverAction: "/ServerActionGetter" as const,
@@ -31,7 +27,7 @@ export const URLpaths = {
 
 export type _GlobalData = {
   __ROUTES__: Record<string, string>;
-  __SERVERSIDE_PROPS__: unknown | undefined;
+  __SERVERSIDE_PROPS__: ServerSideProps;
   __DEV_ROUTE_PREFETCH__: Array<string>;
   __PAGES_DIR__: string;
   __INITIAL_ROUTE__: string;
@@ -61,36 +57,50 @@ export type _globalThis = _GlobalData & {
 };
 
 /**
- * HTTPServer
- *  - port: HTTP server port
- *  - threads: Http worker (multi-threading)
- *    - **only available on Linux with Bun ^1.1.25**
- *  - config: Bun.serve config to pass
- * Dev
- *  - hotServerPort: Hot reload Server port
- *
- * build
- *  - plugins: custom plugins for the build
- *
- * session
- *  - timeout: Invalidate session after X seconds of Idle ( default to 3600 )
- *  - type:
- *      - cookie  : max of 4096 chars ( good for small session data )
- *      - database:hard : session kept on a database on the hard drive ( good for big session data but slower then memory)
- *      - database:memory : session kept on a database in memory ( good for big session data but must have enough RAM )
- *
- * router:
- *   - dynamicPaths: Array of base path of Dynamic loaded module
+ * Server configuration options for Bunext application
+ * 
+ * HTTPServer:
+ *  - port: Port number for the HTTP server to listen on
+ *  - threads: Number of worker threads for multi-threading (optional)
+ *    - Can be a specific number or "all_cpu_core" to use all available CPU cores
+ *    - **Only available on Linux with Bun ^1.1.25**
+ *  - config: Additional Bun.serve configuration options to pass through (optional)
+ * 
+ * Dev:
+ *  - hotServerPort: Port number for the hot reload development server
+ *  - devtoolPanel: Enable/disable client-side development tool panel (optional)
+ * 
+ * build:
+ *  - plugins: Array of custom Bun plugins to use during the build process
+ * 
+ * session (optional):
+ *  - timeout: Session invalidation time in seconds after idle period (default: 3600)
+ *  - type: Session storage strategy:
+ *    - "cookie": Store in browser cookies (max 4096 chars, good for small session data)
+ *    - "database:hard": Store in persistent database on disk (good for large data, slower than memory)
+ *    - "database:memory": Store in in-memory database (good for large data, requires sufficient RAM)
+ * 
+ * router (optional):
+ *  - dynamicPaths: Array of base paths for dynamically loaded modules
+ * 
+ * bunext_plugins (optional):
+ *  - Array of Bunext-specific plugins to enhance functionality
+ * 
+ * robots_txt (optional):
+ *  - BunFile containing the robots.txt content to be served
+ * 
+ * html_lang (optional):
+ *  - Sets the HTML lang attribute for the <html> element
+ *  - Can be a static string (e.g., "en", "fr", "es") or a function that receives the request
+ *  - Defaults to "en" if not specified
+ *  - Use empty string to omit the lang attribute entirely
+ *  - Important for SEO and accessibility compliance
  */
 export type ServerConfig = {
   HTTPServer: {
     port: number;
     threads?: number | "all_cpu_core";
-    config?: Partial<
-      Bun.ServeFunctionOptions<unknown, {} | undefined> & {
-        static?: {} | undefined;
-      }
-    >;
+    config?: Bun.ServeFunctionOptions<unknown, {}>;
   };
   Dev: {
     hotServerPort: number;
@@ -113,6 +123,21 @@ export type ServerConfig = {
     dynamicPaths: Array<string>;
   };
   bunext_plugins?: Array<BunextPlugin>;
+  /**
+   * Robots.txt file to be served
+   */
+  robots_txt?: BunFile;
+  /**
+   * Sets the HTML lang attribute for the <html> element.
+   * 
+   * @default "en"
+   * @param string - Static language code (e.g., "en", "fr", "es")
+   * @param function - Dynamic function receiving the request object to determine language
+   * 
+   * Use empty string to omit the lang attribute entirely.
+   * Important for SEO and accessibility compliance.
+   */
+  html_lang?: string | (() => string | Promise<string> | undefined);
 };
 
 export type OnRequestType = (
@@ -125,6 +150,7 @@ export type ssrElement = {
     tag: string;
     reactElement: string;
     htmlElement: string;
+    name: string;
   }>;
 };
 
@@ -186,18 +212,25 @@ export type ClusterMessageType =
     };
   };
 
-export type Params = Record<string, unknown>;
+export type Params = Record<string, unknown> | undefined;
 
-export type getServerSidePropsFunction = (
+export type getServerSidePropsFunction<T extends Record<string, unknown> = {}> = (
   request_data: { params: Params; request: Request },
   bunextRequest: BunextRequest
-) => Promise<undefined | {}> | undefined | {};
+) => Promise<ServerSideProps<T>>;
+
+/**
+ * Route page function type
+ * 
+ */
+export type routePageFunction = ({ params, props }: { params?: Params, props?: ServerSideProps }) => Promise<JSX.Element> | JSX.Element;
 
 export type ReactShellComponent = React.ComponentType<{
-  children: Array<React.ReactElement>;
+  children: React.ReactNode;
   props?: ServerSideProps;
   params?: Params;
   route: string;
+  lang?: string;
 }>;
 
 export type BunextType = {

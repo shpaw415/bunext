@@ -1,6 +1,6 @@
 "server only";
 
-import { BunextSession, type SessionData } from "../../features/session/session";
+import { BunextSession } from "../../features/session/session";
 import { webToken } from "@bunpmjs/json-webtoken";
 import "./server_global";
 import { deleteSessionById, setSessionById } from "../session";
@@ -22,7 +22,7 @@ export class BunextRequest {
   public plugins: FeatureType = {
     globalData: {},
   };
-  public global_data: Record<any, any> = {};
+  public global_data: Record<string, string> = {};
   public URL: URL;
 
   constructor(props: { request: Request; response: Response }) {
@@ -113,7 +113,7 @@ export class BunextRequest {
       secure: false,
     });
   }
-  public InjectGlobalValues(values: Record<string, any>) {
+  public InjectGlobalValues(values: Record<string, unknown>) {
     for (const [key, val] of Object.entries(values)) {
       try {
         this.plugins.globalData[key] = JSON.stringify(val);
@@ -122,12 +122,7 @@ export class BunextRequest {
       }
     }
   }
-  public setGlobalData<key extends string = string, val = any>(
-    setter: (current: Record<key, val>) => Record<any, any>
-  ) {
-    this.global_data = setter(this.global_data);
-  }
-  encodeSessionData(data: any) {
+  encodeSessionData(data: unknown) {
     return encodeURI(JSON.stringify(data));
   }
 }

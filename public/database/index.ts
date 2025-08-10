@@ -1,0 +1,2 @@
+// Public API: database
+export { Database } from "../../database/index.ts";

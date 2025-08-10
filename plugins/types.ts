@@ -21,7 +21,7 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
   rewrite?: (
     reWriter: HTMLRewriter,
     bunextRequest: BunextRequest,
-    context: T
+    context: T,
   ) => void | Promise<void>;
   after?: (context: T, bunextRequest: BunextRequest) => void | Promise<void>;
 };

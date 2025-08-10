@@ -94,30 +94,37 @@ function formatForConsole(data: any): string {
   }
 
   if (data instanceof Error) {
-    // Format Error objects with stack trace
-    const errorInfo: any = {
-      name: data.name,
-      message: data.message,
-      stack: data.stack
-    };
+    // Format Error objects with readable stack trace
+    let errorOutput = `${data.name}: ${data.message}`;
+
+    if (data.stack) {
+      // Add the stack trace with preserved newlines
+      errorOutput += '\n' + data.stack;
+    }
 
     // Add cause if it exists
     if (data.cause) {
-      errorInfo.cause = data.cause;
+      errorOutput += '\nCause: ' + String(data.cause);
     }
 
     // Include any additional custom properties
+    const customProps: any = {};
     Object.getOwnPropertyNames(data).forEach(key => {
-      if (!['name', 'message', 'stack'].includes(key)) {
-        errorInfo[key] = (data as any)[key];
+      if (!['name', 'message', 'stack', 'cause'].includes(key)) {
+        customProps[key] = (data as any)[key];
       }
     });
 
-    return JSON.stringify(errorInfo, null, 2);
+    if (Object.keys(customProps).length > 0) {
+      errorOutput += '\nAdditional properties:\n' + JSON.stringify(customProps, null, 2);
+    }
+
+    return errorOutput;
   }
 
   // Handle other objects
   try {
+    // Return JSON with preserved newlines
     return JSON.stringify(data, null, 2);
   } catch (error) {
     // Fallback for circular references or non-serializable objects
@@ -165,7 +172,14 @@ class ScrollingConsole {
       } else if (key === 'DOWN') {
         this.scrollDown();
       } else if (key === 'HOME') {
-        const maxScroll = Math.max(0, this.scrollingMessages.length - this.getAvailableLines());
+        // Calculate total wrapped lines for HOME key
+        const allWrappedLines: string[] = [];
+        this.scrollingMessages.forEach(message => {
+          const cleanMessage = message.replace(/^\^K\[.*?\]\^ /, '');
+          const wrappedLines = this.wrapText(cleanMessage, this.terminalWidth - 2);
+          allWrappedLines.push(...wrappedLines);
+        });
+        const maxScroll = Math.max(0, allWrappedLines.length - this.getAvailableLines());
         this.scrollOffset = maxScroll;
         this.render();
       } else if (key === 'END') {
@@ -200,7 +214,6 @@ class ScrollingConsole {
       this.render();
       return;
     }
-
     this.headerLines = getStartLog().split("\n");
     this.headerHeight = this.headerLines.length + 1;
     this.isInitialized = true;
@@ -252,7 +265,16 @@ class ScrollingConsole {
 
   private scrollUp() {
     const availableLines = this.getAvailableLines();
-    const maxScroll = Math.max(0, this.scrollingMessages.length - availableLines);
+
+    // Calculate total wrapped lines
+    const allWrappedLines: string[] = [];
+    this.scrollingMessages.forEach(message => {
+      const cleanMessage = message.replace(/^\^K\[.*?\]\^ /, '');
+      const wrappedLines = this.wrapText(cleanMessage, this.terminalWidth - 2);
+      allWrappedLines.push(...wrappedLines);
+    });
+
+    const maxScroll = Math.max(0, allWrappedLines.length - availableLines);
     const oldOffset = this.scrollOffset;
     this.scrollOffset = Math.min(this.scrollOffset + 1, maxScroll);
 
@@ -276,6 +298,53 @@ class ScrollingConsole {
       this.maxScrollingLines,
       this.terminalHeight - startY - 1
     );
+  }
+
+  private wrapText(text: string, maxWidth: number): string[] {
+    if (text.length <= maxWidth && !text.includes('\n')) {
+      return [text];
+    }
+
+    // First split by newlines to handle existing line breaks
+    const textLines = text.split('\n');
+    const allLines: string[] = [];
+
+    for (const textLine of textLines) {
+      if (textLine.length <= maxWidth) {
+        allLines.push(textLine);
+        continue;
+      }
+
+      // Split by spaces and wrap each line
+      const words = textLine.split(' ');
+      let currentLine = '';
+
+      for (const word of words) {
+        // If adding this word would exceed the line width
+        if (currentLine.length + word.length + 1 > maxWidth) {
+          if (currentLine.length > 0) {
+            allLines.push(currentLine);
+            currentLine = word;
+          } else {
+            // Word is longer than line width, split the word
+            let remaining = word;
+            while (remaining.length > maxWidth) {
+              allLines.push(remaining.slice(0, maxWidth));
+              remaining = remaining.slice(maxWidth);
+            }
+            currentLine = remaining;
+          }
+        } else {
+          currentLine = currentLine.length > 0 ? `${currentLine} ${word}` : word;
+        }
+      }
+
+      if (currentLine.length > 0) {
+        allLines.push(currentLine);
+      }
+    }
+
+    return allLines;
   }
 
   private render() {
@@ -302,44 +371,50 @@ class ScrollingConsole {
     const startY = this.headerHeight + 2;
     const availableLines = this.getAvailableLines();
 
-    const totalMessages = this.scrollingMessages.length;
-    const startIndex = Math.max(0, totalMessages - availableLines - this.scrollOffset);
-    const endIndex = Math.max(0, totalMessages - this.scrollOffset);
-    const visibleMessages = this.scrollingMessages.slice(startIndex, endIndex);
-
-    visibleMessages.forEach((message, index) => {
-      terminal.moveTo(1, startY + index);
-      terminal.eraseLineAfter();
-      this.renderColoredMessage(message);
+    // Prepare all lines with wrapping
+    const allWrappedLines: string[] = [];
+    this.scrollingMessages.forEach(message => {
+      const cleanMessage = message.replace(/^\^K\[.*?\]\^ /, '');
+      const wrappedLines = this.wrapText(cleanMessage, this.terminalWidth - 2);
+      allWrappedLines.push(...wrappedLines);
     });
 
-    for (let i = startY + visibleMessages.length; i < this.terminalHeight; i++) {
+    const totalWrappedLines = allWrappedLines.length;
+    const startIndex = Math.max(0, totalWrappedLines - availableLines - this.scrollOffset);
+    const endIndex = Math.max(0, totalWrappedLines - this.scrollOffset);
+    const visibleLines = allWrappedLines.slice(startIndex, endIndex);
+
+    visibleLines.forEach((line, index) => {
+      terminal.moveTo(1, startY + index);
+      terminal.eraseLineAfter();
+      this.renderSingleLine(line);
+    });
+
+    for (let i = startY + visibleLines.length; i < this.terminalHeight; i++) {
       terminal.moveTo(1, i);
       terminal.eraseLineAfter();
     }
 
-    if (this.scrollOffset > 0 || totalMessages > availableLines) {
+    if (this.scrollOffset > 0 || totalWrappedLines > availableLines) {
       const scrollIndicatorY = startY + availableLines;
       terminal.moveTo(this.terminalWidth - 10, scrollIndicatorY);
-      terminal.gray(`(${totalMessages - endIndex}↑ ${this.scrollOffset}↓)`);
+      terminal.gray(`(${totalWrappedLines - endIndex}↑ ${this.scrollOffset}↓)`);
     }
   }
 
-  private renderColoredMessage(message: string) {
-    const cleanMessage = message.replace(/^\^K\[.*?\]\^ /, '');
-
-    if (cleanMessage.includes('✔')) {
-      terminal.green(cleanMessage);
-    } else if (cleanMessage.includes('✖️') || cleanMessage.includes('×')) {
-      terminal.red(cleanMessage);
-    } else if (cleanMessage.includes('⚠') || cleanMessage.includes('‼')) {
-      terminal.yellow(cleanMessage);
-    } else if (cleanMessage.includes('ℹ') || cleanMessage.includes('i')) {
-      terminal.blue(cleanMessage);
-    } else if (cleanMessage.includes('▶') || cleanMessage.includes('>')) {
-      terminal.cyan(cleanMessage);
+  private renderSingleLine(line: string) {
+    if (line.includes('✔')) {
+      terminal.green(line);
+    } else if (line.includes('✖️') || line.includes('×')) {
+      terminal.red(line);
+    } else if (line.includes('⚠') || line.includes('‼')) {
+      terminal.yellow(line);
+    } else if (line.includes('ℹ') || line.includes('i')) {
+      terminal.blue(line);
+    } else if (line.includes('▶') || line.includes('>')) {
+      terminal.cyan(line);
     } else {
-      terminal.white(cleanMessage);
+      terminal.white(line);
     }
   }
 
@@ -573,13 +648,13 @@ export function initializeDevConsole() {
   process.on('SIGINT', () => {
     console.log('\nReceived SIGINT, cleaning up...');
     globalThis.BunextConsole.destroy();
-    process.exit(0);
+    setTimeout(() => process.exit(0), 1000);
   });
 
   process.on('SIGTERM', () => {
     console.log('\nReceived SIGTERM, cleaning up...');
     globalThis.BunextConsole.destroy();
-    process.exit(0);
+    setTimeout(() => process.exit(0), 1000);
   });
 }
 
@@ -651,11 +726,7 @@ export async function benchmark_console<T>(
   const enabled = process.env.NODE_ENV == "development" || onProduction;
 
   if (res && enabled) {
-    if (process.env.NODE_ENV == "development") {
-      DevConsole(res);
-    } else {
-      console.log(res);
-    }
+    DevConsole(res);
   }
 
   return measuringRes;

@@ -42,7 +42,6 @@ import "../caching/fetch.ts";
 import {
   benchmark_console,
   DevConsole,
-  DevConsoleInfo,
   TerminalIcon,
   TextColor,
   ToColor,
@@ -155,24 +154,29 @@ class BunextServer {
   }
 
   static async getInitedInstance(props: BunextServerProps = DEFAULT_PROPS): Promise<BunextServer> {
+    if (globalThis.Server) return globalThis.Server;
+
     const instance = new BunextServer(props);
     await instance.init();
+
+    globalThis.Server = instance;
+
     return instance;
   }
 
   startServer() {
     this.server = Bun.serve({
-      port: this.port,
-      ...(globalThis.serverConfig?.HTTPServer.config as any),
+      ...globalThis.serverConfig?.HTTPServer.config,
+      ...{ port: this.port },
       fetch: this.createFetchHandler(),
       error: (error: Error) => {
-        process.exit(1);
+        console.error(error);
       }
     });
   }
 
   Reboot() {
-    DevConsoleInfo("Rebooting server...");
+    console.info("Rebooting server...");
     process.exit(ExitCodeDescription[3].code);
   }
 
@@ -391,7 +395,7 @@ class BunextServer {
   }
 
   private createErrorResponse(error: Error): Response {
-    return new Response(renderToString(ErrorFallback(error)), {
+    return new Response(renderToString(ErrorFallback({ error })), {
       headers: {
         "Content-Type": "text/html",
       },

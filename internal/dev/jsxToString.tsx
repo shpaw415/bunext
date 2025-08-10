@@ -3,6 +3,7 @@ import { router } from "../../internal/server/router";
 import type { JSX } from "react";
 import { BunextRequest } from "../server/bunextRequest";
 import type { JsxToStringWorkerMessage } from "./types";
+import { ErrorFallback } from "../../components/fallback";
 
 const modulePath = process.env.module_path as string;
 const props = JSON.parse(process.env.props as string) as {
@@ -34,6 +35,12 @@ try {
 
 } catch (error) {
   Log(`Error creating dynamic page: `, error as Error);
+  process.send?.({
+    type: "jsxToString",
+    jsx: renderToString(<ErrorFallback error={error as Error} />),
+    head: req.headData,
+  } as JsxToStringWorkerMessage);
+
 }
 
 function Log(message: string, error?: Error) {

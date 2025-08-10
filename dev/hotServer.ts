@@ -1,3 +1,5 @@
+import "internal/server/server_global";
+
 export function sendSignal() {
   for (const ws of globalThis.socketList) {
     ws.send("reload");
@@ -7,7 +9,10 @@ export function sendSignal() {
 export type DevWsMessageTypes = "reboot-server";
 
 export const DevWsMessageHandler: Array<(message: DevWsMessageTypes, data: any, ws: Bun.ServerWebSocket<undefined>) => void> = [
-  (message) => message === "reboot-server" && globalThis.Server?.Reboot()
+  (message) => {
+    console.log("Received message:", message, typeof globalThis.Server);
+    message === "reboot-server" && globalThis.Server?.Reboot()
+  }
 ];
 
 export function addDevWsMessageHandler(
