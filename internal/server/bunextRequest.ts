@@ -21,6 +21,7 @@ export class BunextRequest {
   public SessionID?: string;
   public plugins: FeatureType = {
     globalData: {},
+    rawGlobalData: {},
   };
   public global_data: Record<string, string> = {};
   public URL: URL;
@@ -117,6 +118,7 @@ export class BunextRequest {
     for (const [key, val] of Object.entries(values)) {
       try {
         this.plugins.globalData[key] = JSON.stringify(val);
+        this.plugins.rawGlobalData[key] = val;
       } catch (error) {
         console.error(`Failed to serialize value for key "${key}":`, error);
       }

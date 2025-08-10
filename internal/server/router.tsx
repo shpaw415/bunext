@@ -1461,6 +1461,7 @@ class RequestManager {
         <this.Shell
           route={this.serverSide?.pathname + this.search}
           {...(await this.makeServerSideProps()).value}
+          request={this.bunextReq}
         >
           {page}
           <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>

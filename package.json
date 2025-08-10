@@ -94,6 +94,7 @@
   "./client/*": "./public/client/*",
   "./plugins/*": "./plugins/*",
   "./dev": "./public/dev/index.tsx",
-  "./server/bunext-server": "./public/server/bunext-server.ts"
+  "./server/bunext-server": "./public/server/bunext-server.ts",
+  "./client/shell": "./public/client/shell.ts"
   }
 }

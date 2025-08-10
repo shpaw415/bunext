@@ -39,6 +39,7 @@
     "config",
     "database",
     "dev/**/*",
-    "public/**/*"
+    "public/**/*", 
+    ".bunext/react-ssr/hydrate.ts"
   ]
 }

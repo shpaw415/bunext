@@ -1,14 +1,18 @@
 import type { BunextPlugin } from "plugins/types";
 import type { BunextRequest } from "public/request";
 
-async function getHtmlLang() {
+declare global {
+    var __HTML_LANG__: string | undefined;
+}
+
+async function getHtmlLang(bunext: BunextRequest) {
     switch (typeof globalThis.serverConfig.html_lang) {
         case "string":
             return globalThis.serverConfig.html_lang;
         case "undefined":
             return "en";
         case "function":
-            return await globalThis.serverConfig.html_lang() || "en";
+            return await globalThis.serverConfig.html_lang(bunext) || "en";
         default:
             return "en";
     }
@@ -16,15 +20,12 @@ async function getHtmlLang() {
 
 export default {
     router: {
-        html_rewrite: {
-            rewrite(reWriter) {
-                reWriter.on("html", {
-                    async element(element) {
-                        element.setAttribute("lang", await getHtmlLang());
-                    }
-                });
-            },
+        async request(bunext) {
+            bunext.InjectGlobalValues({
+                __HTML_LANG__: await getHtmlLang(bunext)
+            });
         }
     },
+
 
 } as BunextPlugin;

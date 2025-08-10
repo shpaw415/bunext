@@ -26,15 +26,6 @@ export async function hydrate(
   const matched = match(globalX.__INITIAL_ROUTE__.split("?")[0])!;
   const Initial = await import(matched.value) as { default: (args: { props: unknown; params: Record<string, unknown> }) => JSX.Element };
 
-  /*const JsxToDisplay: JSX.Element = await NextJsLayoutStacker({
-    page: Initial.default({
-      props: globalX.__SERVERSIDE_PROPS__,
-      params: matched.params,
-    }),
-    currentVersion: 0,
-    match: matched,
-  });*/
-
   const jsxPage = await CreatePage({
     matched,
     props: globalX.__SERVERSIDE_PROPS__,

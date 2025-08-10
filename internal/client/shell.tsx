@@ -6,12 +6,12 @@ import type { ReactShellComponent } from "internal/types";
 
 export const Shell: ReactShellComponent = ({
   children,
-  lang,
   route,
+  request
 }) => {
   return (
     <SessionProvider>
-      <html lang={lang || "en"}>
+      <html lang={request?.plugins.rawGlobalData?.__HTML_LANG__ as string || globalThis?.__HTML_LANG__ || "en"}>
         <HeadProvider currentPath={route}>
           <body>
             <Dev>{children}</Dev>
@@ -19,5 +19,5 @@ export const Shell: ReactShellComponent = ({
         </HeadProvider>
       </html>
     </SessionProvider>
-  ) as any;
+  );
 };

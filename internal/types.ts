@@ -137,7 +137,7 @@ export type ServerConfig = {
    * Use empty string to omit the lang attribute entirely.
    * Important for SEO and accessibility compliance.
    */
-  html_lang?: string | (() => string | Promise<string> | undefined);
+  html_lang?: string | ((request: BunextRequest) => (string | Promise<string> | undefined));
 };
 
 export type OnRequestType = (
@@ -230,7 +230,7 @@ export type ReactShellComponent = React.ComponentType<{
   props?: ServerSideProps;
   params?: Params;
   route: string;
-  lang?: string;
+  request?: BunextRequest;
 }>;
 
 export type BunextType = {
