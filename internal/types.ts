@@ -29,7 +29,7 @@ export type _GlobalData = {
   __ROUTES__: Record<string, string>;
   __SERVERSIDE_PROPS__: ServerSideProps;
   __DEV_ROUTE_PREFETCH__: Array<string>;
-  __PAGES_DIR__: string;
+  __PAGES_DIR__: "src/pages";
   __INITIAL_ROUTE__: string;
   __LAYOUT_ROUTE__: string[];
   __CSS_PATHS__: string[];

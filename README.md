@@ -990,7 +990,167 @@ export async function ServerWithErrorHandling(data: any) {
 }
 ```
 
-## 🗃️ Database Integration
+## � Head Management
+
+Manage HTML head elements, meta tags, and SEO data dynamically across your application.
+
+### Basic Head Usage
+
+Set head data using the `useHead` hook in your components:
+
+```tsx
+import { useHead } from 'bunext-js/head';
+
+export default function HomePage() {
+  useHead({
+    data: {
+      title: "Home - My Bunext App",
+      author: "Your Name",
+      publisher: "Your Company",
+      meta: [
+        { name: "description", content: "Welcome to my Bunext application" },
+        { name: "keywords", content: "bunext, react, typescript, web framework" },
+        { property: "og:title", content: "Home - My Bunext App" },
+        { property: "og:description", content: "Welcome to my Bunext application" },
+        { property: "og:image", content: "/images/og-image.jpg" },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+      link: [
+        { rel: "canonical", href: "https://myapp.com" },
+        { rel: "alternate", type: "application/rss+xml", href: "/feed.xml" },
+      ],
+    }
+  });
+
+  return (
+    <div>
+      <h1>Welcome to Bunext</h1>
+      <p>This page has dynamic head data including meta tags and SEO optimization.</p>
+    </div>
+  );
+}
+```
+
+### Dynamic Head Data
+
+Update head data based on props or state:
+
+```tsx
+import { useHead } from 'bunext-js/head';
+import { useEffect, useState } from 'react';
+
+export async function getServerSideProps({ params }: { params: { id: string } }) {
+  const post = await fetchPost(params.id);
+  return { post };
+}
+
+function HeadManager({post}:{post: Post}) {
+  
+  // Set head data based on the blog post
+  useHead({
+    data: {
+      title: `${post.title} - My Blog`,
+      author: post.author,
+      meta: [
+        { name: "description", content: post.excerpt },
+        { name: "keywords", content: post.tags.join(", ") },
+        { property: "og:title", content: post.title },
+        { property: "og:description", content: post.excerpt },
+        { property: "og:image", content: post.featuredImage },
+        { property: "og:type", content: "article" },
+        { property: "article:published_time", content: post.publishedAt },
+        { property: "article:author", content: post.author },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: post.title },
+        { name: "twitter:description", content: post.excerpt },
+        { name: "twitter:image", content: post.featuredImage },
+      ],
+      link: [
+        { rel: "canonical", href: `https://myblog.com/posts/${params.id}` },
+      ],
+    }
+  });
+}
+
+export default function BlogPost({ 
+  props, 
+  params 
+}: { 
+  props: { post: Post }; 
+  params: { id: string }; 
+}) {
+const { post } = props;
+  
+
+  return (
+    <article>
+      <HeadManager post={post} />
+      <h1>{post.title}</h1>
+      <p>By {post.author}</p>
+      <div dangerouslySetInnerHTML={{ __html: post.content }} />
+    </article>
+  );
+}
+```
+
+### Global and Route-Specific Head Data
+
+Set global head data that applies to all pages:
+
+```tsx
+// In your layout or shell component
+import { Head } from 'bunext-js/head';
+
+// Set global head data (server-side)
+Head.setHead({
+  path: "*", // Global path or /nested/pathname or /
+  data: {
+    meta: [
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "theme-color", content: "#000000" },
+      { name: "application-name", content: "My Bunext App" },
+    ],
+    link: [
+      { rel: "icon", href: "/favicon.ico" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: "/manifest.json" },
+    ],
+  }
+});
+
+// Set route-specific defaults
+Head.setHead({
+  path: "/blog",
+  data: {
+    title: "Blog - My Bunext App",
+    meta: [
+      { name: "description", content: "Read our latest blog posts and updates" },
+    ],
+  }
+});
+```
+
+### Head Management Features
+
+| Feature | Description | Example |
+|---------|-------------|---------|
+| **Dynamic Updates** | Update head data based on state/props | `useHead({ data })` |
+| **Server-Side Support** | Set head data during SSR | `request.setHead(data)` |
+| **CSS Integration** | Auto-inject route-based CSS | Automatic based on file structure |
+| **Global Data** | Set site-wide defaults | `Head.setHead({ path: "*", data })` |
+| **Performance** | CSS path caching and optimization | Built-in caching system |
+
+### Best Practices
+
+| ✅ Do | ❌ Don't |
+|-------|----------|
+| Use `useHead` for dynamic updates | Manually manipulate DOM head elements |
+| Validate head data structure | Pass invalid objects to head functions |
+| Set global defaults in layouts | Duplicate meta tags across pages |
+| Use server-side head setting for SEO | Rely only on client-side head updates |
+| Handle errors gracefully | Ignore head management errors |
+
+## �🗃️ Database Integration
 
 Type-safe SQLite database with automatic migrations and intuitive query API.
 
