@@ -7,6 +7,7 @@ import { join, normalize } from "path";
 import { mkdirSync } from "fs";
 import { CacheManagerExtends } from "../../internal/caching";
 import type { blurredImage } from "./type";
+import { router } from "internal/server/router";
 
 declare global {
   var blurImages: blurredImage[];
@@ -113,7 +114,7 @@ async function transformImage(req: BunextRequest) {
   }
 
   try {
-    const imagePath = join(process.cwd(), "static", normalize("/" + src));
+    const imagePath = join(process.cwd(), "static", normalize(src));
     const fileBuffer = await Bun.file(imagePath).arrayBuffer();
 
     const filePath = join(
@@ -143,13 +144,15 @@ async function transformImage(req: BunextRequest) {
 
 export default {
   router: {
-    request: async (bunextRequest, manager) => {
+    request: async (bunextRequest) => {
       if (bunextRequest.URL.pathname == "/bunext/image") {
         bunextRequest.__SET_RESPONSE__(await transformImage(bunextRequest));
         return bunextRequest;
-      } else if (manager.serverSide) {
+      } else if (bunextRequest.URL.pathname.endsWith(".js") && !bunextRequest.URL.pathname.endsWith("layout.js")) {
+        const splited = bunextRequest.URL.pathname.replace(router.pageDir, "").split("/");
+        splited.pop();
         bunextRequest.InjectGlobalValues({
-          blurImages: cache.get(bunextRequest.URL.pathname),
+          blurImages: cache.get(normalize(splited.join("/"))),
         });
       }
     },

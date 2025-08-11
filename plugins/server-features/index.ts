@@ -255,9 +255,6 @@ export default {
                 );
             },
         },
-        buildOptions: {
-            minify: false
-        }
     },
     async onFileSystemChange() {
         await InitServerActions();

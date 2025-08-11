@@ -820,11 +820,20 @@ class RequestManager {
       "Cache-Control": "public max-age=3600",
     };
     const cacheKey = this.pathname;
+    let compressedFile: Uint8Array<ArrayBufferLike>;
     if (!this.buildFileCache.has(cacheKey)) {
-      const compressedFile = Bun.gzipSync(await staticResponse.text());
+      let fileContent = await staticResponse.text();
+      if (this.pathname.startsWith("/" + router.pageDir) && this.pathname.endsWith(".js") && Object.keys(this.bunextReq.plugins.globalData).length > 0) {
+        fileContent = [
+          fileContent,
+          ...Object.entries(this.bunextReq.plugins.globalData).map(([key, value]) => `globalThis["${key}"] = ${value};`)
+        ].join("\n");
+      }
+      compressedFile = Bun.gzipSync(fileContent);
       this.buildFileCache.set(cacheKey, compressedFile);
     }
-    const compressedFile = this.buildFileCache.get(cacheKey);
+    compressedFile = this.buildFileCache.get(cacheKey) as Uint8Array<ArrayBufferLike>;
+
     return this.bunextReq.__SET_RESPONSE__(
       new Response(compressedFile, {
         headers: {
