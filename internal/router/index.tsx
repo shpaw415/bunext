@@ -233,11 +233,11 @@ async function fetchServerSideProps(
  * const invalid = ParseServerSideProps('invalid json');
  * console.log(invalid); // undefined
  */
-export function ParseServerSideProps(props: string): ServerSideProps | undefined {
+export function ParseServerSideProps<Props extends Record<string, unknown>>(props: string): ServerSideProps<Props> | undefined {
   if (!props?.trim()) return undefined;
 
   try {
-    const parsed = JSON.parse(props) as ServerSideProps;
+    const parsed = JSON.parse(props) as ServerSideProps<Props>;
 
     // Basic validation
     if (parsed === null) {

@@ -17,6 +17,8 @@ import {
 import CacheManager from "internal/caching/index.ts";
 import { BunextRequest } from "internal/server/bunextRequest.ts";
 import { BunextServer } from "internal/server/index.ts";
+import { getServerActions, InitServerActions } from "plugins/server-features/serverActions";
+import { ssrAsDefaultRoutes } from "plugins/server-features/ssr-page";
 // Add custom matcher for toBeOneOf
 expect.extend({
   toBeOneOf(received: any, expected: any[]) {
@@ -75,6 +77,10 @@ beforeAll(async () => {
     preventDevConsole: true,
   });
 });
+
+afterAll(() => {
+  Server?.close();
+})
 
 // Test configuration and constants
 const TEST_TIMEOUT = 30000; // 30 seconds for slower operations
@@ -367,8 +373,8 @@ describe("Bunext Framework Test Suite", () => {
       expect(Array.isArray(router.staticRoutes)).toBe(true);
 
       // Test SSR default routes
-      expect(router.ssrAsDefaultRoutes).toBeDefined();
-      expect(Array.isArray(router.ssrAsDefaultRoutes)).toBe(true);
+      expect(ssrAsDefaultRoutes).toBeDefined();
+      expect(Array.isArray(ssrAsDefaultRoutes)).toBe(true);
     });
 
     test("CSS and asset handling", async () => {
@@ -389,13 +395,13 @@ describe("Bunext Framework Test Suite", () => {
 
   describe("Server Actions & API Endpoints", () => {
     test("server actions initialization", async () => {
-      await router.InitServerActions();
+      await InitServerActions();
 
-      expect(router.serverActions).toBeDefined();
-      expect(Array.isArray(router.serverActions)).toBe(true);
+      expect(getServerActions()).toBeDefined();
+      expect(Array.isArray(getServerActions())).toBe(true);
 
       const totalActions = Array.prototype.concat(
-        ...router.serverActions.map((e) => e.actions)
+        ...getServerActions().map((e) => e.actions)
       ).length;
       expect(totalActions).toBeGreaterThan(0);
     });

@@ -349,7 +349,8 @@ function HeadProvider({
 
   // Reset data when path changes - use useEffect instead of useMemo for side effects
   useEffect(() => {
-    if (JSON.stringify(onHold) == JSON.stringify(data) && Object.keys(onHold).length > 0) {
+    if (Object.keys(data).length == 0 && Object.keys(onHold).length == 0) return;
+    else if (JSON.stringify(onHold) == JSON.stringify(data) && Object.keys(onHold).length > 0) {
       setData({});
       setOnHold({});
     } else {

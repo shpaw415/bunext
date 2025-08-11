@@ -173,8 +173,11 @@ export type revalidate = {
   time: number;
 };
 
+export type ServerAction = {
+  path: string;
+  actions: Array<Function>;
+}
 export type ServerActionDataType = File | string | Blob | Object | BunFile;
-
 export type ServerActionDataTypeHeader = "json" | "file" | "blob";
 
 export type ClusterMessageType =
@@ -233,6 +236,30 @@ export type ReactShellComponent = React.ComponentType<{
   request?: BunextRequest;
 }>;
 
+export type LayoutModule = {
+  default: ({
+    children,
+    params,
+  }: {
+    children: JSX.Element;
+    params: Record<string, string>;
+  }) => JSX.Element | Promise<JSX.Element>;
+}
+
+export type PageModule = {
+  default?: ({
+    props,
+    params,
+    request,
+  }: {
+    props?: unknown;
+    params?: unknown;
+    request?: BunextRequest;
+  }) => Promise<JSX.Element>;
+  getServerSideProps?: getServerSidePropsFunction;
+}
+
+
 export type BunextType = {
   version: string;
   request: _Request;
@@ -241,4 +268,9 @@ export type BunextType = {
   plugins: Plugins;
   database: Database;
   components: ComponentType;
+};
+
+export type PluginData = {
+  globalData: Record<string, string>;
+  rawGlobalData: Record<string, unknown>;
 };

@@ -21,6 +21,7 @@ import type {
   _GlobalData,
   ErrorFallbackComponent,
   getServerSidePropsFunction,
+  PageModule,
   ReactShellComponent,
   ServerConfig,
   ServerSideProps,
@@ -42,40 +43,10 @@ import { ErrorFallback } from "../../components/fallback";
 // Types and constants
 type SpecialPathNames =
   | "/bunextgetSessionData"
-  | "/ServerActionGetter"
   | "/bunextDeleteSession"
   | "/favicon.ico";
 
 type RouteEntry = [string, string];
-
-interface ServerAction {
-  path: string;
-  actions: Array<Function>;
-}
-
-
-type LayoutModule = {
-  default: ({
-    children,
-    params,
-  }: {
-    children: JSX.Element;
-    params: Record<string, string>;
-  }) => JSX.Element | Promise<JSX.Element>;
-}
-
-type PageModule = {
-  default?: ({
-    props,
-    params,
-    request,
-  }: {
-    props?: unknown;
-    params?: unknown;
-    request?: BunextRequest;
-  }) => Promise<JSX.Element>;
-  getServerSideProps?: getServerSidePropsFunction;
-}
 
 const HTML_DOCTYPE = "<!DOCTYPE html>";
 const SUPPORTED_FILE_EXTENSIONS = [".tsx", ".ts", ".js", ".jsx"] as const;
@@ -137,12 +108,10 @@ class StaticRouters extends PluginLoader {
 
   // Route configuration
   public routes_dump: string;
-  public serverActions: ServerAction[] = [];
   public layoutPaths: string[] = [];
   public cssPaths: string[] = [];
   public cssPathExists: string[] = [];
   public staticRoutes: Array<keyof FileSystemRouter["routes"]> = [];
-  public ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
 
   // Initialization state
   private readonly initPromise: Promise<boolean>;
@@ -279,15 +248,13 @@ class StaticRouters extends PluginLoader {
     try {
       await this.initPlugins();
 
-      const [cssPathExists, staticRoutes, ssrAsDefaultRoutes] = await Promise.all([
+      const [cssPathExists, staticRoutes] = await Promise.all([
         this.getCssPaths(),
         this.getUseStaticRoutes(),
-        this.getSSRDefaultRoutes(),
       ]);
 
       this.cssPathExists = cssPathExists;
       this.staticRoutes = staticRoutes;
-      this.ssrAsDefaultRoutes = ssrAsDefaultRoutes;
       this.inited = true;
 
       this.initResolver?.(true);
@@ -308,7 +275,7 @@ class StaticRouters extends PluginLoader {
   /**
    * Gets routes excluding layout files
    */
-  private getRoutesWithoutLayouts(): RouteEntry[] {
+  getRoutesWithoutLayouts(): RouteEntry[] {
     try {
       return Object.entries(this.server?.routes || {}).filter(
         ([route]) => !route.endsWith("/layout") && !route.endsWith(".d")
@@ -384,37 +351,6 @@ class StaticRouters extends PluginLoader {
     }
 
     return staticRoutes;
-  }
-
-  /**
-   * Identifies routes that should use SSR as default (no props required)
-   */
-  private async getSSRDefaultRoutes(): Promise<string[]> {
-    try {
-      const routes = this.getRoutesWithoutLayouts();
-
-      const moduleChecks = await Promise.all(
-        routes.map(async ([route, path]) => {
-          try {
-            const module = (await import(path)) as PageModule;
-            return {
-              route,
-              hasNoProps: module.default?.length === 0,
-            };
-          } catch (error) {
-            console.warn(`Failed to import module for route ${route}:`, error);
-            return { route, hasNoProps: false };
-          }
-        })
-      );
-
-      return moduleChecks
-        .filter(({ hasNoProps }) => hasNoProps)
-        .map(({ route }) => route);
-    } catch (error) {
-      console.warn("Failed to get SSR default routes:", error);
-      return [];
-    }
   }
 
   /**
@@ -598,43 +534,6 @@ class StaticRouters extends PluginLoader {
     } catch (error) {
       console.warn("Failed to get files from specified page directory:", error);
       return [];
-    }
-  }
-
-  /**
-   * Initializes server actions from page files
-   */
-  async InitServerActions(): Promise<this> {
-    try {
-      const files = this.getFilesFromPageDir().filter((file) => !file.endsWith("d.ts"));
-      this.serverActions = [];
-
-      for (const file of files) {
-        try {
-          const filePath = normalize(`${this.pageDir}/${file}`);
-          const moduleImport = normalize(`${process.cwd()}/${filePath}`);
-          const moduleExports = await import(process.env.NODE_ENV == "development" ? `${moduleImport}?${Bun.randomUUIDv7()}` : moduleImport);
-
-          const serverActionNames = Object.keys(moduleExports).filter((name) =>
-            name.startsWith("Server")
-          );
-
-          if (serverActionNames.length > 0) {
-            this.serverActions.push({
-              path: file,
-              actions: serverActionNames.map((name) => moduleExports[name]),
-            });
-          }
-        } catch (error) {
-          if ((error as Error)?.message == "Requested module is not instantiated yet.") continue;
-          console.warn(`Failed to process server actions for ${file}:`, error);
-        }
-      }
-
-      return this;
-    } catch (error) {
-      console.error("Failed to initialize server actions:", error);
-      throw error;
     }
   }
 

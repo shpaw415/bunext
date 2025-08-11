@@ -49,6 +49,7 @@ import {
 } from "./logs.ts";
 import { DevWsMessageHandler, type DevWsMessageTypes } from "../../dev/hotServer.ts";
 import { ExitCodeDescription } from "../../bin/exit-codes.ts";
+import { Shell } from "internal/client/shell";
 
 
 declare global {
@@ -118,7 +119,7 @@ type BunextServerProps = {
 const DEFAULT_PROPS: BunextServerProps = {
   onRequest: undefined,
   preloadModulePath: "./preload.ts",
-  Shell: () => null,
+  Shell,
   preventDevConsole: false,
 };
 
@@ -173,6 +174,13 @@ class BunextServer {
         console.error(error);
       }
     });
+  }
+
+  close() {
+    console.info("Shutting down server...");
+    this.server?.stop();
+    this.hotServer?.stop();
+    globalThis.BunextConsole.destroy();
   }
 
   Reboot() {
@@ -316,14 +324,14 @@ class BunextServer {
         } else {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) {
-            DevConsole(buildoutput);
-            throw new Error("Production build failed");
+            const err = new Error("Production build failed");
+            console.error(err);
+            throw err;
           }
           setRevalidate(buildoutput.revalidates);
         }
         this.startServer();
       }
-      await router.InitServerActions();
     } else if (isMainThread) {
       if (isDryRun) {
         //@ts-ignore
@@ -341,7 +349,6 @@ class BunextServer {
       }
     } else if (!isMainThread) {
       if (isDryRun) this.startServer();
-      await router.InitServerActions();
       await OnServerStartCluster();
     }
 

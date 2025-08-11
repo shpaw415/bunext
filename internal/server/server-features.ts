@@ -14,11 +14,6 @@ function setRevalidate(
   }
 }
 
-export type FeatureType = {
-  globalData: Record<string, string>;
-  rawGlobalData: Record<string, unknown>;
-};
-
 export async function MakeDynamicComponent({
   id,
   pathName,

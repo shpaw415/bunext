@@ -143,10 +143,14 @@ async function transformImage(req: BunextRequest) {
 
 export default {
   router: {
-    request: async (req) => {
-      if (req.URL.pathname == "/bunext/image") {
-        req.__SET_RESPONSE__(await transformImage(req));
-        return req;
+    request: async (bunextRequest, manager) => {
+      if (bunextRequest.URL.pathname == "/bunext/image") {
+        bunextRequest.__SET_RESPONSE__(await transformImage(bunextRequest));
+        return bunextRequest;
+      } else if (manager.serverSide) {
+        bunextRequest.InjectGlobalValues({
+          blurImages: cache.get(bunextRequest.URL.pathname),
+        });
       }
     },
 
@@ -161,22 +165,6 @@ export default {
               join(cwd, "static", src)
             );
             el.setAttribute("src", base64Data || "");
-          },
-        });
-        reWriter.onDocument({
-          end(end) {
-            const encodedData = cache.get(bunextRequest.URL.pathname);
-
-            const safeJsonString = JSON.stringify(encodedData)
-              .replace(/`/g, "\\`")
-              .replace(/<\/script>/gi, "<\\/script>");
-
-            end.append(
-              `<script> globalThis.blurImages = JSON.parse(\`${safeJsonString}\`); </script>`,
-              {
-                html: true,
-              }
-            );
           },
         });
       },

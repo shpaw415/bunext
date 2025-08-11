@@ -15,7 +15,7 @@ interface ReactElementToJSXStringOptions {
   useFragmentShortSyntax?: boolean;
 }
 
-const reactElementToJSXString: (
+declare const reactElementToJSXString: (
   element: ReactNode,
   options?: ReactElementToJSXStringOptions
 ) => string;

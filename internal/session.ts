@@ -115,7 +115,7 @@ const SESSION_SCHEMA: TableSchema = {
     {
       name: "data",
       type: "json",
-      DataType: {} as any, // Using any to bypass type checking for DataType
+      DataType: {},
     },
   ],
 };

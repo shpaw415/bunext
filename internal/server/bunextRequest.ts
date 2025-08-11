@@ -6,7 +6,7 @@ import "./server_global";
 import { deleteSessionById, setSessionById } from "../session";
 import { generateRandomString } from "../../features/utils";
 import { Head, type _Head } from "../../features/head";
-import { type FeatureType } from "./server-features";
+import type { PluginData } from "internal/types";
 
 export class BunextRequest {
   public request: Request;
@@ -19,7 +19,7 @@ export class BunextRequest {
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
   public SessionID?: string;
-  public plugins: FeatureType = {
+  public plugins: PluginData = {
     globalData: {},
     rawGlobalData: {},
   };
@@ -51,6 +51,10 @@ export class BunextRequest {
     return this._session;
   }
   public __SET_RESPONSE__(response: Response) {
+    this.response = response;
+    return this;
+  }
+  public setResponse(response: Response) {
     this.response = response;
     return this;
   }
