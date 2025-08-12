@@ -1,12 +1,20 @@
 "server only";
 
 import { BunextSession } from "../../features/session/session";
-import { webToken } from "@bunpmjs/json-webtoken";
+import { webToken, type _webToken } from "./webtoken";
 import "./server_global";
 import { deleteSessionById, setSessionById } from "../session";
 import { generateRandomString } from "../../features/utils";
 import { Head, type _Head } from "../../features/head";
 import type { PluginData } from "internal/types";
+import { BunextError } from "./server_global";
+
+
+export type CookieOptions = _webToken & {
+  encrypted?: boolean;
+};
+
+class CookieError extends BunextError { }
 
 export class BunextRequest {
   public request: Request;
@@ -30,7 +38,7 @@ export class BunextRequest {
     this.request = props.request;
     this.response = props.response;
     this.webtoken = new webToken<any>(this.request, {
-      cookieName: "bunext_session_token",
+      cookieName: "bunext_session_token"
     });
     this.SessionID = (
       this.webtoken.session() as undefined | { id: string }
@@ -50,10 +58,6 @@ export class BunextRequest {
     }
     return this._session;
   }
-  public __SET_RESPONSE__(response: Response) {
-    this.response = response;
-    return this;
-  }
   public setResponse(response: Response) {
     this.response = response;
     return this;
@@ -64,7 +68,7 @@ export class BunextRequest {
       [this.path]: data,
     };
   }
-  public async setCookie(response: Response) {
+  public async setSessionCookie(response?: Response) {
     switch (globalThis.serverConfig.session?.type) {
       case "database:hard":
       case "database:memory":
@@ -101,23 +105,39 @@ export class BunextRequest {
       );
     };
 
-    response.headers.append(
+    (response || this.response).headers.append(
       "session",
       this.encodeSessionData(this.session.getPublicSessionData() || {})
     );
-    response.headers.append(
+    (response || this.response).headers.append(
       "__bunext_session_timeout__",
       JSON.stringify(
         this.session.sessionTimeoutFromNow * 1000 + new Date().getTime()
       )
     );
 
-    return this.webtoken.setCookie(response, {
-      expire: setExpire(),
+    return this.webtoken.setCookie(response || this.response, {
+      maxAge: setExpire(),
       httpOnly: true,
       secure: false,
     });
   }
+  public setCookie<T extends Record<string, unknown>>(name: string, data: T, options?: CookieOptions) {
+    const wt = new webToken(this.request, {
+      cookieName: name
+    });
+    if (options?.encrypted) {
+      wt.setData(data);
+      //wt.setCookie(this.response);
+    } else {
+      wt.setPlainJsonCookie(this.response, name, data, options);
+    }
+  }
+  public getCookie<_Data extends Record<string, unknown>>(name: string, encrypted: boolean = false): _Data | undefined {
+    const wt = new webToken<_Data>(this.request, { cookieName: name });
+    return encrypted ? wt.session() : wt.getPlainJsonCookie(name);
+  }
+
   public InjectGlobalValues(values: Record<string, unknown>) {
     for (const [key, val] of Object.entries(values)) {
       try {
@@ -128,6 +148,7 @@ export class BunextRequest {
       }
     }
   }
+
   encodeSessionData(data: unknown) {
     return encodeURI(JSON.stringify(data));
   }

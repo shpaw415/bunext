@@ -110,21 +110,18 @@ class Builder extends PluginLoader {
     await this.InitGetCustomPluginsFromUser();
     await this.initPlugins();
     this.remove_node_modules_files_path.push(
-      ...this.getPlugins().flatMap((p) => p.removeFromBuild ?? [])
+      ...this.getPluginByName("removeFromBuild").flatMap((p) => p ?? [])
     );
     try {
       this.InitGetPlugins();
     } catch (e) {
-      DevConsole()?.error("Plugin has not loaded correctly!\n");
-      DevConsole((e as Error).stack);
+      console.error("Plugin has not loaded correctly!", (e as Error).stack);
     }
     return this;
   }
 
   private async InitGetPlugins() {
-    const pluginsData = this.getPlugins()
-      .map((p) => p.build)
-      .filter((p) => p != undefined);
+    const pluginsData = this.getPluginByName("build");
 
     const config = pluginsData
       .map((p) => p.buildOptions)
@@ -464,7 +461,7 @@ class Builder extends PluginLoader {
     Head.head = data.head;
     globalThis.Server?.updateWorkerData();
     await Promise.all(
-      this.getPlugins().map(({ after_build_main }) => after_build_main?.())
+      this.getPluginByName("after_build_main").map((after_build_main) => after_build_main())
     );
   }
 
@@ -532,7 +529,7 @@ class Builder extends PluginLoader {
     let strRes: BuildOuts | undefined;
     this.createBuildWorker();
     await Promise.all(
-      this.getPlugins().map(({ before_build_main }) => before_build_main?.())
+      this.getPluginByName("before_build_main").map((before_build_main) => before_build_main())
     );
     if (this.BuilderWorker) {
       await this.awaitBuildFinish();
@@ -565,9 +562,8 @@ class Builder extends PluginLoader {
   }
 
   private async afterBuild(build: BuildOutput) {
-    const afterBuildPlugins = this.getPlugins()
-      .map((p) => p.after_build)
-      .filter((p) => p != undefined);
+    const afterBuildPlugins = this.getPluginByName("after_build");
+
     for await (const output of build.outputs) {
       for await (const plugin of afterBuildPlugins) {
         await plugin(output);

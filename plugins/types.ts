@@ -32,11 +32,12 @@ export type BeforeBuild = () => Promise<any> | any;
 export type Request_Plugin = (
   request: BunextRequest,
   manager: RequestManager
-) =>
-  | Promise<void | undefined | BunextRequest>
-  | void
-  | undefined
-  | BunextRequest;
+) => Promise<void | BunextRequest> | BunextRequest | void;
+
+export type AfterRequest_Plugin = (
+  request: BunextRequest,
+  manager: RequestManager
+) => Promise<void | BunextRequest> | BunextRequest | void;
 
 type Build_Plugins = {
   plugin?: Bun.BunPlugin;
@@ -84,12 +85,21 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
     html_rewrite: HTML_Rewrite_plugin_function<HTMLRewrite>;
     /**
      * bypass the request flow and return a custom BunextResponse to the client.
-     * @example (request: BunextRequest) => {
-     *  request.response = new Response("custom response");
+     * @example (request: BunextRequest, manager: RequestManager): Promise<BunextRequest> | BunextRequest => {
+     *  request.setResponse(new Response())
      *  return request;
      * }
      */
     request: Request_Plugin;
+    /**
+     * Triggered after the request is processed.
+     * Allows for modifying the response before it is sent to the client.
+     * @example (request: BunextRequest, manager: RequestManager) => {
+     *  request.response.headers.set("X-Custom-Header", "value");
+     *  return request;
+     * }
+     */
+    after_request: AfterRequest_Plugin;
   }>;
   /**
    * Triggered once when the server start

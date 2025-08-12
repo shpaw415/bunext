@@ -21,7 +21,7 @@ export async function onRequestSSRPage(req: BunextRequest, manager: RequestManag
         req.session.prevent_session_init();
         const stringPage = await getSSRDefaultPage(manager);
         if (stringPage) {
-            req.__SET_RESPONSE__(
+            req.setResponse(
                 new Response(Buffer.from(Bun.gzipSync(stringPage)), {
                     headers: {
                         "content-type": "text/html; charset=utf-8",

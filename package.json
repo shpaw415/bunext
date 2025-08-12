@@ -34,7 +34,6 @@
   },
   "dependencies": {
     "@base2/pretty-print-object": "1.0.2",
-    "@bunpmjs/json-webtoken": "0.1.0",
     "@svgr/core": "8.1.0",
     "@svgr/plugin-jsx": "8.1.0",
     "@svgr/plugin-svgo": "8.1.0",

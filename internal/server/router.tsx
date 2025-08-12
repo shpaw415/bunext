@@ -39,6 +39,7 @@ import "./bunext_global";
 import type { JsxToStringWorkerMessage } from "../dev/types";
 import { SEPARATOR_REGEX } from "../utils";
 import { ErrorFallback } from "../../components/fallback";
+import { BunextError } from "./server_global";
 
 // Types and constants
 type SpecialPathNames =
@@ -69,21 +70,12 @@ class ClientOnlyError extends Error {
   }
 }
 
-/**
- * Base error class for Bunext-specific errors
- */
-class BunextError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = this.constructor.name;
-  }
-}
+
 
 class RouteNotFoundError extends BunextError { }
 class ComponentNotFoundError extends BunextError { }
 class RenderingError extends BunextError { }
 class ServerSidePropsError extends BunextError { }
-class APIEndpointError extends BunextError { }
 class RedirectError extends BunextError { }
 class FileSystemError extends BunextError { }
 
@@ -384,7 +376,7 @@ class StaticRouters extends PluginLoader {
     try {
       await this.isInited();
 
-      return new RequestManager({
+      const manager = new RequestManager({
         request,
         client: this.client,
         server: this.server,
@@ -392,12 +384,23 @@ class StaticRouters extends PluginLoader {
         request_header,
         router: this,
         Shell,
-      }).make();
+      })
+      const req = await manager.make();
+      if (req) {
+        for await (const after_request of
+          this.getSubPluginsByParentName("router", "after_request")) {
+          await after_request(req, manager);
+        }
+      }
+      return req;
+
     } catch (error) {
       console.error("Request serving failed:", error);
       throw error;
     }
   }
+
+
 
   async serverPrebuiltPage(
     serverSide: MatchedRoute,
@@ -680,6 +683,7 @@ class RequestManager {
 
       const message = error instanceof Error ? error.message : String(error);
       throw new RenderingError(`Request processing failed: ${message}`);
+
     }
   }
 
@@ -689,12 +693,10 @@ class RequestManager {
   private async checkPluginServing(): Promise<BunextRequest | null> {
     try {
       const plugins = this.router
-        .getPlugins()
-        .map((p) => p.router?.request)
-        .filter((p) => p !== undefined);
+        .getSubPluginsByParentName("router", "request")
 
       for await (const plugin of plugins) {
-        const res = await plugin(this.bunextReq, this);
+        const res = await plugin?.(this.bunextReq, this);
         if (res) {
           return res;
         }
@@ -720,9 +722,7 @@ class RequestManager {
   public async formatPage(html: string) {
     const rewriter = new HTMLRewriter();
     const plugins = this.router
-      .getPlugins()
-      .map((p) => p.router?.html_rewrite)
-      .filter((p) => p != undefined);
+      .getSubPluginsByParentName("router", "html_rewrite");
     const afters = await Promise.all(
       plugins.map(async (plugin) => {
         const context: unknown = plugin.initContext?.(this.bunextReq);
@@ -769,28 +769,15 @@ class RequestManager {
     }
   }
 
-  private async serveSessionData() {
-    await this.bunextReq.session.initData();
-    return this.bunextReq.__SET_RESPONSE__(
-      new Response(JSON.stringify(this.bunextReq.session.__DATA__.public))
-    );
-  }
-  private async serveDeleteSession() {
-    await this.bunextReq.session.initData();
-    this.bunextReq.session.delete();
-    return this.bunextReq.__SET_RESPONSE__(
-      await this.bunextReq.setCookie(new Response())
-    );
-  }
   private async serveStaticAssets() {
     const staticAssets = await this.router.serveFromDir({
       directory: this.router.staticDir,
       path: this.pathname,
     });
     if (staticAssets == null && this.pathname == "/favicon.ico") {
-      return this.bunextReq.__SET_RESPONSE__(new Response());
+      return this.bunextReq.setResponse(new Response());
     } else if (staticAssets !== null)
-      return this.bunextReq.__SET_RESPONSE__(
+      return this.bunextReq.setResponse(
         new Response(staticAssets, {
           headers: {
             "Content-Type": staticAssets.type,
@@ -834,7 +821,7 @@ class RequestManager {
     }
     compressedFile = this.buildFileCache.get(cacheKey) as Uint8Array<ArrayBufferLike>;
 
-    return this.bunextReq.__SET_RESPONSE__(
+    return this.bunextReq.setResponse(
       new Response(compressedFile, {
         headers: {
           "Content-Type": staticResponse.type,
@@ -849,9 +836,9 @@ class RequestManager {
 
   private MakeTextRes(content: BunFile | string, mimeType?: string) {
     if (content instanceof Blob) {
-      this.bunextReq.__SET_RESPONSE__(new Response(content));
+      this.bunextReq.setResponse(new Response(content));
     } else {
-      this.bunextReq.__SET_RESPONSE__(
+      this.bunextReq.setResponse(
         new Response(content, {
           headers: {
             "Content-Type": `text/${mimeType}`,
@@ -922,13 +909,13 @@ class RequestManager {
           return this.MakeTextRes(getBuildedFile(formatedExt));
         }
 
-        return this.bunextReq.__SET_RESPONSE__(
+        return this.bunextReq.setResponse(
           new Response(null, {
             status: 500,
           })
         );
       default:
-        return this.bunextReq.__SET_RESPONSE__(
+        return this.bunextReq.setResponse(
           new Response(null, {
             status: 404,
           })
@@ -1027,7 +1014,7 @@ class RequestManager {
 
     try {
       const props = await this.makeServerSideProps();
-      return this.bunextReq.__SET_RESPONSE__(
+      return this.bunextReq.setResponse(
         new Response(props.toString(), {
           headers: {
             ...this.bunextReq.response.headers,
@@ -1046,46 +1033,6 @@ class RequestManager {
   /**
    * Serves API endpoint responses
    */
-  private async serveAPIEndpoint(): Promise<null | BunextRequest> {
-    if (this.clientSide || !this.serverSide) {
-      return null;
-    }
-
-    try {
-      const ApiModule = await import(this.serverSide.filePath);
-      const method = this.bunextReq.request.method.toUpperCase();
-
-      if (typeof ApiModule[method] === "undefined") {
-        return null;
-      }
-
-      await this.bunextReq.session.initData();
-
-      const res = await ApiModule[method](this.bunextReq) as
-        BunextRequest | Response | undefined;
-
-      if (res instanceof BunextRequest) {
-        this.bunextReq = res;
-        await this.bunextReq.setCookie(res.response);
-      } else if (res instanceof Response) {
-        this.bunextReq.response = res;
-        await this.bunextReq.setCookie(res);
-      } else {
-        throw new APIEndpointError(
-          `API Endpoint ${this.serverSide.filePath} did not return a BunextRequest or Response object`
-        );
-      }
-
-      return this.bunextReq;
-    } catch (error) {
-      if (error instanceof BunextError) {
-        throw error;
-      }
-      console.error('Error serving API endpoint:', error);
-      const message = error instanceof Error ? error.message : String(error);
-      throw new APIEndpointError(`Failed to serve API endpoint: ${message}`);
-    }
-  }
 
   /**
    * Handles redirects from server-side props
@@ -1098,7 +1045,7 @@ class RequestManager {
         return null;
       }
 
-      return this.bunextReq.__SET_RESPONSE__(
+      return this.bunextReq.setResponse(
         new Response(null, {
           status: 302,
           headers: { Location: props.value.redirect },
@@ -1144,7 +1091,7 @@ class RequestManager {
         return null;
       }
 
-      return this.bunextReq.__SET_RESPONSE__(await this.makeStream(page));
+      return this.bunextReq.setResponse(await this.makeStream(page));
     } catch (error) {
       console.error('Error serving page:', error);
       const message = error instanceof Error ? error.message : String(error);
@@ -1172,10 +1119,6 @@ class RequestManager {
    */
   private async checkStaticServing(): Promise<BunextRequest | null> {
     switch (this.pathname as SpecialPathNames) {
-      case "/bunextgetSessionData":
-        return this.serveSessionData();
-      case "/bunextDeleteSession":
-        return this.serveDeleteSession();
       default:
         return (
           (await this.serveStaticAssets()) ||
@@ -1195,7 +1138,6 @@ class RequestManager {
 
     return (
       (await this.serveServerSideProps()) ||
-      (await this.serveAPIEndpoint()) ||
       (await this.serveRedirectFromServerSideProps())
     );
   }

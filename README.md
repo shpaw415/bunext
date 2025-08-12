@@ -26,7 +26,7 @@ Bunext is a **modern full-stack framework** built specifically for the **Bun run
 
 | Component | Version | Status |
 |-----------|---------|--------|
-| **Bun** | `1.1.0 - 1.2.19` | ✅ Supported |
+| **Bun** | `1.1.0 - 1.2.20` | ✅ Supported |
 | **Node.js** | N/A | ❌ Use Bun runtime |
 | **OS** | Linux, WSL | ✅ Supported |
 | **OS** | Windows | 🚧 In Progress |
@@ -418,10 +418,10 @@ export async function ServerRefreshContent(path: string) {
 function AdminControls() {
   return (
     <div>
-      <button onClick={() => ServerRefreshContent("/products")}>
+      <button onClick={() => ServerRefreshContent("/products/123")}>
         Refresh Products
       </button>
-      <button onClick={() => ServerRefreshContent("/news")}>
+      <button onClick={() => ServerRefreshContent("/news/43")}>
         Refresh News
       </button>
     </div>

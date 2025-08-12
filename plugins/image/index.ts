@@ -146,7 +146,7 @@ export default {
   router: {
     request: async (bunextRequest) => {
       if (bunextRequest.URL.pathname == "/bunext/image") {
-        bunextRequest.__SET_RESPONSE__(await transformImage(bunextRequest));
+        bunextRequest.setResponse(await transformImage(bunextRequest));
         return bunextRequest;
       } else if (bunextRequest.URL.pathname.endsWith(".js") && !bunextRequest.URL.pathname.endsWith("layout.js")) {
         const splited = bunextRequest.URL.pathname.replace(router.pageDir, "").split("/");

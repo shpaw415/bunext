@@ -21,6 +21,17 @@ declare global {
   //@ts-ignore
   var Bunext: BunextType;
 }
+
+/**
+ * Base error class for Bunext-specific errors
+ */
+export class BunextError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
+
 globalThis.socketList ??= [];
 globalThis.dryRun ??= true;
 globalThis.dev ??= {

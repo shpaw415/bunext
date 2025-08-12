@@ -1,3 +1,4 @@
+"server only";
 // this is called on server start
 
 import { router } from "./router";
@@ -14,9 +15,7 @@ export default async function Make() {
   globalThis.__BUNEXT_SERVER_START_PLUGIN_DRY__ = true;
   await router.initPlugins();
   const plugins = router
-    .getPlugins()
-    .map((p) => p.serverStart)
-    .filter((p) => p != undefined);
+    .getPluginByName("serverStart")
   const mains = plugins.map((p) => p.main).filter((p) => p != undefined);
 
   if (process.env.NODE_ENV == "development") {
@@ -37,10 +36,5 @@ export default async function Make() {
 
 export async function OnServerStartCluster() {
   await router.initPlugins();
-  const plugins = router
-    .getPlugins()
-    .map((p) => p?.serverStart?.cluster)
-    .filter((p) => p != undefined);
-
-  await Promise.all(plugins.map((p) => p?.()));
+  await Promise.all(router.getSubPluginsByParentName("serverStart", "cluster").map((p) => p()));
 }

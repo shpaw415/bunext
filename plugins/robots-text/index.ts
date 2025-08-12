@@ -6,7 +6,7 @@ export default {
         request(request) {
             try {
                 if (request.URL.pathname === "/robots.txt") {
-                    return request.__SET_RESPONSE__(
+                    return request.setResponse(
                         new Response(
                             globalThis.serverConfig?.robots_txt ?? RobotText,
                             {

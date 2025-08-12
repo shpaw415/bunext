@@ -11,6 +11,7 @@ import {
   TextColor,
   ToColor,
 } from "./logs";
+import { router } from "./router";
 
 type initFunction = (path?: string) => Promise<any>;
 
@@ -63,11 +64,9 @@ export const doWatchBuild = () =>
       let isBuildPrevented = false;
       const preventBuildFn = () => { isBuildPrevented = true; };
       await Promise.all(
-        builder.getPlugins().map(async (p) => {
+        router.getPluginByName("onFileSystemChange").map(async (plugin) => {
           try {
-            if (p.onFileSystemChange) {
-              await p.onFileSystemChange(path, preventBuildFn);
-            }
+            await plugin(path, preventBuildFn);
           } catch (error) {
             console.error(`Error in plugin's onFileSystemChange hook:`, error);
           }

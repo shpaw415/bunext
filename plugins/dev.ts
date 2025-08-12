@@ -56,7 +56,7 @@ const plugin: BunextPlugin =
  */
 async function handleCssPaths(req: BunextRequest) {
   if (!req.URL.pathname.startsWith(GETCSSPATH_PATHNAME)) return;
-  return req.__SET_RESPONSE__(new Response(JSON.stringify(await router.getCssPaths()), {
+  return req.setResponse(new Response(JSON.stringify(await router.getCssPaths()), {
     headers: {
       "Content-Type": "application/json",
     },
@@ -71,7 +71,7 @@ async function handleDevtoolsJson(req: BunextRequest) {
     return;
   }
 
-  return req.__SET_RESPONSE__(
+  return req.setResponse(
     new Response(
       JSON.stringify({
         name: "Bunext",

@@ -74,21 +74,19 @@ export async function serverActionGetter(manager: RequestManager): Promise<Respo
         result = JSON.stringify({ props: result });
     }
 
-    return manager.bunextReq.setCookie(
-        new Response(result as Exclude<ServerActionDataType, object>, {
-            headers: {
-                ...manager.bunextReq.response.headers,
-                dataType,
-                fileData:
-                    result instanceof File
-                        ? JSON.stringify({
-                            name: result.name,
-                            lastModified: result.lastModified,
-                        })
-                        : undefined,
-            },
-        })
-    );
+    return new Response(result as Exclude<ServerActionDataType, object>, {
+        headers: {
+            ...manager.bunextReq.response.headers,
+            dataType,
+            fileData:
+                result instanceof File
+                    ? JSON.stringify({
+                        name: result.name,
+                        lastModified: result.lastModified,
+                    })
+                    : undefined,
+        },
+    });
 }
 
 /**

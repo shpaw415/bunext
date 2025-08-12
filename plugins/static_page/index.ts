@@ -265,7 +265,7 @@ export default {
         const stringPage =
           (await getStaticPage(manager)) || (await MakeStaticPage(manager));
         if (stringPage)
-          return req.__SET_RESPONSE__(
+          return req.setResponse(
             new Response(Buffer.from(Bun.gzipSync(stringPage || "")), {
               headers: {
                 "content-type": "text/html; charset=utf-8",
@@ -284,7 +284,7 @@ export default {
         const staticData = cacheManager.getStaticFromURL(manager.request.url);
         if (!staticData) await MakeStaticPage(manager);
 
-        return req.__SET_RESPONSE__(
+        return req.setResponse(
           new Response(GetServerSideProps(cacheManager, manager)?.toString(), {
             headers: {
               ...req.response.headers,
