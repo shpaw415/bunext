@@ -43,11 +43,9 @@ export async function onRequestSSRPage(manager: RequestManager): Promise<boolean
 
 
 async function getSSRDefaultPage(manager: RequestManager): Promise<string | null> {
-    console.log("getSSRDefaultPage");
     if (!isSSRDefaultExportPath(manager, true) || !manager.serverSide)
         return null;
     const cache = CacheManager.getSSRDefaultPage(manager.serverSide.pathname);
-    console.log("cache", typeof cache);
     if (cache) return cache;
 
     const preRenderedPage = await getPreRenderedPage(manager);

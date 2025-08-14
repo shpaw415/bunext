@@ -143,12 +143,12 @@ class ScrollingConsole {
   private terminalHeight = 0;
   private terminalWidth = 0;
   private scrollOffset = 0;
-  private originalConsole: Console;
+  private originalConsole: Console = { ...console };
   private isConsoleRedirected = false;
 
   private constructor() {
+    if (process.env?.__DISABLE_DEV_CONSOLE_ == "true") return;
     // Store the original console methods
-    this.originalConsole = { ...console };
 
     this.terminalHeight = terminal.height;
     this.terminalWidth = terminal.width;
@@ -642,6 +642,7 @@ globalThis.BunextConsole ??= ScrollingConsole.getInstance();
 
 // Initialize the console (call this on server startup)
 export function initializeDevConsole() {
+  if (process.env?.__DISABLE_DEV_CONSOLE_ == "true") return;
   globalThis.BunextConsole.initialize();
   globalThis.BunextConsole.redirectConsole();
 
