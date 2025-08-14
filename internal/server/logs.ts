@@ -209,6 +209,7 @@ class ScrollingConsole {
   }
 
   initialize() {
+    if (process.env?.__DISABLE_DEV_CONSOLE_ == "true") return;
     if (this.isInitialized) {
       //console.clear();
       this.render();

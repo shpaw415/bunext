@@ -28,7 +28,7 @@ export async function hydrate(
 
   const jsxPage = await CreatePage({
     matched,
-    props: globalX.__SERVERSIDE_PROPS__,
+    props: globalThis.__SERVERSIDE_PROPS__,
     module: Initial,
     currentVersion: 0,
   });
@@ -38,7 +38,7 @@ export async function hydrate(
     <RouterHost Shell={Shell} {...options}>
       <Shell
         route={globalX.__INITIAL_ROUTE__}
-        {...globalX.__SERVERSIDE_PROPS__ as ServerSideProps}
+        props={globalThis.__SERVERSIDE_PROPS__}
       >
         <ErrorBoundary>
           {jsxPage}

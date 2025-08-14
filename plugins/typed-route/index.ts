@@ -28,6 +28,7 @@ export function makeType(routeDump: string) {
 }
 
 export default {
+  priority: 11,
   async onFileSystemChange(filePath) {
     if (filePath == undefined) return;
     try {

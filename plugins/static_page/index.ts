@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { BunextPlugin } from "../types";
 import type { RequestManager } from "../../internal/server/router";
 import { renderToString } from "react-dom/server";
+import { makeServerSideProps, type ServerSidePropsContext } from "plugins/server-features/serverSideProps";
 
 const staticPageCacheShema: DBSchema = [
   {
@@ -162,21 +163,15 @@ function isUseStaticPath(
   );
 }
 
-function GetServerSideProps(
+async function GetServerSideProps(
   cacheManager: StaticPageCache,
-  manager: RequestManager
+  manager: RequestManager<ServerSidePropsContext>
 ) {
-  if (manager.serverSideProps) return manager.serverSideProps;
-
-  if (!manager.serverSide) return null;
+  if (!manager.serverSide) return false;
   const props = cacheManager.getStaticPageProps(manager.serverSide.pathname);
-  if (props) {
-    manager.serverSideProps = {
-      toString: () => JSON.stringify(props),
-      value: props,
-    };
-    return manager.serverSideProps;
-  }
+  if (props) return props;
+  const serverSideProps = await makeServerSideProps(manager)
+  if (serverSideProps) return serverSideProps;
   return null;
 }
 
@@ -188,10 +183,10 @@ async function getStaticPage(manager: RequestManager) {
   const cacheManager = new StaticPageCache();
   const cache = cacheManager.getStaticPage(manager.request.url);
   if (!cache) {
-    const pageJSX = await manager.MakeDynamicJSXElement({
+    const pageJSX = await manager.makeDynamicJSXPage({
       serverSideProps: (
-        await manager.makeServerSideProps({ disableSession: true })
-      ).value,
+        await makeServerSideProps(manager, { disableSession: true })
+      ),
     });
     if (!pageJSX)
       throw Error(
@@ -201,18 +196,16 @@ async function getStaticPage(manager: RequestManager) {
       manager.serverSide,
       pageJSX
     );
-    const pageString = await manager.formatPage(
-      renderToString(await manager.makePage(PageWithLayouts))
-    );
+    const pageString = renderToString(await manager.WrapPageWithShell(PageWithLayouts));
 
     const props =
       GetServerSideProps(cacheManager, manager) ||
-      (await manager.makeServerSideProps({ disableSession: true }));
+      (await makeServerSideProps(manager, { disableSession: true }));
 
     cacheManager.addStaticPage(
       manager.serverSide.pathname,
       pageString,
-      props.value
+      props
     );
     return pageString;
   }
@@ -226,11 +219,12 @@ async function getStaticPage(manager: RequestManager) {
 async function MakeStaticPage(manager: RequestManager) {
   if (!manager.serverSide)
     throw new Error(`no serverSide path found for ${manager.pathname}`);
-  process.env.__SESSION_MUST_NOT_BE_INITED__ = "true";
+  manager.bunextReq.session.prevent_session_init();
+
   const cacheManager = new StaticPageCache();
-  const props = await manager.makeServerSideProps({ disableSession: true });
-  const pageJSX = await manager.MakeDynamicJSXElement({
-    serverSideProps: props?.value,
+  const props = await makeServerSideProps(manager, { disableSession: true });
+  const pageJSX = await manager.makeDynamicJSXPage({
+    serverSideProps: props,
   });
   if (!pageJSX)
     throw Error(
@@ -240,41 +234,39 @@ async function MakeStaticPage(manager: RequestManager) {
     manager.serverSide,
     pageJSX
   );
-  const pageString = await manager.formatPage(
-    renderToString(await manager.makePage(PageWithLayouts))
-  );
+  const pageString = renderToString(await manager.WrapPageWithShell(PageWithLayouts));
 
   cacheManager.addStaticPage(
     manager.serverSide.pathname,
     pageString,
-    props?.value
+    props
   );
 
   return pageString;
 }
 
 export default {
+  priority: 0,
   router: {
-    async request(req, manager) {
+    async request(manager) {
       if (process.env.NODE_ENV == "development") return;
       const isUseStatic = isUseStaticPath(manager, true);
       if (
-        req.request.headers.get("Accept")?.includes("text/html") &&
+        manager.request.headers.get("Accept")?.includes("text/html") &&
         isUseStatic
       ) {
         const stringPage =
           (await getStaticPage(manager)) || (await MakeStaticPage(manager));
+
+
         if (stringPage)
-          return req.setResponse(
-            new Response(Buffer.from(Bun.gzipSync(stringPage || "")), {
-              headers: {
-                "content-type": "text/html; charset=utf-8",
-                "Content-Encoding": "gzip",
-              },
-            })
-          );
+          manager.bunextReq.setResponse(stringPage || "", {
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+            },
+          });
       } else if (
-        req.request.headers
+        manager.request.headers
           .get("Accept")
           ?.includes("application/vnd.server-side-props") &&
         isUseStatic &&
@@ -283,11 +275,10 @@ export default {
         const cacheManager = new StaticPageCache();
         const staticData = cacheManager.getStaticFromURL(manager.request.url);
         if (!staticData) await MakeStaticPage(manager);
-
-        return req.setResponse(
-          new Response(GetServerSideProps(cacheManager, manager)?.toString(), {
+        const data = GetServerSideProps(cacheManager, manager);
+        return manager.bunextReq.__BYPASS_RESPONSE__ = (
+          new Response(data ? JSON.stringify(data) : null, {
             headers: {
-              ...req.response.headers,
               "Content-Type": "application/vnd.server-side-props",
               "Cache-Control": "no-store",
             },

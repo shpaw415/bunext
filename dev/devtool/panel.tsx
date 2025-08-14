@@ -124,7 +124,7 @@ function Panel({
   }, []);
 
   const filteredServerProps = useMemo(() => {
-    const props = globalThis.__SERVERSIDE_PROPS__;
+    const props = globalThis.__SERVERSIDE_PROPS__ as unknown;
     const filter = serverPropsFilter.toLowerCase();
     if (typeof props === "string") {
       return filter ? (props.toLowerCase().includes(filter) ? props : "") : props;

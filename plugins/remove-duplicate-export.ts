@@ -92,5 +92,6 @@ async function processBundleFile(file: Bun.BuildArtifact) {
 }
 
 export default {
+  priority: 11,
   after_build: processBundleFile,
 } as BunextPlugin;

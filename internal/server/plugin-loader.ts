@@ -39,10 +39,10 @@ export class PluginLoader {
       ...((serverConfig?.bunext_plugins as Array<BunextPlugin>) ?? [])
     );
 
-    this.Plugins = this.Plugins.sort(function (a, b) {
-      return (a?.priority || 1000) - (b?.priority || 1000);
-    });
+    this.Plugins = this.Plugins.sort((a, b) => {
 
+      return ((a?.priority ?? 1000) - (b?.priority ?? 1000));
+    });
     // Clear caches when plugins are reinitialized
     this.clearCaches();
   }

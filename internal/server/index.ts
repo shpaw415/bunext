@@ -207,7 +207,6 @@ class BunextServer {
           try {
             const response = await this.serve(request);
             if (response instanceof Response) return response;
-            if (response instanceof BunextRequest) return response.response;
           } catch (error) {
             console.error(error);
           }
@@ -367,7 +366,7 @@ class BunextServer {
       });
   }
 
-  async serve(request: Request): Promise<Response | BunextRequest | null> {
+  async serve(request: Request): Promise<Response | null> {
     let serverActionData: FormData = new FormData();
     const headers = request.headers.toJSON();
 

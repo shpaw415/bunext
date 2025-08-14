@@ -10,7 +10,7 @@
 
 // Core dependencies
 import { builder } from "../internal/server/build";
-import { router } from "../internal/server/router";
+import { RequestManager, router } from "../internal/server/router";
 
 // Types
 import type { BunextPlugin } from "./types";
@@ -40,10 +40,11 @@ const GETCSSPATH_PATHNAME = "/GetCssPaths";
 const plugin: BunextPlugin =
   process.env.NODE_ENV === "development"
     ? {
+      priority: -1,
       router: {
-        request: async (request) => {
-          await handleDevRequest(request.request);
-          return (await handleDevtoolsJson(request)) || (await handleCssPaths(request));
+        request: async (manager) => {
+          await handleDevRequest(manager);
+          (handleDevtoolsJson(manager.bunextReq)) || (await handleCssPaths(manager.bunextReq));
         },
       },
     }
@@ -55,33 +56,30 @@ const plugin: BunextPlugin =
  * This function collects CSS paths for the current route and returns them.
  */
 async function handleCssPaths(req: BunextRequest) {
-  if (!req.URL.pathname.startsWith(GETCSSPATH_PATHNAME)) return;
-  return req.setResponse(new Response(JSON.stringify(await router.getCssPaths()), {
+  if (req.URL.pathname !== GETCSSPATH_PATHNAME) return;
+  return req.__BYPASS_RESPONSE__ = new Response(JSON.stringify(await router.getCssPaths()), {
     headers: {
       "Content-Type": "application/json",
     },
-  }));
+  });
 }
 
 /**
  * Handles devtools JSON endpoint for Chrome DevTools integration
  */
-async function handleDevtoolsJson(req: BunextRequest) {
-  if (req.URL.pathname !== DEVTOOLS_ENDPOINT) {
-    return;
-  }
+function handleDevtoolsJson(req: BunextRequest): boolean {
+  if (req.URL.pathname !== DEVTOOLS_ENDPOINT) return false;
 
-  return req.setResponse(
-    new Response(
-      JSON.stringify({
-        name: "Bunext",
-        workspace: {
-          root: CWD,
-          uuid: Bun.randomUUIDv7(),
-        },
-      })
-    )
+  req.__BYPASS_RESPONSE__ = new Response(
+    JSON.stringify({
+      name: "Bunext",
+      workspace: {
+        root: CWD,
+        uuid: Bun.randomUUIDv7(),
+      },
+    })
   );
+  return true;
 }
 
 /**
@@ -101,12 +99,11 @@ function shouldRebuildRoute(match: MatchedRoute | null, request: Request): boole
 /**
  * Handles development-specific request processing
  */
-async function handleDevRequest(request: Request) {
-  if (process.env.NODE_ENV !== "development") return;
+async function handleDevRequest(request: RequestManager) {
 
-  const match = router.server.match(request);
+  const match = request.serverSide;
+  if (shouldRebuildRoute(match, request.request)) {
 
-  if (shouldRebuildRoute(match, request)) {
     await buildRoute(match!);
     return;
   }
@@ -117,8 +114,8 @@ async function handleDevRequest(request: Request) {
 /**
  * Handles requests for index.js files that might need rebuilding
  */
-async function handleIndexJsRequest(request: Request) {
-  const url = new URL(request.url);
+async function handleIndexJsRequest(request: RequestManager) {
+  const url = request.bunextReq.URL;
 
   if (!url.pathname.endsWith("index.js")) {
     return;
@@ -165,7 +162,7 @@ function isCurrentDevPath(match: MatchedRoute): boolean {
 async function buildRoute(match: MatchedRoute) {
   await builder.awaitBuildFinish();
 
-  DevConsole().info(
+  console.info(
     ToColor(
       TextColor,
       `compiling ${match.pathname} ...`

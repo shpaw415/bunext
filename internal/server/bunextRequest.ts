@@ -6,23 +6,37 @@ import "./server_global";
 import { deleteSessionById, setSessionById } from "../session";
 import { generateRandomString } from "../../features/utils";
 import { Head, type _Head } from "../../features/head";
-import type { PluginData } from "internal/types";
+import type { _GlobalData, PluginData, ServerConfig } from "internal/types";
 import { BunextError } from "./server_global";
+import { RenderingError, RequestManager, router } from "./router";
+import { timeStamp } from "console";
+import { formatHTML } from "internal/utils";
 
 
 export type CookieOptions = _webToken & {
   encrypted?: boolean;
 };
 
-class CookieError extends BunextError { }
+const HTML_DOCTYPE = "<!DOCTYPE html>";
 
-export class BunextRequest {
+
+class CookieError extends BunextError { }
+export class BunextResponseAlreadySetError extends BunextError { }
+export class BunextResponseNotSetError extends BunextError { }
+export class BunextNoServerSideMatchError extends BunextError { }
+
+export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public request: Request;
-  public response: Response;
+  private _response: Response;
+  private _response_setted: boolean = false;
+  private _response_body: BodyInit | null = null;
+  private _response_init?: ResponseInit;
   private _session?: BunextSession<any>;
+  public manager: RequestManager;
   public webtoken: webToken<any>;
   public headData?: Record<string, _Head>;
   public path: string = "";
+  public __BYPASS_RESPONSE__: Response | undefined;
   /**
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
@@ -31,12 +45,17 @@ export class BunextRequest {
     globalData: {},
     rawGlobalData: {},
   };
-  public global_data: Record<string, string> = {};
+  private _prevent_global_values_injection: boolean = false;
+  private _prevent_rewrite: boolean = false;
+  /**
+   * transport Request specific data for plugins
+   */
+  public context: ContextType = {} as ContextType;
   public URL: URL;
 
-  constructor(props: { request: Request; response: Response }) {
+  constructor(props: { request: Request; response: Response, manager: RequestManager }) {
     this.request = props.request;
-    this.response = props.response;
+    this._response = props.response;
     this.webtoken = new webToken<any>(this.request, {
       cookieName: "bunext_session_token"
     });
@@ -44,6 +63,21 @@ export class BunextRequest {
       this.webtoken.session() as undefined | { id: string }
     )?.id;
     this.URL = new URL(this.request.url);
+    this.manager = props.manager;
+  }
+  /**
+   * Gets the context for the request.
+   * @returns The context for the request.
+   */
+  public getContext<CutsomContextType extends unknown = undefined>(): CutsomContextType extends undefined ? ContextType : CutsomContextType {
+    return this.context as any;
+  }
+  /**
+   * Sets the context for the request.
+   * @param context The context to set for the request. will merge with existing context
+   */
+  public setContext(context: Partial<ContextType>) {
+    this.context = { ...this.context, ...context };
   }
 
   /**
@@ -58,9 +92,25 @@ export class BunextRequest {
     }
     return this._session;
   }
-  public setResponse(response: Response) {
-    this.response = response;
-    return this;
+  public get response(): Response {
+    return this._response;
+  }
+  /**
+   * Sets the response object. For Plugins.
+   * @param response The response object.
+   * @returns The current instance for chaining.
+   */
+  public setResponse(body: BodyInit | null, init?: ResponseInit): void | BunextResponseAlreadySetError {
+    if (this._response_setted) return new BunextResponseAlreadySetError("Response already set");
+    this._response_body = body;
+    this._response_init = init;
+    this._response_setted = true;
+  }
+  public isResponseSetted(): boolean {
+    return this._response_setted || Boolean(this.__BYPASS_RESPONSE__);
+  }
+  public unsetResponse(): void {
+    this._response_setted = false;
   }
   public setHead(data: _Head) {
     this.headData = {
@@ -68,6 +118,10 @@ export class BunextRequest {
       [this.path]: data,
     };
   }
+  /**
+   * <strong>DO NOT USE. BUNEXT INTERNAL USE ONLY</strong>
+   * set the session cookie
+   */
   public async setSessionCookie(response?: Response) {
     switch (globalThis.serverConfig.session?.type) {
       case "database:hard":
@@ -122,6 +176,12 @@ export class BunextRequest {
       secure: false,
     });
   }
+  /**
+   * Sets a cookie for the response.
+   * @param name The name of the cookie.
+   * @param data The data to store in the cookie.
+   * @param options Options for the cookie.
+   */
   public setCookie<T extends Record<string, unknown>>(name: string, data: T, options?: CookieOptions) {
     const wt = new webToken(this.request, {
       cookieName: name
@@ -132,21 +192,188 @@ export class BunextRequest {
     } else {
       wt.setPlainJsonCookie(this.response, name, data, options);
     }
+    return this;
   }
+  /**
+   * Gets a cookie from the request.
+   * @param name The name of the cookie.
+   * @param encrypted Whether the cookie is encrypted.
+   * @returns The cookie data or undefined if not found.
+   */
   public getCookie<_Data extends Record<string, unknown>>(name: string, encrypted: boolean = false): _Data | undefined {
     const wt = new webToken<_Data>(this.request, { cookieName: name });
     return encrypted ? wt.session() : wt.getPlainJsonCookie(name);
   }
-
+  /**
+   * Injects global values into the request context they can be accessed into client-side in the globalThis object.
+   * @param values The global values to inject. must be serializable.
+   */
   public InjectGlobalValues(values: Record<string, unknown>) {
     for (const [key, val] of Object.entries(values)) {
       try {
-        this.plugins.globalData[key] = JSON.stringify(val);
+        this.plugins.globalData[key] = typeof val == "undefined" ? "undefined" : JSON.stringify(val);
         this.plugins.rawGlobalData[key] = val;
       } catch (error) {
         console.error(`Failed to serialize value for key "${key}":`, error);
       }
     }
+  }
+  public preventGlobalValuesInjection() {
+    this._prevent_global_values_injection = true;
+    return this;
+  }
+  public preventRewrite() {
+    this._prevent_rewrite = true;
+    return this;
+  }
+  public GlobalValueInjectionIsPrevented() {
+    return this._prevent_global_values_injection;
+  }
+  public async toResponse(): Promise<Response | BunextResponseNotSetError> {
+    if (this.__BYPASS_RESPONSE__) return this.__BYPASS_RESPONSE__;
+    if (this._response_setted) {
+      if (typeof this._response_body == "string") {
+
+        let formatedStringData = await this.applyModifiers(this._response_body);
+        if ((this._response_init?.headers as { ["Content-Type"]: string })["Content-Type"] == "text/html") {
+          formatedStringData = formatHTML(formatedStringData);
+        }
+        if (!this.manager.request_header["accept-encoding"]?.split(",").map((e) => e.trim()).includes("gzip")) {
+          return new Response(formatedStringData, this._response_init);
+        }
+        return new Response(Bun.gzipSync(formatedStringData), { ...this._response_init, headers: { "Content-Encoding": "gzip", ...this._response_init?.headers }, });
+      }
+
+      return new Response(this._response_body, this._response_init);
+    }
+    return new BunextResponseNotSetError("Response not set");
+  }
+
+  /**
+  * Apply HTML rewrite plugins on html
+  * @param html full page html
+  * @returns the transformed html ready to set to a Response
+  */
+  private async applyRewritePlugins(html: string): Promise<string> {
+    if (this._prevent_rewrite) return html;
+    const rewriter = new HTMLRewriter();
+    const plugins = router
+      .getSubPluginsByParentName("router", "html_rewrite");
+    const afters = await Promise.all(
+      plugins.map(async (plugin) => {
+        const context: unknown = plugin.initContext?.(this);
+        await plugin.rewrite?.(rewriter, this, context);
+        return {
+          after: plugin.after,
+          context: context,
+        };
+      })
+    );
+
+    const transformedText = rewriter.transform(html);
+
+    await Promise.all(
+      afters.map(({ context, after }) => after?.(context, this))
+    );
+
+    return [HTML_DOCTYPE, transformedText].join("\n");
+  }
+  private async applyGlobalVariables(html: string): Promise<string> {
+    if (this._prevent_global_values_injection) return html;
+    const preloadScriptObj = await this.makePreLoadObject();
+    const preloadSriptsStrList = [
+      ...this.preloadToStringArray(preloadScriptObj),
+      "process={env: __PROCESS_ENV__};",
+    ].join(";");
+    const rewriter = new HTMLRewriter();
+
+    rewriter.on("#_BUNEXT_BOOTSTRAP_SCRIPT_", {
+      element(element) {
+        element.setInnerContent(preloadSriptsStrList);
+      },
+    });
+    html = rewriter.transform(html);
+
+    return html;
+  }
+  /**
+   * Applies all modifiers to the HTML **rewrite plugins & global variables**
+   * @param html The HTML to modify
+   * @returns The modified HTML
+   */
+  private async applyModifiers(html: string): Promise<string> {
+    return (await this.applyGlobalVariables(await this.applyRewritePlugins(html)));
+  }
+
+  /**
+   * Creates the preload object for client-side hydration
+   */
+  private async makePreLoadObject(): Promise<Record<keyof _GlobalData, string>> {
+    try {
+      await this.session.initData();
+
+      const createdAt =
+        this.session.__DATA__.private?.__BUNEXT_SESSION_CREATED_AT__ || 0;
+
+      const sessionTimeout =
+        createdAt === 0
+          ? 0
+          : createdAt +
+          this.session.sessionTimeoutFromNow * 1000 -
+          (new Date().getTime() - createdAt);
+
+
+
+      if (this.headData) {
+        Object.entries(this.headData).forEach(([path, data]) => {
+          Head.setHead({
+            path,
+            data
+          });
+        });
+      }
+
+      return {
+        __DEV_ROUTE_PREFETCH__: "[]",
+        __PAGES_DIR__: JSON.stringify(router.pageDir),
+        __INITIAL_ROUTE__: JSON.stringify(this.manager.serverSide?.pathname + this.manager.search),
+        __ROUTES__: router.routes_dump,
+        __LAYOUT_ROUTE__: JSON.stringify(router.layoutPaths),
+        __HEAD_DATA__: JSON.stringify({ ...Head.head }),
+        __PUBLIC_SESSION_DATA__: this.session.exists() ? JSON.stringify(
+          this.session.getPublicData()
+        ) : "undefined",
+        __SESSION_TIMEOUT__: JSON.stringify(sessionTimeout),
+        serverConfig: JSON.stringify({
+          Dev: globalThis.serverConfig.Dev,
+          HTTPServer: globalThis.serverConfig.HTTPServer,
+        } as Partial<ServerConfig>),
+        __PROCESS_ENV__: JSON.stringify({
+          NODE_ENV: process.env.NODE_ENV,
+          ...Object.assign(
+            {},
+            ...Object.entries(process.env)
+              .filter(([key]) => key.startsWith("PUBLIC"))
+              .map(([key, value]) => ({ [key]: value }))
+          ),
+        }),
+        ...(this.plugins.globalData)
+      };
+    } catch (error) {
+      console.error('Error creating preload object:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new RenderingError(`Failed to create preload object: ${message}`);
+    }
+  }
+  /**
+   * Converts preload object to string array for script injection
+   */
+  private preloadToStringArray(
+    preload: Record<keyof _GlobalData & string, string>
+  ): string[] {
+    return Object.entries(preload)
+      .map(([key, value]) => `${key}=${value}`)
+      .filter(Boolean);
   }
 
   encodeSessionData(data: unknown) {

@@ -143,15 +143,16 @@ async function transformImage(req: BunextRequest) {
 }
 
 export default {
+  priority: 10,
   router: {
-    request: async (bunextRequest) => {
-      if (bunextRequest.URL.pathname == "/bunext/image") {
-        bunextRequest.setResponse(await transformImage(bunextRequest));
-        return bunextRequest;
-      } else if (bunextRequest.URL.pathname.endsWith(".js") && !bunextRequest.URL.pathname.endsWith("layout.js")) {
-        const splited = bunextRequest.URL.pathname.replace(router.pageDir, "").split("/");
+    request: async (manager) => {
+      if (manager.bunextReq.URL.pathname == "/bunext/image") {
+        manager.bunextReq.__BYPASS_RESPONSE__ = (await transformImage(manager.bunextReq));
+        return manager.bunextReq;
+      } else if (manager.bunextReq.URL.pathname.endsWith(".js") && !manager.bunextReq.URL.pathname.endsWith("layout.js")) {
+        const splited = manager.bunextReq.URL.pathname.replace(router.pageDir, "").split("/");
         splited.pop();
-        bunextRequest.InjectGlobalValues({
+        manager.bunextReq.InjectGlobalValues({
           blurImages: cache.get(normalize(splited.join("/"))),
         });
       }

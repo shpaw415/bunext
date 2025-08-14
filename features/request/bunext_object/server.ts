@@ -1,12 +1,18 @@
-"server only";
 
-import { BunextRequest } from "../../../internal/server/bunextRequest";
 import { GetRequest } from "../bunextRequest";
 import { useRequest } from "../hooks";
 import type { _Request } from "./types";
 
-const _BunextRequest: _Request = {
-  bunext: BunextRequest,
+let _BunextRequestClass: any = null;
+
+const _BunextRequest = {
+  get bunext() {
+    // Lazy import to avoid circular dependency
+    if (!_BunextRequestClass) {
+      _BunextRequestClass = require("internal/server/bunextRequest").BunextRequest;
+    }
+    return _BunextRequestClass;
+  },
   hook: {
     useRequest,
   },

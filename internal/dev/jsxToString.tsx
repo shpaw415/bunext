@@ -75,6 +75,7 @@ let jsx: JSX.Element;
 const req = new BunextRequest({
   request: new Request(url),
   response: new Response(),
+  manager: undefined as any
 });
 req.path = match.name;
 

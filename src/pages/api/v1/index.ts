@@ -5,21 +5,17 @@ export function POST(request: BunextRequest) {
   console.log(session.getData());
   session.setData({ api: "test" }, true);
 
-  request.response = new Response("POST");
-  return request;
+  return new Response("POST");
 }
 
 export function GET(request: BunextRequest) {
-  request.response = new Response("GET");
-  return request;
+  return new Response("GET");
 }
 
 export function PUT(request: BunextRequest) {
-  request.response = new Response("PUT");
-  return request;
+  return new Response("PUT");
 }
 
 export function DELETE(request: BunextRequest) {
-  request.response = new Response("DELETE");
-  return request;
+  return new Response("DELETE");
 }

@@ -8,11 +8,28 @@ class APIEndpointError extends BunextError { }
 type APIModuleFunction = (req: BunextRequest) => Promise<Response> | Response;
 
 type APIModule = {
-    POST?: APIModuleFunction;
     GET?: APIModuleFunction;
+    HEAD?: APIModuleFunction;
+    OPTIONS?: APIModuleFunction;
+    TRACE?: APIModuleFunction;
     PUT?: APIModuleFunction;
     DELETE?: APIModuleFunction;
+    POST?: APIModuleFunction;
+    PATCH?: APIModuleFunction;
+    CONNECT?: APIModuleFunction;
 };
+
+const API_METHODS = [
+    "GET",
+    "HEAD",
+    "OPTIONS",
+    "TRACE",
+    "PUT",
+    "DELETE",
+    "POST",
+    "PATCH",
+    "CONNECT"
+] as const;
 
 async function serveAPIEndpoint(manager: RequestManager): Promise<boolean> {
     if (manager.clientSide || !manager.serverSide) {
@@ -23,7 +40,7 @@ async function serveAPIEndpoint(manager: RequestManager): Promise<boolean> {
         const ApiModule = await import(manager.serverSide.filePath) as APIModule;
         const method = manager.bunextReq.request.method.toUpperCase() as keyof APIModule;
 
-        if (typeof ApiModule[method] === "undefined") {
+        if (typeof ApiModule[method] === "undefined" || !API_METHODS.includes(method)) {
             return false;
         }
 
@@ -32,7 +49,7 @@ async function serveAPIEndpoint(manager: RequestManager): Promise<boolean> {
         const res = await ApiModule[method](manager.bunextReq);
 
         if (res instanceof Response) {
-            manager.bunextReq.setResponse(res);
+            manager.bunextReq.__BYPASS_RESPONSE__ = res;
         } else {
             throw new APIEndpointError(
                 `API Endpoint ${manager.serverSide.filePath} did not return a Response object`
@@ -51,9 +68,10 @@ async function serveAPIEndpoint(manager: RequestManager): Promise<boolean> {
 }
 
 export default {
+    priority: 1,
     router: {
-        async request(request, manager) {
-            if (await serveAPIEndpoint(manager)) return request;
+        async request(manager) {
+            await serveAPIEndpoint(manager)
         }
     }
 } as BunextPlugin;

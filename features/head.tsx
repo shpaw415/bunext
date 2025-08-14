@@ -433,75 +433,14 @@ function HeadElement({
     setLoadedLinksCount(prev => prev + 1);
   }, []);
 
-  const getPaths = () => {
-    try {
-      return GetCssPaths(
-        {
-          value: normalize(
-            `/${router.pageDir}/${path === "/" ? "index" : path}.js`
-          ),
-          params: {},
-          path: path,
-        },
-        {
-          onlyFilePath: true,
-        }
-      ).map((path) => `${router.buildDir}${path}`);
-    } catch (error) {
-      console.error('[Bunext Head] Error getting paths:', error);
-      return [];
-    }
-  };
-
-  const getStringData = (filePath: string) => {
-    try {
-      const fs = require("fs");
-      if (!fs.existsSync(filePath)) {
-        console.warn(`[Bunext Head] CSS file not found: ${filePath}`);
-        return '';
-      }
-      const buffer = fs.readFileSync(filePath);
-      return buffer.toString("utf-8") as string;
-    } catch (error) {
-      console.error(`[Bunext Head] Error reading CSS file ${filePath}:`, error);
-      return '';
-    }
-  };
-
-  const SSRStyle = useMemo(() => {
-    const stylesElements = typeof window === "undefined" && getPaths().map((cssPath, i) => {
-      const cssContent = getStringData(cssPath);
-      return cssContent ? (
-        <style
-          key={i}
-          dangerouslySetInnerHTML={{
-            __html: cssContent,
-          }}
-          className="bunext-ssr-style"
-        />
-      ) : null;
-    }).filter((v) => v !== null);
-
-    if (stylesElements) {
-      return stylesElements;
-    }
-
-    else {
-      return undefined;
-    }
-
-  }, [path]);
-
   const clearSSRStyleElements = useCallback(() => {
-    const styles = document.querySelectorAll(".bunext-ssr-style");
-    styles.forEach((style) => style.remove());
+    const styles = document.querySelector(".bunext-ssr-style");
+    styles?.remove();
   }, []);
 
   // Clear SSR styles when clearSSRStyle becomes true
   useEffect(() => {
-    if (clearSSRStyle && typeof window !== "undefined") {
-      clearSSRStyleElements();
-    }
+    clearSSRStyleElements();
   }, [clearSSRStyle, clearSSRStyleElements]);
 
   return (
@@ -515,7 +454,6 @@ function HeadElement({
       {data?.link?.map((e, index) => (
         <link key={index} {...e} />
       ))}
-      {SSRStyle}
       {typeof window !== "undefined" &&
         style?.map((props, i) => <link key={i} rel="stylesheet" onLoad={handleLinkLoad} {...props} />)}
     </head>

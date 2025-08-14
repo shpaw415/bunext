@@ -60,7 +60,6 @@ declare global {
   }[];
 
   var __ROUTES__: Record<string, string>;
-  var __SERVERSIDE_PROPS__: unknown | undefined;
   var __DEV_ROUTE_PREFETCH__: Array<string>;
   var __PAGES_DIR__: string;
   var __INITIAL_ROUTE__: string;

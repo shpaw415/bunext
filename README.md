@@ -1635,7 +1635,7 @@ const Config: ServerConfig = {
   },
   
   // Register plugins
-  plugins: [
+  bunext_plugins: [
     analyticsPlugin,
     seoPlugin,
     
@@ -1648,10 +1648,12 @@ const Config: ServerConfig = {
         }
       },
       router: {
-        request: async (req) => {
-          // Add custom request ID
-          req.requestId = Math.random().toString(36).substring(7);
-          return req;
+        request: async (request) => {
+          // Add custom request ID to context
+          request.bunextReq.setContext({ 
+            requestId: Math.random().toString(36).substring(7) 
+          });
+          return request;
         }
       }
     },
@@ -1672,10 +1674,10 @@ const Config: ServerConfig = {
       {
         priority: 0, // Highest priority
         router: {
-          request: async (req) => {
-            // Add security headers
-            req.securityMode = 'strict';
-            return req;
+          request: async (request) => {
+            // Add security mode to context
+            request.bunextReq.setContext({ securityMode: 'strict' });
+            return request;
           }
         }
       }
@@ -1703,10 +1705,10 @@ export const plugins: BunextPlugin[] = [
       }
     },
     router: {
-      request: async (req) => {
+      request: async (request) => {
         const timestamp = new Date().toISOString();
-        console.log(`[${timestamp}] ${req.method} ${req.pathname}`);
-        return req;
+        console.log(`[${timestamp}] ${request.bunextReq.request.method} ${request.bunextReq.URL.pathname}`);
+        return request;
       }
     }
   },
@@ -1739,7 +1741,7 @@ import { plugins } from "./plugins";
 
 const Config: ServerConfig = {
   HTTPServer: { port: 3000 },
-  plugins
+  bunext_plugins: plugins
 };
 
 export default Config;
@@ -2156,15 +2158,15 @@ export const myPlugin: BunextPlugin = {
   
   // Request/Response handling
   router: {
-    request: async (req, manager) => {
+    request: async (request) => {
       // Modify request before processing
-      console.log(`Request: ${req.method} ${req.pathname}`);
-      return req;
+      console.log(`Request: ${request.bunextReq.request.method} ${request.serverSide?.pathname || request.bunextReq.URL.pathname}`);
+      return request;
     },
     
     html_rewrite: {
       initContext(req) {
-        return { requestPath: req.pathname };
+        return { requestPath: req.URL.pathname };
       },
       rewrite(rewriter, req, context) {
         rewriter.on("title", {
@@ -2222,16 +2224,16 @@ export const analyticsPlugin: BunextPlugin = {
   priority: 10,
   
   router: {
-    request: async (req) => {
+    request: async (request) => {
       // Track page views for GET requests
-      if (req.method === "GET" && !req.pathname.startsWith("/api/")) {
+      if (request.bunextReq.request.method === "GET" && !request.bunextReq.URL.pathname.startsWith("/api/")) {
         await trackPageView({
-          path: req.pathname,
-          userAgent: req.request.headers.get("user-agent"),
+          path: request.bunextReq.URL.pathname,
+          userAgent: request.bunextReq.request.headers.get("user-agent"),
           timestamp: Date.now()
         });
       }
-      return req;
+      return request;
     },
     
     html_rewrite: {
@@ -2247,7 +2249,7 @@ export const analyticsPlugin: BunextPlugin = {
                     track: (event, data) => {
                       fetch('/api/analytics', {
                         method: 'POST',
-                        body: JSON.stringify({ event, data, path: '${req.pathname}' })
+                        body: JSON.stringify({ event, data, path: '${req.URL.pathname}' })
                       });
                     }
                   };
@@ -2276,8 +2278,8 @@ export const seoPlugin: BunextPlugin = {
     html_rewrite: {
       initContext(req) {
         return {
-          path: req.pathname,
-          needsOptimization: !req.pathname.startsWith("/api/")
+          path: req.URL.pathname,
+          needsOptimization: !req.URL.pathname.startsWith("/api/")
         };
       },
       
@@ -2380,7 +2382,7 @@ export const securityPlugin: BunextPlugin = {
   priority: 0, // High priority to run first
   
   router: {
-    request: async (req) => {
+    request: async (request) => {
       // Add security headers
       const headers = new Headers();
       headers.set("X-Frame-Options", "DENY");
@@ -2389,10 +2391,10 @@ export const securityPlugin: BunextPlugin = {
       headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
       headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'");
       
-      // Merge with existing response headers when response is created
-      req.securityHeaders = headers;
+      // Store security headers in context for later use
+      request.bunextReq.setContext({ securityHeaders: headers });
       
-      return req;
+      return request;
     }
   }
 };

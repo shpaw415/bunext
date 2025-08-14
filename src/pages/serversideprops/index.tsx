@@ -5,5 +5,5 @@ export function getServerSideProps() {
 }
 
 export default function Page({ props }: { props: { test: boolean } }) {
-  return <>{props.test ? "true" : "false"}</>;
+  return <>{props.test.toString()}</>;
 }

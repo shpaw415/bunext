@@ -4,31 +4,34 @@ import { router, type RequestManager } from "internal/server/router";
 import type { PageModule } from "internal/types";
 import type { BunextRequest } from "public/request";
 import { createElement } from "react";
-import { renderToString } from "react-dom/server";
 
 
 export let ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
+
+export function isAskingHTML(req: BunextRequest): boolean {
+    if (
+        req.request.headers.get("Accept")?.includes("text/html") &&
+        req.request.method.toUpperCase() == "GET") return true;
+    return false;
+}
 
 export function clearSSRPage() {
     CacheManager.clearSSR();
     CacheManager.clearSSRDefaultPage();
 }
 
-export async function onRequestSSRPage(req: BunextRequest, manager: RequestManager): Promise<boolean> {
+export async function onRequestSSRPage(manager: RequestManager): Promise<boolean> {
     // Handle SSR page requests
     if (isSSRDefaultExportPath(manager, true)) {
-        if (!req.request.headers.get("Accept")?.includes("text/html")) return false;
-        req.session.prevent_session_init();
+        if (!isAskingHTML(manager.bunextReq)) return false;
+        manager.bunextReq.session.prevent_session_init();
         const stringPage = await getSSRDefaultPage(manager);
         if (stringPage) {
-            req.setResponse(
-                new Response(Buffer.from(Bun.gzipSync(stringPage)), {
-                    headers: {
-                        "content-type": "text/html; charset=utf-8",
-                        "Content-Encoding": "gzip",
-                    },
-                })
-            );
+            manager.bunextReq.setResponse(stringPage, {
+                headers: {
+                    "content-type": "text/html; charset=utf-8",
+                }
+            });
             return true;
         }
     }
@@ -39,7 +42,7 @@ export async function onRequestSSRPage(req: BunextRequest, manager: RequestManag
 
 
 
-async function getSSRDefaultPage(manager: RequestManager) {
+async function getSSRDefaultPage(manager: RequestManager): Promise<string | null> {
     console.log("getSSRDefaultPage");
     if (!isSSRDefaultExportPath(manager, true) || !manager.serverSide)
         return null;
@@ -55,11 +58,9 @@ async function getSSRDefaultPage(manager: RequestManager) {
         preRenderedPage
     );
 
-    const shelledPage = await manager.makePage(PageWithLayouts);
+    const shelledPage = await manager.WrapPageWithShell(PageWithLayouts);
     if (!shelledPage) return null;
-    const stringifiedShelledPage = await manager.formatPage(
-        renderToString(shelledPage)
-    );
+    const stringifiedShelledPage = manager.JSXToString(shelledPage);
 
     CacheManager.addSSRDefaultPage(
         manager.serverSide.pathname,

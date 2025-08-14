@@ -4,12 +4,19 @@ import { builder } from "internal/server/build";
 import { basename, join, normalize } from "path";
 import { onRequestSSRPage, clearSSRPage, ServerComponentsCompiler, initSSRPage } from "./ssr-page";
 import { generateRandomString } from "features/utils";
+import { serverSidePropsAfterRequestHandler, serveServerSideProps, setGlobalServerSidePropsIfNeeded } from "./serverSideProps";
+import { serveDynamicPage } from "./dynamic-page";
+import { getRelatedCssContent } from "./style-insert";
+import { sessionOnRequestHandler } from "plugins/session";
+import { serveFromBuildDirectory } from "./build-dir";
+import { serveFromNodeModule } from "./node-modules";
+import { serveStaticAssets } from "./static-path";
 
 
 const serverOnlyFilePaths: string[] = [];
 
 export default {
-    priority: 0,
+    priority: 1,
     serverStart: {
         async main() {
             clearSSRPage();
@@ -23,18 +30,42 @@ export default {
     },
     router: {
         html_rewrite: {
-            rewrite: (rewriter) => {
+            rewrite: (rewriter, request) => {
                 rewriter.on("#BUNEXT_INNER_PAGE_INSERTER", {
                     element(element) {
                         element.removeAndKeepContent();
                     },
                 });
+                rewriter.on("head", {
+                    async element(element) {
+
+                        element.append(
+                            [`<style class="bunext-ssr-style">`, await getRelatedCssContent(request.path), "</style>"].join("\n"),
+                            { html: true }
+                        );
+                    },
+                })
             },
         },
-        async request(req, manager) {
-            if (await onRequestServerAction(req, manager)) return req;
-            else if (await onRequestSSRPage(req, manager)) return req;
+        async request(manager) {
+            for await (const handler of [
+                serveFromBuildDirectory,
+                serveStaticAssets,
+                serveFromNodeModule,
+                sessionOnRequestHandler,
+                onRequestServerAction,
+                serveServerSideProps,
+                onRequestSSRPage,
+                serveDynamicPage
+            ]) {
+                if (manager.bunextReq.isResponseSetted()) break;
+                await handler(manager);
+            }
+            setGlobalServerSidePropsIfNeeded(manager);
         },
+        after_request(manager) {
+            return serverSidePropsAfterRequestHandler(manager);
+        }
     },
 
     build: {
@@ -262,6 +293,8 @@ export default {
     },
 
 } as BunextPlugin;
+
+
 
 function isServerOnly(fileContent: string): boolean {
     // Trim whitespace and get the first few lines

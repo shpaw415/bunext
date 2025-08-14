@@ -30,14 +30,13 @@ export type AfterBuildMain = () => Promise<any> | any;
 export type BeforeBuild = () => Promise<any> | any;
 
 export type Request_Plugin = (
-  request: BunextRequest,
-  manager: RequestManager
-) => Promise<void | BunextRequest> | BunextRequest | void;
+  request: RequestManager
+) => Promise<void> | void;
 
 export type AfterRequest_Plugin = (
-  request: BunextRequest,
-  manager: RequestManager
-) => Promise<void | BunextRequest> | BunextRequest | void;
+  request: RequestManager,
+  response: Response
+) => Promise<void | Response> | void | Response;
 
 type Build_Plugins = {
   plugin?: Bun.BunPlugin;
@@ -47,16 +46,15 @@ type Build_Plugins = {
 type onFileSystemChangePlugin = (
   filePath: string | undefined,
   /**
-   * prevent the build from running <br />
-   * this is useful if you want to prevent the build from running when a file is changed
+   * Prevent the build from running <br />
+   * This is useful if you want to prevent the build from running when a file is changed
    */
   preventBuild: () => void,
 ) => void | Promise<void>;
 
 export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
   /**
-   * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing
-   * the file
+   * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing.
    */
   after_build: (BuildArtifact: Bun.BuildArtifact) => Promise<any> | any;
   /**
@@ -68,7 +66,7 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
    */
   before_build_main: BeforeBuild;
   /**
-   * Add plugins and build config
+   * Add Bun.build plugins and build config
    */
   build: Build_Plugins;
   /**
@@ -76,37 +74,50 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
    */
   router: Partial<{
     /**
-     * parse the entire HTML before sending to the client, and rewrite if needed.
+     * Parse and rewrite HTML content before sending to the client.
      *
-     * The result will be cached if it is
+     * The result will be cached if it is:
      *  - SSR page component
      *  - static page (use static)
      */
     html_rewrite: HTML_Rewrite_plugin_function<HTMLRewrite>;
     /**
-     * bypass the request flow and return a custom BunextResponse to the client.
-     * @example (request: BunextRequest, manager: RequestManager): Promise<BunextRequest> | BunextRequest => {
-     *  request.setResponse(new Response())
-     *  return request;
+     * Intercept and modify requests before they are processed by the router.
+     * Access the BunextRequest via manager.bunextReq
+     * @example (manager: RequestManager): Promise<RequestManager> | RequestManager => {
+     * // when set via __BYPASS_RESPONSE__ the HTMLRewrite plugins will be skipped
+     *  manager.bunextReq.__BYPASS_RESPONSE__ = new Response("Custom response");
+     *
+     * // global injected value and rewrite plugin will be applied
+     * manager.bunextReq.setResponse("Custom response", { headers: { "X-Custom-Header": "value" } });
+     *
      * }
      */
     request: Request_Plugin;
     /**
      * Triggered after the request is processed.
      * Allows for modifying the response before it is sent to the client.
-     * @example (request: BunextRequest, manager: RequestManager) => {
-     *  request.response.headers.set("X-Custom-Header", "value");
-     *  return request;
+     *
+     * if a response is returned this will overwrite the original response
+     *
+     * @example (manager: RequestManager, response: Response) => {
+     *  // Modify response headers or return a new response
+     *  const newHeaders = new Headers(response.headers);
+     *  newHeaders.set("X-Custom-Header", "value");
+     *  return new Response(response.body, { 
+     *    status: response.status, 
+     *    headers: newHeaders 
+     *  });
      * }
      */
-    after_request: AfterRequest_Plugin;
+    after_request: AfterRequest_Plugin
   }>;
   /**
-   * Triggered once when the server start
+   * Triggered once when the server starts
    */
   serverStart: ServerStart;
   /**
-   * path from node_modules to force exclusion from the build
+   * Paths from node_modules to force exclusion from the build
    * @example ["my_module/serverOnly/index.ts"]
    */
   removeFromBuild: Array<string>;
@@ -118,7 +129,7 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
   onFileSystemChange: onFileSystemChangePlugin;
 
   /**
-   * 0 more priority then 1
+   * 0 has higher priority than 1
    */
   priority?: number;
-}>;
+}>

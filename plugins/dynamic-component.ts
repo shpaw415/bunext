@@ -44,6 +44,7 @@ async function MakeEntryPoints() {
 const entrypoints = await MakeEntryPoints();
 
 export default {
+  priority: 11,
   build: { buildOptions: { entrypoints } },
   router: {
     html_rewrite: {

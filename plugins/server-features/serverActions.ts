@@ -43,7 +43,7 @@ function extractPostData(data: FormData) {
     });
 }
 
-export async function serverActionGetter(manager: RequestManager): Promise<Response> {
+export async function serverActionGetter(manager: RequestManager): Promise<[body: BodyInit | null, init?: ResponseInit]> {
     const reqData = extractServerActionHeader(manager.request_header);
 
     if (!reqData) throw new Error(`no request Data for ServerAction`);
@@ -74,7 +74,7 @@ export async function serverActionGetter(manager: RequestManager): Promise<Respo
         result = JSON.stringify({ props: result });
     }
 
-    return new Response(result as Exclude<ServerActionDataType, object>, {
+    return [result as Exclude<ServerActionDataType, object>, {
         headers: {
             ...manager.bunextReq.response.headers,
             dataType,
@@ -86,7 +86,7 @@ export async function serverActionGetter(manager: RequestManager): Promise<Respo
                     })
                     : undefined,
         },
-    });
+    }];
 }
 
 /**
@@ -133,10 +133,11 @@ export function getServerActions() {
     return serverActions;
 }
 
-export async function onRequestServerAction(bunext: BunextRequest, manager: RequestManager): Promise<boolean> {
-    if (bunext.URL.pathname == "/ServerActionGetter") {
-        await bunext.session.initData();
-        bunext.setResponse(await serverActionGetter(manager));
+export async function onRequestServerAction(manager: RequestManager): Promise<boolean> {
+    if (manager.bunextReq.URL.pathname == "/ServerActionGetter") {
+        await manager.bunextReq.session.initData();
+
+        manager.bunextReq.setResponse(...(await serverActionGetter(manager)));
         return true;
     }
     return false;

@@ -13,11 +13,12 @@ import type { RequestManager } from "./server/router.tsx";
 import type { JSX } from "react";
 import type React from "react";
 
-export type ServerSideProps<T extends Record<string, unknown> = {}> =
-  {
-    redirect?: string;
-  } & T
-  | undefined;
+export type ServerSideProps<T = undefined> =
+  T extends undefined
+  ? { redirect?: string } & unknown
+  : T extends Record<string, unknown>
+  ? { redirect?: string } & T
+  : T;
 
 export type ErrorFallbackComponent = ({ error, requestManager }: { error: Error, requestManager: RequestManager }) => JSX.Element | Promise<JSX.Element>;
 
@@ -27,12 +28,10 @@ export const URLpaths = {
 
 export type _GlobalData = {
   __ROUTES__: Record<string, string>;
-  __SERVERSIDE_PROPS__: ServerSideProps;
   __DEV_ROUTE_PREFETCH__: Array<string>;
   __PAGES_DIR__: "src/pages";
   __INITIAL_ROUTE__: string;
   __LAYOUT_ROUTE__: string[];
-  __CSS_PATHS__: string[];
   __HEAD_DATA__: Record<string, HeadData>;
   __PUBLIC_SESSION_DATA__: unknown | undefined;
   __SESSION_TIMEOUT__: number;
@@ -230,7 +229,7 @@ export type routePageFunction = ({ params, props }: { params?: Params, props?: S
 
 export type ReactShellComponent = React.ComponentType<{
   children: React.ReactNode;
-  props?: ServerSideProps;
+  props?: ServerSideProps<unknown>;
   params?: Params;
   route: string;
   request?: BunextRequest;

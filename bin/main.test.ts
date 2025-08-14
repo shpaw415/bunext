@@ -3,7 +3,7 @@ import { test, expect, describe, afterAll, beforeAll, beforeEach } from "bun:tes
 import "../database/class.ts";
 
 import "internal/server/server_global.ts";
-import { router } from "internal/server/router";
+import { RequestManager, router } from "internal/server/router";
 import { Shell } from "internal/client/shell.tsx";
 import { ParseServerSideProps } from "internal/router/index.tsx";
 
@@ -223,6 +223,7 @@ describe("Bunext Framework Test Suite", () => {
         request: new BunextRequest({
           request: new Request("http://localhost:3010/"),
           response: new Response(),
+          manager: undefined as any
         }),
       });
       return testSession.initData();
@@ -254,6 +255,7 @@ describe("Bunext Framework Test Suite", () => {
         sessionTimeout: 1, request: new BunextRequest({
           request: new Request("http://localhost:3010/"),
           response: new Response(),
+          manager: undefined as any
         }),
       }); // 1 second
       await shortLivedSession.initData();
@@ -508,10 +510,10 @@ describe("Bunext Framework Test Suite", () => {
         Shell: Shell as any,
       });
 
-      expect(res?.response).toBeDefined();
-      if (!res?.response) throw new Error("No response");
+      expect(res).toBeDefined();
+      if (!res) throw new Error("No response");
 
-      const parsed = ParseServerSideProps(await res.response.text());
+      const parsed = ParseServerSideProps(await res.text());
       expect(parsed?.test).toBe(true);
     });
 
@@ -525,10 +527,10 @@ describe("Bunext Framework Test Suite", () => {
         Shell: Shell as any,
       });
 
-      expect(res?.response).toBeDefined();
-      if (!res?.response) throw new Error("No response");
+      expect(res).toBeDefined();
+      if (!res) throw new Error("No response");
 
-      const parsed = ParseServerSideProps(await res.response.text());
+      const parsed = ParseServerSideProps(await res.text());
       expect(parsed).toBeUndefined();
     });
 
@@ -543,10 +545,12 @@ describe("Bunext Framework Test Suite", () => {
           Shell: Shell as any,
         });
 
-        expect(res?.response).toBeDefined();
-        if (!res?.response) throw new Error("No response");
+        expect(res).toBeDefined();
+        if (!res) throw new Error("No response");
 
-        const parsed = ParseServerSideProps(await res.response.text());
+        const parsed = ParseServerSideProps<{ params: {} }>(await res.text());
+        expect(parsed).toBeObject();
+
         expect(parsed?.redirect).toBe("/");
         expect(parsed?.params).toEqual({});
       };
@@ -567,10 +571,10 @@ describe("Bunext Framework Test Suite", () => {
           Shell: Shell as any,
         });
 
-        expect(res?.response).toBeDefined();
-        if (!res?.response) throw new Error("No response");
+        expect(res).toBeDefined();
+        if (!res) throw new Error("No response");
 
-        const parsed = ParseServerSideProps(await res.response.text());
+        const parsed = ParseServerSideProps(await res.text());
         expect(parsed).toBeUndefined();
       };
 
