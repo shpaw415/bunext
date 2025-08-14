@@ -122,7 +122,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * <strong>DO NOT USE. BUNEXT INTERNAL USE ONLY</strong>
    * set the session cookie
    */
-  public async setSessionCookie(response?: Response) {
+  public async setSessionCookie(response: Response) {
     switch (globalThis.serverConfig.session?.type) {
       case "database:hard":
       case "database:memory":
@@ -262,7 +262,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     const afters = await Promise.all(
       plugins.map(async (plugin) => {
         const context: unknown = plugin.initContext?.(this);
-        await plugin.rewrite?.(rewriter, this, context);
+        await plugin.rewrite?.(rewriter, this.manager, context);
         return {
           after: plugin.after,
           context: context,
@@ -273,7 +273,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     const transformedText = rewriter.transform(html);
 
     await Promise.all(
-      afters.map(({ context, after }) => after?.(context, this))
+      afters.map(({ context, after }) => after?.(context, this.manager))
     );
 
     return [HTML_DOCTYPE, transformedText].join("\n");
@@ -308,7 +308,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   /**
    * Creates the preload object for client-side hydration
    */
-  private async makePreLoadObject(): Promise<Record<keyof _GlobalData, string>> {
+  private async makePreLoadObject(): Promise<Partial<Record<keyof _GlobalData, string>>> {
     try {
       await this.session.initData();
 
@@ -369,7 +369,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * Converts preload object to string array for script injection
    */
   private preloadToStringArray(
-    preload: Record<keyof _GlobalData & string, string>
+    preload: Partial<Record<keyof _GlobalData & string, string>>
   ): string[] {
     return Object.entries(preload)
       .map(([key, value]) => `${key}=${value}`)

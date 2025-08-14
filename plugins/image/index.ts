@@ -165,7 +165,7 @@ export default {
             const src = el.getAttribute("data-bunext-img-src");
             if (!src) return;
             const base64Data = await cache.add(
-              bunextRequest.URL.pathname,
+              bunextRequest.bunextReq.URL.pathname,
               join(cwd, "static", src)
             );
             el.setAttribute("src", base64Data || "");

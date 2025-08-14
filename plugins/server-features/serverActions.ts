@@ -2,7 +2,6 @@ import CacheManager from "internal/caching";
 import { RequestManager, router } from "internal/server/router";
 import type { ServerAction, ServerActionDataType, ServerActionDataTypeHeader } from "internal/types";
 import { normalize } from "path";
-import type { BunextRequest } from "public/request";
 
 
 let serverActions: Array<ServerAction> = [];
@@ -74,17 +73,20 @@ export async function serverActionGetter(manager: RequestManager): Promise<[body
         result = JSON.stringify({ props: result });
     }
 
+    const fileDataHeader = result instanceof File ? {
+        fileData: JSON.stringify({
+            name: result.name,
+            lastModified: result.lastModified,
+        }),
+        "Content-Type": "application/octet-stream"
+    } : {
+        "Content-Type": "application/json"
+    } as any;
+
     return [result as Exclude<ServerActionDataType, object>, {
         headers: {
-            ...manager.bunextReq.response.headers,
             dataType,
-            fileData:
-                result instanceof File
-                    ? JSON.stringify({
-                        name: result.name,
-                        lastModified: result.lastModified,
-                    })
-                    : undefined,
+            ...fileDataHeader,
         },
     }];
 }
@@ -136,8 +138,10 @@ export function getServerActions() {
 export async function onRequestServerAction(manager: RequestManager): Promise<boolean> {
     if (manager.bunextReq.URL.pathname == "/ServerActionGetter") {
         await manager.bunextReq.session.initData();
-
+        manager.bunextReq.preventRewrite();
+        manager.bunextReq.preventGlobalValuesInjection();
         manager.bunextReq.setResponse(...(await serverActionGetter(manager)));
+
         return true;
     }
     return false;

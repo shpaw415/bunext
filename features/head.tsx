@@ -202,7 +202,7 @@ function GlobalDataFromServerSide(): _GlobalData {
 const cssPathCache = new Map<string, string[]>();
 const CSS_CACHE_MAX_SIZE = 100;
 
-function GetCssPaths(match: Match, options?: { onlyFilePath?: boolean }): string[] {
+export function GetCssPaths(match: Match, options?: { onlyFilePath?: boolean }): string[] {
   if (!match) return [];
 
   // Create cache key
@@ -230,7 +230,7 @@ function GetCssPaths(match: Match, options?: { onlyFilePath?: boolean }): string
         `/${globalX.__PAGES_DIR__}${currentPath}/layout.css`
       );
 
-      if (globalX.__CSS_PATHS__.includes(normalizedPath)) {
+      if (globalX.__CSS_PATHS__?.includes(normalizedPath)) {
         cssPaths.push(
           normalizedPath + (options?.onlyFilePath ? "" : setParamOnDevMode())
         );
@@ -244,7 +244,7 @@ function GetCssPaths(match: Match, options?: { onlyFilePath?: boolean }): string
   cssPath.pop();
   const cssFilePath = normalize(`${cssPath.join(".")}.css`);
 
-  if (globalX.__CSS_PATHS__.includes(cssFilePath)) {
+  if (globalX.__CSS_PATHS__?.includes(cssFilePath)) {
     cssPaths.push(
       normalize(
         `${cssFilePath}${options?.onlyFilePath ? "" : setParamOnDevMode()}`

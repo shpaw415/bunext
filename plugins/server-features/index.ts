@@ -11,6 +11,7 @@ import { sessionOnRequestHandler } from "plugins/session";
 import { serveFromBuildDirectory } from "./build-dir";
 import { serveFromNodeModule } from "./node-modules";
 import { serveStaticAssets } from "./static-path";
+import { transformWithReactCompiler } from "./react-compiler";
 
 
 const serverOnlyFilePaths: string[] = [];
@@ -40,7 +41,11 @@ export default {
                     async element(element) {
 
                         element.append(
-                            [`<style class="bunext-ssr-style">`, await getRelatedCssContent(request.path), "</style>"].join("\n"),
+                            [
+                                `<style class="bunext-ssr-style">`,
+                                await getRelatedCssContent(request),
+                                "</style>"
+                            ].join("\n"),
                             { html: true }
                         );
                     },
@@ -91,6 +96,7 @@ export default {
                     },
                     async ({ path, loader, ...props }) => {
                         const fileText = await Bun.file(path).text();
+
                         const exports = new Bun.Transpiler({
                             loader: loader as "tsx" | "ts",
                             exports: {

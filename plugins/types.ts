@@ -20,10 +20,10 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
   initContext?: (req: BunextRequest) => T;
   rewrite?: (
     reWriter: HTMLRewriter,
-    bunextRequest: BunextRequest,
+    manager: RequestManager,
     context: T,
   ) => void | Promise<void>;
-  after?: (context: T, bunextRequest: BunextRequest) => void | Promise<void>;
+  after?: (context: T, manager: RequestManager) => void | Promise<void>;
 };
 
 export type AfterBuildMain = () => Promise<any> | any;

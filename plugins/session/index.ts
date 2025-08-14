@@ -18,6 +18,7 @@ async function serveSessionData(req: BunextRequest): Promise<void> {
 async function serveDeleteSession(req: BunextRequest): Promise<void> {
     await req.session.initData();
     req.session.delete();
+    req.__BYPASS_RESPONSE__ = new Response("session deleted");
 }
 
 export async function sessionOnRequestHandler(request: RequestManager): Promise<Boolean> {
@@ -35,12 +36,9 @@ export async function sessionOnRequestHandler(request: RequestManager): Promise<
 export default {
     priority: 0,
     router: {
-        request() {
-
-        },
-        after_request(request) {
+        after_request(request, response) {
             if (!request.bunextReq.session.isSessionUpdated() && !request.bunextReq.session.isSessionDeleted()) return;
-            request.bunextReq.setSessionCookie();
+            request.bunextReq.setSessionCookie(response);
         },
 
     },

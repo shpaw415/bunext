@@ -35,6 +35,7 @@ export type _GlobalData = {
   __HEAD_DATA__: Record<string, HeadData>;
   __PUBLIC_SESSION_DATA__: unknown | undefined;
   __SESSION_TIMEOUT__: number;
+  __CSS_PATHS__?: Array<string>;
   serverConfig: {
     Dev: {
       hotServerPort: number;

@@ -360,8 +360,8 @@ export class BunextSession<DataType = any> {
     try {
       // Server-side handling
       if (this._request && !this._serverSessionInitialized) {
-        DevConsole().warning("Session not initialized on server");
-        this._log("Session not initialized on server", undefined, "warn");
+        //console.warn("Session not initialized on server");
+        //this._log("Session not initialized on server", undefined, "warn");
         return undefined;
       }
 

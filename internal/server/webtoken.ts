@@ -349,7 +349,6 @@ export class webToken<_Data> {
         if (cookieOptions.domain) {
             cookieString += `; Domain=${cookieOptions.domain}`;
         }
-
         response.headers.append('Set-Cookie', cookieString);
         return response;
     }

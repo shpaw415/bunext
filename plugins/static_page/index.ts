@@ -256,7 +256,6 @@ async function setServerSidePropsContext(manager: RequestManager) {
   if (!manager.request.headers.get("Accept")?.includes("application/vnd.server-side-props")) return;
   await createPageIfNotExist(manager);
   const props = await GetServerSideProps(StaticPageCache.getInstance(), manager);
-  console.log("here:", props);
   manager.bunextReq.setContext({
     __SERVERSIDE_PROPS__: props || null
   });

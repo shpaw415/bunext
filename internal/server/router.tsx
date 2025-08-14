@@ -37,12 +37,6 @@ import { BunextError } from "./server_global";
 import { makeServerSideProps } from "plugins/server-features/serverSideProps";
 import { ErrorFallback } from "components/fallback";
 
-// Types and constants
-type SpecialPathNames =
-  | "/bunextgetSessionData"
-  | "/bunextDeleteSession"
-  | "/favicon.ico";
-
 type RouteEntry = [string, string];
 
 const SUPPORTED_FILE_EXTENSIONS = [".tsx", ".ts", ".js", ".jsx"] as const;
@@ -412,29 +406,6 @@ class StaticRouters extends PluginLoader {
     } catch (error) {
       console.error("Request serving failed:", error);
       throw error;
-    }
-  }
-
-
-
-  private async serverPrebuiltPage(
-    serverSide: MatchedRoute,
-    module: Record<string, Function>
-  ) {
-    const preBuiledPage = CacheManager.getSSR(
-      serverSide.filePath
-    )?.elements.find((e) =>
-      e.tag.endsWith(`${module.default.name}!>`)
-    )?.htmlElement;
-
-    if (preBuiledPage) {
-      return await this.stackLayouts(
-        serverSide,
-        <div
-          id="BUNEXT_INNER_PAGE_INSERTER"
-          dangerouslySetInnerHTML={{ __html: preBuiledPage }}
-        />
-      );
     }
   }
 
