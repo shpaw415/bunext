@@ -137,8 +137,7 @@ function InitServerActionData(...props: Array<any>) {
   };
 
   let formData = new FormData();
-
-  let _props: Array<any> = props.map((prop) => {
+  let _props: Array<unknown> = props.map((prop) => {
     if (prop instanceof File) {
       const id = formatToFile();
       formData.append(id, prop);
@@ -161,7 +160,7 @@ function InitServerActionData(...props: Array<any>) {
       return "BUNEXT_FORMDATA";
     } else return prop;
   });
-  formData.append("props", encodeURI(JSON.stringify(_props)));
+  formData.append("__BUNEXT_PROPS__", encodeURI(JSON.stringify(_props)));
   return formData;
 }
 
@@ -207,10 +206,12 @@ async function ParseServerActionResponse(response: Response) {
   }
 }
 
-export function GetSessionFromResponse(response: Response) {
-  return JSON.parse(decodeURI(response.headers.get("session") || "")) as Record<
+export function GetSessionFromResponse(response: Response): Record<string, unknown> | undefined {
+  const sessionHeader = response.headers.get("session");
+  if (!sessionHeader) return undefined;
+  return JSON.parse(decodeURI(sessionHeader)) as Record<
     string,
-    any
+    unknown
   >;
 }
 

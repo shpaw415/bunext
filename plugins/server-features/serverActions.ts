@@ -1,7 +1,7 @@
 import CacheManager from "internal/caching";
 import { RequestManager, router } from "internal/server/router";
 import type { ServerAction, ServerActionDataType, ServerActionDataTypeHeader } from "internal/types";
-import { normalize } from "path";
+import { normalize, parse } from "path";
 
 
 let serverActions: Array<ServerAction> = [];
@@ -18,7 +18,7 @@ function extractServerActionHeader(header: Record<string, string>) {
 }
 
 function extractPostData(data: FormData) {
-    let raw = data.get("props");
+    let raw = data.get("__BUNEXT_PROPS__");
     if (typeof raw != "string") return [];
     try {
         raw = decodeURI(raw);
@@ -37,6 +37,7 @@ function extractPostData(data: FormData) {
         ) {
             return data.getAll(prop[0]);
         } else if (typeof prop == "string" && prop == "BUNEXT_FORMDATA") {
+            data.delete("__BUNEXT_PROPS__");
             return data;
         } else return prop;
     });
@@ -65,23 +66,22 @@ export async function serverActionGetter(manager: RequestManager): Promise<[body
     );
 
     let dataType: ServerActionDataTypeHeader = "json";
-    if (result instanceof Blob) {
-        dataType = "blob";
-    } else if (result instanceof File) {
+    let fileDataHeader: Record<string, unknown> = {};
+    if (result instanceof Blob || result instanceof File) {
         dataType = "file";
+        fileDataHeader = {
+            fileData: JSON.stringify({
+                name: parse((result as File)?.name || "")?.base || "",
+                lastModified: (result as File).lastModified || 0,
+            }),
+            "Content-Type": "application/octet-stream"
+        };
     } else {
         result = JSON.stringify({ props: result });
+        fileDataHeader = {
+            "Content-Type": "application/json"
+        };
     }
-
-    const fileDataHeader = result instanceof File ? {
-        fileData: JSON.stringify({
-            name: result.name,
-            lastModified: result.lastModified,
-        }),
-        "Content-Type": "application/octet-stream"
-    } : {
-        "Content-Type": "application/json"
-    } as any;
 
     return [result as Exclude<ServerActionDataType, object>, {
         headers: {

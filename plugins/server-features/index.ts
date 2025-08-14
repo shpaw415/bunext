@@ -11,7 +11,6 @@ import { sessionOnRequestHandler } from "plugins/session";
 import { serveFromBuildDirectory } from "./build-dir";
 import { serveFromNodeModule } from "./node-modules";
 import { serveStaticAssets } from "./static-path";
-import { transformWithReactCompiler } from "./react-compiler";
 
 
 const serverOnlyFilePaths: string[] = [];
@@ -136,7 +135,7 @@ export default {
                             process.env.NODE_ENV == "production"
                                 ? path
                                 : path + `?${generateRandomString(5)}`
-                        );
+                        ) as Record<string, unknown>;
                         if (
                             ["layout.tsx"]
                                 .map((endsWith) => path.endsWith(endsWith))

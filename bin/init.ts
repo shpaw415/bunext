@@ -2,7 +2,7 @@
 
 import { cpSync } from "fs";
 import { paths } from "../internal/globals";
-import { generateUuid } from "../features/utils";
+import { generateRandomString, generateUuid } from "../features/utils";
 import { AfterBunextInitMessage } from "../internal/server/logs";
 
 await install(false);
@@ -75,7 +75,11 @@ async function install(total: boolean) {
     envFileContent.includes("WEB_TOKEN_SECRET=") === false &&
       (await Bun.write(
         ".env",
-        `${envFileContent}\nWEB_TOKEN_SECRET="${generateUuid()}"`
+        [
+          envFileContent,
+          `WEB_TOKEN_SECRET="${generateRandomString(32)}"`,
+          `WEB_TOKEN_IV="${generateRandomString(16)}"`,
+        ].join("\n")
       ));
 
     await Bun.write("tsconfig.json", beautify(tsConfig(), null, 2, 50));
