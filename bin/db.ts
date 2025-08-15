@@ -1,3 +1,4 @@
+"server only";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { paths } from "../internal/globals";
 import { resolve } from "node:path";

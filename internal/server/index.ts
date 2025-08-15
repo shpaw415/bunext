@@ -13,7 +13,6 @@ import { ErrorFallback } from "../../components/fallback.tsx";
 
 // Bun and request handling
 import type { Server as _Server } from "bun";
-import { BunextRequest } from "./bunextRequest.ts";
 
 // Node.js modules
 import { cpus, type as OSType } from "node:os";

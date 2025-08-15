@@ -12,9 +12,17 @@ declare global {
 // Constants
 const DEFAULT_DB_PATH = "./config/bunext.sqlite";
 const DEFAULT_CONFIG_PATH = `${process.cwd()}/config/database.ts`;
-const CONFIG_MODULE = (await import(DEFAULT_CONFIG_PATH) as { default: DBSchema });
+let CONFIG_MODULE: { default: DBSchema } | undefined = undefined;
 
-globalThis.dbSchema ??= CONFIG_MODULE.default;
+try {
+  CONFIG_MODULE = (await import(DEFAULT_CONFIG_PATH) as { default: DBSchema });
+} catch (error) {
+  //console.error("Failed to load database config:", error);
+}
+
+if (CONFIG_MODULE) {
+  globalThis.dbSchema ??= CONFIG_MODULE.default;
+}
 
 /**
  * Type-safe connection pool for managing database instances and prepared statements

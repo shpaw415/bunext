@@ -1,4 +1,4 @@
-#!/bin/env bun
+"server only";
 
 import { cpSync } from "fs";
 import { paths } from "../internal/globals";
@@ -49,9 +49,9 @@ async function install(total: boolean) {
   packageJson.scripts = {
     bunext: "bunext",
     build: "bunext build",
-    dev: "bunext --hot .bunext/react-ssr/server.ts dev",
+    dev: "bun --hot .bunext/react-ssr/server.ts dev",
     "db:create": "bunext database:create",
-    start: "bunext .bunext/react-ssr/server.ts production",
+    start: "bun .bunext/react-ssr/server.ts production",
     ...packageJson.scripts,
   };
   packageJson.dependencies = {

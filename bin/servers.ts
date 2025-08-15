@@ -1,3 +1,4 @@
+"server only";
 import "./globals.ts";
 import { paths } from "../internal/globals";
 import { getStartLog } from "../internal/server/logs.ts";

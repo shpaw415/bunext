@@ -4,6 +4,7 @@ import type { ServerWebSocket } from "bun";
 import type { BunextType, ServerConfig } from "../types.ts";
 import type { BunextServer } from "./index.ts";
 
+
 declare global {
   var socketList: ServerWebSocket<unknown>[];
   var dryRun: boolean;
