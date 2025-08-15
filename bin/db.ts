@@ -1,7 +1,7 @@
 "server only";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { paths } from "../internal/globals";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { CONFIG } from "./globals";
 import { terminal } from "terminal-kit";
 
@@ -594,8 +594,7 @@ async function performSelectiveMerge(
     conflictResolution: 'replace' | 'ignore' | 'fail'
 ): Promise<void> {
     try {
-        const fs = require('fs');
-        const { Database: BunDB } = require('bun:sqlite');
+        const fs = await import('fs');
         const { DatabaseManager } = await import("../database/class");
 
         // Decompress backup
@@ -699,7 +698,7 @@ async function createDatabaseSchema(): Promise<void> {
             .join("\n");
 
         await Bun.write(
-            resolve(paths.bunextModulePath, "database", "database_types.ts"),
+            resolve(join("bunext-js", "database", "database_types.ts")),
             typesContent
         );
 
@@ -734,7 +733,7 @@ async function updateDatabaseIndexFile(typeDefinitions: { tables: string[] }): P
         .map((table) => `${table}: new Table<_${table}, SELECT_${table}>({ name: "${table}" })`)
         .join(",\n ")} \n} as const;\n`;
 
-    content = `"use client";
+    content = `"server only";
         ${importContent}
         import { Table } from "./class";
 

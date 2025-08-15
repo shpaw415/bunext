@@ -22,7 +22,7 @@ type RequestManagerContexted = RequestManager<ServerSidePropsContext>;
 
 
 export async function serveServerSideProps(manager: RequestManagerContexted): Promise<boolean> {
-    if (manager.request_header?.accept !== "application/vnd.server-side-props") {
+    if (manager.request.headers.get('accept') != "application/vnd.server-side-props") {
         return false;
     }
 

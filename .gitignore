@@ -181,3 +181,5 @@ test.json
 config/bunext.sqlite
 config/session.*
 tailwind.config.ts
+
+test*.db-*

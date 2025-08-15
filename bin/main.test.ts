@@ -593,10 +593,8 @@ describe("Bunext Framework Test Suite", () => {
       const propsRes = await fetch(`${baseUrl}/serversideprops`, {
         headers: { accept: "application/vnd.server-side-props" }
       });
-
-      if (propsRes.ok) {
-        expect(propsRes.headers.get('content-type')).toContain('application/vnd.server-side-props');
-      }
+      expect(propsRes.status).toBe(200);
+      expect(propsRes.headers.get('Content-Type')).toContain('application/vnd.server-side-props');
     });
 
     test("error handling and fallbacks", async () => {
@@ -629,7 +627,7 @@ describe("Bunext Framework Test Suite", () => {
       // Test cache headers
       const cacheControl = res.headers.get('cache-control');
       expect(cacheControl).toBeDefined();
-      expect(cacheControl).toContain('no-cache'); // SSR should not be cached
+      expect(cacheControl).toBe('no-cache'); // SSR should not be cached
     });
   });
 

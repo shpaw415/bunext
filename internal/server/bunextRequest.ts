@@ -272,7 +272,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
             console.warn("Failed to format HTML:", error);
             // Continue without formatting
           }
-        } else {
+        } else if (!contentType) {
           // Set default content type for non-HTML string responses
           headers.set("Content-Type", "text/plain");
         }
