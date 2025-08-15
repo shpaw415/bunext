@@ -170,7 +170,7 @@ class BunextServer {
       ...{ port: this.port },
       fetch: this.createFetchHandler(),
       error: (error: Error) => {
-        console.error(error);
+        //console.error(error);
       }
     });
   }
@@ -207,7 +207,7 @@ class BunextServer {
             const response = await this.serve(request);
             if (response instanceof Response) return response;
           } catch (error) {
-            console.error(error);
+            //console.error(error);
           }
 
           return new Response("Not found!!", { status: 404 });

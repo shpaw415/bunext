@@ -46,49 +46,66 @@ function extractPostData(data: FormData) {
 export async function serverActionGetter(manager: RequestManager): Promise<[body: BodyInit | null, init?: ResponseInit]> {
     const reqData = extractServerActionHeader(manager.request_header);
 
-    if (!reqData) throw new Error(`no request Data for ServerAction`);
-    const props = extractPostData(manager.data);
+    if (!reqData) {
+        const availableHeaders = Object.keys(manager.request_header).join(', ');
+        throw new Error(`No request data for ServerAction. Missing 'serveractionid' header. Available headers: [${availableHeaders}]`);
+    }
+
+    let props: unknown[];
+    try {
+        props = extractPostData(manager.data);
+    } catch (error) {
+        throw new Error(`Failed to extract POST data for ServerAction ${reqData.path}:${reqData.call}. Error: ${error}`);
+    }
+
     const module = serverActions.find(
         (s) => s.path === reqData.path.slice(1)
     );
-    if (!module)
-        throw new Error(`no module found for ServerAction ${reqData.path}`);
+    if (!module) {
+        const availableModules = serverActions.map(s => s.path).join(', ');
+        throw new Error(`No module found for ServerAction path '${reqData.path}'. Available modules: [${availableModules}]. Total modules loaded: ${serverActions.length}`);
+    }
+
     const call = module.actions.find((f) => f.name === reqData.call);
-    if (!call)
-        throw new Error(
-            `no function founded for ServerAction ${reqData.path}/${reqData.call}`
-        );
+    if (!call) {
+        const availableActions = module.actions.map(f => f.name).join(', ');
+        throw new Error(`No function found for ServerAction '${reqData.call}' in module '${reqData.path}'. Available actions: [${availableActions}]. Total actions in module: ${module.actions.length}`);
+    }
     const fillUndefinedParams = (
         Array.apply(null, Array(call.length)) as Array<null>
     ).map(() => undefined);
-    let result: ServerActionDataType = await call(
-        ...[...props, ...fillUndefinedParams, manager.bunextReq]
-    );
 
-    let dataType: ServerActionDataTypeHeader = "json";
-    let fileDataHeader: Record<string, unknown> = {};
-    if (result instanceof Blob || result instanceof File) {
-        dataType = "file";
-        fileDataHeader = {
-            fileData: JSON.stringify({
-                name: parse((result as File)?.name || "")?.base || "",
-                lastModified: (result as File).lastModified || 0,
-            }),
-            "Content-Type": "application/octet-stream"
-        };
-    } else {
-        result = JSON.stringify({ props: result });
-        fileDataHeader = {
-            "Content-Type": "application/json"
-        };
+    try {
+        let result = await call(
+            ...[...props, ...fillUndefinedParams, manager.bunextReq]
+        );
+        let dataType: ServerActionDataTypeHeader = "json";
+        let fileDataHeader: Record<string, unknown> = {};
+        if (result instanceof Blob || result instanceof File) {
+            dataType = "file";
+            fileDataHeader = {
+                fileData: JSON.stringify({
+                    name: parse((result as File)?.name || "")?.base || "",
+                    lastModified: (result as File).lastModified || 0,
+                }),
+                "Content-Type": "application/octet-stream"
+            };
+        } else {
+            result = JSON.stringify({ props: result });
+            fileDataHeader = {
+                "Content-Type": "application/json"
+            };
+        }
+
+        return [result as Exclude<ServerActionDataType, object>, {
+            headers: {
+                dataType,
+                ...fileDataHeader,
+            },
+        }];
+    } catch (error) {
+        throw error;
     }
-
-    return [result as Exclude<ServerActionDataType, object>, {
-        headers: {
-            dataType,
-            ...fileDataHeader,
-        },
-    }];
 }
 
 /**

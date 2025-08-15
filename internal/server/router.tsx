@@ -372,46 +372,40 @@ class StaticRouters extends PluginLoader {
     data: FormData,
     { Shell }: { Shell: ReactShellComponent }
   ): Promise<Response> {
-    try {
-      await this.isInited();
+    await this.isInited();
 
-      const manager = new RequestManager({
-        request,
-        client: this.client,
-        server: this.server,
-        data,
-        request_header,
-        router: this,
-        Shell,
-      })
-      await manager.make();
-      let response = await manager.bunextReq.toResponse();
+    const manager = new RequestManager({
+      request,
+      client: this.client,
+      server: this.server,
+      data,
+      request_header,
+      router: this,
+      Shell,
+    })
+    await manager.make();
+    let response = await manager.bunextReq.toResponse();
 
-      if (response instanceof BunextResponseNotSetError) return new Response(null, {
-        headers: {
-          "Content-Type": "text/plain",
-        },
-        status: 404,
-      });
+    if (response instanceof BunextResponseNotSetError) return new Response(null, {
+      headers: {
+        "Content-Type": "text/plain",
+      },
+      status: 404,
+    });
 
 
-      if (response instanceof BunextError) {
-        this.Logger(response, "error");
-        return new Response(renderToString(ErrorFallback({ error: response })));
-      }
-      for await (const after_request of
-        this.getSubPluginsByParentName("router", "after_request")) {
-        const result = await after_request(manager, response);
-        if (result instanceof Response) {
-          response = result;
-        }
-      }
-      return response;
-
-    } catch (error) {
-      console.error("Request serving failed:", error);
-      throw error;
+    if (response instanceof BunextError) {
+      this.Logger(response, "error");
+      return new Response(renderToString(ErrorFallback({ error: response })));
     }
+    for await (const after_request of
+      this.getSubPluginsByParentName("router", "after_request")) {
+      const result = await after_request(manager, response);
+      if (result instanceof Response) {
+        response = result;
+      }
+    }
+    return response;
   }
 
   public async CreateDynamicPage(
@@ -660,36 +654,19 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
   async make(): Promise<void> {
     process.env.__SESSION_MUST_NOT_BE_INITED__ = "false";
 
-    try {
-      await this.checkPluginServing();
-    } catch (error) {
-      console.error('Error in request processing:', error);
+    await this.checkPluginServing();
 
-      if (error instanceof BunextError) {
-        throw error;
-      }
-
-      const message = error instanceof Error ? error.message : String(error);
-      throw new RenderingError(`Request processing failed: ${message}`);
-
-    }
   }
 
   /**
    * Checks and applies plugin-based request handling
    */
   private async checkPluginServing(): Promise<void> {
-    try {
-      const plugins = this.router
-        .getSubPluginsByParentName("router", "request")
-      for await (const plugin of plugins) {
-        await plugin(this);
-        if (this.bunextReq.__BYPASS_RESPONSE__) break;
-      }
-    } catch (error) {
-      console.error('Error in plugin serving:', error);
-      const message = error instanceof Error ? error.message : String(error);
-      throw new RenderingError(`Plugin serving failed: ${message}`);
+    const plugins = this.router
+      .getSubPluginsByParentName("router", "request");
+    for await (const plugin of plugins) {
+      await plugin(this);
+      if (this.bunextReq.__BYPASS_RESPONSE__) break;
     }
   }
   /**

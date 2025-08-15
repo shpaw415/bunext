@@ -58,12 +58,7 @@ async function serveAPIEndpoint(manager: RequestManager): Promise<boolean> {
 
         return true;
     } catch (error) {
-        if (error instanceof BunextError) {
-            throw error;
-        }
-        console.error('Error serving API endpoint:', error);
-        const message = error instanceof Error ? error.message : String(error);
-        throw new APIEndpointError(`Failed to serve API endpoint: ${message}`);
+        throw error;
     }
 }
 
