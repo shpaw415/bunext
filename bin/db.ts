@@ -1,7 +1,7 @@
 "server only";
 import { ConvertShemaToType, type DBSchema } from "../database/schema";
 import { paths } from "../internal/globals";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { CONFIG } from "./globals";
 import { terminal } from "terminal-kit";
 
@@ -698,7 +698,7 @@ async function createDatabaseSchema(): Promise<void> {
             .join("\n");
 
         await Bun.write(
-            resolve(join("bunext-js", "database", "database_types.ts")),
+            resolve(paths.bunextModulePath, "database", "database_types.ts"),
             typesContent
         );
 
