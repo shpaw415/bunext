@@ -68,19 +68,32 @@ await initializeTestDatabase();
 const cwd = process.cwd();
 let Server: BunextServer | undefined = undefined;
 
+async function InitServer() {
+  if (Server) Server.close();
+  Server = await createServer();
+}
 
-beforeAll(async () => {
-  Server = await BunextServer.getInitedInstance({
+function createServer() {
+  return BunextServer.getInitedInstance({
     onRequest: undefined,
     preloadModulePath: `${cwd}/config/preload.ts`,
-    Shell: () => null,
+    Shell: Shell,
     preventDevConsole: true,
   });
+}
+
+
+beforeAll(async () => {
+  console.log("init before")
+  process.env.NODE_ENV = "production";
+  await Bun.$`bun run build`.quiet();
+
+  await InitServer();
 });
 
-afterAll(() => {
-  Server?.close();
-})
+afterAll(async () => {
+  await Server?.close();
+});
 
 // Test configuration and constants
 const TEST_TIMEOUT = 30000; // 30 seconds for slower operations
@@ -93,21 +106,6 @@ const testSessionData = {
   userId: 12345,
   preferences: { theme: "dark", lang: "en" }
 };
-
-// Helper functions for testing
-async function waitForServer(port: number, timeout = 5000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    try {
-      const response = await fetch(`http://localhost:${port}/`);
-      if (response.ok) return true;
-    } catch (error) {
-      // Server not ready yet
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  return false;
-}
 
 function createWebSocketConnection(port: number): Promise<{ ws: WebSocket; connected: boolean }> {
   return new Promise((resolve) => {
@@ -141,18 +139,6 @@ function createWebSocketConnection(port: number): Promise<{ ws: WebSocket; conne
 
 describe("Bunext Framework Test Suite", () => {
 
-  beforeAll(async () => {
-    // Database already initialized at module level
-
-    // Ensure server is ready before running tests
-    if (Server) {
-      const serverReady = await waitForServer(Server.port);
-      if (!serverReady) {
-        throw new Error(`Server not ready on port ${Server.port}`);
-      }
-    }
-  });
-
   describe("Server Features", () => {
     test("server initialization and basic functionality", async () => {
       expect(Server).not.toBe(undefined);
@@ -160,7 +146,13 @@ describe("Bunext Framework Test Suite", () => {
       expect(Server?.port).toBeGreaterThan(0);
       expect(Server?.hostName).toBe("localhost");
 
-      const res = await fetch(`http://localhost:${Server?.port}/`);
+      const res = await fetch(`http://localhost:${Server?.port}/`, {
+        method: "GET",
+        headers: {
+          "Accept": "text/html"
+        }
+      });
+      expect(res.status).toBe(200);
       expect(res.ok).toBe(true);
       expect(res.headers.get('content-type')).toContain('text/html');
     });
@@ -207,9 +199,14 @@ describe("Bunext Framework Test Suite", () => {
     });
 
     test("server CORS and security headers", async () => {
-      const res = await fetch(`http://localhost:${Server?.port}/`);
+      const res = await fetch(`http://localhost:${Server?.port}/`, {
+        method: "GET",
+        headers: {
+          "Accept": "text/html"
+        }
+      });
       expect(res.headers.get('content-encoding')).toBe('gzip'); // Compression enabled
-      expect(res.headers.get('cache-control')).toBe('no-store'); // SSR cache control
+      expect(res.headers.get('cache-control')).toBe('no-cache'); // SSR cache control
     });
   });
 
@@ -497,9 +494,10 @@ describe("Bunext Framework Test Suite", () => {
     });
   });
 
-  describe("Request Features & SSR", () => {
-    const baseUrl = `http://localhost:${globalThis.serverConfig?.HTTPServer?.port || Server?.port}`;
-
+  describe("Request Features & SSR", async () => {
+    const Server = await createServer();
+    const baseUrl = `http://localhost:${Server.port}`;
+    console.log(baseUrl);
     test("server-side props: defined response", async () => {
       const headers = {
         accept: "application/vnd.server-side-props",
@@ -585,7 +583,10 @@ describe("Bunext Framework Test Suite", () => {
 
     test("request header handling and MIME types", async () => {
       // Test HTML request
-      const htmlRes = await fetch(`${baseUrl}/`);
+      const htmlRes = await fetch(`${baseUrl}/`, {
+        headers: { accept: "text/html" }
+      });
+      console.log(baseUrl);
       expect(htmlRes.headers.get('content-type')).toContain('text/html');
 
       // Test server-side props request
@@ -620,13 +621,15 @@ describe("Bunext Framework Test Suite", () => {
 
     test("caching and performance optimizations", async () => {
       // Test gzip compression
-      const res = await fetch(`${baseUrl}/`);
+      const res = await fetch(`${baseUrl}/`, {
+        headers: { accept: "text/html" }
+      });
       expect(res.headers.get('content-encoding')).toBe('gzip');
 
       // Test cache headers
       const cacheControl = res.headers.get('cache-control');
       expect(cacheControl).toBeDefined();
-      expect(cacheControl).toContain('no-store'); // SSR should not be cached
+      expect(cacheControl).toContain('no-cache'); // SSR should not be cached
     });
   });
 
@@ -660,7 +663,9 @@ describe("Bunext Framework Test Suite", () => {
     test("concurrent request handling", async () => {
       const concurrentRequests = 10;
       const requests = Array.from({ length: concurrentRequests }, (_, i) =>
-        fetch(`http://localhost:${Server?.port}/`)
+        fetch(`http://localhost:${Server?.port}/`, {
+          headers: { accept: "text/html" }
+        })
       );
 
       const results = await Promise.allSettled(requests);

@@ -22,18 +22,17 @@ export function clearSSRPage() {
 
 export async function onRequestSSRPage(manager: RequestManager): Promise<boolean> {
     // Handle SSR page requests
-    if (isSSRDefaultExportPath(manager, true)) {
-        if (!isAskingHTML(manager.bunextReq)) return false;
-        manager.bunextReq.session.prevent_session_init();
-        const stringPage = await getSSRDefaultPage(manager);
-        if (stringPage) {
-            manager.bunextReq.setResponse(stringPage, {
-                headers: {
-                    "content-type": "text/html; charset=utf-8",
-                }
-            });
-            return true;
-        }
+    if (!isSSRDefaultExportPath(manager, true) || !isAskingHTML(manager.bunextReq)) return false;
+    manager.bunextReq.session.prevent_session_init();
+    const stringPage = await getSSRDefaultPage(manager);
+    if (stringPage) {
+        manager.bunextReq.setResponse(stringPage, {
+            headers: {
+                "content-type": "text/html; charset=utf-8",
+                "cache-control": "no-cache"
+            }
+        });
+        return true;
     }
     return false;
 }

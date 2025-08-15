@@ -12,6 +12,9 @@ declare global {
 // Constants
 const DEFAULT_DB_PATH = "./config/bunext.sqlite";
 const DEFAULT_CONFIG_PATH = `${process.cwd()}/config/database.ts`;
+const CONFIG_MODULE = (await import(DEFAULT_CONFIG_PATH) as { default: DBSchema });
+
+globalThis.dbSchema ??= CONFIG_MODULE.default;
 
 /**
  * Type-safe connection pool for managing database instances and prepared statements
@@ -77,35 +80,6 @@ class TypeSafeConnectionPool {
     this.queryCache.clear();
   }
 }
-
-/**
- * Initialize global database schema and instance with proper error handling
- */
-async function initializeGlobalDatabase(): Promise<void> {
-  try {
-    if (!globalThis.dbSchema) {
-      const configModule = await import(DEFAULT_CONFIG_PATH);
-      globalThis.dbSchema = configModule.default;
-    }
-
-    if (!globalThis.MainDatabase) {
-      globalThis.MainDatabase = new _BunDB(DEFAULT_DB_PATH, {
-        create: true,
-        strict: true,
-      });
-
-      // Enable WAL mode for better performance and concurrency
-      globalThis.MainDatabase.exec("PRAGMA journal_mode = WAL;");
-      globalThis.MainDatabase.exec("PRAGMA foreign_keys = ON;");
-      globalThis.MainDatabase.exec("PRAGMA synchronous = NORMAL;");
-    }
-  } catch (error) {
-    console.warn("Failed to initialize global database:", error);
-  }
-}
-
-// Initialize on module load
-await initializeGlobalDatabase();
 
 /**
  * Database utility class for creating tables
@@ -1169,7 +1143,10 @@ class Table<
   }) {
 
     this.tableName = config.name;
-    this.databaseInstance = config.db || globalThis.MainDatabase;
+    this.databaseInstance = config.db || new _BunDB(DEFAULT_DB_PATH, {
+      create: true,
+      strict: true,
+    });
     this.schema = (config?.schema ?? globalThis.dbSchema)?.find(s => s.name === config.name)?.columns || [];
     this.isDebugEnabled = config.debug || false;
 
@@ -1177,9 +1154,13 @@ class Table<
       throw new Error("Database instance is not available");
     }
 
-    if ((config.enableWAL !== false) && config.db) {
-      this.databaseInstance.exec("PRAGMA journal_mode = WAL;");
-    }
+    this.initDatabase();
+  }
+
+  initDatabase(): void {
+    this.databaseInstance.exec("PRAGMA journal_mode = WAL;");
+    this.databaseInstance.exec("PRAGMA foreign_keys = ON;");
+    this.databaseInstance.exec("PRAGMA synchronous = NORMAL;");
   }
 
   /**

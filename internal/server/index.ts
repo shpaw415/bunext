@@ -176,10 +176,10 @@ class BunextServer {
     });
   }
 
-  close() {
+  async close() {
     console.info("Shutting down server...");
-    this.server?.stop();
-    this.hotServer?.stop();
+    await this.server?.stop();
+    await this.hotServer?.stop();
     globalThis.BunextConsole.destroy();
   }
 
