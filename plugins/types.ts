@@ -23,7 +23,7 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
     manager: RequestManager,
     context: T,
   ) => void | Promise<void>;
-  after?: (context: T, manager: RequestManager) => void | Promise<void>;
+  after?: (context: T, manager: RequestManager, HTML: string) => void | Promise<void>;
 };
 
 export type AfterBuildMain = () => Promise<any> | any;

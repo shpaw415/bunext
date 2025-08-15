@@ -683,7 +683,12 @@ async function OnDevRouterUpdate(matched: Exclude<Match, null>): Promise<void> {
   if (matched.path === __MAIN_ROUTE__) return;
 
   try {
-    await fetch(window.location.href);
+    await fetch(window.location.href, {
+      method: "PATCH",
+      headers: {
+        "cache-control": "no-store"
+      },
+    });
   } catch (error) {
     console.warn("Failed to update dev router:", error);
   }

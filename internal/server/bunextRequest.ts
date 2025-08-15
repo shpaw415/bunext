@@ -115,7 +115,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public setHead(data: _Head) {
     this.headData = {
       ...Head.head,
-      [this.path]: data,
+      [this.manager.pathname]: data,
     };
   }
   /**
@@ -230,23 +230,87 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     return this._prevent_global_values_injection;
   }
   public async toResponse(): Promise<Response | BunextResponseNotSetError> {
-    if (this.__BYPASS_RESPONSE__) return this.__BYPASS_RESPONSE__;
-    if (this._response_setted) {
-      if (typeof this._response_body == "string") {
+    try {
+      // Return bypass response if set
+      if (this.__BYPASS_RESPONSE__) return this.__BYPASS_RESPONSE__;
 
-        let formatedStringData = await this.applyModifiers(this._response_body);
-        if ((this._response_init?.headers as { ["Content-Type"]: string })["Content-Type"] == "text/html") {
-          formatedStringData = formatHTML(formatedStringData);
-        }
-        if (!this.manager.request_header["accept-encoding"]?.split(",").map((e) => e.trim()).includes("gzip")) {
-          return new Response(formatedStringData, this._response_init);
-        }
-        return new Response(Bun.gzipSync(formatedStringData), { ...this._response_init, headers: { "Content-Encoding": "gzip", ...this._response_init?.headers }, });
+      if (!this._response_setted) {
+        return new BunextResponseNotSetError("Response not set");
       }
 
+      // Handle string responses with potential HTML processing
+      if (typeof this._response_body === "string") {
+        let formattedStringData: string;
+
+        try {
+          formattedStringData = await this.applyModifiers(this._response_body);
+        } catch (error) {
+          console.error("Failed to apply modifiers:", error);
+          formattedStringData = this._response_body; // Fallback to original
+        }
+
+        // Initialize response init if not set
+        if (!this._response_init) {
+          this._response_init = { headers: {} };
+        }
+        if (!this._response_init.headers) {
+          this._response_init.headers = {};
+        }
+
+        // Safely handle headers (support both Headers object and plain object)
+        const headers = this._response_init.headers instanceof Headers
+          ? this._response_init.headers
+          : new Headers(this._response_init.headers as HeadersInit);
+
+        const contentType = headers.get("Content-Type") || headers.get("content-type");
+
+        // Apply HTML formatting if content type is HTML
+        if (contentType?.includes("text/html")) {
+          try {
+            formattedStringData = formatHTML(formattedStringData);
+          } catch (error) {
+            console.warn("Failed to format HTML:", error);
+            // Continue without formatting
+          }
+        } else {
+          // Set default content type for non-HTML string responses
+          headers.set("Content-Type", "text/plain");
+        }
+
+        // Update headers in response init
+        this._response_init.headers = headers;
+
+        // Handle compression if client supports it
+        const acceptEncoding = this.manager.request.headers.get("accept-encoding");
+        const supportsGzip = acceptEncoding?.includes("gzip") || acceptEncoding?.includes("*");
+
+        if (supportsGzip && formattedStringData.length > 1024) { // Only compress if worth it
+          try {
+            const compressedData = Bun.gzipSync(formattedStringData);
+            headers.set("Content-Encoding", "gzip");
+            headers.set("Vary", "Accept-Encoding");
+
+            return new Response(compressedData, this._response_init);
+          } catch (error) {
+            console.warn("Failed to compress response:", error);
+            // Fall back to uncompressed
+          }
+        }
+
+        return new Response(formattedStringData, this._response_init);
+      }
+
+      // Handle non-string responses (buffers, streams, etc.)
       return new Response(this._response_body, this._response_init);
+
+    } catch (error) {
+      console.error("Error in toResponse():", error);
+      // Return a basic error response instead of throwing
+      return new Response("Internal Server Error", {
+        status: 500,
+        headers: { "Content-Type": "text/plain" }
+      });
     }
-    return new BunextResponseNotSetError("Response not set");
   }
 
   /**
@@ -273,7 +337,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     const transformedText = rewriter.transform(html);
 
     await Promise.all(
-      afters.map(({ context, after }) => after?.(context, this.manager))
+      afters.map(({ context, after }) => after?.(context, this.manager, transformedText))
     );
 
     return [HTML_DOCTYPE, transformedText].join("\n");

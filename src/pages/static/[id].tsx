@@ -1,5 +1,7 @@
+"use static";
 import { useHead } from "bunext-js/head";
 import type { BunextRequest } from "bunext-js/request";
+import { generateRandomString } from "features/utils";
 
 type Props = {
   id: string;
@@ -12,7 +14,7 @@ export async function getServerSideProps({
 }): Promise<Props> {
   Bunext.router.revalidate.static(request, 5);
   return {
-    id: "allo",
+    id: `allo-${generateRandomString(5)}`,
   };
 }
 

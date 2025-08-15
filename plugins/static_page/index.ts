@@ -1,3 +1,5 @@
+"server only";
+
 import type { DBSchema } from "../../database/schema";
 import { CacheManagerExtends } from "../../internal/caching";
 import type { staticPage } from "../../internal/types";
@@ -6,7 +8,7 @@ import type { BunextPlugin } from "../types";
 import type { RequestManager } from "../../internal/server/router";
 import { renderToString } from "react-dom/server";
 import { makeServerSideProps, type ServerSidePropsContext } from "plugins/server-features/serverSideProps";
-import { isAskingHTML } from "plugins/server-features/ssr-page";
+import { isAskingHTML } from "plugins/server-features/utils";
 
 const staticPageCacheShema: DBSchema = [
   {
@@ -185,7 +187,6 @@ async function MakeStaticPage(manager: RequestManager) {
     throw new Error(`no serverSide path found for ${manager.pathname}`);
   manager.bunextReq.session.prevent_session_init();
 
-  const cacheManager = new StaticPageCache();
   const props = await makeServerSideProps(manager, { disableSession: true });
   const pageJSX = await manager.makeDynamicJSXPage({
     serverSideProps: props,
@@ -200,11 +201,6 @@ async function MakeStaticPage(manager: RequestManager) {
   );
   const pageString = renderToString(await manager.WrapPageWithShell(PageWithLayouts));
 
-  cacheManager.addStaticPage(
-    manager.serverSide.pathname,
-    pageString,
-    props
-  );
   return { page: pageString, props };
 }
 
@@ -214,27 +210,29 @@ export default {
     async request(manager) {
       if (process.env.NODE_ENV == "development" || manager.bunextReq.isResponseSetted()) return;
       await setServerSidePropsContext(manager);
-      const isUseStatic = isUseStaticPath(manager, true);
-      if (
-        isAskingHTML(manager.bunextReq) &&
-        isUseStatic
-      ) {
-        const { page, props } =
-          (await getStaticPage(manager)) || (await MakeStaticPage(manager));
+      if (!isAskingHTML(manager.bunextReq) || !isUseStaticPath(manager, true)) return;
 
+      const { page, props } =
+        (await getStaticPage(manager)) || (await MakeStaticPage(manager));
 
-        manager.bunextReq.setContext({
-          __SERVERSIDE_PROPS__: props || null
+      manager.bunextReq.setContext({
+        __SERVERSIDE_PROPS__: props || null
+      });
+
+      if (page)
+        manager.bunextReq.setResponse(page || "", {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
         });
-
-        if (page)
-          manager.bunextReq.setResponse(page || "", {
-            headers: {
-              "content-type": "text/html; charset=utf-8",
-            },
-          });
-      }
     },
+    html_rewrite: {
+      after(context, manager, HTML) {
+        if (!isAskingHTML(manager.bunextReq) || !isUseStaticPath(manager)) return;
+        const Props = manager.bunextReq.getContext<{ __SERVERSIDE_PROPS__?: unknown }>().__SERVERSIDE_PROPS__;
+        new StaticPageCache().addStaticPage(manager.pathname, HTML, Props as any);
+      },
+    }
   },
   serverStart: {
     main() {

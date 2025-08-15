@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { RequestContext } from "../../internal/server/context";
 export { GetSession } from "../request/bunextRequest";
 import { DevConsole, SessionNotInitedWarning } from "../../internal/server/logs.ts";
+import { GetSessionFromResponse } from "internal/globals";
 
 /**
  * Session data structure with improved type safety
@@ -145,7 +146,22 @@ export class BunextSession<DataType = any> {
       this._serverSessionInitialized = true;
     }
   }
-
+  /**
+   * Sets session data from a response object.
+   * 
+   * Exemple: From a API call
+   * 
+   * @param response The response object to extract session data from.
+   * @returns A promise that resolves when the data has been set.
+   */
+  async setDataFromResponse(response: Response) {
+    if (!response.ok) {
+      throw new SessionError("Failed to set data from response", "RESPONSE_ERROR");
+    }
+    const data = GetSessionFromResponse(response);
+    if (!data) return;
+    this.setData(data as Partial<DataType>, true);
+  }
   /**
    * Set session data (enhanced to support both server and client-side updates)
    * On client-side, updates global session data for server action callbacks

@@ -11,7 +11,7 @@ export const Shell: ReactShellComponent = ({
 }) => {
   return (
     <SessionProvider>
-      <html lang={request?.plugins.rawGlobalData?.__HTML_LANG__ as string || globalThis?.__HTML_LANG__ || "en"}>
+      <html lang={request?.getContext<{ __HTML_LANG__: string }>()?.__HTML_LANG__ || globalThis?.__HTML_LANG__ || "en"}>
         <HeadProvider currentPath={route}>
           <body>
             <Dev>{children}</Dev>

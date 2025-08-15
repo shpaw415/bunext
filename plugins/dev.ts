@@ -45,6 +45,14 @@ const plugin: BunextPlugin =
         request: async (manager) => {
           await handleDevRequest(manager);
           (handleDevtoolsJson(manager.bunextReq)) || (await handleCssPaths(manager.bunextReq));
+
+          if (
+            manager.request.method === "PATCH" &&
+            !manager.bunextReq.isResponseSetted()
+          ) {
+            manager.bunextReq.preventGlobalValuesInjection().preventRewrite();
+            manager.bunextReq.setResponse("update-path");
+          }
         },
       },
     }
@@ -100,7 +108,6 @@ function shouldRebuildRoute(match: MatchedRoute | null, request: Request): boole
  * Handles development-specific request processing
  */
 async function handleDevRequest(request: RequestManager) {
-
   const match = request.serverSide;
   if (shouldRebuildRoute(match, request.request)) {
 

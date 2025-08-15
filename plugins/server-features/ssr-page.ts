@@ -4,16 +4,12 @@ import { router, type RequestManager } from "internal/server/router";
 import type { PageModule } from "internal/types";
 import type { BunextRequest } from "public/request";
 import { createElement } from "react";
+import { isAskingHTML } from "./utils";
 
 
 export let ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
 
-export function isAskingHTML(req: BunextRequest): boolean {
-    if (
-        req.request.headers.get("Accept")?.includes("text/html") &&
-        req.request.method.toUpperCase() == "GET") return true;
-    return false;
-}
+
 
 export function clearSSRPage() {
     CacheManager.clearSSR();

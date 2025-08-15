@@ -89,18 +89,43 @@ class TypeSafeConnectionPool {
   }
 }
 
+class DatabaseInitializer {
+  /**
+   * Direct access to the database instance
+   * @link https://bun.sh/docs/api/sqlite
+   */
+  readonly databaseInstance: _BunDB;
+  private readonly DBSchema: DBSchema;
+
+  constructor(config: {
+    db?: _BunDB;
+    schema?: DBSchema;
+  }) {
+    this.DBSchema = config?.schema || globalThis.dbSchema || [];
+    this.databaseInstance = config.db || new _BunDB(DEFAULT_DB_PATH, {
+      create: true,
+      strict: true,
+    })
+    if (!this.databaseInstance) {
+      throw new Error("Database instance is not available");
+    }
+    this.initDatabase();
+  }
+
+  private initDatabase(): void {
+    this.databaseInstance.exec("PRAGMA journal_mode = WAL;");
+    this.databaseInstance.exec("PRAGMA foreign_keys = ON;");
+    this.databaseInstance.exec("PRAGMA synchronous = NORMAL;");
+  }
+}
+
 /**
  * Database utility class for creating tables
  */
-export class DatabaseManager {
-  public databaseInstance: _BunDB;
+export class DatabaseManager extends DatabaseInitializer {
 
   constructor(db?: _BunDB) {
-    this.databaseInstance = db || globalThis.MainDatabase;
-
-    if (!this.databaseInstance) {
-      throw new Error("Database instance is not available. Please ensure the database is properly initialized.");
-    }
+    super({ db });
   }
 
   /**
@@ -1053,76 +1078,6 @@ export class DatabaseManager {
     }
   }
 }
-// Clean type definitions for database operations
-type OptionsFlags<Type> = {
-  [Property in keyof Type]?: true;
-};
-
-
-// Select field options that work with autocomplete
-type SelectFields<T> = {
-  [K in keyof T]?: true;
-};
-
-
-// Precise type selection for return values
-type PreciseSelectedType<T, S> = S extends undefined
-  ? { [K in keyof T]: T[K] }
-  : S extends Record<string, unknown>
-  ? Exclude<{ [K in keyof T as K extends keyof S ? (S[K] extends true ? K : never) : never]: T[K] }, Record<string, never>>
-  : never;
-
-// Optional select fields for flexibility
-type OptionalSelectFields<T> = {
-  [K in keyof T]?: true;
-};
-
-// Database operation options
-type WhereClause<T> = Partial<T> | {
-  LIKE?: Partial<T>;
-  OR?: Partial<T>[];
-  greaterThan?: Partial<T>;
-  lessThan?: Partial<T>;
-  notEqual?: Partial<T>;
-  greaterThanOrEqual?: Partial<T>;
-  lessThanOrEqual?: Partial<T>;
-};
-
-type SelectWhereClause<T> = WhereClause<T>;
-
-type DatabaseSelectOptions<T, S = undefined> = {
-  where?: WhereClause<T>;
-  select?: S;
-  limit?: number;
-  skip?: number;
-};
-
-
-type DatabaseUpdateOptions<T> = {
-  where: WhereClause<T>;
-  values: Partial<T>;
-};
-
-type DatabaseDeleteOptions<T> = {
-  where: WhereClause<T>;
-};
-
-type DatabaseCountOptions<T> = {
-  where?: WhereClause<T>;
-};
-
-// Query builder types
-type SelectQuery<T> = {
-  select?: SelectFields<T>;
-  where?: WhereClause<T>;
-  limit?: number;
-  skip?: number;
-  orderBy?: {
-    column: keyof T;
-    direction?: 'ASC' | 'DESC';
-  };
-};
-
 
 
 /**
@@ -1131,16 +1086,10 @@ type SelectQuery<T> = {
 class Table<
   T extends Record<string, any>,
   SELECT_FORMAT extends Record<string, any>
-> {
+> extends DatabaseInitializer {
   private readonly tableName: string;
   private readonly isDebugEnabled: boolean;
   private readonly schema: TableSchema["columns"];
-
-  /**
-   * Direct access to the database instance
-   * @link https://bun.sh/docs/api/sqlite
-   */
-  readonly databaseInstance: _BunDB;
 
   constructor(config: {
     name: string;
@@ -1149,27 +1098,13 @@ class Table<
     debug?: boolean;
     enableWAL?: boolean;
   }) {
-
+    super({ db: config.db, schema: config.schema });
     this.tableName = config.name;
-    this.databaseInstance = config.db || new _BunDB(DEFAULT_DB_PATH, {
-      create: true,
-      strict: true,
-    });
     this.schema = (config?.schema ?? globalThis.dbSchema)?.find(s => s.name === config.name)?.columns || [];
     this.isDebugEnabled = config.debug || false;
-
-    if (!this.databaseInstance) {
-      throw new Error("Database instance is not available");
-    }
-
-    this.initDatabase();
   }
 
-  initDatabase(): void {
-    this.databaseInstance.exec("PRAGMA journal_mode = WAL;");
-    this.databaseInstance.exec("PRAGMA foreign_keys = ON;");
-    this.databaseInstance.exec("PRAGMA synchronous = NORMAL;");
-  }
+
 
   /**
    * Creates the table using the schema definition with sophisticated type mapping and constraints
@@ -3156,6 +3091,77 @@ class Table<
   }
 }
 
+
+// Clean type definitions for database operations
+type OptionsFlags<Type> = {
+  [Property in keyof Type]?: true;
+};
+
+
+// Select field options that work with autocomplete
+type SelectFields<T> = {
+  [K in keyof T]?: true;
+};
+
+
+// Precise type selection for return values
+type PreciseSelectedType<T, S> = S extends undefined
+  ? { [K in keyof T]: T[K] }
+  : S extends Record<string, unknown>
+  ? Exclude<{ [K in keyof T as K extends keyof S ? (S[K] extends true ? K : never) : never]: T[K] }, Record<string, never>>
+  : never;
+
+// Optional select fields for flexibility
+type OptionalSelectFields<T> = {
+  [K in keyof T]?: true;
+};
+
+// Database operation options
+type WhereClause<T> = Partial<T> | {
+  LIKE?: Partial<T>;
+  OR?: Partial<T>[];
+  greaterThan?: Partial<T>;
+  lessThan?: Partial<T>;
+  notEqual?: Partial<T>;
+  greaterThanOrEqual?: Partial<T>;
+  lessThanOrEqual?: Partial<T>;
+};
+
+type SelectWhereClause<T> = WhereClause<T>;
+
+type DatabaseSelectOptions<T, S = undefined> = {
+  where?: WhereClause<T>;
+  select?: S;
+  limit?: number;
+  skip?: number;
+};
+
+
+type DatabaseUpdateOptions<T> = {
+  where: WhereClause<T>;
+  values: Partial<T>;
+};
+
+type DatabaseDeleteOptions<T> = {
+  where: WhereClause<T>;
+};
+
+type DatabaseCountOptions<T> = {
+  where?: WhereClause<T>;
+};
+
+// Query builder types
+type SelectQuery<T> = {
+  select?: SelectFields<T>;
+  where?: WhereClause<T>;
+  limit?: number;
+  skip?: number;
+  orderBy?: {
+    column: keyof T;
+    direction?: 'ASC' | 'DESC';
+  };
+};
+
 /**
  * Type-safe query builder for fluent query construction
  * Provides method chaining with full TypeScript type inference
@@ -3256,6 +3262,8 @@ class QueryBuilder<T extends Record<string, any>> {
     return (this.table as any).exists({ where: this.options.where });
   }
 }
+
+
 
 
 

@@ -2,7 +2,7 @@ import type { BunextPlugin } from "../types";
 import { readdir, readFile, stat } from "fs/promises";
 import { join } from "path";
 import { DevConsole } from "../../internal/server/logs";
-import { isAskingHTML } from "plugins/server-features/ssr-page";
+import { isAskingHTML } from "plugins/server-features/utils";
 
 interface CSSModulesConfig {
     srcDir?: string;

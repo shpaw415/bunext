@@ -108,10 +108,9 @@ class StaticRouters extends PluginLoader {
     super();
 
     try {
-      this.server = this.createFileSystemRouter(this.pageDir, true);
+      this.server = this.createFileSystemRouter(this.pageDir);
       this.client = this.createFileSystemRouter(
         join(this.buildDir, this.pageDir),
-        false
       );
 
       this.routes_dump = this.generateServerSideRouteDump(this.server);
@@ -130,12 +129,10 @@ class StaticRouters extends PluginLoader {
    */
   private createFileSystemRouter(
     directory: string,
-    isServerSide: boolean
   ): FileSystemRouter {
     const config = {
       dir: join(this.baseDir, directory),
       style: "nextjs" as const,
-      ...(isServerSide && { fileExtensions: [...SUPPORTED_FILE_EXTENSIONS] }),
     };
 
     return new Bun.FileSystemRouter(config);
@@ -309,16 +306,25 @@ class StaticRouters extends PluginLoader {
    */
   private async getUseStaticRoutes(): Promise<string[]> {
     const staticRoutes: string[] = [];
-    const useStaticRegex = /(['"])use static\1/;
+    // More robust regex that handles whitespace and optional semicolons
+    const useStaticRegex = /^\s*(['"])use\s+static\1\s*;?\s*$/;
 
     try {
       await Promise.all(
         this.getRoutesWithoutLayouts().map(async ([route, path]) => {
           try {
             const fileContent = await Bun.file(path).text();
-            const firstLine = fileContent.split("\n").at(0);
+            // Check first few non-empty lines in case of comments or blank lines
+            const lines = fileContent.split("\n");
+            const firstNonEmptyLines = lines
+              .filter(line => line.trim().length > 0)
+              .slice(0, 3); // Check first 3 non-empty lines
 
-            if (firstLine && useStaticRegex.test(firstLine)) {
+            const hasUseStatic = firstNonEmptyLines.some(line =>
+              useStaticRegex.test(line.trim())
+            );
+
+            if (hasUseStatic) {
               staticRoutes.push(route);
             }
           } catch (error) {
@@ -339,10 +345,9 @@ class StaticRouters extends PluginLoader {
    */
   public setRoutes(): void {
     try {
-      this.server = this.createFileSystemRouter(this.pageDir, true);
+      this.server = this.createFileSystemRouter(this.pageDir);
       this.client = this.createFileSystemRouter(
-        join(this.buildDir, this.pageDir),
-        false
+        join(this.buildDir, this.pageDir)
       );
 
       this.routes_dump = this.generateClientSideRouteDump(this.client);

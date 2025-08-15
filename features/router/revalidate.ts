@@ -74,9 +74,9 @@ let timer: Timer | undefined = undefined;
 function revalidateStatic(pathlike: Request | string, timeout?: number) {
   if (!isServer) publicThrow();
 
-  import("../../internal/caching/index.ts").then(async (module) => {
+  import("plugins/static_page").then(async (module) => {
     const revalidate = async () => {
-      const manager = new module.CacheManager();
+      const manager = new module.StaticPageCache();
       if (pathlike instanceof Request) {
         const { router } = await import("../../internal/server/router.tsx");
         const match = router.server.match(pathlike);

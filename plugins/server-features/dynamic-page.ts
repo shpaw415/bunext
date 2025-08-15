@@ -2,7 +2,7 @@ import { RenderingError, type RequestManager } from "internal/server/router";
 import { makeServerSideProps } from "./serverSideProps";
 import type { JSX } from "react";
 import { fallBackComponents } from "internal/server/fallbacks";
-import { isAskingHTML } from "./ssr-page";
+import { isAskingHTML } from "./utils";
 
 export async function serveDynamicPage(manager: RequestManager): Promise<boolean> {
     manager.bunextReq.session.prevent_session_init();

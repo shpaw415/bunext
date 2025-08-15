@@ -1,3 +1,4 @@
+import { isAskingHTML } from "plugins/server-features/utils";
 import type { BunextPlugin } from "plugins/types";
 import type { BunextRequest } from "public/request";
 
@@ -19,12 +20,17 @@ async function getHtmlLang(bunext: BunextRequest) {
 }
 
 export default {
-    priority: 0,
+    priority: -1,
     router: {
         async request(req) {
+            if (!isAskingHTML(req.bunextReq)) return;
+            const lang = await getHtmlLang(req.bunextReq);
             req.bunextReq.InjectGlobalValues({
-                __HTML_LANG__: await getHtmlLang(req.bunextReq)
+                __HTML_LANG__: lang
             });
+            req.bunextReq.setContext({
+                __HTML_LANG__: lang
+            })
         }
     },
 
