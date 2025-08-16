@@ -237,7 +237,6 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
       } catch (error) {
         console.error(`Failed to serialize value for key "${key}":`, error);
       }
-      return this;
     }
     return this;
   }
@@ -397,20 +396,6 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    */
   private async makePreLoadObject(): Promise<Partial<Record<keyof _GlobalData, string>>> {
     try {
-      await this.session.initData();
-
-      const createdAt =
-        this.session.__DATA__.private?.__BUNEXT_SESSION_CREATED_AT__ || 0;
-
-      const sessionTimeout =
-        createdAt === 0
-          ? 0
-          : createdAt +
-          this.session.sessionTimeoutFromNow * 1000 -
-          (new Date().getTime() - createdAt);
-
-
-
       if (this.headData) {
         Object.entries(this.headData).forEach(([path, data]) => {
           Head.setHead({
@@ -427,10 +412,6 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
         __ROUTES__: router.routes_dump,
         __LAYOUT_ROUTE__: JSON.stringify(router.layoutPaths),
         __HEAD_DATA__: JSON.stringify({ ...Head.head }),
-        __PUBLIC_SESSION_DATA__: this.session.exists() ? JSON.stringify(
-          this.session.getPublicData()
-        ) : "undefined",
-        __SESSION_TIMEOUT__: JSON.stringify(sessionTimeout),
         serverConfig: JSON.stringify({
           Dev: globalThis.serverConfig.Dev,
           HTTPServer: globalThis.serverConfig.HTTPServer,

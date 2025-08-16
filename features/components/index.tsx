@@ -41,23 +41,22 @@ export function DynamicComponent<Props extends {}, ElementName extends string>({
       });
 
     if (id) {
-      const El = globalThis?.__BUNEXT_dynamicComponents__?.find(
+      const El = globalThis?.__BUNEXT_DYNAMIC_COMPONENTS__?.find(
         (p) => p.id == id
       );
       if (!El) return fallback;
       return createElement(El.element.type, {
         dangerouslySetInnerHTML: {
-          __html: decodeURI(El.content),
+          __html: document.getElementById(El.id)?.innerHTML,
         },
       });
     }
     return undefined;
   });
   const version = useLoadingVersion();
-  const devKey = process.env.NODE_ENV == "development" ? `?${version}` : "";
-  console.log(pathName, devKey);
+  const devKey = process.env.NODE_ENV == "development" ? `?v=${version}` : "";
   useEffect(() => {
-    import(`${pathName}${devKey}`)
+    import(`${pathName}.js${devKey}`)
       .then((module) => {
         const Component = module[elementName];
         if (!Component) {

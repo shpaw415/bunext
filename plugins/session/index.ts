@@ -1,4 +1,5 @@
 import type { RequestManager } from "internal/server/router";
+import { isAskingHTML } from "plugins/server-features/utils";
 import type { BunextPlugin } from "plugins/types";
 import { BunextRequest } from "public/request";
 
@@ -36,6 +37,25 @@ export async function sessionOnRequestHandler(request: RequestManager): Promise<
 export default {
     priority: 0,
     router: {
+        async request(manager) {
+            if (!isAskingHTML(manager.bunextReq)) return;
+            const session = manager.bunextReq.session;
+            await session.initData();
+            const createdAt =
+                session.__DATA__.private?.__BUNEXT_SESSION_CREATED_AT__ || 0;
+
+            const sessionTimeout =
+                createdAt === 0
+                    ? 0
+                    : createdAt +
+                    session.sessionTimeoutFromNow * 1000 -
+                    (new Date().getTime() - createdAt);
+            manager.bunextReq.InjectGlobalValues({
+                __SESSION_TIMEOUT__: sessionTimeout,
+                __PUBLIC_SESSION_DATA__: session.exists() ? session.getPublicData() : undefined,
+            });
+
+        },
         after_request(request, response) {
             if (!request.bunextReq.session.isSessionUpdated() && !request.bunextReq.session.isSessionDeleted()) return;
             request.bunextReq.setSessionCookie(response);

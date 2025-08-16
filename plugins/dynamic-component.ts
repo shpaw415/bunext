@@ -5,12 +5,11 @@ import { join, resolve, normalize } from "path";
 import type { JSX } from "react";
 
 declare global {
-  var __BUNEXT_dynamicComponents__: Array<dynamicComponents>;
+  var __BUNEXT_DYNAMIC_COMPONENTS__: Array<dynamicComponents>;
 }
 
 type dynamicComponents = {
   id: string;
-  content: string;
   pathname: string;
   element: {
     type: keyof JSX.IntrinsicElements;
@@ -93,7 +92,6 @@ export default {
 
             context.push({
               id,
-              content: encodeURI(JSXElementStringified),
               pathname: new URL(bunext_req.request.url).pathname,
               element: {
                 type: JSXElement.type,
@@ -111,15 +109,9 @@ export default {
         });
         rewrite.onDocument({
           end(end) {
-            end.append(
-              `<script> 
-              __BUNEXT_dynamicComponents__ = JSON.parse(atob('${Buffer.from(
-                JSON.stringify(context)
-              ).toString("base64")}')); </script>`,
-              {
-                html: true,
-              }
-            );
+            bunext_req.bunextReq.InjectGlobalValues({
+              __BUNEXT_DYNAMIC_COMPONENTS__: context,
+            })
           },
         });
       },

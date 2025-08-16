@@ -15,3 +15,4 @@ export default function DynamicImport({ props }: { props: {} }) {
     />
   );
 }
+
