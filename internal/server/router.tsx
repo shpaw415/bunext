@@ -7,7 +7,7 @@ import {
   type Subprocess,
 } from "bun";
 import { NJSON } from "next-json";
-import { join, relative, sep, normalize } from "node:path";
+import { join, relative, sep, normalize, resolve } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import {
@@ -552,9 +552,24 @@ class StaticRouters extends PluginLoader {
     path: string;
     suffixes?: string[];
   }): Promise<BunFile | null> {
+
+
+
+
     try {
-      const basePath = join(config.directory, normalize(decodeURI(config.path)));
       const suffixes = config.suffixes ?? [...STATIC_FILE_SUFFIXES];
+
+      const baseDir = resolve(config.directory);
+      const decoded = decodeURI(config.path);
+      const normalized = normalize(decoded);
+      // Resolve against baseDir. Prefix with "." to keep normalized absolute-style inputs inside baseDir.
+      const basePath = resolve(baseDir, "." + normalized);
+      // Ensure the resolved path stays within baseDir
+      if (relative(baseDir, basePath).startsWith("..")) {
+        throw new FileSystemError(
+          `Rejected path outside of base directory: ${decoded}`
+        );
+      }
 
       for (const suffix of suffixes) {
         try {

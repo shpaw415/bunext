@@ -56,9 +56,9 @@ export default {
             });
 
         },
-        after_request(request, response) {
+        async after_request(request, response) {
             if (!request.bunextReq.session.isSessionUpdated() && !request.bunextReq.session.isSessionDeleted()) return;
-            request.bunextReq.setSessionCookie(response);
+            await request.bunextReq.setSessionCookie(response);
         },
 
     },

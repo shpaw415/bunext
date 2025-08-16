@@ -579,7 +579,7 @@ export const RouterHost = ({
           import(
             [
               matched.value,
-              `?__BUNEXT_PARAMS__=${JSON.stringify(matched.params)}`,
+              `?__BUNEXT_PARAMS__=${encodeURI(JSON.stringify(matched.params))}`,
               "&__BUNEXT_NAVIGATE__=true",
               (process.env.NODE_ENV === "development" ? `&__BUNEXT_VERSION__=${currentVersion}` : "")
             ].join("")

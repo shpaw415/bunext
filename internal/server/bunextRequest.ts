@@ -67,7 +67,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this.URL = new URL(this.request.url);
     this.manager = props.manager;
     const bunext_params = this.URL.searchParams.get("__BUNEXT_PARAMS__");
-    this.__REQUEST_PARAMS__ = bunext_params ? JSON.parse(bunext_params) : formatParams(this.manager?.serverSide?.params);
+    this.__REQUEST_PARAMS__ = bunext_params ? JSON.parse(decodeURI(bunext_params)) : formatParams(this.manager?.serverSide?.params);
     this.__REQUEST_NAVIGATE__ = this.URL.searchParams.has("__BUNEXT_NAVIGATE__");
   }
   /**
