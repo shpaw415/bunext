@@ -13,7 +13,7 @@ async function getHtmlLang(bunext: BunextRequest) {
         case "undefined":
             return "en";
         case "function":
-            return await globalThis.serverConfig.html_lang(bunext) || "en";
+            return (await globalThis.serverConfig.html_lang(bunext)) || "en";
         default:
             return "en";
     }
@@ -23,7 +23,8 @@ export default {
     priority: -1,
     router: {
         async request(req) {
-            if (!isAskingHTML(req.bunextReq)) return;
+            if (!isAskingHTML(req.bunextReq) && !req.bunextReq.isClientNavigation()) return;
+
             const lang = await getHtmlLang(req.bunextReq);
             req.bunextReq.InjectGlobalValues({
                 __HTML_LANG__: lang

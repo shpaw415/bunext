@@ -1,6 +1,6 @@
 import { generateRandomString } from "features/utils";
 import { RequestManager, router } from "internal/server/router";
-
+import { extname } from "path";
 
 
 export async function serveFromBuildDirectory(manager: RequestManager) {
@@ -24,6 +24,18 @@ export async function serveFromBuildDirectory(manager: RequestManager) {
     const ProductionHeader = {
         "Cache-Control": "public max-age=3600",
     };
+    if (staticResponse.name && extname(staticResponse.name) == ".js") {
+        manager.bunextReq.preventRewrite().preventGlobalValuesInjection();
+        manager.bunextReq.setResponse([await staticResponse.text(), manager.bunextReq.globalDataToJSFormat()].join("\n"), {
+            headers: {
+                "Content-Type": "application/javascript",
+                ...(process.env.NODE_ENV == "production"
+                    ? ProductionHeader
+                    : DevHeader),
+            }
+        });
+        return true;
+    }
 
     manager.bunextReq.setResponse(staticResponse, {
         headers: {

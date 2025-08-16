@@ -577,8 +577,12 @@ export const RouterHost = ({
         const [props, module] = await Promise.all([
           fetchServerSideProps(target),
           import(
-            `${matched.value}${process.env.NODE_ENV === "development" ? `?${currentVersion}` : ""
-            }`
+            [
+              matched.value,
+              `?__BUNEXT_PARAMS__=${JSON.stringify(matched.params)}`,
+              "&__BUNEXT_NAVIGATE__=true",
+              (process.env.NODE_ENV === "development" ? `&__BUNEXT_VERSION__=${currentVersion}` : "")
+            ].join("")
           ),
         ]);
 

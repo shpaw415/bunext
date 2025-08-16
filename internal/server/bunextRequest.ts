@@ -8,7 +8,7 @@ import { generateRandomString } from "../../features/utils";
 import { Head, type _Head } from "../../features/head";
 import type { _GlobalData, PluginData, ServerConfig } from "internal/types";
 import { BunextError } from "./server_global";
-import { RenderingError, RequestManager, router } from "./router";
+import { formatParams, RenderingError, RequestManager, router } from "./router";
 import { timeStamp } from "console";
 import { formatHTML } from "internal/utils";
 
@@ -37,6 +37,8 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public headData?: Record<string, _Head>;
   public path: string = "";
   public __BYPASS_RESPONSE__: Response | undefined;
+  private readonly __REQUEST_PARAMS__: Record<string, string | string[]> | undefined;
+  private readonly __REQUEST_NAVIGATE__: boolean;
   /**
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
@@ -64,6 +66,9 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     )?.id;
     this.URL = new URL(this.request.url);
     this.manager = props.manager;
+    const bunext_params = this.URL.searchParams.get("__BUNEXT_PARAMS__");
+    this.__REQUEST_PARAMS__ = bunext_params ? JSON.parse(bunext_params) : formatParams(this.manager?.serverSide?.params);
+    this.__REQUEST_NAVIGATE__ = this.URL.searchParams.has("__BUNEXT_NAVIGATE__");
   }
   /**
    * Gets the context for the request.
@@ -78,6 +83,20 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    */
   public setContext(context: Partial<ContextType>) {
     this.context = { ...this.context, ...context };
+  }
+  /**
+   * Gets the request parameters same as RouteMatch.params
+   * @returns The request parameters.
+   */
+  public getRequestParams<T extends Record<string, unknown> = {}>() {
+    return this.__REQUEST_PARAMS__ as T;
+  }
+  /**
+   * Checks if the request is a client-side navigation.
+   * @returns True if the request is a client-side navigation, false otherwise.
+   */
+  public isClientNavigation() {
+    return this.__REQUEST_NAVIGATE__;
   }
 
   /**
@@ -111,6 +130,8 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   }
   public unsetResponse(): void {
     this._response_setted = false;
+    this._response_body = null;
+    this._response_init = undefined;
   }
   public setHead(data: _Head) {
     this.headData = {
@@ -205,7 +226,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     return encrypted ? wt.session() : wt.getPlainJsonCookie(name);
   }
   /**
-   * Injects global values into the request context they can be accessed into client-side in the globalThis object.
+   * Injects global values into the request. they can be accessed into client-side in the globalThis object.
    * @param values The global values to inject. must be serializable.
    */
   public InjectGlobalValues(values: Record<string, unknown>) {
@@ -216,7 +237,9 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
       } catch (error) {
         console.error(`Failed to serialize value for key "${key}":`, error);
       }
+      return this;
     }
+    return this;
   }
   public preventGlobalValuesInjection() {
     this._prevent_global_values_injection = true;
@@ -430,13 +453,21 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     }
   }
   /**
+   * ** **Bunext Internal use only** **
+   * 
+   * Converts global data to JS format for script injection
+   */
+  globalDataToJSFormat() {
+    return this.preloadToStringArray(this.plugins.globalData).join(";");
+  }
+  /**
    * Converts preload object to string array for script injection
    */
   private preloadToStringArray(
     preload: Partial<Record<keyof _GlobalData & string, string>>
   ): string[] {
     return Object.entries(preload)
-      .map(([key, value]) => `${key}=${value}`)
+      .map(([key, value]) => `globalThis["${key}"]=${value}`)
       .filter(Boolean);
   }
 

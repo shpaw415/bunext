@@ -7,7 +7,7 @@ import {
   type Subprocess,
 } from "bun";
 import { NJSON } from "next-json";
-import { extname, join, relative, sep, normalize } from "node:path";
+import { join, relative, sep, normalize } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import {
@@ -19,15 +19,12 @@ import { type JSX } from "react";
 import type {
   _GlobalData,
   ReactShellComponent,
-  ServerConfig,
   ServerSideProps,
 } from "../types";
-import { Head, type _Head } from "../../features/head";
+import { type _Head } from "../../features/head";
 import { BunextRequest, BunextResponseNotSetError } from "./bunextRequest";
 import { RequestContext } from "./context";
 import { PluginLoader } from "./plugin-loader";
-import { generateRandomString } from "../../features/utils";
-import CacheManager from "../caching";
 
 // Global imports
 import "./server_global";
@@ -780,7 +777,8 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
   }
 }
 
-function formatParams(match: MatchedRoute["params"]): Record<string, unknown> {
+export function formatParams(match: MatchedRoute["params"] | undefined): Record<string, unknown> {
+  if (!match) return {};
   const params =
     Object.entries(match).map(([key, value]) => {
       const val = value.split("/");

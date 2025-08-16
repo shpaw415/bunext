@@ -23,7 +23,8 @@ const Config: ServerConfig = {
   bunext_plugins: [
   ],
   html_lang(request) {
-    return "fr"
+    const params = request.getRequestParams<{ lang?: string }>();
+    return params.lang || "en";
   },
 };
 
