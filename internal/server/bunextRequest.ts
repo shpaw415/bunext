@@ -11,6 +11,7 @@ import { BunextError } from "./server_global";
 import { formatParams, RenderingError, RequestManager, router } from "./router";
 import { timeStamp } from "console";
 import { formatHTML } from "internal/utils";
+import type { DirectiveTool } from "plugins/utils";
 
 
 export type CookieOptions = _webToken & {
@@ -39,6 +40,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public __BYPASS_RESPONSE__: Response | undefined;
   private readonly __REQUEST_PARAMS__: Record<string, string | string[]> | undefined;
   private readonly __REQUEST_NAVIGATE__: boolean;
+  public readonly isAskingHTML: boolean;
   /**
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
@@ -55,7 +57,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public context: ContextType = {} as ContextType;
   public URL: URL;
 
-  constructor(props: { request: Request; response: Response, manager: RequestManager }) {
+  constructor(props: { request: Request; response: Response, manager: RequestManager, directivesTools: DirectiveTool }) {
     this.request = props.request;
     this._response = props.response;
     this.webtoken = new webToken<any>(this.request, {
@@ -66,9 +68,11 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     )?.id;
     this.URL = new URL(this.request.url);
     this.manager = props.manager;
+
     const bunext_params = this.URL.searchParams.get("__BUNEXT_PARAMS__");
     this.__REQUEST_PARAMS__ = bunext_params ? JSON.parse(decodeURI(bunext_params)) : formatParams(this.manager?.serverSide?.params);
     this.__REQUEST_NAVIGATE__ = this.URL.searchParams.has("__BUNEXT_NAVIGATE__");
+    this.isAskingHTML = this.__REQUEST_NAVIGATE__ ? false : Boolean(this.request.headers.get("accept")?.includes("text/html"));
   }
   /**
    * Gets the context for the request.

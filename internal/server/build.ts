@@ -4,20 +4,19 @@ import "./server_global.ts";
 import "./bunext_global";
 import { join, basename } from "node:path";
 import {
-  type BuildConfig,
   type BuildOutput,
   type BunPlugin,
   type JavaScriptLoader,
 } from "bun";
 import { normalize, resolve } from "path";
-import { isValidElement, type JSX, type ReactNode } from "react";
+import { type JSX, isValidElement } from "react";
 import reactElementToJSXString from "../jsxToString/index";
 import { mkdirSync, rmSync, unlinkSync } from "node:fs";
 import { renderToString } from "react-dom/server";
 import type { ssrElement } from "../types";
 import "../globals";
 import { Head, type _Head } from "../../features/head";
-import { BuildServerComponentWithHooksWarning, DevConsole } from "./logs";
+import { DevConsole } from "./logs";
 import CacheManager from "../caching";
 import { router } from "./router";
 import * as React from "react";
@@ -29,6 +28,7 @@ import type {
 } from "./build-worker.ts";
 import { generateRandomString } from "../../features/utils/index.ts";
 import { ExitCodeDescription } from "../../bin/exit-codes.ts";
+import { DirectiveTool } from "plugins/utils";
 
 globalThis.React = React;
 
@@ -54,6 +54,8 @@ declare global {
 }
 
 const cwd = process.cwd();
+
+const fileDirective = new DirectiveTool();
 
 class Builder extends PluginLoader {
   public options: _Mainoptions = {
@@ -285,63 +287,50 @@ class Builder extends PluginLoader {
     if (modulePath.endsWith(".d.ts")) return;
 
     Head._setCurrentPath(modulePath);
-    const moduleContent = await Bun.file(modulePath).text();
-    const _module = await import(
+    const _module = (await import(
       modulePath +
       (process.env.NODE_ENV == "development"
         ? `?${generateRandomString(5)}`
-        : "")
+        : "")) as Record<string, unknown>
     );
-    const isServer = !this.isUseClient(moduleContent);
-    const { exports } = new Bun.Transpiler({ loader: "tsx" }).scan(
-      moduleContent
-    );
-    if (!isServer) return;
-    for await (const ex of exports) {
-      const exported = _module[ex] as Function | unknown;
-      if (
-        typeof exported != "function" ||
-        exported.name.startsWith("Server") ||
-        exported.name == "getServerSideProps" ||
-        exported.length > 0
-      )
-        continue;
-      let element: ReactNode | undefined = undefined;
+    if (await fileDirective.pathIs("use-client", modulePath)) return;
+
+    for await (const ex of Object.keys(_module)) {
       try {
-        element = await exported();
-      } catch (e) {
-        if (e instanceof Error) {
-          if (e.message.startsWith("Cannot call a class constructor")) continue;
-          DevConsole(e);
-          if (
-            e.message.startsWith(
-              "null is not an object (evaluating 'dispatcher.use"
-            )
-          ) {
-            DevConsole(BuildServerComponentWithHooksWarning);
-          }
 
+        const exported = _module[ex] as (() => JSX.Element | Promise<JSX.Element>) | unknown;
+        if (
+          typeof exported != "function" ||
+          exported.name.startsWith("Server") ||
+          exported.name == "getServerSideProps" ||
+          exported.length > 0
+        )
+          continue;
+
+        const element = await exported();
+
+        if (!isValidElement(element)) continue;
+        let moduleSSR =
+          CacheManager.getSSR(modulePath) || CacheManager.addSSR(modulePath, []);
+        const SSRelement = moduleSSR.elements.find(
+          (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
+        );
+        if (SSRelement) {
+          SSRelement.reactElement = this.toJSX(element);
+          SSRelement.htmlElement = renderToString(element);
+        } else {
+          moduleSSR.elements.push({
+            tag: `<!Bunext_Element_${exported.name}!>`,
+            reactElement: this.toJSX(element),
+            htmlElement: renderToString(element),
+            name: exported.name
+          });
         }
+        CacheManager.addSSR(modulePath, moduleSSR.elements);
+      } catch (e) {
+        //console.error("PreBuild Error:", e);
+        continue;
       }
-      if (!isValidElement(element)) continue;
-      let moduleSSR =
-        CacheManager.getSSR(modulePath) || CacheManager.addSSR(modulePath, []);
-      const SSRelement = moduleSSR.elements.find(
-        (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
-      );
-
-      if (SSRelement) {
-        SSRelement.reactElement = this.toJSX(element);
-        SSRelement.htmlElement = renderToString(element as JSX.Element);
-      } else {
-        moduleSSR.elements.push({
-          tag: `<!Bunext_Element_${exported.name}!>`,
-          reactElement: this.toJSX(element),
-          htmlElement: renderToString(element as JSX.Element),
-          name: exported.name
-        });
-      }
-      CacheManager.addSSR(modulePath, moduleSSR.elements);
     }
   }
   async preBuildAll(skip?: ssrElement[]) {
@@ -365,16 +354,7 @@ class Builder extends PluginLoader {
     });
   }
 
-  isUseClient(fileData: string) {
-    const line = fileData
-      .split("\n")
-      .filter((l) => l.trim().length > 0)
-      .at(0);
-    if (!line) return false;
-    if (line.startsWith("'use client'") || line.startsWith('"use client"'))
-      return true;
-    return false;
-  }
+
   async resetPath(path: string) {
     const ssr = CacheManager.getSSR(path);
     if (!ssr) return false;
@@ -515,8 +495,8 @@ class Builder extends PluginLoader {
             }
             break;
           case "log":
-            message.message && DevConsole().info(message.message);
-            message.error && DevConsole().error("Error From Build Worker: ", message.error);
+            message.message && console.info(message.message);
+            message.error && console.error("Error From Build Worker: ", message.error);
             break;
         }
       },
@@ -550,7 +530,7 @@ class Builder extends PluginLoader {
 
       return strRes;
     } else {
-      DevConsole().warning("BuilderWorker not found, using the main process to build.\nThis may cause some errors.");
+      console.warn("BuilderWorker not found, using the main process to build.\nThis may cause some errors.");
       strRes = await this._makeBuild(path);
       if (strRes) {
         this.revalidates = strRes.revalidates;

@@ -471,6 +471,7 @@ export class BunextSession<DataType = any> {
    * Initialize session data (server-side only)
    */
   async initData(): Promise<void> {
+    if (this._serverSessionInitialized) return;
     if (!this._request) {
       this._log("No request available for session initialization", undefined, "warn");
       return;
@@ -753,6 +754,7 @@ export class BunextSession<DataType = any> {
 
   prevent_session_init(): void {
     this._serverSessionInitialized = true;
+    this.reset();
   }
 
   setSessionTimeout(value: number): void {
@@ -761,58 +763,9 @@ export class BunextSession<DataType = any> {
   }
 }
 
-/**
- * Legacy Session class for backward compatibility
- * @deprecated Use BunextSession instead
- */
-export class _Session<DataType = any> extends BunextSession<DataType> {
-  constructor(options: any = {}) {
-    //console.warn("_Session is deprecated, use BunextSession instead");
-    super({
-      data: options.data,
-      sessionTimeout: options.sessionTimeout,
-      request: options.request,
-      updateFunction: options.update_function,
-    });
-  }
 
-  // Legacy properties for backward compatibility
-  get session_expiration_override(): number | undefined {
-    return this._sessionExpirationOverride;
-  }
 
-  set session_expiration_override(value: number | undefined) {
-    this._sessionExpirationOverride = value;
-  }
-
-  get sessionTimeoutFromNow(): number {
-    const timeout = this._sessionExpirationOverride || this._sessionTimeout;
-    const createdAt = this._internalData.private.__BUNEXT_SESSION_CREATED_AT__;
-    if (!createdAt) return timeout;
-
-    const elapsed = (Date.now() - createdAt) / 1000;
-    return Math.max(0, timeout - elapsed);
-  }
-
-  // New methods to replace deprecated ones
-  isSessionUpdated(): boolean {
-    return this._isUpdated;
-  }
-
-  isSessionDeleted(): boolean {
-    return this._isDeleted;
-  }
-
-  getSessionData(): any {
-    return this.getData();
-  }
-
-  getPublicSessionData(): any {
-    return this._internalData.public;
-  }
-}
-
-export const SessionContext = createContext<_Session<any>>(new _Session({}));
+export const SessionContext = createContext<BunextSession<any>>(new BunextSession({}));
 export const SessionDidUpdateContext = createContext(false);
 
 /**

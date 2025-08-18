@@ -1,4 +1,3 @@
-import { isAskingHTML } from "plugins/server-features/utils";
 import type { BunextPlugin } from "plugins/types";
 import type { BunextRequest } from "public/request";
 
@@ -23,7 +22,7 @@ export default {
     priority: -1,
     router: {
         async request(req) {
-            if (!isAskingHTML(req.bunextReq) && !req.bunextReq.isClientNavigation()) return;
+            if (!req.bunextReq.isAskingHTML && !req.bunextReq.isClientNavigation()) return;
 
             const lang = await getHtmlLang(req.bunextReq);
             req.bunextReq.InjectGlobalValues({

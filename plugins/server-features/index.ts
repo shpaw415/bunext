@@ -11,9 +11,9 @@ import { sessionOnRequestHandler } from "plugins/session";
 import { serveFromBuildDirectory } from "./build-dir";
 import { serveFromNodeModule } from "./node-modules";
 import { serveStaticAssets } from "./static-path";
+import { DirectiveTool } from "plugins/utils";
 
 
-const serverOnlyFilePaths: string[] = [];
 
 export default {
     priority: 1,
@@ -53,14 +53,15 @@ export default {
         },
         async request(manager) {
             for await (const handler of [
+                onRequestSSRPage,
+                serveDynamicPage,
                 serveFromBuildDirectory,
                 serveStaticAssets,
                 serveFromNodeModule,
                 sessionOnRequestHandler,
                 onRequestServerAction,
                 serveServerSideProps,
-                onRequestSSRPage,
-                serveDynamicPage
+
             ]) {
                 if (manager.bunextReq.isResponseSetted()) break;
                 await handler(manager);
@@ -76,7 +77,8 @@ export default {
         plugin: {
             name: "server-features",
             target: "browser",
-            setup(build) {
+            async setup(build) {
+                const fileDirective = new DirectiveTool();
                 build.onLoad(
                     {
                         filter: new RegExp(
@@ -125,7 +127,7 @@ export default {
                     { namespace: "client", filter: /\.tsx$/ },
                     async ({ path }) => {
                         let fileContent = await Bun.file(path).text();
-                        if (isServerOnly(fileContent)) {
+                        if (await fileDirective.pathIs("server-only", path)) {
                             return {
                                 contents: "",
                                 loader: "js",
@@ -147,7 +149,7 @@ export default {
                             };
                         }
 
-                        if (builder.isUseClient(fileContent))
+                        if (await fileDirective.pathIs("use-client", path))
                             return {
                                 contents: await ClientSideFeatures(fileContent, path, _module_),
                                 loader: "js",
@@ -209,14 +211,14 @@ export default {
                     { namespace: "client", filter: /\.ts$/ },
                     async ({ path }) => {
 
-                        const fileContent = await Bun.file(path).text();
-                        if (isServerOnly(fileContent)) {
+
+                        if (await fileDirective.pathIs("server-only", path)) {
                             return {
                                 contents: "",
                                 loader: "js",
                             };
                         }
-
+                        const fileContent = await Bun.file(path).text();
                         return {
                             contents: await ClientSideFeatures(
                                 fileContent,
@@ -271,20 +273,13 @@ export default {
                         if (
                             builder.remove_node_modules_files_path.includes(
                                 path.replace(builder.options.baseDir + "/node_modules/", "")
-                            )
+                            ) || await fileDirective.pathIs("server-only", path)
                         ) {
-                            return returnEmptyFile(loader);
-                        }
-                        const fileText = await Bun.file(path).text();
-                        if (serverOnlyFilePaths.includes(path)) {
-                            return returnEmptyFile(loader);
-                        } else if (isServerOnly(fileText)) {
-                            serverOnlyFilePaths.push(path);
                             return returnEmptyFile(loader);
                         }
 
                         return {
-                            contents: fileText,
+                            contents: await Bun.file(path).text(),
                             loader,
                         };
                     }
@@ -299,28 +294,6 @@ export default {
 
 } as BunextPlugin;
 
-
-
-function isServerOnly(fileContent: string): boolean {
-    // Trim whitespace and get the first few lines
-    const trimmedContent = fileContent.trim();
-
-    // Check for various "server only" directive formats
-    const serverOnlyPatterns = [
-        /^["']server only["'];?\s*$/m,           // "server only" or 'server only'
-        /^\/\*\s*server only\s*\*\/\s*$/m,      // /* server only */
-        /^\/\/\s*server only\s*$/m,             // // server only
-        /^["']use server only["'];?\s*$/m,      // "use server only"
-        /^\/\*\s*@server-only\s*\*\/\s*$/m,     // /* @server-only */
-        /^\/\/\s*@server-only\s*$/m             // // @server-only
-    ];
-
-    // Check if any of the patterns match at the beginning of the file
-    return serverOnlyPatterns.some(pattern => {
-        const match = trimmedContent.match(pattern);
-        return match && match.index === 0;
-    });
-}
 
 function returnEmptyFile(loader: Bun.Loader) {
     return {

@@ -13,7 +13,7 @@ Bunext is a **modern full-stack framework** built specifically for the **Bun run
 
 ## ✨ Key Features
 
-- 🚀 **Lightning Fast**: Multi-threaded HTTP workers (Linux)
+- 🚀 **Lightning Fast**: Multi-threaded HTTP workers (Linux) [**Beta!**]
 - 🔄 **Universal Rendering**: SSR, CSR, and Static Site Generation
 - 🗄️ **Built-in Database**: Type-safe SQLite with automatic migrations
 - 🔐 **Session Management**: Secure client/server session handling

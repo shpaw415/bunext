@@ -65,8 +65,6 @@ async function serveAPIEndpoint(manager: RequestManager): Promise<boolean> {
 export default {
     priority: 1,
     router: {
-        async request(manager) {
-            await serveAPIEndpoint(manager)
-        }
+        request(manager) { serveAPIEndpoint(manager); }
     }
 } as BunextPlugin;

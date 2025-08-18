@@ -2,14 +2,10 @@ import type { FileSystemRouter } from "bun";
 import CacheManager from "internal/caching";
 import { router, type RequestManager } from "internal/server/router";
 import type { PageModule } from "internal/types";
-import type { BunextRequest } from "public/request";
-import { createElement } from "react";
-import { isAskingHTML } from "./utils";
+import { createElement, type JSX } from "react";
 
 
 export let ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
-
-
 
 export function clearSSRPage() {
     CacheManager.clearSSR();
@@ -18,7 +14,7 @@ export function clearSSRPage() {
 
 export async function onRequestSSRPage(manager: RequestManager): Promise<boolean> {
     // Handle SSR page requests
-    if (!isSSRDefaultExportPath(manager, true) || !isAskingHTML(manager.bunextReq)) return false;
+    if (!isSSRDefaultExportPath(manager, true) || !manager.bunextReq.isAskingHTML) return false;
     manager.bunextReq.session.prevent_session_init();
     const stringPage = await getSSRDefaultPage(manager);
     if (stringPage) {
@@ -76,19 +72,16 @@ function isSSRDefaultExportPath(
 
 async function getPreRenderedPage(manager: RequestManager) {
     if (!manager.serverSide) throw ErrorOnNoServerSideMatch(manager);
-    const module = await import(manager.serverSide.filePath);
+    const module = await import(manager.serverSide.filePath) as { default?: () => JSX.Element };
     const preBuiledPage = CacheManager.getSSR(
         manager.serverSide.filePath
     )?.elements.find((e) =>
-        e.tag.endsWith(`${module.default.name}!>`)
+        e.tag.endsWith(`${module.default?.name}!>`)
     )?.htmlElement;
 
     if (!preBuiledPage) return null;
 
-    return await manager.router.stackLayouts(
-        manager.serverSide,
-        HTMLJSXWrapper(preBuiledPage)
-    );
+    return HTMLJSXWrapper(preBuiledPage);
 }
 
 function ErrorOnNoServerSideMatch(manager: RequestManager) {

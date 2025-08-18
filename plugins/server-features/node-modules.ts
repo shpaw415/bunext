@@ -3,6 +3,7 @@ import { extname, normalize } from "path";
 
 export async function serveFromNodeModule(manager: RequestManager): Promise<void> {
     if (!manager.pathname.startsWith("/node_modules")) return;
+    manager.bunextReq.preventGlobalValuesInjection().preventRewrite();
     const nodeModuleFile = await manager.router.serveFromDir({
         directory: "node_modules",
         path: normalize(manager.pathname.replace("node_modules", "")),

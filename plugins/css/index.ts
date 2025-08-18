@@ -2,7 +2,6 @@ import type { BunextPlugin } from "../types";
 import { readdir, readFile, stat } from "fs/promises";
 import { join } from "path";
 import { DevConsole } from "../../internal/server/logs";
-import { isAskingHTML } from "plugins/server-features/utils";
 
 interface CSSModulesConfig {
     srcDir?: string;
@@ -22,7 +21,7 @@ export const cssModulesTypesPlugin: BunextPlugin = {
     },
     router: {
         async request(manager) {
-            if (!isAskingHTML(manager.bunextReq)) return;
+            if (!manager.bunextReq.isAskingHTML) return;
             const cssPaths = await manager.router.getCssPaths(true);
             manager.bunextReq.InjectGlobalValues({
                 __CSS_PATHS__: cssPaths

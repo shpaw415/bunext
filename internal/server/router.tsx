@@ -31,8 +31,9 @@ import "./server_global";
 import "./bunext_global";
 import type { JsxToStringWorkerMessage } from "../dev/types";
 import { BunextError } from "./server_global";
-import { makeServerSideProps } from "plugins/server-features/serverSideProps";
 import { ErrorFallback } from "components/fallback";
+import { DirectiveTool } from "plugins/utils";
+
 
 type RouteEntry = [string, string];
 
@@ -45,6 +46,9 @@ const STATIC_FILE_SUFFIXES = [
   "/index.js",
   ".css",
 ] as const;
+
+
+
 
 /**
  * Custom error for client-only components
@@ -74,6 +78,8 @@ class ServerRouteNotFoundError extends Error {
   }
 }
 
+const fileDirectives = new DirectiveTool();
+
 /**
  * Main router class that handles static and dynamic routing for Bunext applications
  * Extends PluginLoader to support routing plugins
@@ -88,12 +94,12 @@ class StaticRouters extends PluginLoader {
   public layoutPaths: string[] = [];
   public cssPaths: string[] = [];
   public cssPathExists: string[] = [];
-  public staticRoutes: Array<keyof FileSystemRouter["routes"]> = [];
-
   // Initialization state
   private readonly initPromise: Promise<boolean>;
   private initResolver?: (value: boolean | PromiseLike<boolean>) => void;
   private inited = false;
+
+  public fileDirectives?: DirectiveTool;
 
   // Directory configuration
   public readonly baseDir = process.cwd();
@@ -103,13 +109,11 @@ class StaticRouters extends PluginLoader {
 
   constructor() {
     super();
-
     try {
       this.server = this.createFileSystemRouter(this.pageDir);
       this.client = this.createFileSystemRouter(
         join(this.buildDir, this.pageDir),
       );
-
       this.routes_dump = this.generateServerSideRouteDump(this.server);
       this.layoutPaths = this.getLayoutPaths();
 
@@ -119,6 +123,14 @@ class StaticRouters extends PluginLoader {
     } catch (error) {
       throw new Error(`Failed to initialize StaticRouters: ${error}`);
     }
+  }
+  /**
+   * Gets the singleton instance of the StaticRouters class initalized
+   */
+  static async getInstance() {
+    const instance = new StaticRouters();
+    await instance.init();
+    return instance;
   }
 
   /**
@@ -212,6 +224,17 @@ class StaticRouters extends PluginLoader {
     }
   }
 
+  private async initFileDirectives() {
+    const [cssPathExists, fileDirective] = await Promise.all([
+      this.getCssPaths(),
+      await DirectiveTool.getInstance(Object.entries(this.server.routes).map(([route, path]) => ({ path, route })))
+    ]);
+
+    this.cssPathExists = cssPathExists;
+    this.fileDirectives = fileDirective;
+
+  }
+
   /**
    * Initializes the router with all necessary data
    * This method is idempotent and can be safely called multiple times
@@ -221,14 +244,8 @@ class StaticRouters extends PluginLoader {
 
     try {
       await this.initPlugins();
+      await this.initFileDirectives();
 
-      const [cssPathExists, staticRoutes] = await Promise.all([
-        this.getCssPaths(),
-        this.getUseStaticRoutes(),
-      ]);
-
-      this.cssPathExists = cssPathExists;
-      this.staticRoutes = staticRoutes;
       this.inited = true;
 
       this.initResolver?.(true);
@@ -296,44 +313,6 @@ class StaticRouters extends PluginLoader {
       console.warn("Failed to get CSS paths:", error);
       return [];
     }
-  }
-
-  /**
-   * Identifies routes that use static rendering
-   */
-  private async getUseStaticRoutes(): Promise<string[]> {
-    const staticRoutes: string[] = [];
-    // More robust regex that handles whitespace and optional semicolons
-    const useStaticRegex = /^\s*(['"])use\s+static\1\s*;?\s*$/;
-
-    try {
-      await Promise.all(
-        this.getRoutesWithoutLayouts().map(async ([route, path]) => {
-          try {
-            const fileContent = await Bun.file(path).text();
-            // Check first few non-empty lines in case of comments or blank lines
-            const lines = fileContent.split("\n");
-            const firstNonEmptyLines = lines
-              .filter(line => line.trim().length > 0)
-              .slice(0, 3); // Check first 3 non-empty lines
-
-            const hasUseStatic = firstNonEmptyLines.some(line =>
-              useStaticRegex.test(line.trim())
-            );
-
-            if (hasUseStatic) {
-              staticRoutes.push(route);
-            }
-          } catch (error) {
-            console.warn(`Failed to check static route ${route}:`, error);
-          }
-        })
-      );
-    } catch (error) {
-      console.warn("Failed to get static routes:", error);
-    }
-
-    return staticRoutes;
   }
 
   /**
@@ -522,27 +501,6 @@ class StaticRouters extends PluginLoader {
     }
   }
 
-  /**
-   * Checks if a file contains 'use client' directive
-   */
-  isUseClient(fileData: string): boolean {
-    try {
-      const firstLine = fileData
-        .split("\n")
-        .filter((line) => line.trim().length > 0)
-        .at(0);
-
-      if (!firstLine) return false;
-
-      return (
-        firstLine.startsWith("'use client'") ||
-        firstLine.startsWith('"use client"')
-      );
-    } catch (error) {
-      console.warn("Failed to check 'use client' directive:", error);
-      return false;
-    }
-  }
 
   /**
    * Serves files from a specified directory with fallback suffixes
@@ -654,7 +612,8 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
     this.bunextReq = new BunextRequest({
       request: this.request,
       response: new Response(),
-      manager: this
+      manager: this,
+      directivesTools: fileDirectives
     });
 
     this.relatedCssPaths = [];
@@ -775,11 +734,10 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
       <RequestContext.Provider value={this.bunextReq}>
         <this.Shell
           route={this.serverSide?.pathname + this.search}
-          props={(await makeServerSideProps(this))}
           request={this.bunextReq}
         >
           {page}
-          <script src="/.bunext/react-ssr/hydrate.js" type="module"></script>
+          <script src="/.bunext/react-ssr/hydrate.js" type="module" />
           <script id="_BUNEXT_BOOTSTRAP_SCRIPT_" />
         </this.Shell>
       </RequestContext.Provider>

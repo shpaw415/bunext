@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import { BunextRequest } from "../server/bunextRequest";
 import type { JsxToStringWorkerMessage } from "./types";
 import { ErrorFallback } from "../../components/fallback";
+import { DirectiveTool } from "plugins/utils";
 
 // Redirect all console methods to send process messages
 function createConsoleRedirect(methodName: keyof typeof console) {
@@ -75,7 +76,8 @@ let jsx: JSX.Element;
 const req = new BunextRequest({
   request: new Request(url),
   response: new Response(),
-  manager: undefined as any
+  manager: undefined as any,
+  directivesTools: await DirectiveTool.getInstance()
 });
 req.path = match.name;
 

@@ -10,7 +10,7 @@ export async function serveFromBuildDirectory(manager: RequestManager) {
         path: manager.pathname,
     });
     if (!staticResponse) return false;
-
+    manager.bunextReq.preventRewrite().preventGlobalValuesInjection();
     const date = new Date();
     date.setTime(date.getTime() + 360000);
     const DevHeader = {
@@ -25,7 +25,7 @@ export async function serveFromBuildDirectory(manager: RequestManager) {
         "Cache-Control": "public max-age=3600",
     };
     if (staticResponse.name && extname(staticResponse.name) == ".js") {
-        manager.bunextReq.preventRewrite().preventGlobalValuesInjection();
+
         manager.bunextReq.setResponse([await staticResponse.text(), manager.bunextReq.globalDataToJSFormat()].join("\n"), {
             headers: {
                 "Content-Type": "application/javascript",

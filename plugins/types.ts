@@ -84,8 +84,9 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
     /**
      * Intercept and modify requests before they are processed by the router.
      * Access the BunextRequest via manager.bunextReq
-     * @example (manager: RequestManager): Promise<RequestManager> | RequestManager => {
-     * // when set via __BYPASS_RESPONSE__ the HTMLRewrite plugins will be skipped
+     * @example (manager: RequestManager): Promise<RequestManager> | RequestManager | void | Promise<void> => {
+     * // when set via __BYPASS_RESPONSE__ the HTMLRewrite plugins, globalValuesInjection and other request plugin will be skipped
+     * // more performant but less flexible
      *  manager.bunextReq.__BYPASS_RESPONSE__ = new Response("Custom response");
      *
      * // global injected value and rewrite plugin will be applied

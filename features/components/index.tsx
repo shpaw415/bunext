@@ -3,6 +3,21 @@ import { createElement, useEffect, useState, type JSX } from "react";
 import { useLoadingVersion } from "../../internal/router/index";
 import { makeDocURL } from "../../internal/documentation/paths";
 
+export type DynamicComponentProps<Props extends {}, ElementName extends string> = {
+  pathName: string;
+  elementName: ElementName;
+  bootStrap?: Partial<{
+    style: string[];
+  }>;
+  props?: Props;
+  onError?: () => void;
+  fallback?: JSX.Element;
+  id: string;
+};
+
+export const BUNEXT_Dynamic_Element = "BUNEXT_Dynamic_Element";
+export const BUNEXT_Dynamic_Element_PREFIX = "BUNEXT_Dynamic_Element_";
+
 /**
  * @dev this is related with plugins/router/html_rewrite/dynamic_components.ts
  * @param id must be unique in page and cannot be random **Required to make it SSR**
@@ -19,21 +34,11 @@ export function DynamicComponent<Props extends {}, ElementName extends string>({
   onError,
   fallback,
   id,
-}: {
-  pathName: string;
-  elementName: ElementName;
-  bootStrap?: Partial<{
-    style: string[];
-  }>;
-  props?: Props;
-  onError?: () => void;
-  fallback?: JSX.Element;
-  id?: string;
-}) {
+}: DynamicComponentProps<Props, ElementName>) {
   const [El, setEl] = useState<JSX.Element | undefined>(() => {
     if (typeof window == "undefined")
       return createElement("div", {
-        className: "BUNEXT_Dynamic_Element",
+        className: [BUNEXT_Dynamic_Element, BUNEXT_Dynamic_Element_PREFIX + id].join(" "),
         id,
         pathname: pathName,
         elementname: elementName,
@@ -47,7 +52,7 @@ export function DynamicComponent<Props extends {}, ElementName extends string>({
       if (!El) return fallback;
       return createElement(El.element.type, {
         dangerouslySetInnerHTML: {
-          __html: document.getElementById(El.id)?.innerHTML,
+          __html: document.getElementsByClassName(El.id)?.[0]?.innerHTML,
         },
       });
     }
@@ -60,7 +65,6 @@ export function DynamicComponent<Props extends {}, ElementName extends string>({
       .then((module) => {
         const Component = module[elementName];
         if (!Component) {
-          console.error(`Component not found: ${elementName}`);
           throw new Error(`Component ${elementName} not found in module ${pathName}`);
         }
         setEl(<Component {...props} />);

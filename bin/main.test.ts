@@ -19,6 +19,7 @@ import { BunextRequest } from "internal/server/bunextRequest.ts";
 import { BunextServer } from "internal/server/index.ts";
 import { getServerActions, InitServerActions } from "plugins/server-features/serverActions";
 import { ssrAsDefaultRoutes } from "plugins/server-features/ssr-page";
+import { DirectiveTool } from "plugins/utils";
 // Add custom matcher for toBeOneOf
 expect.extend({
   toBeOneOf(received: any, expected: any[]) {
@@ -220,7 +221,8 @@ describe("Bunext Framework Test Suite", () => {
         request: new BunextRequest({
           request: new Request("http://localhost:3010/"),
           response: new Response(),
-          manager: undefined as any
+          manager: undefined as any,
+          directivesTools: await DirectiveTool.getInstance()
         }),
       });
       return testSession.initData();
@@ -252,7 +254,8 @@ describe("Bunext Framework Test Suite", () => {
         sessionTimeout: 1, request: new BunextRequest({
           request: new Request("http://localhost:3010/"),
           response: new Response(),
-          manager: undefined as any
+          manager: undefined as any,
+          directivesTools: await DirectiveTool.getInstance()
         }),
       }); // 1 second
       await shortLivedSession.initData();

@@ -2,21 +2,16 @@ import { RenderingError, type RequestManager } from "internal/server/router";
 import { makeServerSideProps } from "./serverSideProps";
 import type { JSX } from "react";
 import { fallBackComponents } from "internal/server/fallbacks";
-import { isAskingHTML } from "./utils";
 
 export async function serveDynamicPage(manager: RequestManager): Promise<boolean> {
-    manager.bunextReq.session.prevent_session_init();
 
-    if (
-        !manager.serverSide ||
-        !isAskingHTML(manager.bunextReq) ||
-        manager.serverSide.pathname === "/favicon.ico"
-    ) {
+    if (!manager.bunextReq.isAskingHTML || manager.bunextReq.isResponseSetted()) {
         return false;
     }
 
     try {
         const serverSideProps = (await makeServerSideProps(manager));
+        manager.bunextReq.session.prevent_session_init();
         let pageJSX: JSX.Element | null = null;
         try {
             pageJSX = await manager.makeDynamicJSXPage({ serverSideProps });

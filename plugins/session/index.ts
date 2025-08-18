@@ -1,5 +1,4 @@
 import type { RequestManager } from "internal/server/router";
-import { isAskingHTML } from "plugins/server-features/utils";
 import type { BunextPlugin } from "plugins/types";
 import { BunextRequest } from "public/request";
 
@@ -38,7 +37,7 @@ export default {
     priority: 0,
     router: {
         async request(manager) {
-            if (!isAskingHTML(manager.bunextReq)) return;
+            if (!manager.bunextReq.isAskingHTML) return;
             const session = manager.bunextReq.session;
             await session.initData();
             const createdAt =

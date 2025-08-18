@@ -156,7 +156,7 @@ export type ssrElement = {
 
 export type staticPage = {
   pathname: string;
-  page: string;
+  page?: string;
   /**
    * must be json decode
    */

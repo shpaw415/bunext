@@ -621,7 +621,7 @@ export const RouterHost = ({
 
         if (!ErrorBoundary) {
           // Fallback to location.href if no error boundary
-          location.href = target;
+          if (process.env?.PUBLIC_BUNEXT_DEV !== "true") location.href = target;
         }
       }
     },
@@ -636,7 +636,7 @@ export const RouterHost = ({
       reload(pathname).catch((error) => {
         console.error("Failed to reload route:", error);
         if (!ErrorBoundary) {
-          location.href = pathname;
+          if (process.env?.PUBLIC_BUNEXT_DEV !== "true") location.href = pathname;
         }
       });
     }

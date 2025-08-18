@@ -64,12 +64,7 @@ export async function setGlobalServerSidePropsIfNeeded(manager: RequestManagerCo
     });
 }
 
-export async function makeServerSideProps(manager: RequestManager<ServerSidePropsContext>, options?: {
-    disableSession?: boolean
-}): Promise<ServerSidePropsTyped> {
-    if (options?.disableSession) {
-        manager.bunextReq.session.prevent_session_init();
-    }
+export async function makeServerSideProps(manager: RequestManager<ServerSidePropsContext>): Promise<ServerSidePropsTyped> {
 
     // Return cached props if available
     if (manager.bunextReq.context?.__SERVERSIDE_PROPS__) {
@@ -92,9 +87,7 @@ export async function makeServerSideProps(manager: RequestManager<ServerSideProp
         }
 
         // Initialize session if needed
-        if (!options?.disableSession) {
-            await manager.bunextReq.session.initData();
-        }
+        await manager.bunextReq.session.initData();
 
         // Call the getServerSideProps function
         const result = await module.getServerSideProps(
