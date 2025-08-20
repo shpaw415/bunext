@@ -14,12 +14,14 @@ import {
   cleanExpiredSessions,
   getSessionStats
 } from "internal/session.ts";
-import CacheManager from "internal/caching/index.ts";
 import { BunextRequest } from "internal/server/bunextRequest.ts";
 import { BunextServer } from "internal/server/index.ts";
 import { getServerActions, InitServerActions } from "plugins/server-features/serverActions";
-import { ssrAsDefaultRoutes } from "plugins/server-features/ssr-page";
+import { ssrAsDefaultRoutes, SSRCache } from "plugins/server-features/ssr-page";
 import { DirectiveTool } from "plugins/utils";
+
+import { revalidate } from "plugins/server-features/ssr-page";
+
 // Add custom matcher for toBeOneOf
 expect.extend({
   toBeOneOf(received: any, expected: any[]) {
@@ -312,7 +314,6 @@ describe("Bunext Framework Test Suite", () => {
     });
 
     test("revalidation system", async () => {
-      const { revalidate } = await import("features/router/revalidate.ts");
 
       // Test revalidation functionality
       expect(revalidate).toBeDefined();
@@ -347,8 +348,8 @@ describe("Bunext Framework Test Suite", () => {
       }
     });
 
-    test("caching system functionality", () => {
-      expect(CacheManager).toBeDefined();
+    test("caching system functionality", async () => {
+      expect(SSRCache).toBeDefined();
 
       // Test cache operations
       const testPath = "/test-cache-path";
@@ -359,20 +360,20 @@ describe("Bunext Framework Test Suite", () => {
         name: "Test Element"
       }];
 
-      CacheManager.addSSR(testPath, testElements);
-      const cachedSSR = CacheManager.getSSR(testPath);
+      await SSRCache.addSSR(testPath, testElements);
+      const cachedSSR = await SSRCache.getSSR(testPath);
       expect(cachedSSR).toBeDefined();
       expect(cachedSSR?.elements).toEqual(testElements);
 
       // Test cache clearing
-      CacheManager.clearSSR();
-      expect(CacheManager.getSSR(testPath)).toBeUndefined();
+      await SSRCache.clearSSR();
+      expect(await SSRCache.getSSR(testPath)).toBeUndefined();
     });
 
     test("static site generation features", async () => {
       // Test static routes identification
-      expect(router.staticRoutes).toBeDefined();
-      expect(Array.isArray(router.staticRoutes)).toBe(true);
+      expect(router.fileDirectives?.getFromDirective("use-static")).toBeDefined();
+      expect(Array.isArray(router.fileDirectives?.getFromDirective("use-static"))).toBe(true);
 
       // Test SSR default routes
       expect(ssrAsDefaultRoutes).toBeDefined();

@@ -1,348 +1,55 @@
 "server only";
 
-import Database from "bun:sqlite";
-import { _Database, Table } from "../../database/class";
-import type {
-  revalidate,
-  ssrElement,
-  SSRPage,
-  staticPage,
-} from "../../internal/types";
-import type { DBSchema } from "../../database/schema";
+import { _Database, DatabaseManager, Table, type PoolConfig, type PooledConnection } from "../../database/class";
+import type { _DataType, DBSchema } from "../../database/schema";
 import { type _Head } from "../../features/head";
 
-declare global {
-  //@ts-ignore
-  var CacheManage: CacheManager;
-}
 
-const dbSchema: DBSchema = [
-  {
-    name: "ssr",
-    columns: [
-      {
-        name: "path",
-        type: "string",
-        primary: true,
-      },
-      {
-        name: "elements",
-        type: "json",
-        DataType: [
-          {
-            tag: "string",
-            reactElement: "string",
-            htmlElement: "string",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    name: "revalidate",
-    columns: [
-      {
-        name: "path",
-        type: "string",
-        primary: true,
-      },
-      {
-        name: "time",
-        type: "number",
-      },
-    ],
-  },
-  {
-    name: "head",
-    columns: [
-      {
-        name: "path",
-        type: "string",
-        primary: true,
-      },
-      {
-        name: "title",
-        type: "string",
-        nullable: true,
-      },
-      {
-        name: "author",
-        type: "string",
-        nullable: true,
-      },
-      {
-        name: "publisher",
-        type: "string",
-        nullable: true,
-      },
-      {
-        name: "meta",
-        type: "json",
-        DataType: [],
-      },
-      {
-        name: "link",
-        type: "json",
-        DataType: [],
-      },
-    ],
-  },
-  {
-    name: "static_page",
-    columns: [
-      {
-        name: "pathname",
-        type: "string",
-        unique: true,
-        primary: true,
-      },
-      {
-        name: "page",
-        type: "string",
-      },
-      {
-        name: "props",
-        type: "json",
-        nullable: true,
-        DataType: {},
-      },
-    ],
-  },
-  {
-    name: "page",
-    columns: [
-      {
-        name: "route",
-        type: "string",
-        primary: true,
-        unique: true,
-      },
-      {
-        name: "content",
-        type: "string",
-      },
-    ],
-  },
-];
-
-class CacheManagerExtends {
-  private db = new _Database(
-    new Database(import.meta.dirname + "/cache.sqlite", {
-      create: true,
-      readwrite: true,
-    })
-  );
+class CacheManagerPool {
+  private db: DatabaseManager;
   private dbSchema: DBSchema;
 
-  constructor({ shema, dbPath }: { shema: DBSchema; dbPath?: string }) {
-    this.dbSchema = shema;
+  constructor({ schema, dbPath, poolConfig }: { schema: DBSchema; dbPath?: string, poolConfig?: Partial<PoolConfig> }) {
+    this.dbSchema = schema;
+    const conf: Partial<PoolConfig> = {
+      maxConnections: 10,
+      minConnections: 5,
+      enableQueryCache: false,
+      enableLogging: false,
+      idleTimeout: 30000,
+      ...poolConfig
+    };
     if (dbPath) {
-      this.db = new _Database(
-        new Database(dbPath, {
-          create: true,
-          readwrite: true,
-        })
-      );
+      this.db = new _Database().withPooling({
+        dbPath: dbPath,
+        poolConfig: conf,
+      });
+    } else {
+      this.db = new _Database().withPooling({
+        dbPath: import.meta.dirname + "/cache.sqlite",
+        poolConfig: conf,
+      });
     }
     for (const tab of this.dbSchema) this.db.create(tab);
   }
 
-  protected CreateTable<T1 extends {}, T2 extends {}>(name: string) {
+  async getTable<T1 extends {}, T2 extends {}, T3 extends unknown = unknown>(name: string, then?: (table: Table<T1, T2>) => T3 | Promise<T3>): Promise<T3> {
+    const db = (await this.db.getPooledConnection());
+    if (!db) throw new Error("Database connection not available");
     const table = new Table<T1, T2>({
-      db: this.db.databaseInstance,
-      name: name,
+      db: db.database,
+      name,
       schema: this.dbSchema,
       enableWAL: true,
     });
-
-    table.createTable();
-
-    return table;
+    const res = await then?.(table) as T3;
+    this.close(db);
+    return res;
   }
-  protected isPrimaryError(err: Error, callback?: Function) {
-    const is = (err as any).code == "SQLITE_CONSTRAINT_PRIMARYKEY";
-    callback?.();
-    return is;
+
+  close(connection: PooledConnection) {
+    return this.db.releasePooledConnection(connection);
   }
 }
 
-class CacheManager {
-  private db = new _Database(
-    new Database(import.meta.dirname + "/cache.sqlite", {
-      create: true,
-      readwrite: true,
-    })
-  );
-  private ssr = this.CreateTable<ssrElement, ssrElement>("ssr");
-  private revalidate = this.CreateTable<revalidate, revalidate>("revalidate");
-  private head = this.CreateTable<_Head, _Head>("head");
-  private page = this.CreateTable<SSRPage, SSRPage>("page");
-  private static_page = this.CreateTable<staticPage, staticPage>("static_page");
-
-  private CreateTable<T1 extends {}, T2 extends {}>(name: string) {
-    return new Table<T1, T2>({
-      db: this.db.databaseInstance,
-      name: name,
-      schema: dbSchema,
-      enableWAL: true,
-    });
-  }
-
-  constructor() {
-    for (const tab of dbSchema) this.db.create(tab);
-  }
-
-  //SSR Default Page
-
-  addSSRDefaultPage(route: string, content: string) {
-    try {
-      this.page.insert([{ route, content }]);
-    } catch (e) {
-      this.isPrimaryError(e as Error, () =>
-        this.page.update({
-          where: {
-            route,
-          },
-          values: {
-            content,
-          },
-        })
-      );
-    }
-  }
-  getSSRDefaultPage(route: string) {
-    return this.page
-      .select({
-        where: {
-          route,
-        },
-        select: {
-          content: true,
-        },
-      })
-      .at(0)?.content;
-  }
-  removeSSRDefaultPage(route: string) {
-    this.page.delete({
-      where: { route },
-    });
-  }
-  clearSSRDefaultPage() {
-    this.page.databaseInstance.run("DELETE FROM page");
-  }
-
-  // SSR Element
-
-  addSSR(path: string, elements: ssrElement["elements"]) {
-    const doUpdate = () =>
-      this.ssr.update({ where: { path }, values: { elements } });
-
-    try {
-      this.ssr.insert([
-        {
-          path,
-          elements,
-        },
-      ]);
-    } catch (e) {
-      if (!this.isPrimaryError(e as Error, doUpdate)) throw e;
-    }
-
-    return {
-      path,
-      elements,
-    } as ssrElement;
-  }
-  getSSR(path: string) {
-    return this.ssr.select({ where: { path } }).at(0) as ssrElement | undefined;
-  }
-  getAllSSR() {
-    return this.ssr.select({}) as ssrElement[];
-  }
-  deleteSSR(path: string) {
-    this.ssr.delete({ where: { path } });
-  }
-  clearSSR() {
-    this.ssr.databaseInstance.run("DELETE FROM ssr");
-  }
-
-  // Static Page
-
-  addStaticPage(pathname: string, page: string, raw_props?: any) {
-    try {
-      this.static_page.insert([
-        {
-          pathname,
-          page,
-          props: raw_props,
-        },
-      ]);
-    } catch (e) {
-      if (
-        !this.isPrimaryError(e as Error, () =>
-          this.static_page.update({
-            where: {
-              pathname,
-            },
-            values: {
-              page,
-              props: raw_props,
-            },
-          })
-        )
-      )
-        throw e;
-    }
-  }
-  getStaticPage(url: string): staticPage | undefined {
-    const _url = new URL(url);
-    return (this.static_page
-      .select({
-        where: {
-          pathname: _url.pathname,
-        },
-        select: {
-          page: true,
-          props: true,
-        },
-      })
-      .at(0) ?? undefined) as
-      | (Omit<staticPage, "props"> & { props: string })
-      | undefined;
-  }
-  getStaticPageProps(pathname: string) {
-    return (
-      (this.static_page
-        .select({
-          where: {
-            pathname,
-          },
-          select: {
-            props: true,
-          },
-        })
-        .at(0) ?? undefined) as staticPage | undefined
-    )?.props;
-  }
-  removeStaticPage(pathname: string) {
-    this.static_page.delete({
-      where: {
-        pathname,
-      },
-    });
-  }
-  clearStaticPage() {
-    this.static_page.databaseInstance.run("DELETE FROM static_page");
-  }
-
-  private isPrimaryError(err: Error, callback?: Function) {
-    const is = (err as any).code == "SQLITE_CONSTRAINT_PRIMARYKEY";
-    callback?.();
-    return is;
-  }
-}
-//@ts-ignore
-if (typeof window == "undefined") globalThis.CacheManage ??= new CacheManager();
-
-export default globalThis.CacheManage;
-export { CacheManager, CacheManagerExtends };
+export { CacheManagerPool };

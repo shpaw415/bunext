@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { navigate } from "./revalidate";
-import type { RoutesType } from "../../plugins/typed-route/type";
-import { PreLoadPath } from "../../internal/router";
+import { navigate } from "public/router/navigate";
+import type { RoutesType } from "plugins/typed-route/type";
+import { PreLoadPath } from "internal/router";
 
 /**
  * Renders an anchor element that intercepts navigation to handle client-side routing.
@@ -53,4 +53,3 @@ function Link({
 }
 
 export { Link };
-export default Link;

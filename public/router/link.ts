@@ -1,2 +1,2 @@
 // Public API: router/link
-export * from "../../features/router/components.tsx";
+export { Link } from "features/router/components.tsx";

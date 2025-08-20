@@ -6,4 +6,4 @@ export {
     useReload,
     useReloadEffect,
     useRouteState
-} from "../../internal/router";
+} from "internal/router";

@@ -1,3 +1,3 @@
 export {
     BunextServer,
-} from "../../internal/server";
+} from "internal/server";

@@ -5,9 +5,10 @@ import type { BunextRequest } from "../../internal/server/bunextRequest";
 import type { BunextPlugin } from "../types";
 import { join, normalize } from "path";
 import { mkdirSync } from "fs";
-import { CacheManagerExtends } from "../../internal/caching";
+import { CacheManagerPool } from "../../internal/caching";
 import type { blurredImage } from "./type";
 import { router } from "internal/server/router";
+import type { Table } from "database/class";
 
 declare global {
   var blurImages: blurredImage[];
@@ -16,12 +17,11 @@ globalThis.blurImages ??= [];
 
 const cwd = process.cwd();
 
-class BlurredImageCache extends CacheManagerExtends {
-  blurredCache = this.CreateTable<blurredImage, blurredImage>("blured_image");
+class BlurredImageCache extends CacheManagerPool {
   cachedBlurredImages: Array<{ path: string; img_path: string }> = [];
   constructor() {
     super({
-      shema: [
+      schema: [
         {
           name: "blured_image",
           columns: [
@@ -47,25 +47,28 @@ class BlurredImageCache extends CacheManagerExtends {
     });
   }
 
-  clear() {
-    this.blurredCache.databaseInstance.query("DELETE from blured_image").all();
+  async blurredCache<T>(callback: (table: Table<blurredImage, blurredImage>) => T) {
+    return this.getTable<blurredImage, blurredImage>("blured_image", callback) as Promise<T>;
   }
 
-  get(path: string) {
-    const res = this.blurredCache.select({
+  async clear() {
+    return this.blurredCache(t => t.databaseInstance.query("DELETE from blured_image").all());
+  }
+
+  async get(path: string) {
+    return this.blurredCache((t) => t.select({
       where: { path },
       select: { encoded: true, img_path: true },
-    });
-
-    return res;
+    }));
   }
-  private getSpecific(data: { path: string; img_path: string }) {
-    return this.blurredCache
-      .select({
+  private async getSpecific(data: { path: string; img_path: string }) {
+    return this.blurredCache((t) =>
+      t.select({
         where: data,
         select: { encoded: true },
       })
-      .at(0)?.encoded;
+        .at(0)?.encoded
+    );
   }
   async add(path: string, img_path: string) {
     const resolvedImgPath = img_path.replace(join(cwd, "static"), "");
@@ -81,14 +84,15 @@ class BlurredImageCache extends CacheManagerExtends {
       .toBuffer();
     const newEl = `data:image/jpeg;base64,${buffer.toString("base64")}`;
     this.cachedBlurredImages.push({ path, img_path });
-    this.blurredCache.insert([
-      {
-        encoded: newEl,
-        img_path: resolvedImgPath,
-        path,
-      },
-    ]);
-
+    this.blurredCache((t) =>
+      t.insert([
+        {
+          encoded: newEl,
+          img_path: resolvedImgPath,
+          path,
+        },
+      ])
+    );
     return newEl;
   }
 }
@@ -153,7 +157,7 @@ export default {
         const splited = manager.bunextReq.URL.pathname.replace(router.pageDir, "").split("/");
         splited.pop();
         manager.bunextReq.InjectGlobalValues({
-          blurImages: cache.get(normalize(splited.join("/"))),
+          blurImages: await cache.get(normalize(splited.join("/"))),
         });
       }
     },
@@ -181,7 +185,7 @@ export default {
       });
     },
     dev() {
-      cache.clear();
+      return cache.clear();
     },
   },
 } as BunextPlugin;

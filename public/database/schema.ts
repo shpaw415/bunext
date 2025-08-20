@@ -1,2 +1,7 @@
 // Public API: database/schema
-export * from "../../database/schema.ts";
+export {
+    type DBSchema,
+    type ColumnsSchema,
+    type TableSchema,
+    Union
+} from "database/schema";

@@ -48,7 +48,7 @@ export class DirectiveTool {
      * @param route The route to check.
      * @returns The directive associated with the route, or null if none found.
      */
-    public getDirectiveFromRoute(route: string) {
+    public getDirectiveFromRoute(route: string): Directives | null {
         for (const [directive, entries] of this.entries) {
             if (entries.some(entry => entry.route === route)) {
                 return directive;

@@ -1,2 +1,3 @@
 // Public API: router/navigate
-export * from "../../features/router/revalidate.ts";
+export { navigate } from "internal/router";
+export { Link } from "./components";

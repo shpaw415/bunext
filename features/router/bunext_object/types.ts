@@ -1,10 +1,9 @@
 import type { Link as _Link } from "../components";
 import type { navigate, usePathname } from "../../../internal/router/index";
 import type {
-  revalidate,
-  revalidateEvery,
   revalidateStatic,
-} from "../revalidate";
+} from "plugins/static_page";
+import type { revalidate, revalidateEvery } from "plugins/server-features/ssr-page";
 
 export type Router = {
   revalidate: Revalidate;

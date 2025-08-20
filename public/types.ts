@@ -1,2 +1,2 @@
 // Public API: types
-export * from "../internal/types.ts";
+export * from "internal/types";

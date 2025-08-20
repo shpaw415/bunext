@@ -1,7 +1,8 @@
 import type { Router } from "./types";
-import { revalidate, revalidateEvery, revalidateStatic } from "../revalidate";
+import { revalidateStatic } from "plugins/static_page";
 import { usePathname } from "../../../internal/router/index";
 import { Link } from "../components";
+import { revalidate, revalidateEvery } from "plugins/server-features/ssr-page";
 
 const RouterInit: Router = {
   revalidate: {

@@ -1,7 +1,7 @@
-import CacheManager from "internal/caching";
 import { RequestManager, router } from "internal/server/router";
 import type { ServerAction, ServerActionDataType, ServerActionDataTypeHeader } from "internal/types";
 import { normalize, parse } from "path";
+import { SSRCache } from "./ssr-page";
 
 
 let serverActions: Array<ServerAction> = [];
@@ -180,7 +180,7 @@ export async function ServerComponentsToTag(
     _module: Record<string, unknown>
 ) {
     // ServerComponent
-    const ssrModule = CacheManager.getSSR(modulePath);
+    const ssrModule = await SSRCache.getSSR(modulePath);
     const defaultName = (_module?.default as Function)?.name;
     let replaceServerElement: {
         [key: string]: {

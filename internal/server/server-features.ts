@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { revalidate } from "../../features/router/revalidate";
+import { revalidate } from "plugins/server-features/ssr-page";
 import { type JSX } from "react";
 function setRevalidate(
   revalidates: {

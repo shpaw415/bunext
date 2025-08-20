@@ -17,7 +17,6 @@ import type { ssrElement } from "../types";
 import "../globals";
 import { Head, type _Head } from "../../features/head";
 import { DevConsole } from "./logs";
-import CacheManager from "../caching";
 import { router } from "./router";
 import * as React from "react";
 
@@ -29,6 +28,7 @@ import type {
 import { generateRandomString } from "../../features/utils/index.ts";
 import { ExitCodeDescription } from "../../bin/exit-codes.ts";
 import { DirectiveTool } from "plugins/utils";
+import { SSRCache } from "plugins/server-features/ssr-page";
 
 globalThis.React = React;
 
@@ -311,7 +311,7 @@ class Builder extends PluginLoader {
 
         if (!isValidElement(element)) continue;
         let moduleSSR =
-          CacheManager.getSSR(modulePath) || CacheManager.addSSR(modulePath, []);
+          await SSRCache.getSSR(modulePath) || await SSRCache.addSSR(modulePath, []);
         const SSRelement = moduleSSR.elements.find(
           (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
         );
@@ -326,7 +326,7 @@ class Builder extends PluginLoader {
             name: exported.name
           });
         }
-        CacheManager.addSSR(modulePath, moduleSSR.elements);
+        await SSRCache.addSSR(modulePath, moduleSSR.elements);
       } catch (e) {
         //console.error("PreBuild Error:", e);
         continue;
@@ -356,7 +356,7 @@ class Builder extends PluginLoader {
 
 
   async resetPath(path: string) {
-    const ssr = CacheManager.getSSR(path);
+    const ssr = await SSRCache.getSSR(path);
     if (!ssr) return false;
     if (process.env.NODE_ENV == "production") {
       const extensions = ["tsx", "jsx"];
@@ -370,22 +370,22 @@ class Builder extends PluginLoader {
           _path.pop();
           const resolvedPath = resolve(normalize("/" + join(..._path)), imp);
           for await (const ext of extensions) {
-            const i = CacheManager.getSSR(`${resolvedPath}.${ext}`);
-            if (i) CacheManager.deleteSSR(i.path);
+            const i = await SSRCache.getSSR(`${resolvedPath}.${ext}`);
+            if (i) await SSRCache.deleteSSR(i.path);
           }
           continue;
         }
         const absolutePath = Bun.fileURLToPath(
           import.meta.resolve?.(imp) || ""
         );
-        CacheManager.deleteSSR(absolutePath);
+        await SSRCache.deleteSSR(absolutePath);
       }
     }
-    CacheManager.deleteSSR(ssr.path);
+    await SSRCache.deleteSSR(ssr.path);
     return true;
   }
-  findPathIndex(path: string): boolean {
-    return Boolean(CacheManager.getSSR(path));
+  async findPathIndex(path: string): Promise<boolean> {
+    return Boolean(await SSRCache.getSSR(path));
   }
 
   private async _makeBuild(path?: string) {
@@ -394,7 +394,7 @@ class Builder extends PluginLoader {
     try {
       BuildPath
         ? await this.preBuild(BuildPath)
-        : await this.preBuildAll(CacheManager.getAllSSR());
+        : await this.preBuildAll(await SSRCache.getAllSSR());
     } catch (e) {
       DevConsole()?.error("PreBuild Error");
 

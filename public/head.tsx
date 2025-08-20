@@ -6,4 +6,4 @@ export {
     HeadProvider,
     HeadUtils,
     HeadErrorBoundary,
-} from "../features/head.tsx";
+} from "features/head";

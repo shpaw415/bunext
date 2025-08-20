@@ -1,2 +1,4 @@
+"server only";
+
 // Public API: database/types
-export * from "../../database/database_types.ts";
+export * from "database/database_types";

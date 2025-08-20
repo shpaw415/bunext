@@ -1,4 +1,4 @@
-import { get } from "./init";
+import { SVGCache } from "./init";
 import type { BunextPlugin } from "../types";
 
 export default {
@@ -9,7 +9,7 @@ export default {
       async setup(build) {
         build.onLoad({ filter: /\.svg$/ }, async ({ path }) => {
           return {
-            contents: await get(path),
+            contents: await SVGCache.get(path),
             loader: "jsx",
           };
         });

@@ -1,12 +1,13 @@
 "server only";
 
 import type { DBSchema } from "../../database/schema";
-import { CacheManagerExtends } from "../../internal/caching";
+import { CacheManagerPool } from "../../internal/caching";
 import type { getServerSidePropsFunction, ServerSideProps, staticPage } from "../../internal/types";
 import { join } from "node:path";
 import type { BunextPlugin } from "../types";
-import type { RequestManager } from "../../internal/server/router";
+import { router, type RequestManager } from "../../internal/server/router";
 import { renderToString } from "react-dom/server";
+import type { Table } from "public/database/class";
 
 const staticPageCacheShema: DBSchema = [
   {
@@ -44,23 +45,22 @@ const staticPageCacheShema: DBSchema = [
 type StaticPageCacheType = staticPage & { created_at: Date; etag: string };
 
 
-export class StaticPageCache extends CacheManagerExtends {
-  private static_page = this.CreateTable<StaticPageCacheType, StaticPageCacheType>("static_page");
+class StaticPageCache extends CacheManagerPool {
 
   constructor() {
     super({
-      shema: staticPageCacheShema,
+      schema: staticPageCacheShema,
       dbPath: join(import.meta.dirname, "static_page.sqlite"),
     });
   }
 
-  static getInstance(): StaticPageCache {
-    return new StaticPageCache();
+  async static_page<T>(then: (table: Table<StaticPageCacheType, StaticPageCacheType>) => T | Promise<T>): Promise<T> {
+    return await this.getTable<StaticPageCacheType, StaticPageCacheType>("static_page", then) as T;
   }
 
-  addStaticPage(pathname: string, page?: string, raw_props?: {}, etag?: string) {
+  async addStaticPage(pathname: string, page?: string, raw_props?: {}, etag?: string) {
     const pageEtag = etag || this.generateETag(page || "", raw_props);
-    this.static_page.upsert([
+    return await this.static_page((table) => table.upsert([
       {
         pathname,
         page,
@@ -68,24 +68,24 @@ export class StaticPageCache extends CacheManagerExtends {
         created_at: new Date(),
         etag: pageEtag,
       },
-    ], ["pathname"]);
+    ], ["pathname"]));
   }
 
-  addStaticPageProps(pathname: string, props: staticPage["props"]) {
-    this.static_page.upsert([{
+  async addStaticPageProps(pathname: string, props: staticPage["props"]) {
+    return this.static_page((table) => table.upsert([{
       pathname,
       props,
       etag: this.generateETag("", props),
       created_at: new Date(),
-    }], ["pathname"]);
+    }], ["pathname"]));
   }
 
   private generateETag(page: string, props?: Object): string {
     const content = page + (props ? JSON.stringify(props) : '');
     return `"${Bun.hash(content).toString(16)}"`;
   }
-  updateHTML(pathname: string, HTML: string) {
-    this.static_page.update({
+  async updateHTML(pathname: string, HTML: string) {
+    return this.static_page((table) => table.update({
       where: {
         pathname
       },
@@ -93,10 +93,10 @@ export class StaticPageCache extends CacheManagerExtends {
         page: HTML,
         etag: this.generateETag(HTML)
       }
-    });
+    }));
   }
-  getStaticPage(pathname: string) {
-    return (this.static_page
+  async getStaticPage(pathname: string) {
+    return (this.static_page((table) => table
       .select({
         where: {
           pathname,
@@ -106,40 +106,43 @@ export class StaticPageCache extends CacheManagerExtends {
           props: true,
         },
       })
-      .at(0) ?? undefined)
+      .at(0) ?? undefined))
   }
-  getStaticPageProps(pathname: string) {
-    return (
-      (this.static_page
-        .select({
-          where: {
-            pathname,
-          },
-          select: {
-            props: true,
-          },
-        })
-        .at(0) ?? undefined) as staticPage | undefined
-    )?.props;
+  async getStaticPageProps(pathname: string) {
+    return this.static_page((table) => table
+      .select({
+        where: {
+          pathname,
+        },
+        select: {
+          props: true,
+        },
+      })
+      .at(0)?.props ?? undefined as staticPage | undefined
+    );
+
   }
-  removeStaticPage(pathname: string) {
-    this.static_page.delete({
+  async removeStaticPage(pathname: string) {
+    return await this.static_page((table) => table
+      .delete({
+        where: {
+          pathname,
+        },
+      }));
+  }
+  async clearStaticPage() {
+    return this.static_page((table) => table.databaseInstance.run("DELETE FROM static_page"));
+  }
+  async exists(pathname: string): Promise<boolean> {
+    return this.static_page((table) => table.exists({
       where: {
         pathname,
       },
-    });
-  }
-  clearStaticPage() {
-    this.static_page.databaseInstance.run("DELETE FROM static_page");
-  }
-  exists(pathname: string) {
-    return this.static_page.exists({
-      where: {
-        pathname,
-      },
-    });
+    }));
   }
 }
+
+export const StaticPageCacheInstance = new StaticPageCache();
 
 /**
  * Make static page
@@ -210,15 +213,15 @@ export default {
 
     },
     html_rewrite: {
-      after(context, manager, HTML) {
+      async after(context, manager, HTML) {
         if (!manager.bunextReq.isAskingHTML || !manager.router.fileDirectives?.getDirectiveFromRoute(manager.pathname)) return;
-        new StaticPageCache().updateHTML(manager.pathname, HTML);
+        await StaticPageCacheInstance.updateHTML(manager.pathname, HTML);
       },
     }
   },
   serverStart: {
-    main() {
-      new StaticPageCache().clearStaticPage();
+    async main() {
+      await StaticPageCacheInstance.clearStaticPage();
     },
 
   },
@@ -226,7 +229,7 @@ export default {
 
 
 async function makeServerSidePropsIfNotExists(manager: RequestManager) {
-  const cache = StaticPageCache.getInstance();
+  const cache = StaticPageCacheInstance;
   const props = cache.getStaticPageProps(manager.pathname);
   if (props) return props;
 
@@ -249,13 +252,49 @@ async function makeServerSideProps<T extends Record<string, unknown> = {}>(manag
  * @returns pageData
  */
 async function createHTMLIfNotExists(manager: RequestManager, props: staticPage["props"]): Promise<Omit<staticPage, "pathname">> {
-  const cache = StaticPageCache.getInstance();
+  const cache = StaticPageCacheInstance;
   const pathname = manager.pathname;
-  const pageData = cache.getStaticPage(pathname);
-  if (!pageData?.page) {
+  const pageData = await cache.getStaticPage(pathname);
+  if (!pageData || !pageData) {
     const page = (await MakeStaticPage(manager, props)) as staticPage;
     cache.addStaticPage(pathname, page.page, props);
     return page;
   }
   return pageData;
+}
+
+const noRouteThrow = (route: string) =>
+  new Error(`route ${route} does not exists`);
+
+
+
+let timers = new Map<string, NodeJS.Timeout>();
+
+
+
+/**
+ * revalidate the specific path like: /some/path/id_1
+ * @param pathname pathLike of the route you want to revalidate
+ * @param timeout timeout in seconds
+ */
+export function revalidateStatic<TimeOut extends number | undefined = undefined>(pathlike: Request | string, timeout?: TimeOut): TimeOut extends number ? void : Promise<void> {
+
+  const _revalidate: () => Promise<void> = async () => {
+    const manager = StaticPageCacheInstance;
+    if (pathlike instanceof Request) {
+      const match = router.server.match(pathlike);
+      if (!match) throw noRouteThrow(pathlike.url);
+      manager.removeStaticPage(match.pathname);
+    } else {
+      manager.removeStaticPage(pathlike);
+    }
+  };
+
+  if (typeof timeout == "undefined") {
+    return _revalidate() as any;
+  } else {
+    clearTimeout(timers.get(pathlike instanceof Request ? pathlike.url : pathlike));
+    timers.set(pathlike instanceof Request ? pathlike.url : pathlike, setTimeout(_revalidate, timeout * 1000));
+    return undefined as any;
+  }
 }

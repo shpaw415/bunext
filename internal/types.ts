@@ -1,7 +1,7 @@
 import type { BunFile, BunPlugin } from "bun";
 import type { _Head, HeadData } from "../features/head";
 import type { BunextRequest } from "./server/bunextRequest.ts";
-import type { revalidate } from "../features/router/revalidate.ts";
+import type { revalidate } from "plugins/server-features/ssr-page.ts";
 import type { Plugins } from "../plugins/bunext_object/type.ts";
 import type { Router } from "../features/router/bunext_object/types.ts";
 import type { Database } from "../database/bunext_object/types.ts";

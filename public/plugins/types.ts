@@ -1,2 +1,2 @@
 // Public API: plugins/types
-export * from "../../plugins/types.ts";
+export { type BunextPlugin } from "plugins/types";

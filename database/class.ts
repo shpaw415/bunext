@@ -25,67 +25,466 @@ if (CONFIG_MODULE) {
 }
 
 /**
- * Type-safe connection pool for managing database instances and prepared statements
+ * Advanced connection pool configuration interface
  */
-class TypeSafeConnectionPool {
-  private static instances: Map<string, _BunDB> = new Map();
-  private static preparedStatements: Map<string, ReturnType<_BunDB['prepare']>> = new Map();
-  private static queryCache: Map<string, unknown[]> = new Map();
-  private static cacheMaxSize = 1000;
+export interface PoolConfig {
+  /** Maximum number of database connections to maintain */
+  maxConnections: number;
+  /** Minimum number of idle connections to keep */
+  minConnections: number;
+  /** Maximum time (ms) to wait for a connection */
+  acquireTimeout: number;
+  /** Maximum time (ms) a connection can be idle before closing */
+  idleTimeout: number;
+  /** Interval (ms) for cleaning up idle connections */
+  reapInterval: number;
+  /** Maximum time (ms) a connection can be used before being recreated */
+  maxConnectionAge: number;
+  /** Enable/disable query result caching */
+  enableQueryCache: boolean;
+  /** Maximum number of cached query results */
+  maxCacheSize: number;
+  /** Enable/disable prepared statement pooling */
+  enableStatementPooling: boolean;
+  /** Enable connection health checks */
+  enableHealthChecks: boolean;
+  /** Enable detailed logging */
+  enableLogging: boolean;
+}
 
-  static getConnection(dbPath: string): _BunDB {
-    if (!this.instances.has(dbPath)) {
-      const db = new _BunDB(dbPath, { create: true, strict: true });
+/**
+ * Connection wrapper with metadata
+ */
+export interface PooledConnection {
+  id: string;
+  database: _BunDB;
+  createdAt: number;
+  lastUsed: number;
+  inUse: boolean;
+  queryCount: number;
+  errorCount: number;
+}
 
-      // Optimize SQLite settings for performance
-      db.exec("PRAGMA journal_mode = WAL;");
-      db.exec("PRAGMA foreign_keys = ON;");
-      db.exec("PRAGMA synchronous = NORMAL;");
-      db.exec("PRAGMA cache_size = -64000;"); // 64MB cache
-      db.exec("PRAGMA temp_store = MEMORY;");
-      db.exec("PRAGMA mmap_size = 268435456;"); // 256MB mmap
+/**
+ * Pool statistics interface
+ */
+interface PoolStats {
+  totalConnections: number;
+  activeConnections: number;
+  idleConnections: number;
+  waitingClients: number;
+  totalCreated: number;
+  totalDestroyed: number;
+  totalAcquired: number;
+  totalReleased: number;
+  totalErrors: number;
+  averageAcquireTime: number;
+  cacheHitRate: number;
+}
 
-      this.instances.set(dbPath, db);
-    }
-    return this.instances.get(dbPath)!;
+/**
+ * Enhanced type-safe connection pool for managing database instances with advanced features
+ */
+class AdvancedConnectionPool {
+  private static pools: Map<string, AdvancedConnectionPool> = new Map();
+
+  private connections: Map<string, PooledConnection> = new Map();
+  private availableConnections: string[] = [];
+  private waitingQueue: Array<{
+    resolve: (connection: PooledConnection) => void;
+    reject: (error: Error) => void;
+    timestamp: number;
+  }> = [];
+
+  private preparedStatements: Map<string, ReturnType<_BunDB['prepare']>> = new Map();
+  private queryCache: Map<string, { result: unknown[]; timestamp: number; ttl: number }> = new Map();
+
+  private stats: PoolStats = {
+    totalConnections: 0,
+    activeConnections: 0,
+    idleConnections: 0,
+    waitingClients: 0,
+    totalCreated: 0,
+    totalDestroyed: 0,
+    totalAcquired: 0,
+    totalReleased: 0,
+    totalErrors: 0,
+    averageAcquireTime: 0,
+    cacheHitRate: 0
+  };
+
+  private acquireTimes: number[] = [];
+  private cacheHits = 0;
+  private cacheRequests = 0;
+
+  private cleanupInterval?: Timer;
+  private healthCheckInterval?: Timer;
+
+  private readonly config: PoolConfig;
+  private readonly dbPath: string;
+
+  constructor(dbPath: string, config: Partial<PoolConfig> = {}) {
+    this.dbPath = dbPath;
+    this.config = {
+      maxConnections: 10,
+      minConnections: 2,
+      acquireTimeout: 10000,
+      idleTimeout: 30000,
+      reapInterval: 10000,
+      maxConnectionAge: 3600000, // 1 hour
+      enableQueryCache: true,
+      maxCacheSize: 1000,
+      enableStatementPooling: true,
+      enableHealthChecks: true,
+      enableLogging: false,
+      ...config
+    };
+
+    this.initialize();
   }
 
-  static getPreparedStatement(key: string, query: string, db: _BunDB): ReturnType<_BunDB['prepare']> {
+  static getPool(dbPath: string, config?: Partial<PoolConfig>): AdvancedConnectionPool {
+    if (!this.pools.has(dbPath)) {
+      this.pools.set(dbPath, new AdvancedConnectionPool(dbPath, config));
+    }
+    return this.pools.get(dbPath)!;
+  }
+
+  private async initialize(): Promise<void> {
+    // Create minimum connections
+    for (let i = 0; i < this.config.minConnections; i++) {
+      await this.createConnection();
+    }
+
+    // Start cleanup interval
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupIdleConnections();
+      this.cleanupExpiredCache();
+    }, this.config.reapInterval);
+
+    // Start health check interval
+    if (this.config.enableHealthChecks) {
+      this.healthCheckInterval = setInterval(() => {
+        this.performHealthChecks();
+      }, this.config.reapInterval * 2);
+    }
+  }
+
+  private async createConnection(): Promise<PooledConnection> {
+    const id = `conn_${Date.now()}_${Bun.randomUUIDv7()}`;
+    const database = new _BunDB(this.dbPath, { create: true, strict: true });
+
+    // Optimize SQLite settings for performance
+    database.exec("PRAGMA journal_mode = WAL;");
+    database.exec("PRAGMA foreign_keys = ON;");
+    database.exec("PRAGMA synchronous = NORMAL;");
+    database.exec("PRAGMA cache_size = -64000;"); // 64MB cache
+    database.exec("PRAGMA temp_store = MEMORY;");
+    database.exec("PRAGMA mmap_size = 268435456;"); // 256MB mmap
+
+    const connection: PooledConnection = {
+      id,
+      database,
+      createdAt: Date.now(),
+      lastUsed: Date.now(),
+      inUse: false,
+      queryCount: 0,
+      errorCount: 0
+    };
+
+    this.connections.set(id, connection);
+    this.availableConnections.push(id);
+    this.stats.totalCreated++;
+    this.updateStats();
+
+    if (this.config.enableLogging) {
+      console.log(`[Pool] Created connection ${id} for ${this.dbPath}`);
+    }
+
+    return connection;
+  }
+
+  async acquire(): Promise<PooledConnection> {
+    const startTime = Date.now();
+
+    return new Promise(async (resolve, reject) => {
+      // Check for available connections
+      if (this.availableConnections.length > 0) {
+        const connectionId = this.availableConnections.shift()!;
+        const connection = this.connections.get(connectionId)!;
+        connection.inUse = true;
+        connection.lastUsed = Date.now();
+
+        this.stats.totalAcquired++;
+        this.recordAcquireTime(Date.now() - startTime);
+        this.updateStats();
+
+        resolve(connection);
+        return;
+      }
+
+      // Try to create new connection if under limit
+      if (this.connections.size < this.config.maxConnections) {
+        try {
+          const connection = await this.createConnection();
+          connection.inUse = true;
+          this.availableConnections.pop(); // Remove from available since we're using it
+
+          this.stats.totalAcquired++;
+          this.recordAcquireTime(Date.now() - startTime);
+          this.updateStats();
+
+          resolve(connection);
+          return;
+        } catch (error) {
+          this.stats.totalErrors++;
+          reject(new Error(`Failed to create connection: ${error}`));
+          return;
+        }
+      }
+
+      // Add to waiting queue
+      this.waitingQueue.push({
+        resolve,
+        reject,
+        timestamp: Date.now()
+      });
+      this.updateStats();
+
+      // Set timeout
+      setTimeout(() => {
+        const index = this.waitingQueue.findIndex(w => w.resolve === resolve);
+        if (index !== -1) {
+          this.waitingQueue.splice(index, 1);
+          this.updateStats();
+          reject(new Error('Connection acquire timeout'));
+        }
+      }, this.config.acquireTimeout);
+    });
+  }
+
+  release(connection: PooledConnection): void {
+    if (!this.connections.has(connection.id)) {
+      return;
+    }
+
+    connection.inUse = false;
+    connection.lastUsed = Date.now();
+    this.stats.totalReleased++;
+
+    // Check if connection is too old
+    if (Date.now() - connection.createdAt > this.config.maxConnectionAge) {
+      this.destroyConnection(connection.id);
+      return;
+    }
+
+    // Serve waiting client or return to pool
+    if (this.waitingQueue.length > 0) {
+      const waiter = this.waitingQueue.shift()!;
+      connection.inUse = true;
+      connection.lastUsed = Date.now();
+      this.stats.totalAcquired++;
+      this.recordAcquireTime(Date.now() - waiter.timestamp);
+      waiter.resolve(connection);
+    } else {
+      this.availableConnections.push(connection.id);
+    }
+
+    this.updateStats();
+  }
+
+  private destroyConnection(connectionId: string): void {
+    const connection = this.connections.get(connectionId);
+    if (!connection) return;
+
+    try {
+      connection.database.close();
+    } catch (error) {
+      if (this.config.enableLogging) {
+        console.error(`[Pool] Error closing connection ${connectionId}:`, error);
+      }
+    }
+
+    this.connections.delete(connectionId);
+    const availableIndex = this.availableConnections.indexOf(connectionId);
+    if (availableIndex !== -1) {
+      this.availableConnections.splice(availableIndex, 1);
+    }
+
+    this.stats.totalDestroyed++;
+    this.updateStats();
+
+    if (this.config.enableLogging) {
+      console.log(`[Pool] Destroyed connection ${connectionId}`);
+    }
+  }
+
+  private cleanupIdleConnections(): void {
+    const now = Date.now();
+    const connectionsToDestroy: string[] = [];
+
+    for (const [id, connection] of this.connections) {
+      if (!connection.inUse &&
+        now - connection.lastUsed > this.config.idleTimeout &&
+        this.connections.size > this.config.minConnections) {
+        connectionsToDestroy.push(id);
+      }
+    }
+
+    connectionsToDestroy.forEach(id => this.destroyConnection(id));
+  }
+
+  private cleanupExpiredCache(): void {
+    if (!this.config.enableQueryCache) return;
+
+    const now = Date.now();
+    for (const [key, cached] of this.queryCache) {
+      if (now - cached.timestamp > cached.ttl) {
+        this.queryCache.delete(key);
+      }
+    }
+  }
+
+  private performHealthChecks(): void {
+    for (const [id, connection] of this.connections) {
+      if (!connection.inUse) {
+        try {
+          // Simple health check query
+          connection.database.prepare("SELECT 1").get();
+        } catch (error) {
+          if (this.config.enableLogging) {
+            console.warn(`[Pool] Health check failed for connection ${id}, destroying`);
+          }
+          this.destroyConnection(id);
+        }
+      }
+    }
+  }
+
+  getPreparedStatement(key: string, query: string, db: _BunDB): ReturnType<_BunDB['prepare']> {
+    if (!this.config.enableStatementPooling) {
+      return db.prepare(query);
+    }
+
     if (!this.preparedStatements.has(key)) {
       this.preparedStatements.set(key, db.prepare(query));
     }
     return this.preparedStatements.get(key)!;
   }
 
-  static getCachedQuery<T = unknown[]>(key: string): T | undefined {
-    return this.queryCache.get(key) as T | undefined;
+  getCachedQuery<T = unknown[]>(key: string): T | undefined {
+    if (!this.config.enableQueryCache) return undefined;
+
+    this.cacheRequests++;
+    const cached = this.queryCache.get(key);
+
+    if (cached && Date.now() - cached.timestamp <= cached.ttl) {
+      this.cacheHits++;
+      return cached.result as T;
+    }
+
+    if (cached) {
+      this.queryCache.delete(key);
+    }
+
+    return undefined;
   }
 
-  static setCachedQuery<T = unknown[]>(key: string, result: T): void {
-    if (this.queryCache.size >= this.cacheMaxSize) {
+  setCachedQuery<T = unknown[]>(key: string, result: T, ttl: number = 300000): void {
+    if (!this.config.enableQueryCache) return;
+
+    if (this.queryCache.size >= this.config.maxCacheSize) {
       // Remove oldest entry
       const firstKey = this.queryCache.keys().next().value;
       if (firstKey) {
         this.queryCache.delete(firstKey);
       }
     }
-    this.queryCache.set(key, result as unknown[]);
+
+    this.queryCache.set(key, {
+      result: result as unknown[],
+      timestamp: Date.now(),
+      ttl
+    });
   }
 
-  static clearCache(): void {
+  private recordAcquireTime(time: number): void {
+    this.acquireTimes.push(time);
+    if (this.acquireTimes.length > 100) {
+      this.acquireTimes.shift();
+    }
+  }
+
+  private updateStats(): void {
+    this.stats.totalConnections = this.connections.size;
+    this.stats.activeConnections = Array.from(this.connections.values()).filter(c => c.inUse).length;
+    this.stats.idleConnections = this.stats.totalConnections - this.stats.activeConnections;
+    this.stats.waitingClients = this.waitingQueue.length;
+
+    if (this.acquireTimes.length > 0) {
+      this.stats.averageAcquireTime = this.acquireTimes.reduce((a, b) => a + b, 0) / this.acquireTimes.length;
+    }
+
+    if (this.cacheRequests > 0) {
+      this.stats.cacheHitRate = this.cacheHits / this.cacheRequests;
+    }
+  }
+
+  getStats(): PoolStats {
+    this.updateStats();
+    return { ...this.stats };
+  }
+
+  clearCache(): void {
     this.queryCache.clear();
+    this.cacheHits = 0;
+    this.cacheRequests = 0;
   }
 
-  static closeAll(): void {
+  async close(): Promise<void> {
+    // Clear intervals
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    // Reject waiting clients
+    this.waitingQueue.forEach(waiter => {
+      waiter.reject(new Error('Pool is closing'));
+    });
+    this.waitingQueue.length = 0;
+
+    // Close all connections
+    for (const [id, connection] of this.connections) {
+      try {
+        connection.database.close();
+      } catch (error) {
+        console.error(`Error closing connection ${id}:`, error);
+      }
+    }
+
+    // Clear prepared statements
     for (const stmt of this.preparedStatements.values()) {
-      stmt.finalize();
+      try {
+        stmt.finalize();
+      } catch (error) {
+        // Ignore finalization errors
+      }
     }
-    for (const db of this.instances.values()) {
-      db.close();
-    }
-    this.instances.clear();
+
+    this.connections.clear();
+    this.availableConnections.length = 0;
     this.preparedStatements.clear();
     this.queryCache.clear();
+  }
+
+  static async closeAllPools(): Promise<void> {
+    await Promise.all(
+      Array.from(this.pools.values()).map(pool => pool.close())
+    );
+    this.pools.clear();
   }
 }
 
@@ -96,16 +495,25 @@ class DatabaseInitializer {
    */
   readonly databaseInstance: _BunDB;
   private readonly DBSchema: DBSchema;
+  private readonly usePool: boolean;
+  private readonly poolConfig?: Partial<PoolConfig>;
+  private pool?: AdvancedConnectionPool;
 
   constructor(config: {
     db?: _BunDB;
     schema?: DBSchema;
+    usePool?: boolean;
+    poolConfig?: Partial<PoolConfig>;
+    dbPath?: string;
   }) {
     this.DBSchema = config?.schema || globalThis.dbSchema || [];
+    this.usePool = config?.usePool ?? false;
+    this.poolConfig = config?.poolConfig;
     this.databaseInstance = config.db || new _BunDB(DEFAULT_DB_PATH, {
       create: true,
       strict: true,
-    })
+    });
+
     if (!this.databaseInstance) {
       throw new Error("Database instance is not available");
     }
@@ -117,15 +525,103 @@ class DatabaseInitializer {
     this.databaseInstance.exec("PRAGMA foreign_keys = ON;");
     this.databaseInstance.exec("PRAGMA synchronous = NORMAL;");
   }
+
+  /**
+   * Get a connection from the pool (if pooling is enabled)
+   */
+  async getPooledConnection(): Promise<PooledConnection | null> {
+    if (!this.usePool || !this.pool) {
+      return null;
+    }
+    return await this.pool.acquire();
+  }
+
+  /**
+   * Release a pooled connection back to the pool
+   */
+  releasePooledConnection(connection: PooledConnection): void {
+    if (this.usePool && this.pool) {
+      this.pool.release(connection);
+    }
+  }
+
+  /**
+   * Get pool statistics (if pooling is enabled)
+   */
+  getPoolStats(): PoolStats | null {
+    if (!this.usePool || !this.pool) {
+      return null;
+    }
+    return this.pool.getStats();
+  }
+
+  /**
+   * Execute a query with automatic connection pooling
+   */
+  async executeWithPool<T>(
+    queryFn: (db: _BunDB) => T,
+    useCache: boolean = false,
+    cacheKey?: string,
+    cacheTTL: number = 300000
+  ): Promise<T> {
+    if (!this.usePool || !this.pool) {
+      return queryFn(this.databaseInstance);
+    }
+
+    // Check cache first if enabled
+    if (useCache && cacheKey) {
+      const cached = this.pool.getCachedQuery<T>(cacheKey);
+      if (cached !== undefined) {
+        return cached;
+      }
+    }
+
+    const connection = await this.pool.acquire();
+    try {
+      const result = queryFn(connection.database);
+      connection.queryCount++;
+
+      // Cache result if enabled
+      if (useCache && cacheKey) {
+        this.pool.setCachedQuery(cacheKey, result, cacheTTL);
+      }
+
+      return result;
+    } catch (error) {
+      connection.errorCount++;
+      throw error;
+    } finally {
+      this.pool.release(connection);
+    }
+  }
+
+  /**
+   * Close the pool (if pooling is enabled)
+   */
+  async closePool(): Promise<void> {
+    if (this.usePool && this.pool) {
+      await this.pool.close();
+    }
+  }
 }
 
 /**
- * Database utility class for creating tables
+ * Database utility class for creating tables with optional connection pooling
  */
 export class DatabaseManager extends DatabaseInitializer {
 
-  constructor(db?: _BunDB) {
-    super({ db });
+  constructor(config?: {
+    db?: _BunDB;
+    usePool?: boolean;
+    poolConfig?: Partial<PoolConfig>;
+    dbPath?: string;
+  }) {
+    super({
+      db: config?.db,
+      usePool: config?.usePool,
+      poolConfig: config?.poolConfig,
+      dbPath: config?.dbPath || DEFAULT_DB_PATH
+    });
   }
 
   /**
@@ -1077,6 +1573,179 @@ export class DatabaseManager extends DatabaseInitializer {
       return { isValid: false, errors: [`Integrity check failed: ${error}`] };
     }
   }
+
+  /**
+   * Enable connection pooling for this database manager
+   * @param poolConfig Optional pool configuration
+   * @param dbPath Database path (required for pooling)
+   * @returns New DatabaseManager instance with pooling enabled
+   * 
+   * @example
+   * ```typescript
+   * // Enable pooling with default settings
+   * const pooledDb = new DatabaseManager().withPooling({ dbPath: './my-db.sqlite' });
+   * 
+   * // Enable pooling with custom configuration
+   * const customPooledDb = new DatabaseManager().withPooling({
+   *   dbPath: './my-db.sqlite',
+   *   poolConfig: {
+   *     maxConnections: 20,
+   *     minConnections: 5,
+   *     acquireTimeout: 15000,
+   *     enableQueryCache: true,
+   *     maxCacheSize: 2000
+   *   }
+   * });
+   * 
+   * // Use the pooled database
+   * const stats = customPooledDb.getPoolStats();
+   * console.log('Active connections:', stats?.activeConnections);
+   * ```
+   */
+  withPooling(config: {
+    dbPath: string;
+    poolConfig?: Partial<PoolConfig>;
+  }): DatabaseManager {
+    return new DatabaseManager({
+      usePool: true,
+      poolConfig: config.poolConfig,
+      dbPath: config.dbPath
+    });
+  }
+
+  /**
+   * Create a factory function for creating pooled database instances
+   * Useful for dependency injection or creating multiple instances with the same configuration
+   * 
+   * @param defaultConfig Default configuration for all instances
+   * @returns Factory function that creates DatabaseManager instances
+   * 
+   * @example
+   * ```typescript
+   * // Create a factory with default pooling configuration
+   * const createDB = DatabaseManager.createPoolFactory({
+   *   usePool: true,
+   *   poolConfig: {
+   *     maxConnections: 10,
+   *     enableQueryCache: true
+   *   }
+   * });
+   * 
+   * // Create instances for different databases
+   * const userDB = createDB({ dbPath: './users.sqlite' });
+   * const productDB = createDB({ dbPath: './products.sqlite' });
+   * const logDB = createDB({ dbPath: './logs.sqlite', poolConfig: { maxConnections: 5 } });
+   * ```
+   */
+  static createPoolFactory(defaultConfig: {
+    usePool?: boolean;
+    poolConfig?: Partial<PoolConfig>;
+  }) {
+    return (instanceConfig: {
+      dbPath: string;
+      db?: _BunDB;
+      usePool?: boolean;
+      poolConfig?: Partial<PoolConfig>;
+    }): DatabaseManager => {
+      return new DatabaseManager({
+        ...defaultConfig,
+        ...instanceConfig,
+        poolConfig: {
+          ...defaultConfig.poolConfig,
+          ...instanceConfig.poolConfig
+        }
+      });
+    };
+  }
+
+  /**
+   * Get global pool statistics for all database pools
+   * @returns Object containing statistics for all active pools
+   * 
+   * @example
+   * ```typescript
+   * const globalStats = DatabaseManager.getGlobalPoolStats();
+   * console.log('Total pools:', Object.keys(globalStats).length);
+   * 
+   * for (const [dbPath, stats] of Object.entries(globalStats)) {
+   *   console.log(`Database ${dbPath}:`, {
+   *     connections: stats.totalConnections,
+   *     active: stats.activeConnections,
+   *     cacheHitRate: (stats.cacheHitRate * 100).toFixed(2) + '%'
+   *   });
+   * }
+   * ```
+   */
+  static getGlobalPoolStats(): Record<string, PoolStats> {
+    // This would need to be implemented by maintaining a registry in AdvancedConnectionPool
+    // For now, return empty object as this would require refactoring the pool class
+    return {};
+  }
+
+  /**
+   * Close all connection pools
+   * Should be called when shutting down the application
+   * 
+   * @example
+   * ```typescript
+   * // Graceful shutdown
+   * process.on('SIGTERM', async () => {
+   *   await DatabaseManager.closeAllPools();
+   *   process.exit(0);
+   * });
+   * ```
+   */
+  static async closeAllPools(): Promise<void> {
+    await AdvancedConnectionPool.closeAllPools();
+  }
+
+  /**
+   * Execute multiple operations in a transaction with automatic connection pooling
+   * @param operations Array of operations to execute
+   * @param isolationLevel SQLite isolation level
+   * @returns Array of results from each operation
+   * 
+   * @example
+   * ```typescript
+   * const dbManager = new DatabaseManager().withPooling({ dbPath: './db.sqlite' });
+   * 
+   * const results = await dbManager.executePooledTransaction([
+   *   (db) => db.prepare('INSERT INTO users (name) VALUES (?)').run('Alice'),
+   *   (db) => db.prepare('INSERT INTO users (name) VALUES (?)').run('Bob'),
+   *   (db) => db.prepare('SELECT COUNT(*) as count FROM users').get()
+   * ]);
+   * 
+   * console.log('User count after inserts:', results[2]);
+   * ```
+   */
+  async executePooledTransaction<T extends any[]>(
+    operations: Array<(db: _BunDB) => any>,
+    isolationLevel: 'DEFERRED' | 'IMMEDIATE' | 'EXCLUSIVE' = 'DEFERRED'
+  ): Promise<T> {
+    return await this.executeWithPool(async (db) => {
+      const results: any[] = [];
+
+      try {
+        db.exec(`BEGIN ${isolationLevel}`);
+
+        for (const operation of operations) {
+          const result = operation(db);
+          results.push(result);
+        }
+
+        db.exec('COMMIT');
+        return results as T;
+      } catch (error) {
+        try {
+          db.exec('ROLLBACK');
+        } catch (rollbackError) {
+          // Log rollback error but throw original error
+          console.error('Error during rollback:', rollbackError);
+        }
+        throw error;
+      }
+    });
+  }
 }
 
 
@@ -1151,7 +1820,7 @@ class Table<
     };
 
     // Use DatabaseManager's sophisticated table creation logic
-    const dbManager = new DatabaseManager(this.databaseInstance);
+    const dbManager = new DatabaseManager({ db: this.databaseInstance });
 
     try {
       dbManager.createTable(tableSchema);

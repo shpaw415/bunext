@@ -1030,7 +1030,7 @@ describe('DatabaseManager Operations', () => {
     beforeAll(() => {
         // Create a file-based database for testing DatabaseManager features
         const fileDb = new Database(testDbPath);
-        testDbManager = new DatabaseManager(fileDb);
+        testDbManager = new DatabaseManager({ db: fileDb });
 
         // Create the same table structure in file db
         testDbManager.createTable({
@@ -1056,7 +1056,7 @@ describe('DatabaseManager Operations', () => {
     describe('Table Creation', () => {
         test('should create table with proper schema', () => {
             const tempDb = new Database(':memory:');
-            const manager = new DatabaseManager(tempDb);
+            const manager = new DatabaseManager({ db: tempDb });
 
             manager.createTable({
                 name: 'TestTable',
@@ -1076,7 +1076,7 @@ describe('DatabaseManager Operations', () => {
 
         test('should create multiple tables', () => {
             const tempDb = new Database(':memory:');
-            const manager = new DatabaseManager(tempDb);
+            const manager = new DatabaseManager({ db: tempDb });
 
             manager.create([
                 {
@@ -1125,7 +1125,7 @@ describe('DatabaseManager Operations', () => {
             // Create a new database and restore from backup
             const restoreDbPath = './test-restore.db';
             const restoreDb = new Database(restoreDbPath);
-            const restoreManager = new DatabaseManager(restoreDb);
+            const restoreManager = new DatabaseManager({ db: restoreDb });
 
             restoreManager.restore(backupPath);
 
@@ -1156,7 +1156,7 @@ describe('DatabaseManager Operations', () => {
 
         test('should import database schema', () => {
             const tempDb = new Database(':memory:');
-            const manager = new DatabaseManager(tempDb);
+            const manager = new DatabaseManager({ db: tempDb });
 
             const schema = {
                 version: "1.0",
@@ -1241,7 +1241,7 @@ describe('DatabaseManager Operations', () => {
     describe('Transaction Operations', () => {
         test('should execute multiple statements in transaction', () => {
             const tempDb = new Database(':memory:');
-            const manager = new DatabaseManager(tempDb);
+            const manager = new DatabaseManager({ db: tempDb });
 
             const statements = [
                 "CREATE TABLE TempTable (id INTEGER PRIMARY KEY, name TEXT)",
@@ -1262,7 +1262,7 @@ describe('DatabaseManager Operations', () => {
             // Create source database
             const sourceDbPath = './test-source.db';
             const sourceDb = new Database(sourceDbPath);
-            const sourceManager = new DatabaseManager(sourceDb);
+            const sourceManager = new DatabaseManager({ db: sourceDb });
 
             // Create table and insert data in source
             sourceManager.createTable({
@@ -1279,7 +1279,7 @@ describe('DatabaseManager Operations', () => {
             // Create target database
             const targetDbPath = './test-target.db';
             const targetDb = new Database(targetDbPath);
-            const targetManager = new DatabaseManager(targetDb);
+            const targetManager = new DatabaseManager({ db: targetDb });
 
             targetManager.createTable({
                 name: 'MergeTable',
@@ -1322,7 +1322,7 @@ describe('Error Handling and Edge Cases', () => {
 
     test('should handle invalid table schema', () => {
         const tempDb = new Database(':memory:');
-        const manager = new DatabaseManager(tempDb);
+        const manager = new DatabaseManager({ db: tempDb });
 
         expect(() => manager.createTable({
             name: '',
@@ -1332,7 +1332,7 @@ describe('Error Handling and Edge Cases', () => {
 
     test('should handle duplicate column names in schema', () => {
         const tempDb = new Database(':memory:');
-        const manager = new DatabaseManager(tempDb);
+        const manager = new DatabaseManager({ db: tempDb });
 
         expect(() => manager.createTable({
             name: 'DuplicateTest',
@@ -1345,7 +1345,7 @@ describe('Error Handling and Edge Cases', () => {
 
     test('should handle schema without primary key', () => {
         const tempDb = new Database(':memory:');
-        const manager = new DatabaseManager(tempDb);
+        const manager = new DatabaseManager({ db: tempDb });
 
         expect(() => manager.createTable({
             name: 'NoPrimaryKey',
@@ -1391,7 +1391,7 @@ describe('Type Safety and Advanced Queries', () => {
     test('should handle JSON data types', () => {
         // Create a table with JSON column
         const tempDb = new Database(':memory:');
-        const manager = new DatabaseManager(tempDb);
+        const manager = new DatabaseManager({ db: tempDb });
 
         manager.createTable({
             name: 'JsonTest',
@@ -1429,7 +1429,7 @@ describe('Type Safety and Advanced Queries', () => {
 
     test('should handle date and float types correctly', () => {
         const tempDb = new Database(':memory:');
-        const manager = new DatabaseManager(tempDb);
+        const manager = new DatabaseManager({ db: tempDb });
 
         manager.createTable({
             name: 'TypeTest',
@@ -1473,7 +1473,7 @@ describe('Type Safety and Advanced Queries', () => {
 
     test('should handle union constraints', () => {
         const tempDb = new Database(':memory:');
-        const manager = new DatabaseManager(tempDb);
+        const manager = new DatabaseManager({ db: tempDb });
 
         manager.createTable({
             name: 'UnionTest',
@@ -1645,7 +1645,7 @@ describe('Performance and Advanced Scenarios', () => {
 describe('Integration and Real-world Scenarios', () => {
     test('should support typical e-commerce workflow', () => {
         const tempDb = new Database(':memory:');
-        const manager = new DatabaseManager(tempDb);
+        const manager = new DatabaseManager({ db: tempDb });
 
         // Create multiple related tables
         manager.create([
@@ -1732,7 +1732,7 @@ describe('Integration and Real-world Scenarios', () => {
         const newDb = new Database(':memory:');
 
         // Create old schema
-        const oldManager = new DatabaseManager(oldDb);
+        const oldManager = new DatabaseManager({ db: oldDb });
         oldManager.createTable({
             name: 'LegacyUsers',
             columns: [
@@ -1747,7 +1747,7 @@ describe('Integration and Real-world Scenarios', () => {
         oldDb.prepare('INSERT INTO LegacyUsers (username, active) VALUES (?, ?)').run('olduser2', 0);
 
         // Create new schema
-        const newManager = new DatabaseManager(newDb);
+        const newManager = new DatabaseManager({ db: newDb });
         newManager.createTable({
             name: 'ModernUsers',
             columns: [

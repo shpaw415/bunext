@@ -169,7 +169,7 @@ export async function initializeSessionDatabase(): Promise<void> {
  */
 function createDatabaseTables(database: Database): void {
   try {
-    new _Database(database).create(SESSION_SCHEMA);
+    new _Database({ db: database }).create(SESSION_SCHEMA);
   } catch (error) {
     throw new SessionError(
       `Failed to create database tables: ${error instanceof Error ? error.message : String(error)}`,

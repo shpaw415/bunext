@@ -19,7 +19,7 @@ import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
 
 // Features
-import { revalidate } from "../../features/router/revalidate.ts";
+import { revalidate } from "plugins/server-features/ssr-page.ts";
 import {
   cleanExpiredSessions,
   deleteSessionById,

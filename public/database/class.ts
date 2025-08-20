@@ -1,2 +1,7 @@
 // Public API: database/class
-export * from "../../database/class.ts";
+export {
+    DatabaseManager,
+    Table,
+    type PoolConfig,
+    type PooledConnection,
+} from "database/class";

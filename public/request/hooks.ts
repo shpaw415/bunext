@@ -1,2 +1,2 @@
 // Public API: request/hooks
-export * from "../../features/request/hooks.ts";
+export { useRequest } from "features/request/hooks.ts";

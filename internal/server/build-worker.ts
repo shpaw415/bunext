@@ -1,5 +1,5 @@
+import { SSRCache } from "plugins/server-features/ssr-page";
 import { Head } from "../../features/head";
-import CacheManager from "../caching/index.ts";
 import { builder, type BuildOuts } from "./build.ts";
 
 export type BuildWorkerMessage = {
@@ -46,7 +46,7 @@ async function build(
   try {
     BuildPath
       ? await builder.preBuild(BuildPath)
-      : await builder.preBuildAll(CacheManager.getAllSSR());
+      : await builder.preBuildAll(await SSRCache.getAllSSR());
   } catch (e) {
     return {
       success: false,
