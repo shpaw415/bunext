@@ -1,6 +1,6 @@
-import Database from "bun:sqlite";
 import { _Database, Table } from "../../database/class";
 import { transform } from "@svgr/core";
+import type { DBSchema } from "database/schema";
 import { CacheManagerPool } from "internal/caching";
 
 export type cacheType = {
@@ -9,37 +9,45 @@ export type cacheType = {
   hash: number;
 };
 
+const Schema: DBSchema = [
+  {
+    name: "svg_cache",
+    columns: [
+      {
+        name: "path",
+        type: "string",
+        primary: true,
+        unique: true,
+      },
+      {
+        name: "data",
+        type: "string",
+      },
+      {
+        name: "hash",
+        type: "number",
+      },
+    ],
+  },
+];
+class SVGCacheManager {
 
-class SVGCacheManager extends CacheManagerPool {
+  private poolManager!: CacheManagerPool;
+
   constructor() {
-    super({
-      dbPath: import.meta.dirname + "/svg.sqlite",
-      schema: [
-        {
-          name: "svg_cache",
-          columns: [
-            {
-              name: "path",
-              type: "string",
-              primary: true,
-              unique: true,
-            },
-            {
-              name: "data",
-              type: "string",
-            },
-            {
-              name: "hash",
-              type: "number",
-            },
-          ],
-        },
-      ],
-    });
+  }
+
+  static async create() {
+    const instance = new SVGCacheManager();
+    await instance.initialize();
+    return instance;
+  }
+  async initialize() {
+    this.poolManager = await CacheManagerPool.create({ dbPath: import.meta.dirname + "/svg.sqlite", schema: Schema });
   }
 
   private svg_cache<T>(then: (table: Table<cacheType, cacheType>) => T) {
-    return this.getTable<cacheType, cacheType>("svg_cache", then) as Promise<T>;
+    return this.poolManager.getTable<cacheType, cacheType>("svg_cache", then) as Promise<T>;
   }
 
   async get(path: string) {
@@ -86,7 +94,7 @@ class SVGCacheManager extends CacheManagerPool {
   }
 }
 
-const SVGCache = new SVGCacheManager();
+const SVGCache = await SVGCacheManager.create();
 
 if (import.meta.main) {
   SVGCache.clearCache();

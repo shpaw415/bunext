@@ -1,3 +1,4 @@
+import type { MatchedRoute } from "bun";
 
 
 export type Directives = "use-client" | "use-server" | "use-static" | "server-only";
@@ -35,9 +36,9 @@ export class DirectiveTool {
      * @param route Optional route information.
      * @returns True if the file path is associated with the directive, false otherwise.
      */
-    public async pathIs(directive: Directives, filePath: string, route?: string) {
-        if (!this.filePaths.includes(filePath)) return (await this.addEntry(filePath, route) == directive);
-        return Boolean(this.entries.get(directive)?.find((entry) => entry.path === filePath));
+    public async pathIs(directive: Directives, filePath: string, route?: string): Promise<boolean> {
+        if (!this.filePaths.includes(filePath)) return ((await this.addEntry(filePath, route)) == directive);
+        return this.entries.get(directive)?.some((entry) => entry.path === filePath) ?? false;
     }
 
     public getFromDirective(directive: Directives): Array<DirectiveEntry> {
@@ -48,9 +49,9 @@ export class DirectiveTool {
      * @param route The route to check.
      * @returns The directive associated with the route, or null if none found.
      */
-    public getDirectiveFromRoute(route: string): Directives | null {
+    public getDirectiveFromRoute(match: MatchedRoute): Directives | null {
         for (const [directive, entries] of this.entries) {
-            if (entries.some(entry => entry.route === route)) {
+            if (entries.some(entry => entry.route === match.pathname)) {
                 return directive;
             }
         }
@@ -77,7 +78,7 @@ export class DirectiveTool {
      * @returns The directive associated with the file path, default: use-server
      */
     public async addEntry(filePath: string, route?: string) {
-        if (this.filePaths.includes(filePath)) return;
+        if (this.filePaths.includes(filePath)) return this.getDirectiveFromFilePath(filePath) as Directives;
         const directive = await this.detectDirective(filePath);
         if (!this.entries.has(directive)) {
             this.entries.set(directive, []);

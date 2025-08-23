@@ -1,5 +1,5 @@
 import { SVGCache } from "./init";
-import type { BunextPlugin } from "../types";
+import type { BunextPlugin } from "plugins/types";
 
 export default {
   priority: 11,

@@ -12,7 +12,7 @@ async function basicPoolingExample() {
     console.log('=== Basic Pooling Example ===');
 
     // Create a database manager with connection pooling enabled
-    const db = new DatabaseManager().withPooling({
+    const db = await new DatabaseManager().withPooling({
         dbPath: './example.sqlite'
     });
 
@@ -54,7 +54,7 @@ async function advancedPoolingExample() {
         enableLogging: true        // Enable detailed logging
     };
 
-    const db = new DatabaseManager().withPooling({
+    const db = await new DatabaseManager().withPooling({
         dbPath: './advanced-example.sqlite',
         poolConfig
     });
@@ -165,7 +165,7 @@ async function factoryPatternExample() {
 async function bulkOperationsExample() {
     console.log('=== Bulk Operations with Pooling Example ===');
 
-    const db = new DatabaseManager().withPooling({
+    const db = await new DatabaseManager().withPooling({
         dbPath: './bulk-example.sqlite',
         poolConfig: {
             maxConnections: 15,

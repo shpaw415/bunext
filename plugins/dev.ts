@@ -9,13 +9,13 @@
  */
 
 // Core dependencies
-import { builder } from "../internal/server/build";
-import { RequestManager, router } from "../internal/server/router";
+import { builder } from "internal/server/build";
+import { RequestManager, router } from "internal/server/router";
 
 // Types
 import type { BunextPlugin } from "./types";
 import type { MatchedRoute } from "bun";
-import type { BunextRequest } from "../internal/server/bunextRequest";
+import type { BunextRequest } from "internal/server/bunextRequest";
 
 // Node.js path utilities
 import { relative, normalize } from "node:path";
@@ -23,17 +23,18 @@ import { relative, normalize } from "node:path";
 // Logging utilities
 import {
   benchmark_console,
-  DevConsole,
   TerminalIcon,
   TextColor,
   ToColor,
-} from "../internal/server/logs";
+} from "internal/server/logs";
+import { resetPath } from "./server-features/ssr-page";
 
 // Constants
 const CWD = process.cwd();
 const DEVTOOLS_ENDPOINT = "/.well-known/appspecific/com.chrome.devtools.json";
 const SERVER_SIDE_PROPS_HEADER = "application/vnd.server-side-props";
 const GETCSSPATH_PATHNAME = "/GetCssPaths";
+
 
 
 // Plugin configuration
@@ -110,7 +111,6 @@ function shouldRebuildRoute(match: MatchedRoute | null, request: Request): boole
 async function handleDevRequest(request: RequestManager) {
   const match = request.serverSide;
   if (shouldRebuildRoute(match, request.request)) {
-
     await buildRoute(match!);
     return;
   }
@@ -185,7 +185,7 @@ async function buildRoute(match: MatchedRoute) {
         `compiled ${match.pathname} in ${time}ms`
       )}`,
     async () => {
-      await builder.resetPath(match.filePath);
+      await resetPath(match.filePath);
       await builder.makeBuild(match.filePath);
       router.client.reload();
     }

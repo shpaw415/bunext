@@ -9,6 +9,7 @@ import { CacheManagerPool } from "../../internal/caching";
 import type { blurredImage } from "./type";
 import { router } from "internal/server/router";
 import type { Table } from "database/class";
+import type { DBSchema } from "database/schema";
 
 declare global {
   var blurImages: blurredImage[];
@@ -17,38 +18,50 @@ globalThis.blurImages ??= [];
 
 const cwd = process.cwd();
 
-class BlurredImageCache extends CacheManagerPool {
+const schema: DBSchema = [
+  {
+    name: "blured_image",
+    columns: [
+      {
+        name: "id",
+        type: "number",
+        autoIncrement: true,
+        primary: true,
+      },
+      {
+        name: "path",
+        type: "string",
+      },
+      { name: "img_path", type: "string" },
+      {
+        name: "encoded",
+        type: "string",
+      },
+    ],
+  },
+];
+
+class BlurredImageCache {
   cachedBlurredImages: Array<{ path: string; img_path: string }> = [];
-  constructor() {
-    super({
-      schema: [
-        {
-          name: "blured_image",
-          columns: [
-            {
-              name: "id",
-              type: "number",
-              autoIncrement: true,
-              primary: true,
-            },
-            {
-              name: "path",
-              type: "string",
-            },
-            { name: "img_path", type: "string" },
-            {
-              name: "encoded",
-              type: "string",
-            },
-          ],
-        },
-      ],
+  manager!: CacheManagerPool;
+
+
+  static async create() {
+    const instance = new BlurredImageCache();
+    await instance.initialize();
+    return instance;
+  }
+
+  async initialize() {
+    this.manager = await CacheManagerPool.create({
+      schema,
       dbPath: join(import.meta.dirname, "image_cache.sqlite"),
     });
   }
 
+
   async blurredCache<T>(callback: (table: Table<blurredImage, blurredImage>) => T) {
-    return this.getTable<blurredImage, blurredImage>("blured_image", callback) as Promise<T>;
+    return this.manager.getTable<blurredImage, blurredImage>("blured_image", callback) as Promise<T>;
   }
 
   async clear() {
@@ -97,7 +110,7 @@ class BlurredImageCache extends CacheManagerPool {
   }
 }
 
-export const cache = new BlurredImageCache();
+export const cache = await BlurredImageCache.create();
 
 async function transformImage(req: BunextRequest) {
   const url = req.URL;

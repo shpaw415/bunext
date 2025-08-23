@@ -1,4 +1,4 @@
-import { SSRCache } from "plugins/server-features/ssr-page";
+import { preBuild, preBuildAll, SSRCache } from "plugins/server-features/ssr-page";
 import { Head } from "../../features/head";
 import { builder, type BuildOuts } from "./build.ts";
 
@@ -45,8 +45,8 @@ async function build(
 ): Promise<Omit<BuildWorkerResponse, "type">> {
   try {
     BuildPath
-      ? await builder.preBuild(BuildPath)
-      : await builder.preBuildAll(await SSRCache.getAllSSR());
+      ? await preBuild(BuildPath)
+      : await preBuildAll(await SSRCache.getAllSSR());
   } catch (e) {
     return {
       success: false,

@@ -18,7 +18,7 @@ const Config: ServerConfig = {
     type: "database:hard",
   },
   router: {
-    dynamicPaths: ["src/dynamic"],
+    //dynamicPaths: ["src/dynamic"],
   },
   bunext_plugins: [
   ],

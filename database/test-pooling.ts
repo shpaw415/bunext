@@ -10,7 +10,7 @@ async function testPoolingFeature() {
     try {
         // Test 1: Basic pooling setup
         console.log('\n1️⃣ Testing basic pooling setup...');
-        const db = new DatabaseManager().withPooling({
+        const db = await new DatabaseManager().withPooling({
             dbPath: './test-pool.sqlite',
             poolConfig: {
                 maxConnections: 5,

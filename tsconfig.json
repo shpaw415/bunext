@@ -36,10 +36,11 @@
     "components",
     "features",
     "bin",
-    "config",
+    "config/*",
     "database",
     "dev/**/*",
     "public/**/*", 
-    ".bunext/react-ssr/hydrate.ts"
+    "config.dev/*",
+    ".bunext/react-ssr/*"
   ]
 }

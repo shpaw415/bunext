@@ -79,13 +79,6 @@ declare global {
     }
   }
 }
-if (typeof window === "undefined" && !process.env.NODE_ENV) {
-  if (process.argv[2] === "dev") {
-    process.env.NODE_ENV = "development";
-  } else {
-    process.env.NODE_ENV = "production";
-  }
-}
 
 globalThis.React = React;
 globalThis.jsx_w77yafs4 = jsx;

@@ -746,24 +746,6 @@ async function updateDatabaseIndexFile(typeDefinitions: { tables: string[] }): P
 }
 
 /**
- * Helper function to replace content between separators
- */
-function replaceContentBetweenSeparators(
-    content: string,
-    separator: string,
-    newContent: string
-): string {
-    const parts = content.split(separator);
-
-    if (parts.length !== 2) {
-        throw new Error(`Invalid separator format in database index file: ${separator}`);
-    }
-
-    parts[1] = newContent;
-    return parts.join(separator);
-}
-
-/**
  * Creates the database tables from the schema
  */
 async function createDatabase(): Promise<void> {

@@ -4,6 +4,7 @@ import { exit } from "node:process";
 import { handleDev, handleProduction } from "./servers.ts";
 import { handleDatabaseBackup, handleDatabaseCreate, handleDatabaseMerge, handleDatabaseRestore } from "./db.ts";
 import { builder } from "../internal/server/build.ts";
+import { preBuildAll } from "plugins/server-features/ssr-page";
 // Command types
 type BunextCommand =
   | "init"
@@ -151,7 +152,7 @@ async function handleInit(): Promise<void> {
  */
 async function handleBuild(): Promise<void> {
   try {
-    await builder.preBuildAll();
+    await preBuildAll();
     const result = await builder.build();
     console.log("Build completed successfully:", result);
   } catch (error) {

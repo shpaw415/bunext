@@ -140,7 +140,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public setHead(data: _Head) {
     this.headData = {
       ...Head.head,
-      [this.manager.pathname]: data,
+      [this.manager?.serverSide?.pathname || this.path]: data,
     };
   }
   /**
@@ -248,6 +248,9 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this._prevent_global_values_injection = true;
     return this;
   }
+  public isGlobalValuesInjectionPrevented() {
+    return this._prevent_global_values_injection;
+  }
   public preventRewrite() {
     this._prevent_rewrite = true;
     return this;
@@ -265,69 +268,70 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
       }
 
       // Handle string responses with potential HTML processing
-      if (typeof this._response_body === "string") {
-        let formattedStringData: string;
+      if (typeof this._response_body !== "string") return new Response(this._response_body, this._response_init);
 
-        try {
-          formattedStringData = await this.applyModifiers(this._response_body);
-        } catch (error) {
-          console.error("Failed to apply modifiers:", error);
-          formattedStringData = this._response_body; // Fallback to original
-        }
 
-        // Initialize response init if not set
-        if (!this._response_init) {
-          this._response_init = { headers: {} };
-        }
-        if (!this._response_init.headers) {
-          this._response_init.headers = {};
-        }
+      let formattedStringData: string;
 
-        // Safely handle headers (support both Headers object and plain object)
-        const headers = this._response_init.headers instanceof Headers
-          ? this._response_init.headers
-          : new Headers(this._response_init.headers as HeadersInit);
-
-        const contentType = headers.get("Content-Type") || headers.get("content-type");
-
-        // Apply HTML formatting if content type is HTML
-        if (contentType?.includes("text/html")) {
-          try {
-            formattedStringData = formatHTML(formattedStringData);
-          } catch (error) {
-            console.warn("Failed to format HTML:", error);
-            // Continue without formatting
-          }
-        } else if (!contentType) {
-          // Set default content type for non-HTML string responses
-          headers.set("Content-Type", "text/plain");
-        }
-
-        // Update headers in response init
-        this._response_init.headers = headers;
-
-        // Handle compression if client supports it
-        const acceptEncoding = this.manager.request.headers.get("accept-encoding");
-        const supportsGzip = acceptEncoding?.includes("gzip") || acceptEncoding?.includes("*");
-
-        if (supportsGzip && formattedStringData.length > 1024) { // Only compress if worth it
-          try {
-            const compressedData = Bun.gzipSync(formattedStringData);
-            headers.set("Content-Encoding", "gzip");
-            headers.set("Vary", "Accept-Encoding");
-
-            return new Response(compressedData, this._response_init);
-          } catch (error) {
-            console.warn("Failed to compress response:", error);
-            // Fall back to uncompressed
-          }
-        }
-
-        return new Response(formattedStringData, this._response_init);
+      try {
+        formattedStringData = await this.applyModifiers(this._response_body);
+      } catch (error) {
+        console.error("Failed to apply modifiers:", error);
+        formattedStringData = this._response_body; // Fallback to original
       }
 
+      // Initialize response init if not set
+      if (!this._response_init) {
+        this._response_init = { headers: {} };
+      }
+      if (!this._response_init.headers) {
+        this._response_init.headers = {};
+      }
+
+      // Safely handle headers (support both Headers object and plain object)
+      const headers = this._response_init.headers instanceof Headers
+        ? this._response_init.headers
+        : new Headers(this._response_init.headers as HeadersInit);
+
+      const contentType = headers.get("Content-Type") || headers.get("content-type");
+
+      // Apply HTML formatting if content type is HTML
+      if (contentType?.includes("text/html")) {
+        try {
+          formattedStringData = formatHTML(formattedStringData);
+        } catch (error) {
+          console.warn("Failed to format HTML:", error);
+          // Continue without formatting
+        }
+      } else if (!contentType) {
+        // Set default content type for non-HTML string responses
+        headers.set("Content-Type", "text/plain");
+      }
+
+      // Update headers in response init
+      this._response_init.headers = headers;
+
+      // Handle compression if client supports it
+      const acceptEncoding = this.manager.request.headers.get("accept-encoding");
+      const supportsGzip = acceptEncoding?.includes("gzip") || acceptEncoding?.includes("*");
+
+      if (supportsGzip && formattedStringData.length > 1024) { // Only compress if worth it
+        try {
+          const compressedData = Bun.gzipSync(formattedStringData);
+          headers.set("Content-Encoding", "gzip");
+          headers.set("Vary", "Accept-Encoding");
+
+          return new Response(compressedData, this._response_init);
+        } catch (error) {
+          console.warn("Failed to compress response:", error);
+          // Fall back to uncompressed
+        }
+      }
+
+      return new Response(formattedStringData, this._response_init);
+
       // Handle non-string responses (buffers, streams, etc.)
-      return new Response(this._response_body, this._response_init);
+
 
     } catch (error) {
       console.error("Error in toResponse():", error);

@@ -2,6 +2,7 @@
 
 import { Database as _BunDB } from "bun:sqlite";
 import type { _DataType, DBSchema, TableSchema, ColumnsSchema } from "./schema";
+import { isJsxOpeningElement } from "typescript";
 
 // Global type declarations
 declare global {
@@ -139,8 +140,12 @@ class AdvancedConnectionPool {
       enableLogging: false,
       ...config
     };
+  }
 
-    this.initialize();
+  static async create(dbPath: string, config: Partial<PoolConfig> = {}): Promise<AdvancedConnectionPool> {
+    const instance = new AdvancedConnectionPool(dbPath, config);
+    await instance.initialize();
+    return instance;
   }
 
   static getPool(dbPath: string, config?: Partial<PoolConfig>): AdvancedConnectionPool {
@@ -150,7 +155,7 @@ class AdvancedConnectionPool {
     return this.pools.get(dbPath)!;
   }
 
-  private async initialize(): Promise<void> {
+  async initialize(): Promise<void> {
     // Create minimum connections
     for (let i = 0; i < this.config.minConnections; i++) {
       await this.createConnection();
@@ -488,6 +493,20 @@ class AdvancedConnectionPool {
   }
 }
 
+type DatabaseInitializerConfig = {
+  db?: _BunDB;
+  schema?: DBSchema;
+  usePool?: boolean;
+  poolConfig?: Partial<PoolConfig>;
+  dbPath?: string;
+};
+
+type DatabaseInitializerConfigDbPathMendatory = {
+  schema?: DBSchema;
+  poolConfig?: Partial<PoolConfig>;
+  dbPath: string;
+};
+
 class DatabaseInitializer {
   /**
    * Direct access to the database instance
@@ -499,17 +518,11 @@ class DatabaseInitializer {
   private readonly poolConfig?: Partial<PoolConfig>;
   private pool?: AdvancedConnectionPool;
 
-  constructor(config: {
-    db?: _BunDB;
-    schema?: DBSchema;
-    usePool?: boolean;
-    poolConfig?: Partial<PoolConfig>;
-    dbPath?: string;
-  }) {
+  constructor(config: DatabaseInitializerConfig) {
     this.DBSchema = config?.schema || globalThis.dbSchema || [];
     this.usePool = config?.usePool ?? false;
     this.poolConfig = config?.poolConfig;
-    this.databaseInstance = config.db || new _BunDB(DEFAULT_DB_PATH, {
+    this.databaseInstance = config.db || new _BunDB(config?.dbPath || DEFAULT_DB_PATH, {
       create: true,
       strict: true,
     });
@@ -518,6 +531,20 @@ class DatabaseInitializer {
       throw new Error("Database instance is not available");
     }
     this.initDatabase();
+  }
+
+  static async createWithPool(config: DatabaseInitializerConfigDbPathMendatory) {
+    const instance = new DatabaseManager({
+      usePool: true,
+      poolConfig: config.poolConfig,
+      dbPath: config.dbPath
+    });
+    await instance.initPool(config.dbPath, config.poolConfig);
+    return instance;
+  }
+
+  async initPool(dbPath: string, poolConfig?: Partial<PoolConfig>): Promise<void> {
+    this.pool = new AdvancedConnectionPool(dbPath, poolConfig);
   }
 
   private initDatabase(): void {
@@ -1602,12 +1629,11 @@ export class DatabaseManager extends DatabaseInitializer {
    * console.log('Active connections:', stats?.activeConnections);
    * ```
    */
-  withPooling(config: {
+  async withPooling(config: {
     dbPath: string;
     poolConfig?: Partial<PoolConfig>;
-  }): DatabaseManager {
-    return new DatabaseManager({
-      usePool: true,
+  }): Promise<DatabaseManager> {
+    return DatabaseManager.createWithPool({
       poolConfig: config.poolConfig,
       dbPath: config.dbPath
     });

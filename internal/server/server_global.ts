@@ -5,6 +5,14 @@ import type { BunextType, ServerConfig } from "../types.ts";
 import type { BunextServer } from "./index.ts";
 
 
+if (typeof process.env.NODE_ENV == "undefined") {
+  if (process.argv[2] === "dev") {
+    process.env.NODE_ENV = "development";
+  } else {
+    process.env.NODE_ENV = "production";
+  }
+}
+
 declare global {
   var socketList: ServerWebSocket<unknown>[];
   var dryRun: boolean;
@@ -61,5 +69,10 @@ export async function InitGlobalServerConfig() {
   //@ts-ignore
   globalThis.serverConfig ??= config;
 }
+
+
+export const baseDir = process.cwd();
+export const pageDir = "src/pages" as const;
+export const buildDir = ".bunext/build" as const;
 
 await InitGlobalServerConfig();

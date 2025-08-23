@@ -1,4 +1,4 @@
-"use client";
+"server only";
 
 import type { _Users, SELECT_Users } from "./database_types.ts";
 

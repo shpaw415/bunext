@@ -105,7 +105,7 @@ async function initializeTailwind(config: TailwindConfig): Promise<void> {
     }
 
     // Set global flag for other parts of the framework
-    globalThis.tailwind_enabled = true;
+    //globalThis.tailwind_enabled = true;
 
     // Ensure input CSS file exists
     await ensureInputFile(config);

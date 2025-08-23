@@ -3,7 +3,7 @@ import { sendSignal } from "../../dev/hotServer";
 import "./server_global";
 import { paths } from "../globals";
 import { builder } from "./build";
-import { normalize, relative } from "node:path";
+import { join, normalize, relative } from "node:path";
 import {
   benchmark_console,
   DevConsole,
@@ -12,6 +12,7 @@ import {
   ToColor,
 } from "./logs";
 import { router } from "./router";
+import { resetPath } from "plugins/server-features/ssr-page";
 
 type initFunction = (path?: string) => Promise<any>;
 
@@ -83,10 +84,10 @@ export const doWatchBuild = () =>
           "/"
         );
         pathnameArray.pop();
-        const pathname = pathnameArray.join("/") || "/";
+        const pathname = pathnameArray.length > 0 ? join(...pathnameArray) : "/";
         setTimeout(
           () =>
-            DevConsole(
+            console.log(
               `${ToColor("blue", TerminalIcon.info)} ${ToColor(
                 TextColor,
                 `compiling ${pathname} ...`
@@ -102,7 +103,7 @@ export const doWatchBuild = () =>
             )}`,
           async () => {
             if (isBuildPrevented) return;
-            await builder.resetPath(probablePath);
+            await resetPath(probablePath);
             await builder.makeBuild(probablePath);
           }
         );

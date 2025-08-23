@@ -1,5 +1,5 @@
 import { plugin, type BunPlugin } from "bun";
-import { get } from "bunext-js/plugins/svg/init.ts"; // must be absolute
+import { SVGCache } from "bunext-js/plugins/svg/init.ts"; // must be absolute
 
 const SvgPlugin: BunPlugin = {
   name: "SVG loader",
@@ -12,7 +12,7 @@ const SvgPlugin: BunPlugin = {
         return {
           contents: `
           "use client";
-        ${await get(path)}
+        ${await SVGCache.get(path)}
           `,
           loader: "js",
         };

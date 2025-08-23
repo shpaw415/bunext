@@ -45,17 +45,25 @@ const staticPageCacheShema: DBSchema = [
 type StaticPageCacheType = staticPage & { created_at: Date; etag: string };
 
 
-class StaticPageCache extends CacheManagerPool {
+class StaticPageCache {
 
-  constructor() {
-    super({
+  private poolManager!: CacheManagerPool;
+
+  async initialize() {
+    this.poolManager = await CacheManagerPool.create({
       schema: staticPageCacheShema,
       dbPath: join(import.meta.dirname, "static_page.sqlite"),
     });
   }
 
+  static async create() {
+    const instance = new StaticPageCache();
+    await instance.initialize();
+    return instance;
+  }
+
   async static_page<T>(then: (table: Table<StaticPageCacheType, StaticPageCacheType>) => T | Promise<T>): Promise<T> {
-    return await this.getTable<StaticPageCacheType, StaticPageCacheType>("static_page", then) as T;
+    return await this.poolManager.getTable<StaticPageCacheType, StaticPageCacheType>("static_page", then) as T;
   }
 
   async addStaticPage(pathname: string, page?: string, raw_props?: {}, etag?: string) {
@@ -142,7 +150,44 @@ class StaticPageCache extends CacheManagerPool {
   }
 }
 
-export const StaticPageCacheInstance = new StaticPageCache();
+export const StaticPageCacheInstance = await StaticPageCache.create();
+
+export default {
+  priority: 0,
+  router: {
+    async request(manager) {
+      if (process.env.NODE_ENV == "development" || manager.bunextReq.isResponseSetted()) return;
+
+
+      const isUseStatic = manager.serverSide?.filePath ? (await manager.router.fileDirectives?.pathIs("use-static", manager.serverSide?.filePath)) as boolean : false;
+      if (!isUseStatic) return;
+
+      if (isRequestGetServerSideProps(manager)) {
+        return await handleGetServerSideProps(manager);
+      } else if (!manager.bunextReq.isAskingHTML) return;
+      else {
+        await handleGetHTMLPage(manager);
+      }
+
+    },
+    html_rewrite: {
+      async after(context, manager, HTML) {
+        if (
+          !manager.bunextReq.isAskingHTML ||
+          manager.serverSide && !(await manager.router.fileDirectives?.pathIs("use-static", manager.serverSide.filePath)
+          )) return;
+        await StaticPageCacheInstance.updateHTML(manager.pathname, HTML);
+      },
+    }
+  },
+  serverStart: {
+    async main() {
+      await StaticPageCacheInstance.clearStaticPage();
+    },
+
+  },
+} as BunextPlugin;
+
 
 /**
  * Make static page
@@ -182,7 +227,7 @@ function serveGetServerSideProps(manager: RequestManager, props: staticPage["pro
 
 async function handleGetServerSideProps(manager: RequestManager) {
   const props = await makeServerSidePropsIfNotExists(manager);
-  createHTMLIfNotExists(manager, props);
+  await createHTMLIfNotExists(manager, props);
   serveGetServerSideProps(manager, props);
 }
 
@@ -199,42 +244,16 @@ async function handleGetHTMLPage(manager: RequestManager) {
   });
 }
 
-export default {
-  priority: 0,
-  router: {
-    async request(manager) {
-      if (process.env.NODE_ENV == "development" || manager.bunextReq.isResponseSetted()) return;
 
-      const isUseStatic = manager.router.fileDirectives?.getDirectiveFromRoute(manager.pathname);
-      if (isRequestGetServerSideProps(manager) && isUseStatic) {
-        return await handleGetServerSideProps(manager);
-      } else if (!manager.bunextReq.isAskingHTML || !isUseStatic) return;
-      else await handleGetHTMLPage(manager);
-
-    },
-    html_rewrite: {
-      async after(context, manager, HTML) {
-        if (!manager.bunextReq.isAskingHTML || !manager.router.fileDirectives?.getDirectiveFromRoute(manager.pathname)) return;
-        await StaticPageCacheInstance.updateHTML(manager.pathname, HTML);
-      },
-    }
-  },
-  serverStart: {
-    async main() {
-      await StaticPageCacheInstance.clearStaticPage();
-    },
-
-  },
-} as BunextPlugin;
 
 
 async function makeServerSidePropsIfNotExists(manager: RequestManager) {
   const cache = StaticPageCacheInstance;
-  const props = cache.getStaticPageProps(manager.pathname);
+  const props = await cache.getStaticPageProps(manager.pathname);
   if (props) return props;
 
   const _props = await makeServerSideProps(manager);
-  cache.addStaticPageProps(manager.pathname, _props);
+  await cache.addStaticPageProps(manager.pathname, _props);
   return _props;
 }
 
@@ -255,9 +274,9 @@ async function createHTMLIfNotExists(manager: RequestManager, props: staticPage[
   const cache = StaticPageCacheInstance;
   const pathname = manager.pathname;
   const pageData = await cache.getStaticPage(pathname);
-  if (!pageData || !pageData) {
+  if (!pageData?.page) {
     const page = (await MakeStaticPage(manager, props)) as staticPage;
-    cache.addStaticPage(pathname, page.page, props);
+    await cache.addStaticPage(pathname, page.page, props);
     return page;
   }
   return pageData;

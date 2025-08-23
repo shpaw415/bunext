@@ -113,7 +113,7 @@ export async function makeServerSideProps(manager: RequestManager<ServerSideProp
 
 export function serverSidePropsAfterRequestHandler(manager: RequestManagerContexted): Response | void {
     const props = manager.bunextReq.getContext().__SERVERSIDE_PROPS__;
-    if (props?.redirect && manager.request_header?.accept !== "application/vnd.server-side-props") {
+    if (props?.redirect && manager.request.headers.get("accept") == "application/vnd.server-side-props") {
         return setRedirectToPath(props.redirect);
     }
 

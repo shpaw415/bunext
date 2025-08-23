@@ -19,7 +19,7 @@ import { cpus, type as OSType } from "node:os";
 import cluster from "node:cluster";
 
 // Features
-import { revalidate } from "plugins/server-features/ssr-page.ts";
+import { resetPath, revalidate } from "plugins/server-features/ssr-page.ts";
 import {
   cleanExpiredSessions,
   deleteSessionById,
@@ -290,7 +290,7 @@ class BunextServer {
 
     // Initialize the enhanced terminal console
     !this.preventDevConsole && initializeDevConsole();
-    dry && DevConsole().info("Starting...");
+    dry && console.info("Starting...");
 
     dry && await benchmark_console(
       (time) =>
@@ -316,19 +316,17 @@ class BunextServer {
       }
       if (isDryRun) {
         await OnServerStart();
+        this.startServer();
         if (isDev) {
           doWatchBuild();
           this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
         } else {
           const buildoutput = await builder.makeBuild();
           if (!buildoutput) {
-            const err = new Error("Production build failed");
-            console.error(err);
-            throw err;
+            throw new Error("Production build failed", { cause: buildoutput });
           }
           setRevalidate(buildoutput.revalidates);
         }
-        this.startServer();
       }
     } else if (isMainThread) {
       if (isDryRun) {
@@ -353,7 +351,7 @@ class BunextServer {
     if (isDryRun) globalThis.dryRun = false;
 
     if (this.isClustered && !isDev && isMainThread)
-      DevConsole().info("Starting Bunext in Multi-threaded mode");
+      console.info("Starting Bunext in Multi-threaded mode");
 
     return this;
   }
@@ -502,7 +500,7 @@ class BunextServer {
   }
 
   private async handleUpdateBuild(path?: string) {
-    if (path) await builder.resetPath(path);
+    if (path) await resetPath(path);
     await builder.makeBuild();
     await this.updateWorkerData();
   }

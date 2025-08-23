@@ -2,20 +2,15 @@
 
 import "./server_global.ts";
 import "./bunext_global";
-import { join, basename } from "node:path";
+import { join } from "node:path";
 import {
   type BuildOutput,
   type BunPlugin,
-  type JavaScriptLoader,
 } from "bun";
-import { normalize, resolve } from "path";
-import { type JSX, isValidElement } from "react";
-import reactElementToJSXString from "../jsxToString/index";
+import { normalize } from "path";
 import { mkdirSync, rmSync, unlinkSync } from "node:fs";
-import { renderToString } from "react-dom/server";
-import type { ssrElement } from "../types";
 import "../globals";
-import { Head, type _Head } from "../../features/head";
+import { Head, type _Head } from "features/head";
 import { DevConsole } from "./logs";
 import { router } from "./router";
 import * as React from "react";
@@ -25,10 +20,8 @@ import type {
   BuildWorkerMessage,
   BuildWorkerResponse,
 } from "./build-worker.ts";
-import { generateRandomString } from "../../features/utils/index.ts";
-import { ExitCodeDescription } from "../../bin/exit-codes.ts";
-import { DirectiveTool } from "plugins/utils";
-import { SSRCache } from "plugins/server-features/ssr-page";
+import { ExitCodeDescription } from "bin/exit-codes.ts";
+import { preBuild, preBuildAll, SSRCache } from "plugins/server-features/ssr-page";
 
 globalThis.React = React;
 
@@ -42,9 +35,9 @@ export type BuildOuts = {
 
 type _Mainoptions = {
   baseDir: string;
-  buildDir: string;
-  pageDir: string;
-  hydrate: string;
+  buildDir: ".bunext/build";
+  pageDir: "src/pages";
+  hydrate: ".bunext/react-ssr/hydrate.ts";
 };
 
 declare global {
@@ -54,8 +47,6 @@ declare global {
 }
 
 const cwd = process.cwd();
-
-const fileDirective = new DirectiveTool();
 
 class Builder extends PluginLoader {
   public options: _Mainoptions = {
@@ -282,121 +273,17 @@ class Builder extends PluginLoader {
         }
     }
   }
-  async preBuild(modulePath: string): Promise<void> {
 
-    if (modulePath.endsWith(".d.ts")) return;
-
-    Head._setCurrentPath(modulePath);
-    const _module = (await import(
-      modulePath +
-      (process.env.NODE_ENV == "development"
-        ? `?${generateRandomString(5)}`
-        : "")) as Record<string, unknown>
-    );
-    if (await fileDirective.pathIs("use-client", modulePath)) return;
-
-    for await (const ex of Object.keys(_module)) {
-      try {
-
-        const exported = _module[ex] as (() => JSX.Element | Promise<JSX.Element>) | unknown;
-        if (
-          typeof exported != "function" ||
-          exported.name.startsWith("Server") ||
-          exported.name == "getServerSideProps" ||
-          exported.length > 0
-        )
-          continue;
-
-        const element = await exported();
-
-        if (!isValidElement(element)) continue;
-        let moduleSSR =
-          await SSRCache.getSSR(modulePath) || await SSRCache.addSSR(modulePath, []);
-        const SSRelement = moduleSSR.elements.find(
-          (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
-        );
-        if (SSRelement) {
-          SSRelement.reactElement = this.toJSX(element);
-          SSRelement.htmlElement = renderToString(element);
-        } else {
-          moduleSSR.elements.push({
-            tag: `<!Bunext_Element_${exported.name}!>`,
-            reactElement: this.toJSX(element),
-            htmlElement: renderToString(element),
-            name: exported.name
-          });
-        }
-        await SSRCache.addSSR(modulePath, moduleSSR.elements);
-      } catch (e) {
-        //console.error("PreBuild Error:", e);
-        continue;
-      }
-    }
-  }
-  async preBuildAll(skip?: ssrElement[]) {
-    const files = await Array.fromAsync(
-      this.glob(
-        normalize([this.options.baseDir, this.options.pageDir].join("/"))
-      )
-    );
-    for await (const file of files) {
-      if (skip?.find((e) => e.path == file)) continue;
-      await this.preBuild(file);
-    }
-  }
-  private toJSX(el: JSX.Element) {
-    return reactElementToJSXString(el, {
-      showFunctions: true,
-      showDefaultProps: true,
-      useFragmentShortSyntax: true,
-      sortProps: false,
-      useBooleanShorthandSyntax: false,
-    });
-  }
-
-
-  async resetPath(path: string) {
-    const ssr = await SSRCache.getSSR(path);
-    if (!ssr) return false;
-    if (process.env.NODE_ENV == "production") {
-      const extensions = ["tsx", "jsx"];
-      for (const imp of new Bun.Transpiler({
-        loader: path.split(".").at(-1) as JavaScriptLoader,
-      })
-        .scanImports(await Bun.file(path).text())
-        .map((e) => e.path)) {
-        if (imp.startsWith(".")) {
-          const _path = path.split("/");
-          _path.pop();
-          const resolvedPath = resolve(normalize("/" + join(..._path)), imp);
-          for await (const ext of extensions) {
-            const i = await SSRCache.getSSR(`${resolvedPath}.${ext}`);
-            if (i) await SSRCache.deleteSSR(i.path);
-          }
-          continue;
-        }
-        const absolutePath = Bun.fileURLToPath(
-          import.meta.resolve?.(imp) || ""
-        );
-        await SSRCache.deleteSSR(absolutePath);
-      }
-    }
-    await SSRCache.deleteSSR(ssr.path);
-    return true;
-  }
-  async findPathIndex(path: string): Promise<boolean> {
-    return Boolean(await SSRCache.getSSR(path));
-  }
 
   private async _makeBuild(path?: string) {
     const BuildPath = path ?? process.env.BuildPath;
 
     try {
       BuildPath
-        ? await this.preBuild(BuildPath)
-        : await this.preBuildAll(await SSRCache.getAllSSR());
+        ? await preBuild(BuildPath)
+        : await preBuildAll(await SSRCache.getAllSSR());
     } catch (e) {
-      DevConsole()?.error("PreBuild Error");
+      console.error("PreBuild Error");
 
       if (process.send)
         process.send({
@@ -520,7 +407,7 @@ class Builder extends PluginLoader {
       } as BuildWorkerMessage);
       await this.awaitBuildFinish();
       if (this.BuilderWorker.exitCode) {
-        DevConsole("BuilderWorker exited");
+        console.log("BuilderWorker exited");
         this.createBuildWorker();
       }
       strRes = {

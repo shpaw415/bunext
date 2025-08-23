@@ -120,7 +120,7 @@ export type ServerConfig = {
     /**
      * Array of base path of Dynamic loaded module
      */
-    dynamicPaths: Array<string>;
+    dynamicPaths?: Array<string>;
   };
   bunext_plugins?: Array<BunextPlugin>;
   /**

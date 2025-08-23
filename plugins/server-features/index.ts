@@ -2,7 +2,7 @@ import type { BunextPlugin } from "plugins/types";
 import { InitServerActions, onRequestServerAction, ServerActionCompiler, ServerActionToTag, ServerComponentsToTag } from "./serverActions";
 import { builder } from "internal/server/build";
 import { basename, join, normalize } from "path";
-import { onRequestSSRPage, clearSSRPage, ServerComponentsCompiler, initSSRPage } from "./ssr-page";
+import { onRequestSSRPage, clearSSRPage, ServerComponentsCompiler, initSSRPage, SSRCache } from "./ssr-page";
 import { generateRandomString } from "features/utils";
 import { serverSidePropsAfterRequestHandler, serveServerSideProps, setGlobalServerSidePropsIfNeeded } from "./serverSideProps";
 import { serveDynamicPage } from "./dynamic-page";
@@ -290,6 +290,7 @@ export default {
     async onFileSystemChange() {
         await InitServerActions();
         await initSSRPage();
+        //await SSRCache.clearSSR();
     },
 
 } as BunextPlugin;

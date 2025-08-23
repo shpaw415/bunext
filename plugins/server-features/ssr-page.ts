@@ -4,63 +4,80 @@ import type { FileSystemRouter } from "bun";
 import { CacheManagerPool } from "internal/caching";
 import { router, type RequestManager } from "internal/server/router";
 import type { ClusterMessageType, PageModule, ssrElement, SSRPage } from "internal/types";
-import { createElement, type JSX } from "react";
+import { createElement, isValidElement, type JSX } from "react";
 import { join } from "path";
 import type { Table } from "database/class";
 import { builder } from "internal/server/build";
+import type { DBSchema } from "database/schema";
+import { generateRandomString } from "features/utils";
+import { DirectiveTool } from "plugins/utils";
+import reactElementToJSXString from "internal/jsxToString";
+import { renderToString } from "react-dom/server";
+import { normalize, resolve } from "path";
+import { baseDir, pageDir } from "internal/server/server_global";
+import { Head } from "features/head";
 
-class SSRPageCache extends CacheManagerPool {
+const Schema: DBSchema = [
+    {
+        name: "ssr",
+        columns: [
+            {
+                name: "path",
+                type: "string",
+                primary: true,
+            },
+            {
+                name: "elements",
+                type: "json",
+                DataType: [
+                    {
+                        tag: "string",
+                        reactElement: "string",
+                        htmlElement: "string",
+                    },
+                ],
+            },
 
-    constructor() {
-        super({
-            schema: [
-                {
-                    name: "ssr",
-                    columns: [
-                        {
-                            name: "path",
-                            type: "string",
-                            primary: true,
-                        },
-                        {
-                            name: "elements",
-                            type: "json",
-                            DataType: [
-                                {
-                                    tag: "string",
-                                    reactElement: "string",
-                                    htmlElement: "string",
-                                },
-                            ],
-                        },
+        ],
 
-                    ],
+    },
+    {
+        name: "page",
+        columns: [
+            {
+                name: "route",
+                type: "string",
+                primary: true,
+                unique: true,
+            },
+            {
+                name: "content",
+                type: "string",
+            },
+        ],
+    },
+];
+const DBPath = join(import.meta.dirname, "ssr_cache.sqlite");
+const fileDirective = new DirectiveTool();
+class SSRPageCache {
 
-                },
-                {
-                    name: "page",
-                    columns: [
-                        {
-                            name: "route",
-                            type: "string",
-                            primary: true,
-                            unique: true,
-                        },
-                        {
-                            name: "content",
-                            type: "string",
-                        },
-                    ],
-                },
-            ],
-            dbPath: join(import.meta.dirname, "ssr_cache.sqlite"),
-        })
+    private poolManager!: CacheManagerPool;
+
+    static async create() {
+        const instance = new SSRPageCache();
+        await instance.initialize();
+        return instance;
     }
+
+    async initialize() {
+        this.poolManager = await CacheManagerPool.create({ dbPath: DBPath, schema: Schema });
+    }
+
     private ssr<T>(callback: (table: Table<ssrElement, ssrElement>) => T | Promise<T>) {
-        return this.getTable<ssrElement, ssrElement>("ssr", callback) as Promise<T>;
+        return this.poolManager.getTable<ssrElement, ssrElement>("ssr", callback) as Promise<T>;
     }
     private page<T>(callback: (table: Table<SSRPage, SSRPage>) => T | Promise<T>) {
-        return this.getTable<SSRPage, SSRPage>("page", callback) as Promise<T>;
+        return this.poolManager.getTable<SSRPage, SSRPage>("page", callback) as Promise<T>;
     }
 
     //SSR Default Page
@@ -119,7 +136,7 @@ class SSRPageCache extends CacheManagerPool {
 }
 
 
-export const SSRCache = new SSRPageCache();
+export const SSRCache = await SSRPageCache.create();
 
 export let ssrAsDefaultRoutes: Array<keyof FileSystemRouter["routes"]> = [];
 
@@ -152,7 +169,7 @@ export async function onRequestSSRPage(manager: RequestManager): Promise<boolean
 async function getSSRDefaultPage(manager: RequestManager): Promise<string | null> {
     if (!isSSRDefaultExportPath(manager, true) || !manager.serverSide)
         return null;
-    const cache = await SSRCache.getSSRDefaultPage(manager.serverSide.pathname);
+    const cache = await SSRCache.getSSRDefaultPage(manager.serverSide.filePath);
     if (cache) return cache;
 
     const preRenderedPage = await getPreRenderedPage(manager);
@@ -284,12 +301,194 @@ const findRouteOrThrow = (path: string) => {
     return matched;
 };
 
+
+const fullPagePath = join(baseDir, pageDir);
+const testAgainstExt = ["ts", "tsx"];
+const moduleImports = new Map<string, string[]>();
+
+class PreBuildContext {
+    private paths: Set<string> = new Set();
+
+    constructor(route: string) {
+        Head._setCurrentPath(route);
+    }
+
+    async preBuild(modulePath: string) {
+        if (this.paths.has(modulePath) || modulePath.endsWith(".d.ts")) return;
+        this.paths.add(modulePath);
+
+        const _module = (await import(
+            modulePath + this.getDevKey()
+        ) as Record<string, unknown>);
+        if (await fileDirective.pathIs("use-client", modulePath)) return;
+
+
+        const existingImports = await this.getModuleImportsFromFilePath(modulePath);
+
+        const moduleSSR =
+            await SSRCache.getSSR(modulePath) || await SSRCache.addSSR(modulePath, []);
+
+        await Promise.all(existingImports.map((imp) => this.preBuild(imp)));
+
+        await Promise.all(
+            Object.keys(_module).map(async (ex) => {
+                try {
+
+                    const exported = _module[ex] as (() => JSX.Element | Promise<JSX.Element>) | unknown;
+                    if (
+                        typeof exported != "function" ||
+                        exported.name.startsWith("Server") ||
+                        exported.name == "getServerSideProps" ||
+                        exported.length > 0
+                    )
+                        return;
+
+                    const element = await exported() as unknown;
+
+
+                    if (!isValidElement(element)) return;
+
+                    const SSRelement = moduleSSR.elements.find(
+                        (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
+                    );
+                    if (SSRelement) {
+                        SSRelement.reactElement = this.toJSX(element);
+                        SSRelement.htmlElement = renderToString(element);
+                    } else {
+                        moduleSSR.elements.push({
+                            tag: `<!Bunext_Element_${exported.name}!>`,
+                            reactElement: this.toJSX(element),
+                            htmlElement: renderToString(element),
+                            name: exported.name
+                        });
+                    }
+                } catch (e) {
+                    console.error("PreBuild Error:", e);
+                    return;
+                }
+            }));
+        if (moduleSSR.elements.length > 0) await SSRCache.addSSR(modulePath, moduleSSR.elements);
+    }
+
+
+    private getDevKey() {
+        return process.env.NODE_ENV == "development"
+            ? `?${generateRandomString(5)}`
+            : "";
+    }
+    private onProduction(callback: () => void) {
+        if (process.env.NODE_ENV == "production") {
+            callback();
+        }
+    }
+    private async testExists(e: string) {
+        for await (const ext of testAgainstExt) {
+            const fullName = `${e}.${ext}`;
+            if (await Bun.file(fullName).exists()) {
+                return fullName;
+            }
+        }
+        return undefined;
+    }
+    private async getModuleImportsFromFilePath(modulePath: string): Promise<string[]> {
+        this.onProduction(() => {
+            const res = moduleImports.get(modulePath);
+            if (res) return res;
+        });
+
+        const imports = new Bun.Transpiler({
+            "loader": "tsx"
+        }).scanImports(await Bun.file(modulePath).text());
+
+
+        const filtered = imports.map((el) => {
+            try { return Bun.fileURLToPath(import.meta.resolve(el.path, modulePath)) } catch (e) {
+                console.error("Error resolving import path:", el.path, "from", modulePath, e);
+                return undefined;
+            }
+        }).filter((e) => e != undefined && e.startsWith(fullPagePath)) as string[];
+
+        const existingFiles = (await Promise.all(filtered.map(this.testExists))).filter((e) => e != undefined) as string[];
+
+        this.onProduction(() => {
+            moduleImports.set(modulePath, existingFiles);
+        });
+
+        return existingFiles;
+
+    }
+    private toJSX(el: JSX.Element) {
+        return reactElementToJSXString(el, {
+            showFunctions: true,
+            showDefaultProps: true,
+            useFragmentShortSyntax: true,
+            sortProps: false,
+            useBooleanShorthandSyntax: false,
+        });
+    }
+}
+
+export async function preBuild(modulePath: string): Promise<void> {
+    const context = new PreBuildContext(modulePath);
+    await context.preBuild(modulePath);
+
+}
+export async function preBuildAll(skip?: ssrElement[]) {
+    const files = await Array.fromAsync(
+        builder.glob(
+            fullPagePath
+        )
+    );
+    for await (const file of files) {
+        if (skip?.find((e) => e.path == file)) continue;
+        await preBuild(file);
+    }
+}
+
+
+export async function resetPath(path: string) {
+    const ssr = await SSRCache.getSSR(path);
+    if (!ssr) {
+        return false;
+    }
+    if (process.env.NODE_ENV == "production") {
+        const extensions = ["tsx", "jsx"];
+        for (const imp of new Bun.Transpiler({
+            loader: path.split(".").at(-1) as Bun.JavaScriptLoader,
+        })
+            .scanImports(await Bun.file(path).text())
+            .map((e) => e.path)) {
+            if (imp.startsWith(".")) {
+                const _path = path.split("/");
+                _path.pop();
+                const resolvedPath = resolve(normalize("/" + join(..._path)), imp);
+                for await (const ext of extensions) {
+                    const i = await SSRCache.getSSR(`${resolvedPath}.${ext}`);
+                    if (i) await SSRCache.deleteSSR(i.path);
+                }
+                continue;
+            }
+            const absolutePath = Bun.fileURLToPath(
+                import.meta.resolve?.(imp) || ""
+            );
+            await SSRCache.deleteSSR(absolutePath);
+        }
+    }
+    await SSRCache.deleteSSR(ssr.path);
+    return true;
+}
+
+
+export async function findPathIndex(path: string): Promise<boolean> {
+    return Boolean(await SSRCache.getSSR(path));
+}
+
 export async function revalidate(...path: string[]) {
     const _paths = path.map((p) => findRouteOrThrow(p));
 
     const route = (await Promise.all(_paths
         .map(async (route) => {
-            const res = await builder.findPathIndex(route.filePath);
+            const res = await findPathIndex(route.filePath);
             return res ? route : null;
         }))).filter(t => t !== null);
 
@@ -305,7 +504,7 @@ export async function revalidate(...path: string[]) {
     SSRCache.removeSSRDefaultPage(...route.map(({ pathname }) =>
         pathname
     ));
-    await Promise.all(route.map(({ filePath }) => builder.resetPath(filePath)));
+    await Promise.all(route.map(({ filePath }) => resetPath(filePath)));
     await builder.makeBuild();
 }
 /**

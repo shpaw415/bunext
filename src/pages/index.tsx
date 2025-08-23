@@ -29,7 +29,7 @@ Head.setHead({
 });
 
 export function TestServerElement1() {
-  return <div>{Bun.password.hashSync("allô")}</div>;
+  return <div>ALLO: {Bun.password.hashSync("allô")}</div>;
 }
 
 function DynamicFileImport() {
@@ -55,7 +55,8 @@ export default async function Page() {
     <div>
       <TestElement />
       <TestServerElement1 />
-      {TestServerElement2()}
+      <TestServerElement2 />
+
       <TestElement3 />
       <Bunext.router.navigate.components.link href="/other">
         <button>Other page</button>
@@ -79,6 +80,10 @@ export default async function Page() {
       </Bunext.router.navigate.components.link>
     </div>
   );
+}
+
+export function TestElement4() {
+  return <div>{Bun.hash("allô").toLocaleString()}</div>;
 }
 
 function SetSessionButton() {
