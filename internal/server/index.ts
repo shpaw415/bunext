@@ -37,7 +37,7 @@ import type {
 import OnServerStart, { OnServerStartCluster } from "./server-start.ts";
 
 // Caching and logging
-import "../caching/fetch.ts";
+import "../../plugins/fetch-caching/fetch.ts";
 import {
   benchmark_console,
   DevConsole,

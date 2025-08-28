@@ -2,7 +2,6 @@
 
 import { _Database, DatabaseManager, Table, type PoolConfig, type PooledConnection } from "../../database/class";
 import type { _DataType, DBSchema } from "../../database/schema";
-import { type _Head } from "../../features/head";
 
 
 type CacheManagerPoolConfig = { schema: DBSchema; dbPath?: string, poolConfig?: Partial<PoolConfig> };
@@ -55,4 +54,134 @@ class CacheManagerPool {
   }
 }
 
-export { CacheManagerPool };
+type CacheManagerPoolDefaultConfigShemaType<T> = {
+  id?: number;
+  tag: string;
+  key: string;
+  value: T;
+  expiresAt?: Date;
+}
+
+const CacheManagerPoolDefaultConfig: CacheManagerPoolConfig = {
+  schema: [{
+    name: "cache",
+    columns: [
+      {
+        name: "id",
+        type: "number",
+        primary: true,
+        autoIncrement: true,
+        unique: true,
+      },
+      {
+        name: "tag",
+        type: "string"
+      },
+      {
+        name: "key",
+        type: "string",
+        unique: true,
+      },
+      {
+        name: "value",
+        type: "json",
+        DataType: {}
+      },
+      { name: "expiresAt", type: "Date", nullable: true }
+    ]
+  }],
+  poolConfig: {
+    maxConnections: 10,
+    minConnections: 5,
+    enableLogging: false,
+  }
+};
+
+class CacheManager<T extends Record<string, unknown>> {
+  private cache!: CacheManagerPool;
+  private tag: string;
+
+  constructor(tag: string) {
+    this.tag = tag;
+  }
+
+  static async create<T extends Record<string, unknown>>(tag: string, config?: { dbPath?: string, poolConfig?: Partial<PoolConfig> }) {
+    const instance = new CacheManager<T>(tag);
+    await instance.__initialize__(config);
+    return instance;
+  }
+
+  async __initialize__(config?: { dbPath?: string, poolConfig?: Partial<PoolConfig> }) {
+    this.cache = await CacheManagerPool.create({
+      dbPath: config?.dbPath || import.meta.dirname + "/cache.sqlite",
+      ...CacheManagerPoolDefaultConfig,
+      poolConfig: {
+        ...CacheManagerPoolDefaultConfig.poolConfig,
+        ...config?.poolConfig
+      }
+    });
+  }
+
+  private cacheTable<K>(callback: (table: Table<CacheManagerPoolDefaultConfigShemaType<T>, CacheManagerPoolDefaultConfigShemaType<T>>) => K): Promise<K> {
+    return this.cache.getTable("cache", callback);
+  }
+
+  public set(key: string, value: T, expiresAt?: Date) {
+    return this.cacheTable((table) => {
+      table.upsert([
+        {
+          tag: this.tag,
+          key: this.tag + ":" + key,
+          value,
+          expiresAt
+        }
+      ], ["key"], ["value", "expiresAt"]);
+    });
+  }
+
+  public get(key: string): Promise<T | null> {
+    return this.cacheTable<T | null>(table => {
+      const res = table.findFirst({
+        where: {
+          tag: this.tag,
+          key: this.tag + ":" + key
+        },
+        select: {
+          value: true,
+          expiresAt: true
+        }
+      });
+
+      if (!res) return null;
+      if (res.expiresAt && res.expiresAt.getTime() < Date.now()) {
+        this.delete(key);
+        return null;
+      }
+
+      return res.value;
+    });
+  }
+
+  public delete(key: string) {
+    return this.cacheTable(table => {
+      return table.delete({
+        where: {
+          tag: this.tag,
+          key: this.tag + ":" + key
+        },
+      });
+    });
+  }
+
+  public clear() {
+    return this.cacheTable(table => {
+      return table.delete({
+        where: {
+          tag: this.tag
+        }
+      });
+    });
+  }
+}
+
+export { CacheManagerPool, CacheManager };

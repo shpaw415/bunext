@@ -3,7 +3,6 @@
 import { normalize } from "node:path";
 import type { BunextPlugin } from "../../plugins/types";
 
-type NoUndefinedField<T> = { [P in keyof T]-?: NoUndefinedField<NonNullable<T[P]>> };
 
 export class PluginLoader {
   protected Plugins: BunextPlugin[] = [];
@@ -43,6 +42,7 @@ export class PluginLoader {
 
       return ((a?.priority ?? 1000) - (b?.priority ?? 1000));
     });
+
     // Clear caches when plugins are reinitialized
     this.clearCaches();
   }

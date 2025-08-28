@@ -43,6 +43,32 @@ type Build_Plugins = {
   buildOptions?: Partial<Bun.BuildConfig>;
 };
 
+export type PreBuildContextDefaultValues = { route: string };
+
+type buildContextPlugin<T extends Record<string, unknown> = {}> = {
+  /**
+ * Context values to be passed to the SSR pre-build step.
+ *
+ * can be accessed in the SSR pre-build process via the usePluginContext hook.
+ *
+ * this is useful for getting data on pre-build-time if some data are only accessible from the pre-build event.
+ * 
+ * what is preBuild?
+ * @link soon
+ *
+ * **The context key must be unique**
+ * @example { user: { id: 1, name: "John Doe" } }
+ * // src/pages/index.tsx
+ * const { user } = usePluginContext();
+ * user.name = "Jane Doe";
+ *
+ */
+  init_context: () => T | Promise<T>;
+  /**
+   * After the pre-build process is complete, you can access the modified context.
+   */
+  after_pre_build: (context: T & PreBuildContextDefaultValues) => Promise<void> | void;
+};
 type onFileSystemChangePlugin = (
   filePath: string | undefined,
   /**
@@ -52,11 +78,8 @@ type onFileSystemChangePlugin = (
   preventBuild: () => void,
 ) => void | Promise<void>;
 
-export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
-  /**
-   * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing.
-   */
-  after_build: (BuildArtifact: Bun.BuildArtifact) => Promise<any> | any;
+export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<string, unknown> = {}> = Partial<{
+
   /**
    * Triggered on the main thread after the build step.
    */
@@ -65,10 +88,40 @@ export type BunextPlugin<HTMLRewrite = unknown> = Partial<{
    * Triggered on the main thread before the build step.
    */
   before_build_main: BeforeBuild;
+
+  /**
+   * Triggered on the build worker thread
+   */
+  build_worker: {
+    /**
+     * Triggered on the **Build-Worker-Thread** when the Thread is spawned.
+     */
+    start: () => Promise<any> | any;
+    /**
+     * Triggered on the **Build-Worker-Thread** before the build step.
+     */
+    before_build: () => Promise<any> | any;
+    /**
+     * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing.
+     */
+    after_build: (BuildArtifact: Bun.BuildArtifact) => Promise<any> | any;
+  }
   /**
    * Add Bun.build plugins and build config
    */
   build: Build_Plugins;
+  /**
+   * Pre-build context to be passed to the SSR pre-build step.
+   * 
+   * Can be accessed in the SSR pre-build process via the usePluginContext hook.
+   * 
+   * This is useful for getting data on pre-build-time if some data are only accessible from the pre-build event.
+   * 
+   * **what is preBuild?**
+   * @link soon
+   */
+  pre_build_context: buildContextPlugin<PreBuildContext>;
+
   /**
    * Router related plugin section
    */

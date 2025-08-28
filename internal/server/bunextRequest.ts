@@ -5,14 +5,12 @@ import { webToken, type _webToken } from "./webtoken";
 import "./server_global";
 import { deleteSessionById, setSessionById } from "../session";
 import { generateRandomString } from "../../features/utils";
-import { Head, type _Head } from "../../features/head";
 import type { _GlobalData, PluginData, ServerConfig } from "internal/types";
 import { BunextError } from "./server_global";
 import { formatParams, RenderingError, RequestManager, router } from "./router";
-import { timeStamp } from "console";
 import { formatHTML } from "internal/utils";
 import type { DirectiveTool } from "plugins/utils";
-
+import { join, resolve } from "path";
 
 export type CookieOptions = _webToken & {
   encrypted?: boolean;
@@ -26,6 +24,8 @@ export class BunextResponseAlreadySetError extends BunextError { }
 export class BunextResponseNotSetError extends BunextError { }
 export class BunextNoServerSideMatchError extends BunextError { }
 
+const CURRENT_PATH = process.cwd();
+
 export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public request: Request;
   private _response: Response;
@@ -35,12 +35,12 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   private _session?: BunextSession<any>;
   public manager: RequestManager;
   public webtoken: webToken<any>;
-  public headData?: Record<string, _Head>;
   public path: string = "";
   public __BYPASS_RESPONSE__: Response | undefined;
   private readonly __REQUEST_PARAMS__: Record<string, string | string[]> | undefined;
   private readonly __REQUEST_NAVIGATE__: boolean;
   public readonly isAskingHTML: boolean;
+  public readonly match: { pathname?: string, route?: string, filePaths?: { build: string, src: string } };
   /**
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
@@ -72,7 +72,27 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     const bunext_params = this.URL.searchParams.get("__BUNEXT_PARAMS__");
     this.__REQUEST_PARAMS__ = bunext_params ? JSON.parse(decodeURI(bunext_params)) : formatParams(this.manager?.serverSide?.params);
     this.__REQUEST_NAVIGATE__ = this.URL.searchParams.has("__BUNEXT_NAVIGATE__");
+    this.match = {
+      pathname: this.URL.searchParams.get("__BUNEXT_PATHNAME__") || undefined,
+      route: this.URL.searchParams.get("__BUNEXT_ROUTE__") || undefined,
+      filePaths: this.__REQUEST_NAVIGATE__ ? {
+        build: this.sanitizePath("." + this.URL.pathname, join(CURRENT_PATH, this.manager.router.buildDir)),
+        src: this.jsToTsx(this.sanitizePath("." + this.URL.pathname, CURRENT_PATH))
+      } : undefined
+    };
     this.isAskingHTML = this.__REQUEST_NAVIGATE__ ? false : Boolean(this.request.headers.get("accept")?.includes("text/html"));
+  }
+  private jsToTsx(filename: string) {
+    if (filename.endsWith('.js')) {
+      return filename.replace(/\.js$/, '.tsx');
+    } else return filename;
+  }
+  sanitizePath(unsafePath: string, basePath: string) {
+    const resolvedPath = resolve(basePath, unsafePath);
+    if (!resolvedPath.startsWith(basePath)) {
+      throw new Error('Access to path is not allowed.');
+    }
+    return resolvedPath;
   }
   /**
    * Gets the context for the request.
@@ -85,8 +105,8 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * Sets the context for the request.
    * @param context The context to set for the request. will merge with existing context
    */
-  public setContext(context: Partial<ContextType>) {
-    this.context = { ...this.context, ...context };
+  public setContext<CutsomContextType extends unknown = undefined>(context: CutsomContextType extends undefined ? ContextType : CutsomContextType) {
+    this.context = { ...this.context, ...context as any };
   }
   /**
    * Gets the request parameters same as RouteMatch.params
@@ -137,12 +157,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this._response_body = null;
     this._response_init = undefined;
   }
-  public setHead(data: _Head) {
-    this.headData = {
-      ...Head.head,
-      [this.manager?.serverSide?.pathname || this.path]: data,
-    };
-  }
+
   /**
    * <strong>DO NOT USE. BUNEXT INTERNAL USE ONLY</strong>
    * set the session cookie
@@ -404,22 +419,12 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    */
   private async makePreLoadObject(): Promise<Partial<Record<keyof _GlobalData, string>>> {
     try {
-      if (this.headData) {
-        Object.entries(this.headData).forEach(([path, data]) => {
-          Head.setHead({
-            path,
-            data
-          });
-        });
-      }
-
       return {
         __DEV_ROUTE_PREFETCH__: "[]",
         __PAGES_DIR__: JSON.stringify(router.pageDir),
         __INITIAL_ROUTE__: JSON.stringify(this.manager.serverSide?.pathname + this.manager.search),
         __ROUTES__: router.routes_dump,
         __LAYOUT_ROUTE__: JSON.stringify(router.layoutPaths),
-        __HEAD_DATA__: JSON.stringify({ ...Head.head }),
         serverConfig: JSON.stringify({
           Dev: globalThis.serverConfig.Dev,
           HTTPServer: globalThis.serverConfig.HTTPServer,

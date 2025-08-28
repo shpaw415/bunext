@@ -1,4 +1,4 @@
-import { useHead } from "bunext-js/head";
+import { useHead } from "public/head";
 import "@static/style/other.css";
 
 export function getServerSideProps() {

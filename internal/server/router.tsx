@@ -21,7 +21,6 @@ import type {
   ReactShellComponent,
   ServerSideProps,
 } from "../types";
-import { type _Head } from "../../features/head";
 import { BunextRequest, BunextResponseNotSetError } from "./bunextRequest";
 import { RequestContext } from "./context";
 import { PluginLoader } from "./plugin-loader";
@@ -675,7 +674,6 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
         ipc: (message: JsxToStringWorkerMessage) => {
           if (message.type == "jsxToString") {
             pageString = message.jsx;
-            if (message.head) this.bunextReq.headData = message.head;
             resolve(true);
 
           } else (console[message.type] as any)(...message.message);

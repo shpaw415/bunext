@@ -1,4 +1,4 @@
-import type { _Head, HeadData } from "../features/head";
+import type { HeadData } from "public/head";
 import { jsxDEV, Fragment, type JSXSource } from "react/jsx-dev-runtime";
 import { jsxs, jsx } from "react/jsx-runtime";
 import React from "react";
@@ -6,7 +6,6 @@ import { navigate } from "./router/index";
 import type { _GlobalData, ServerConfig } from "./types";
 
 declare global {
-  var head: { [key: string]: _Head };
   var MakeServerActionRequest: (
     props: Array<any>,
     serverActionID: string
@@ -61,15 +60,16 @@ declare global {
 
   var __ROUTES__: Record<string, string>;
   var __DEV_ROUTE_PREFETCH__: Array<string>;
-  var __PAGES_DIR__: string;
+  var __PAGES_DIR__: "src/pages";
   var __INITIAL_ROUTE__: string;
   var __LAYOUT_ROUTE__: string[];
   var __CSS_PATHS__: string[];
-  var __HEAD_DATA__: Record<string, HeadData>;
+  var __HEAD_DATA__: HeadData;
   var __PUBLIC_SESSION_DATA__: Record<string, unknown> | undefined;
   var __SESSION_TIMEOUT__: number;
   var serverConfig: ServerConfig;
   var __PROCESS_ENV__: Record<string, string>;
+  var Context: React.Context<any>;
 }
 
 declare global {
@@ -91,6 +91,8 @@ globalThis.Fragment_8vg9x3sq = Fragment;
 globalThis.Fragment = Fragment;
 globalThis.ServerActionCallbacks ??= [];
 globalThis.__ROUTES__ ??= {};
+globalThis.Context ??= React.createContext(undefined);
+
 
 export const paths = {
   bunextDirName: ".bunext",

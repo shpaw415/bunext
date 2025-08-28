@@ -1,6 +1,6 @@
 "use static";
 import "@static/style.css";
-import { Head, useHead } from "public/head";
+import { useHead } from "public/head";
 
 type Params = {
   segment: string;

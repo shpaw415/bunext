@@ -86,11 +86,12 @@
     "./utils": "./public/utils/index.ts",
     "./utils/types": "./public/utils/types.ts",
     "./plugins/types": "./public/plugins/types.ts",
+    "./plugins/utils": "./public/plugins/index.ts",
+    "./plugins/*": "./plugins/*",
     "./router/*": "./public/router/*",
     "./client/hydrate": "./public/client/hydrate.ts",
     "./client/globals": "./public/client/globals.ts",
     "./client/*": "./public/client/*",
-    "./plugins/*": "./plugins/*",
     "./dev": "./public/dev/index.tsx",
     "./server/bunext-server": "./public/server/bunext-server.ts",
     "./client/shell": "./public/client/shell.ts"

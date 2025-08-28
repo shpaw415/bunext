@@ -1,6 +1,6 @@
 "server only";
 
-import type { FileSystemRouter } from "bun";
+import type { FileSystemRouter, MatchedRoute } from "bun";
 import { CacheManagerPool } from "internal/caching";
 import { router, type RequestManager } from "internal/server/router";
 import type { ClusterMessageType, PageModule, ssrElement, SSRPage } from "internal/types";
@@ -15,7 +15,8 @@ import reactElementToJSXString from "internal/jsxToString";
 import { renderToString } from "react-dom/server";
 import { normalize, resolve } from "path";
 import { baseDir, pageDir } from "internal/server/server_global";
-import { Head } from "features/head";
+import { Wrapper } from "./ssr-page-preload";
+import type { BunextPlugin, PreBuildContextDefaultValues } from "plugins/types";
 
 const Schema: DBSchema = [
     {
@@ -54,6 +55,11 @@ const Schema: DBSchema = [
                 name: "content",
                 type: "string",
             },
+            {
+                name: "wrapped",
+                type: "boolean",
+                default: false
+            }
         ],
     },
 ];
@@ -82,8 +88,9 @@ class SSRPageCache {
 
     //SSR Default Page
 
-    addSSRDefaultPage(route: string, content: string) {
-        return this.page(t => t.upsert([{ route, content }], ["route"]));
+    addSSRDefaultPage(route: string, content: string, wrapped: boolean = false) {
+
+        return this.page(t => t.upsert([{ route, content, wrapped }], ["route"]));
     }
     async getSSRDefaultPage(route: string) {
         return (await this.page(t => t
@@ -93,9 +100,10 @@ class SSRPageCache {
                 },
                 select: {
                     content: true,
+                    wrapped: true
                 },
                 limit: 1
-            }))).at(0)?.content;
+            }))).at(0);
     }
     removeSSRDefaultPage(...route: string[]) {
         this.page(t => t.delete({
@@ -153,7 +161,7 @@ export async function onRequestSSRPage(manager: RequestManager): Promise<boolean
     if (stringPage) {
         manager.bunextReq.setResponse(stringPage, {
             headers: {
-                "content-type": "text/html; charset=utf-8",
+                "content-type": "text/html",
                 "cache-control": "no-cache"
             }
         });
@@ -162,15 +170,37 @@ export async function onRequestSSRPage(manager: RequestManager): Promise<boolean
     return false;
 }
 
-
-
+/**
+ * Wraps the given HTML page with the necessary layout and shell.
+ * @param manager The request manager.
+ * @param HTMLPage The HTML page to wrap.
+ * @returns The wrapped HTML page as a string.
+ */
+async function WrapPage(manager: RequestManager, HTMLPage: string) {
+    return manager.JSXToString(
+        await manager.WrapPageWithShell(
+            await manager.router.stackLayouts(
+                manager.serverSide as MatchedRoute,
+                HTMLJSXWrapper(HTMLPage)
+            )
+        )
+    );
+}
 
 
 async function getSSRDefaultPage(manager: RequestManager): Promise<string | null> {
     if (!isSSRDefaultExportPath(manager, true) || !manager.serverSide)
         return null;
-    const cache = await SSRCache.getSSRDefaultPage(manager.serverSide.filePath);
-    if (cache) return cache;
+    const cache = (await SSRCache.getSSRDefaultPage(manager.serverSide.name));
+    if (cache) {
+        if (cache.wrapped === false) {
+            const wrappedPage = await WrapPage(manager, cache.content);
+            await SSRCache.addSSRDefaultPage(manager.serverSide.name, wrappedPage, true);
+            return wrappedPage;
+        }
+        return cache.content;
+    }
+
 
     const preRenderedPage = await getPreRenderedPage(manager);
     if (!preRenderedPage) return null;
@@ -211,7 +241,6 @@ async function getPreRenderedPage(manager: RequestManager) {
     ))?.elements.find((e) =>
         e.tag.endsWith(`${module.default?.name}!>`)
     )?.htmlElement;
-
     if (!preBuiledPage) return null;
 
     return HTMLJSXWrapper(preBuiledPage);
@@ -306,16 +335,27 @@ const fullPagePath = join(baseDir, pageDir);
 const testAgainstExt = ["ts", "tsx"];
 const moduleImports = new Map<string, string[]>();
 
+
 class PreBuildContext {
     private paths: Set<string> = new Set();
+    private MainRoute: string | undefined;
+    private MainModulePath: string | undefined;
+    private plugins = builder.getPluginByName("pre_build_context");
 
-    constructor(route: string) {
-        Head._setCurrentPath(route);
+    private async getPluginContexts() {
+        return Object.assign({}, ...await Promise.all(this.plugins.map((context) => context.init_context()))) || {} as Record<string, unknown>;
+    }
+
+    getAfterPluginContextCallback() {
+        return this.plugins.map((context) => context.after_pre_build);
     }
 
     async preBuild(modulePath: string) {
         if (this.paths.has(modulePath) || modulePath.endsWith(".d.ts")) return;
         this.paths.add(modulePath);
+
+        if (!this.MainRoute) this.MainRoute = Object.entries(router.server.routes).find(([_, route]) => route === modulePath)?.[0];
+        if (!this.MainModulePath) this.MainModulePath = modulePath;
 
         const _module = (await import(
             modulePath + this.getDevKey()
@@ -343,30 +383,51 @@ class PreBuildContext {
                     )
                         return;
 
-                    const element = await exported() as unknown;
+                    const contexts = {
+                        ...(await this.getPluginContexts()),
+                        route: this.MainRoute
+                    } as Record<string, unknown> & PreBuildContextDefaultValues;
 
+                    const WrappedElement = await Wrapper(exported as () => Promise<JSX.Element>, contexts);
+                    const element = (WrappedElement.props as { children: JSX.Element }).children;
 
                     if (!isValidElement(element)) return;
 
                     const SSRelement = moduleSSR.elements.find(
                         (e) => e.tag == `<!Bunext_Element_${exported.name}!>`
                     );
+
+                    const compiledElements = {
+                        reactElement: this.toJSX(element),
+                        htmlElement: renderToString(WrappedElement),
+                    };
+
                     if (SSRelement) {
-                        SSRelement.reactElement = this.toJSX(element);
-                        SSRelement.htmlElement = renderToString(element);
+                        SSRelement.reactElement = compiledElements.reactElement;
+                        SSRelement.htmlElement = compiledElements.htmlElement;
+
                     } else {
                         moduleSSR.elements.push({
                             tag: `<!Bunext_Element_${exported.name}!>`,
-                            reactElement: this.toJSX(element),
-                            htmlElement: renderToString(element),
+                            htmlElement: compiledElements.htmlElement,
+                            reactElement: compiledElements.reactElement,
                             name: exported.name
                         });
                     }
+
+                    if (this.MainRoute && this.MainModulePath == modulePath) {
+                        await SSRCache.addSSRDefaultPage(this.MainRoute, compiledElements.htmlElement);
+                    }
+
+                    await Promise.all(this.getAfterPluginContextCallback().map((callback) => callback(contexts)));
+
                 } catch (e) {
                     console.error("PreBuild Error:", e);
                     return;
                 }
-            }));
+            })
+        );
+
         if (moduleSSR.elements.length > 0) await SSRCache.addSSR(modulePath, moduleSSR.elements);
     }
 
@@ -429,7 +490,7 @@ class PreBuildContext {
 }
 
 export async function preBuild(modulePath: string): Promise<void> {
-    const context = new PreBuildContext(modulePath);
+    const context = new PreBuildContext();
     await context.preBuild(modulePath);
 
 }
@@ -523,4 +584,3 @@ export async function revalidateEvery(path: string | string[], seconde: number) 
         });
     }
 }
-

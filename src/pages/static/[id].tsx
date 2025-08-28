@@ -1,5 +1,5 @@
 "use static";
-import { useHead } from "bunext-js/head";
+import { useHead } from "public/head";
 import type { BunextRequest } from "bunext-js/request";
 import { generateRandomString } from "features/utils";
 

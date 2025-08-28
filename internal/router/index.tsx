@@ -317,13 +317,14 @@ export const useReloadEffect = (
   deps: React.DependencyList = []
 ) => {
   const [once, setOnce] = useState(true);
+  const pathname = usePathname();
   useEffect(() => {
     if (once) {
       setOnce(false);
       return;
     }
     return effect();
-  }, [useContext(VersionContext), ...deps]);
+  }, [pathname, ...deps]);
 };
 
 /**
@@ -444,7 +445,7 @@ export function PreLoadPath(path: string): Promise<void> {
         throw new RouteNotFoundError(path);
       }
 
-      await preloadModule(matched.value, { as: "script" });
+      preloadModule(matched.value, { as: "script" });
       preloadedPaths.add(path);
       RouterLogger.log("Preloaded path", { path });
     } catch (error) {
@@ -542,7 +543,7 @@ export const RouterHost = ({
 }) => {
   const pathname = useLocationProperty(
     () => normalizeUrl(location.pathname + location.search),
-    () => globalX.__INITIAL_ROUTE__
+    () => globalThis.__INITIAL_ROUTE__
   );
 
   const [current, setCurrent] = useState(children);
@@ -574,6 +575,7 @@ export const RouterHost = ({
 
         await OnDevRouterUpdate(matched);
 
+
         const [props, module] = await Promise.all([
           fetchServerSideProps(target),
           import(
@@ -581,6 +583,8 @@ export const RouterHost = ({
               matched.value,
               `?__BUNEXT_PARAMS__=${encodeURI(JSON.stringify(matched.params))}`,
               "&__BUNEXT_NAVIGATE__=true",
+              `&__BUNEXT_PATHNAME__=${encodeURI(target)}`,
+              `&__BUNEXT_ROUTE__=${encodeURI(matched.path)}`,
               (process.env.NODE_ENV === "development" ? `&__BUNEXT_VERSION__=${currentVersion}` : "")
             ].join("")
           ),
@@ -592,21 +596,19 @@ export const RouterHost = ({
           currentVersion,
           matched,
         });
-
+        const JSXToDisplayEl = () => JsxToDisplay;
         if (currentVersion === versionRef.current) {
           if (typeof props == "object" && props?.redirect) {
             navigate(props.redirect as RoutesType);
           } else {
-            startTransition(() => {
-              onRouteUpdated?.(target);
-              setVersion(currentVersion);
-              setIsLoading(false);
-              setCurrent(
-                <Shell route={target} props={props}>
-                  {JsxToDisplay}
-                </Shell>
-              );
-            });
+            onRouteUpdated?.(target);
+            setVersion(currentVersion);
+            setIsLoading(false);
+            setCurrent(
+              <Shell route={target} props={props}>
+                <JSXToDisplayEl />
+              </Shell>
+            );
           }
         }
       } catch (error) {
@@ -655,15 +657,10 @@ export const RouterHost = ({
     );
   }
 
-  // Render loading component if loading and LoadingComponent is provided
-  if (isLoading && LoadingComponent) {
-    return <LoadingComponent />;
-  }
-
   return (
     <ReloadContext.Provider value={reload}>
       <VersionContext.Provider value={version}>
-        {current}
+        {isLoading && LoadingComponent ? <LoadingComponent /> : current}
       </VersionContext.Provider>
     </ReloadContext.Provider>
   );
@@ -684,7 +681,7 @@ export function AddOnDevRouteUpdateCallback(callback: () => Promise<void> | void
  */
 async function OnDevRouterUpdate(matched: Exclude<Match, null>): Promise<void> {
   if (process.env.NODE_ENV !== "development") return;
-  if (matched.path === __MAIN_ROUTE__) return;
+  //if (matched.path === __MAIN_ROUTE__) return;
 
   try {
     await fetch(window.location.href, {

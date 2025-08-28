@@ -292,7 +292,6 @@ export default {
         await initSSRPage();
         //await SSRCache.clearSSR();
     },
-
 } as BunextPlugin;
 
 

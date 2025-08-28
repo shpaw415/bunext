@@ -10,7 +10,7 @@ import {
 import { normalize } from "path";
 import { mkdirSync, rmSync, unlinkSync } from "node:fs";
 import "../globals";
-import { Head, type _Head } from "features/head";
+import { Head } from "public/head";
 import { DevConsole } from "./logs";
 import { router } from "./router";
 import * as React from "react";
@@ -20,8 +20,6 @@ import type {
   BuildWorkerMessage,
   BuildWorkerResponse,
 } from "./build-worker.ts";
-import { ExitCodeDescription } from "bin/exit-codes.ts";
-import { preBuild, preBuildAll, SSRCache } from "plugins/server-features/ssr-page";
 
 globalThis.React = React;
 
@@ -30,7 +28,6 @@ export type BuildOuts = {
     path: string;
     time: number;
   }[];
-  head: Record<string, _Head>;
 };
 
 type _Mainoptions = {
@@ -50,9 +47,9 @@ const cwd = process.cwd();
 
 class Builder extends PluginLoader {
   public options: _Mainoptions = {
-    pageDir: "src/pages",
-    buildDir: ".bunext/build",
-    hydrate: ".bunext/react-ssr/hydrate.ts",
+    pageDir: join("src", "pages") as "src/pages",
+    buildDir: join(".bunext", "build") as ".bunext/build",
+    hydrate: join(".bunext", "react-ssr", "hydrate.ts") as ".bunext/react-ssr/hydrate.ts",
     baseDir: cwd,
   };
   public preBuildPaths: Array<string> = [];
@@ -161,7 +158,7 @@ class Builder extends PluginLoader {
       entrypoints.push(path);
     }
     entrypoints = entrypoints.filter((e) => {
-      const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx"];
+      const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx", "loading.tsx"];
       if (
         allowedEndsWith.includes(e.split("/").at(-1) as string) ||
         /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(e)
@@ -188,7 +185,7 @@ class Builder extends PluginLoader {
       const layoutPathsFromCurrentPath = layoutsPaths
         .map((path) => normalize(path.replace("layout.tsx", "")))
         .filter((e) => pathFromPageDir.startsWith(e))
-        .map((path) => normalize(`${cwd}/${pageDir}/${path}/layout.tsx`));
+        .map((path) => join(cwd, pageDir, path, "layout.tsx"));
       return layoutPathsFromCurrentPath;
     }
 
@@ -206,8 +203,7 @@ class Builder extends PluginLoader {
   }
 
   async build(onlyPath?: string) {
-    process.env.__BUILD_MODE__ = "true";
-    const { baseDir, hydrate, buildDir, ...options } = this.options;
+    const { baseDir, hydrate, buildDir } = this.options;
 
     const entrypoints =
       onlyPath && process.env.NODE_ENV == "development"
@@ -240,7 +236,7 @@ class Builder extends PluginLoader {
       plugins: [...this.plugins, ...(this.BuildPluginsConfig?.plugins || [])],
       define: {
         "process.env.NODE_ENV": JSON.stringify(
-          process.env.NODE_ENV || "development"
+          process.env.NODE_ENV
         ),
         ...this.BuildPluginsConfig.define,
       },
@@ -251,14 +247,10 @@ class Builder extends PluginLoader {
         "crypto",
         "node:path",
         import.meta.filename,
-        "bunext-js/features/router.ts",
-        "bunext-js/features/request.ts",
         ...(this.BuildPluginsConfig?.external || []),
       ],
     });
-    await this.afterBuild(build);
     this.cleanBuildDir(build);
-    process.env.__BUILD_MODE__ = "false";
 
     return build;
   }
@@ -269,63 +261,13 @@ class Builder extends PluginLoader {
         try {
           unlinkSync(file);
         } catch {
-          DevConsole()?.error(`${file} not found for deletion`);
+          console.error(`${file} not found for deletion`);
         }
     }
   }
 
-
-  private async _makeBuild(path?: string) {
-    const BuildPath = path ?? process.env.BuildPath;
-
-    try {
-      BuildPath
-        ? await preBuild(BuildPath)
-        : await preBuildAll(await SSRCache.getAllSSR());
-    } catch (e) {
-      console.error("PreBuild Error");
-
-      if (process.send)
-        process.send({
-          type: "error",
-          error: e,
-        });
-      process.exit(ExitCodeDescription[2].code)
-    }
-    try {
-      const output = await this.build(BuildPath);
-      if (!output.success) {
-        DevConsole(output);
-        throw new Error("Build Error");
-      }
-    } catch (e: any) {
-      DevConsole()?.error("Build Error");
-      DevConsole(e);
-      process.exitCode = ExitCodeDescription[2].code;
-
-      if (process.send)
-        process.send({
-          type: "error",
-          error: e,
-        });
-
-      process.exit(ExitCodeDescription[2].code);
-    }
-
-    const data = {
-      revalidates: this.revalidates,
-      head: Head.head,
-      type: "build",
-    };
-
-    if (process.send) process.send(data);
-
-    return data as BuildOuts;
-  }
-
   async updateData(data: BuildOuts) {
     this.revalidates = data.revalidates;
-    Head.head = data.head;
     globalThis.Server?.updateWorkerData();
     await Promise.all(
       this.getPluginByName("after_build_main").map((after_build_main) => after_build_main())
@@ -356,7 +298,6 @@ class Builder extends PluginLoader {
       env: {
         ...process.env,
         NODE_ENV: process.env.NODE_ENV,
-        __BUILD_MODE__: "true",
       },
       stdout: "inherit",
       stderr: "inherit",
@@ -369,8 +310,8 @@ class Builder extends PluginLoader {
         switch (message.type) {
           case "build":
             if (!message.success) {
-              message.message && DevConsole().error(message.message);
-              message.error && DevConsole(message.error);
+              message.message && console.error(message.message);
+              message.error && console.error(message.error);
               self.BuildWorkerResolver();
               break;
             }
@@ -395,47 +336,26 @@ class Builder extends PluginLoader {
   async makeBuild(path?: string) {
     let strRes: BuildOuts | undefined;
     this.createBuildWorker();
+    if (!this.BuilderWorker) throw new Error("BuilderWorker not found");
+
     await Promise.all(
       this.getPluginByName("before_build_main").map((before_build_main) => before_build_main())
     );
-    if (this.BuilderWorker) {
-      await this.awaitBuildFinish();
-      this.createAwaiter();
-      this.BuilderWorker.send({
-        type: "build",
-        BuildPath: path,
-      } as BuildWorkerMessage);
-      await this.awaitBuildFinish();
-      if (this.BuilderWorker.exitCode) {
-        console.log("BuilderWorker exited");
-        this.createBuildWorker();
-      }
-      strRes = {
-        revalidates: this.revalidates,
-        head: Head.head,
-      };
-
-      return strRes;
-    } else {
-      console.warn("BuilderWorker not found, using the main process to build.\nThis may cause some errors.");
-      strRes = await this._makeBuild(path);
-      if (strRes) {
-        this.revalidates = strRes.revalidates;
-        Head.head = strRes.head;
-        this.updateData(strRes);
-      }
-      return strRes as BuildOuts;
+    await this.awaitBuildFinish();
+    this.createAwaiter();
+    this.BuilderWorker.send({
+      type: "build",
+      BuildPath: path,
+    } as BuildWorkerMessage);
+    await this.awaitBuildFinish();
+    if (this.BuilderWorker.exitCode) {
+      this.createBuildWorker();
     }
-  }
+    strRes = {
+      revalidates: this.revalidates,
+    };
 
-  private async afterBuild(build: BuildOutput) {
-    const afterBuildPlugins = this.getPluginByName("after_build");
-
-    for await (const output of build.outputs) {
-      for await (const plugin of afterBuildPlugins) {
-        await plugin(output);
-      }
-    }
+    return strRes;
   }
 
   public glob(
@@ -449,6 +369,8 @@ class Builder extends PluginLoader {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
   }
 }
+
+
 const builder: Builder = Boolean(process.env.__INIT__)
   ? (undefined as any)
   : new Builder();

@@ -26,9 +26,6 @@ declare global {
   var __INIT__: boolean | undefined;
 }
 
-// Initialize global variables safely
-globalThis.head ??= {};
-
 /**
  * Main CLI handler - processes command line arguments and executes appropriate commands
  */

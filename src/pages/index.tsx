@@ -5,7 +5,7 @@ import { useSession, GetSession } from "bunext-js/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 
-import { Head } from "bunext-js/head";
+import { Head } from "public/head";
 import { useEffect } from "react";
 
 
@@ -15,18 +15,6 @@ type SessionType = {
   test: boolean;
 };
 
-Head.setHead({
-  data: {
-    title: "Main page",
-    meta: [
-      {
-        name: "description",
-        content: "This is the main page"
-      }
-    ]
-  },
-  path: "/",
-});
 
 export function TestServerElement1() {
   return <div>ALLO: {Bun.password.hashSync("allô")}</div>;
@@ -50,35 +38,45 @@ function DynamicFileImport() {
  * @returns The main page JSX element.
  */
 export default async function Page() {
-  Bunext.router.revalidate.ssr.every("/", 5);
+  //Bunext.router.revalidate.ssr.every("/", 5);
   return (
-    <div>
-      <TestElement />
-      <TestServerElement1 />
-      <TestServerElement2 />
+    <Head data={{
+      title: "Main page",
+      meta: [
+        {
+          name: "description",
+          content: "This is the main page"
+        }
+      ]
+    }}>
+      <div>
+        <TestElement />
+        <TestServerElement1 />
+        <TestServerElement2 />
 
-      <TestElement3 />
-      <Bunext.router.navigate.components.link href="/other">
-        <button>Other page</button>
-      </Bunext.router.navigate.components.link>
-      <SetSessionButton />
-      <DeleteSessionButton />
-      <button onClick={() => fetch("/api/v1", { method: "POST" })}>api</button>
-      <button onClick={() => ServerPrintSession()}>
-        Print session to server console
-      </button>
-      <button onClick={async () => await ServerRevalidateNow()}>
-        Revalidate now
-      </button>
-      <Bunext.router.navigate.components.link href="/dynamic">
-        <button>Goto dynamic</button>
-      </Bunext.router.navigate.components.link>
-      <IsLogged />
-      <DynamicFileImport />
-      <Bunext.router.navigate.components.link href="/dynamic/static/test/">
-        <button>Other page</button>
-      </Bunext.router.navigate.components.link>
-    </div>
+        <TestElement3 />
+        <Bunext.router.navigate.components.link href="/other">
+          <button>Other page</button>
+        </Bunext.router.navigate.components.link>
+        <SetSessionButton />
+        <DeleteSessionButton />
+        <button onClick={() => fetch("/api/v1", { method: "POST" })}>api</button>
+        <button onClick={() => ServerPrintSession()}>
+          Print session to server console
+        </button>
+        <button onClick={async () => await ServerRevalidateNow()}>
+          Revalidate now
+        </button>
+        <Bunext.router.navigate.components.link href="/dynamic">
+          <button>Goto dynamic</button>
+        </Bunext.router.navigate.components.link>
+        <IsLogged />
+        <DynamicFileImport />
+        <Bunext.router.navigate.components.link href="/dynamic/static/test/">
+          <button>Other page</button>
+        </Bunext.router.navigate.components.link>
+      </div>
+    </Head>
   );
 }
 

@@ -1,5 +1,5 @@
 import type { BunFile, BunPlugin } from "bun";
-import type { _Head, HeadData } from "../features/head";
+import type { HeadData } from "public/head";
 import type { BunextRequest } from "./server/bunextRequest.ts";
 import type { revalidate } from "plugins/server-features/ssr-page.ts";
 import type { Plugins } from "../plugins/bunext_object/type.ts";
@@ -32,7 +32,7 @@ export type _GlobalData = {
   __PAGES_DIR__: "src/pages";
   __INITIAL_ROUTE__: string;
   __LAYOUT_ROUTE__: string[];
-  __HEAD_DATA__: Record<string, HeadData>;
+  __HEAD_DATA__: HeadData;
   __PUBLIC_SESSION_DATA__: unknown | undefined;
   __SESSION_TIMEOUT__: number;
   __CSS_PATHS__?: Array<string>;
@@ -53,7 +53,7 @@ export type _GlobalData = {
 };
 
 export type _globalThis = _GlobalData & {
-  __HEAD_DATA__: Record<string, _Head>;
+  __HEAD_DATA__: HeadData;
 };
 
 /**
@@ -166,6 +166,7 @@ export type staticPage = {
 export type SSRPage = {
   route: string;
   content: string;
+  wrapped: boolean;
 };
 
 export type revalidate = {

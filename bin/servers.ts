@@ -25,7 +25,6 @@ export async function handleDev(): Promise<void> {
 async function startDevServer(): Promise<void> {
     const proc = $`bun --hot ${paths.bunextDirName}/react-ssr/server.ts`.env({
         ...process.env,
-        __HEAD_DATA__: JSON.stringify(globalThis.head),
         NODE_ENV: process.env.NODE_ENV,
     })
 
@@ -47,7 +46,6 @@ export function startProductionServer(): void {
         cmd: ["bun", `${paths.bunextDirName}/react-ssr/server.ts`, "production"],
         env: {
             ...process.env,
-            __HEAD_DATA__: JSON.stringify(globalThis.head),
             NODE_ENV: "production",
         },
         stdout: "inherit",

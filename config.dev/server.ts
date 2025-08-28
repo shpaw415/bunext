@@ -12,6 +12,7 @@ const Config: ServerConfig = {
   },
   build: {
     plugins: [],
+
   },
   session: {
     timeout: 3600,
@@ -21,6 +22,13 @@ const Config: ServerConfig = {
     //dynamicPaths: ["src/dynamic"],
   },
   bunext_plugins: [
+    {
+      build: {
+        buildOptions: {
+          "minify": false
+        }
+      }
+    }
   ],
   html_lang(request) {
     const params = request.getRequestParams<{ lang?: string }>();

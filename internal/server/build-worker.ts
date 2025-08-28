@@ -1,6 +1,9 @@
 import { preBuild, preBuildAll, SSRCache } from "plugins/server-features/ssr-page";
-import { Head } from "../../features/head";
 import { builder, type BuildOuts } from "./build.ts";
+import type { BuildOutput } from "bun";
+
+
+await Promise.all(builder.getSubPluginsByParentName("build_worker", "start").map((onBuilderWorker) => onBuilderWorker()));
 
 export type BuildWorkerMessage = {
   type: "build";
@@ -55,7 +58,9 @@ async function build(
     };
   }
   try {
+    await beforeBuild();
     const output = await builder.build(BuildPath);
+    await afterBuild(output);
     if (!output.success) {
       return {
         success: false,
@@ -73,13 +78,25 @@ async function build(
 
   const data = {
     revalidates: builder.revalidates,
-    head: Head.head,
   };
 
   return {
     success: true,
     data,
   };
+}
+
+async function afterBuild(build: BuildOutput) {
+  const afterBuildPlugins = builder.getSubPluginsByParentName("build_worker", "after_build");
+  const awaiters: Promise<any>[] = [];
+  for (const output of build.outputs) {
+    awaiters.push(...afterBuildPlugins.map((plugin) => plugin(output)));
+  }
+  await Promise.all(awaiters);
+}
+
+function beforeBuild() {
+  return Promise.all(builder.getSubPluginsByParentName("build_worker", "before_build").map((plugin) => plugin()));
 }
 
 if (import.meta.main) init();

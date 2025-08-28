@@ -140,7 +140,6 @@ export class BunextSession<DataType = any> {
 
     // Auto-initialize in build mode or when session init is disabled
     if (
-      process.env.__BUILD_MODE__ ||
       process.env.__SESSION_MUST_NOT_BE_INITED__ === "true"
     ) {
       this._serverSessionInitialized = true;

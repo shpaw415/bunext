@@ -198,7 +198,7 @@ var getReactElementDisplayName = function getReactElementDisplayName(element) {
       return "".concat(element.type._context.displayName || 'Context', ".Consumer");
 
     case reactIs.isContextProvider(element):
-      return "".concat(element.type._context.displayName || 'Context', ".Provider");
+      return "".concat(element.type._context?.displayName || 'Context', ".Provider");
 
     case reactIs.isLazy(element):
       return 'Lazy';

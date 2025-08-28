@@ -122,7 +122,6 @@ try {
   process.send?.({
     type: "jsxToString",
     jsx: renderToString(jsx),
-    head: req.headData,
   } as JsxToStringWorkerMessage);
 
 } catch (error) {
@@ -130,7 +129,6 @@ try {
   process.send?.({
     type: "jsxToString",
     jsx: renderToString(<ErrorFallback error={error as Error} />),
-    head: req.headData,
   } as JsxToStringWorkerMessage);
 
 }
