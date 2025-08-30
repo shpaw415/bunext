@@ -9,7 +9,7 @@ import type { BunextPlugin } from "plugins/types";
 
 class ServerSidePropsError extends BunextError { }
 
-type ServerSidePropsTyped = ServerSideProps<{}> | undefined;
+type ServerSidePropsTyped = ServerSideProps<{}> | null;
 
 
 declare global {
@@ -33,9 +33,9 @@ class ServerSidePropsManager {
         return instance;
     }
 
-    getFromCache(manager: RequestManagerContexted) {
-        if (!manager.bunextReq.match) return undefined;
-        return this.cache.get(manager.bunextReq.match?.pathname) as ServerSidePropsTyped | null;
+    getFromCache(manager: RequestManagerContexted): Promise<ServerSidePropsTyped | null> {
+        if (!manager.bunextReq.match) return Promise.resolve(null);
+        return this.cache.get(manager.bunextReq.match?.pathname);
     }
     getFromCacheByPath(pathname: string) {
         return this.cache.get(pathname) as ServerSidePropsTyped | null;
@@ -70,7 +70,6 @@ class ServerSidePropsManager {
 
         try {
             const result = await this.makeForPath(manager.bunextReq.match.filePaths.src, manager);
-
             (manager.bunextReq.setContext({
                 __SERVERSIDE_PROPS__: result
             }));
@@ -93,7 +92,7 @@ class ServerSidePropsManager {
 
         // Return empty props if no getServerSideProps function
         if (!module?.getServerSideProps) {
-            return undefined;
+            return null;
         }
 
         // Initialize session if needed
@@ -148,16 +147,16 @@ export default {
     priority: 0,
     router: {
         async request(manager) {
-            if (manager.request.headers.get("accept") == "application/vnd.server-side-props") {
-                let props = serverSidePropsManager.getFromCache(manager);
-                if (!props) props = await serverSidePropsManager.make(manager);
+            if (manager.request.headers.get("accept") == "application/vnd.server-side-props" && manager.serverSide?.filePath) {
+                let props = await serverSidePropsManager.getFromCache(manager);
+                if (!props) props = await serverSidePropsManager.makeForPath(manager.serverSide.filePath, manager);
                 return serveServerSideProps(manager, props);
             } else if (manager.bunextReq.isAskingHTML) {
-                let props = serverSidePropsManager.getFromCache(manager);
+                let props = await serverSidePropsManager.getFromCache(manager);
                 if (!props) props = await serverSidePropsManager.make(manager);
                 if (props?.redirect) {
-                    manager.bunextReq.__BYPASS_RESPONSE__ = setRedirectToPath(props.redirect);
-                    return;
+                    return manager.bunextReq.__BYPASS_RESPONSE__ = setRedirectToPath(props.redirect);
+
                 }
                 manager.bunextReq.InjectGlobalValues<ServerSidePropsContext>({
                     __SERVERSIDE_PROPS__: props

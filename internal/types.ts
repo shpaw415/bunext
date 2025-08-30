@@ -157,10 +157,6 @@ export type ssrElement = {
 export type staticPage = {
   pathname: string;
   page?: string;
-  /**
-   * must be json decode
-   */
-  props?: string | Record<string, any> | { redirect: string };
 };
 
 export type SSRPage = {
