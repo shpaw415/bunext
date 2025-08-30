@@ -4,7 +4,6 @@ import { builder } from "internal/server/build";
 import { basename, join, normalize } from "path";
 import { onRequestSSRPage, clearSSRPage, ServerComponentsCompiler, initSSRPage, SSRCache } from "./ssr-page";
 import { generateRandomString } from "features/utils";
-import { serverSidePropsAfterRequestHandler, serveServerSideProps, setGlobalServerSidePropsIfNeeded } from "./serverSideProps";
 import { serveDynamicPage } from "./dynamic-page";
 import { getRelatedCssContent } from "./style-insert";
 import { sessionOnRequestHandler } from "plugins/session";
@@ -16,7 +15,7 @@ import { DirectiveTool } from "plugins/utils";
 
 
 export default {
-    priority: 1,
+    priority: 2,
     serverStart: {
         async main() {
             clearSSRPage();
@@ -60,16 +59,10 @@ export default {
                 serveFromNodeModule,
                 sessionOnRequestHandler,
                 onRequestServerAction,
-                serveServerSideProps,
-
             ]) {
                 if (manager.bunextReq.isResponseSetted()) break;
                 await handler(manager);
             }
-            setGlobalServerSidePropsIfNeeded(manager);
-        },
-        after_request(manager) {
-            return serverSidePropsAfterRequestHandler(manager);
         }
     },
 

@@ -1,3 +1,5 @@
+"server only";
+
 import { DynamicComponent } from "..";
 import type { ComponentType } from "./types";
 

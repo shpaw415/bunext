@@ -16,7 +16,7 @@ export const headCache = globalThis.__HEAD_CACHE__;
 export default {
     router: {
         async request(manager) {
-            if (!manager.bunextReq.isAskingHTML && !manager.bunextReq.isClientNavigation()) return;
+            if (!manager.bunextReq.isAskingHTML && !manager.bunextReq.isClientNavigating) return;
 
             const cachedHeadData = manager.serverSide?.name ? await headCache.get(manager.serverSide?.pathname) || undefined : {};
 

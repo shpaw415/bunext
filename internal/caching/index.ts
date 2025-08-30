@@ -58,7 +58,7 @@ type CacheManagerPoolDefaultConfigShemaType<T> = {
   id?: number;
   tag: string;
   key: string;
-  value: T;
+  value?: T;
   expiresAt?: Date;
 }
 
@@ -85,7 +85,8 @@ const CacheManagerPoolDefaultConfig: CacheManagerPoolConfig = {
       {
         name: "value",
         type: "json",
-        DataType: {}
+        DataType: {},
+        nullable: true
       },
       { name: "expiresAt", type: "Date", nullable: true }
     ]
@@ -103,10 +104,12 @@ class CacheManager<T extends Record<string, unknown>> {
 
   constructor(tag: string) {
     this.tag = tag;
+    if (arguments[1] != "_") throw new Error("CacheManager must be created with CacheManager.create()");
   }
 
   static async create<T extends Record<string, unknown>>(tag: string, config?: { dbPath?: string, poolConfig?: Partial<PoolConfig> }) {
-    const instance = new CacheManager<T>(tag);
+    //@ts-ignore
+    const instance = new CacheManager<T>(tag, "_");
     await instance.__initialize__(config);
     return instance;
   }
@@ -158,7 +161,7 @@ class CacheManager<T extends Record<string, unknown>> {
         return null;
       }
 
-      return res.value;
+      return res.value || null;
     });
   }
 

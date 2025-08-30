@@ -10,7 +10,8 @@ import { BunextError } from "./server_global";
 import { formatParams, RenderingError, RequestManager, router } from "./router";
 import { formatHTML } from "internal/utils";
 import type { DirectiveTool } from "plugins/utils";
-import { join, resolve } from "path";
+import path, { join, resolve } from "path";
+import type { MatchedRoute } from "bun";
 
 export type CookieOptions = _webToken & {
   encrypted?: boolean;
@@ -26,6 +27,13 @@ export class BunextNoServerSideMatchError extends BunextError { }
 
 const CURRENT_PATH = process.cwd();
 
+export type BunextRequestMatch = {
+  pathname: string;
+  route: string;
+  filePaths: { build: string; src: string };
+  params: Record<string, string | string[]> | undefined;
+};
+
 export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public request: Request;
   private _response: Response;
@@ -37,10 +45,17 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public webtoken: webToken<any>;
   public path: string = "";
   public __BYPASS_RESPONSE__: Response | undefined;
-  private readonly __REQUEST_PARAMS__: Record<string, string | string[]> | undefined;
-  private readonly __REQUEST_NAVIGATE__: boolean;
+  /**
+   * Indicates if the request is asking for HTML.
+   *
+   * normally the first HTML load
+   */
   public readonly isAskingHTML: boolean;
-  public readonly match: { pathname?: string, route?: string, filePaths?: { build: string, src: string } };
+  /**
+   * Indicates if the request is a client-side navigation.
+   */
+  public readonly isClientNavigating: boolean;
+  public readonly match?: BunextRequestMatch;
   /**
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
@@ -69,19 +84,37 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this.URL = new URL(this.request.url);
     this.manager = props.manager;
 
-    const bunext_params = this.URL.searchParams.get("__BUNEXT_PARAMS__");
-    this.__REQUEST_PARAMS__ = bunext_params ? JSON.parse(decodeURI(bunext_params)) : formatParams(this.manager?.serverSide?.params);
-    this.__REQUEST_NAVIGATE__ = this.URL.searchParams.has("__BUNEXT_NAVIGATE__");
-    this.match = {
-      pathname: this.URL.searchParams.get("__BUNEXT_PATHNAME__") || undefined,
-      route: this.URL.searchParams.get("__BUNEXT_ROUTE__") || undefined,
-      filePaths: this.__REQUEST_NAVIGATE__ ? {
-        build: this.sanitizePath("." + this.URL.pathname, join(CURRENT_PATH, this.manager.router.buildDir)),
-        src: this.jsToTsx(this.sanitizePath("." + this.URL.pathname, CURRENT_PATH))
-      } : undefined
-    };
-    this.isAskingHTML = this.__REQUEST_NAVIGATE__ ? false : Boolean(this.request.headers.get("accept")?.includes("text/html"));
+    this.isClientNavigating = this.URL.searchParams.has("__BUNEXT_NAVIGATE__");
+    this.isAskingHTML = this.isClientNavigating ? false : Boolean(this.request.headers.get("accept")?.includes("text/html"));
+    this.match = this.initMatch();
   }
+
+  private initMatch() {
+    if (this.isClientNavigating) {
+      const checkExists = [this.URL.searchParams.get("__BUNEXT_PATHNAME__"), this.URL.searchParams.get("__BUNEXT_ROUTE__"), this.URL.searchParams.get("__BUNEXT_PARAMS__")];
+      if (checkExists.some((e) => e === null)) throw new BunextNoServerSideMatchError(`missing maching information ${JSON.stringify(checkExists, null, 2)}`);
+      return {
+        pathname: checkExists[0] as string,
+        route: checkExists[1] as string,
+        filePaths: {
+          build: this.sanitizePath("." + this.URL.pathname, join(CURRENT_PATH, this.manager.router.buildDir)),
+          src: this.jsToTsx(this.sanitizePath("." + this.URL.pathname, CURRENT_PATH))
+        },
+        params: JSON.parse(decodeURI(checkExists[2] as string))
+      };
+    } else if (this.isAskingHTML && this.manager.serverSide) {
+      return {
+        pathname: this.manager.serverSide.pathname,
+        route: this.manager.serverSide.name,
+        filePaths: {
+          build: this.manager.clientSide?.filePath as string,
+          src: this.manager.serverSide.filePath as string
+        },
+        params: formatParams(this.manager.serverSide.params)
+      };
+    } else return undefined;
+  }
+
   private jsToTsx(filename: string) {
     if (filename.endsWith('.js')) {
       return filename.replace(/\.js$/, '.tsx');
@@ -107,20 +140,6 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    */
   public setContext<CutsomContextType extends unknown = undefined>(context: CutsomContextType extends undefined ? ContextType : CutsomContextType) {
     this.context = { ...this.context, ...context as any };
-  }
-  /**
-   * Gets the request parameters same as RouteMatch.params
-   * @returns The request parameters.
-   */
-  public getRequestParams<T extends Record<string, unknown> = {}>() {
-    return this.__REQUEST_PARAMS__ as T;
-  }
-  /**
-   * Checks if the request is a client-side navigation.
-   * @returns True if the request is a client-side navigation, false otherwise.
-   */
-  public isClientNavigation() {
-    return this.__REQUEST_NAVIGATE__;
   }
 
   /**
@@ -248,7 +267,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * Injects global values into the request. they can be accessed into client-side in the globalThis object.
    * @param values The global values to inject. must be serializable.
    */
-  public InjectGlobalValues(values: Record<string, unknown>) {
+  public InjectGlobalValues<T extends Record<string, unknown> = {}>(values: T) {
     for (const [key, val] of Object.entries(values)) {
       try {
         this.plugins.globalData[key] = typeof val == "undefined" ? "undefined" : JSON.stringify(val);

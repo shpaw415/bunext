@@ -31,7 +31,7 @@ const Config: ServerConfig = {
     }
   ],
   html_lang(request) {
-    const params = request.getRequestParams<{ lang?: string }>();
+    const params = request.match?.params as { lang?: string };
     return params.lang || "en";
   },
 };

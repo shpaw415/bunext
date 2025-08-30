@@ -153,7 +153,7 @@ class StaticPageCache {
 export const StaticPageCacheInstance = await StaticPageCache.create();
 
 export default {
-  priority: 0,
+  priority: 1,
   router: {
     async request(manager) {
       if (process.env.NODE_ENV == "development" || manager.bunextReq.isResponseSetted()) return;

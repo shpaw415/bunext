@@ -55,10 +55,13 @@ export const navigate = (
     }
 };
 
-/**
- * Enhanced history patching with better error handling
- */
-if (typeof history !== "undefined") {
+declare global {
+    var __INIT_HISTORY__: boolean;
+}
+globalThis.__INIT_HISTORY__ ??= false;
+
+if (typeof history !== "undefined" && !globalThis.__INIT_HISTORY__) {
+    globalThis.__INIT_HISTORY__ = true;
     for (const type of [eventPushState, eventReplaceState] as const) {
         const original = history[type];
 

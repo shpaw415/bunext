@@ -22,7 +22,7 @@ export default {
     priority: -1,
     router: {
         async request(req) {
-            if (!req.bunextReq.isAskingHTML && !req.bunextReq.isClientNavigation()) return;
+            if (!req.bunextReq.isAskingHTML && !req.bunextReq.isClientNavigating) return;
 
             const lang = await getHtmlLang(req.bunextReq);
             req.bunextReq.InjectGlobalValues({

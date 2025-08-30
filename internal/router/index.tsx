@@ -184,7 +184,9 @@ async function fetchServerSideProps(
 
       if (response.ok) {
         const props = ParseServerSideProps(await response.text());
-
+        if (props?.redirect) {
+          navigate(props.redirect as RoutesType);
+        }
         // Cache successful response
         if (useCache && props) {
           propsCache.set(pathname, { data: props, timestamp: Date.now() });
@@ -546,7 +548,6 @@ export const RouterHost = ({
   );
 
   const [current, setCurrent] = useState(children);
-  const [current_props, setCurrent_props] = useState<{ route: string, props: ServerSideProps<unknown> }>({ route: globalThis.__INITIAL_ROUTE__, props: globalThis.__SERVERSIDE_PROPS__ });
   const [version, setVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -604,7 +605,6 @@ export const RouterHost = ({
             onRouteUpdated?.(target);
             setVersion(currentVersion);
             setIsLoading(false);
-            setCurrent_props({ route: target, props });
             setCurrent(JsxToDisplay);
           }
         }

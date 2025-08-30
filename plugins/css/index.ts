@@ -21,7 +21,7 @@ export const cssModulesTypesPlugin: BunextPlugin = {
     },
     router: {
         async request(manager) {
-            if (!manager.bunextReq.isAskingHTML && !manager.bunextReq.isClientNavigation()) return;
+            if (!manager.bunextReq.isAskingHTML && !manager.bunextReq.isClientNavigating) return;
             const cssPaths = await manager.router.getCssPaths(true);
             manager.bunextReq.InjectGlobalValues({
                 __CSS_PATHS__: cssPaths

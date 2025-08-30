@@ -1,7 +1,7 @@
 "use client";
 import { createElement, useEffect, useState, type JSX } from "react";
-import { useLoadingVersion } from "../../internal/router/index";
-import { makeDocURL } from "../../internal/documentation/paths";
+import { useLoadingVersion } from "internal/router";
+import { makeDocURL } from "internal/documentation/paths";
 
 export type DynamicComponentProps<Props extends {}, ElementName extends string> = {
   pathName: string;
