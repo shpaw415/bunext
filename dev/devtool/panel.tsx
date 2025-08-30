@@ -1,6 +1,6 @@
 "use client";
 
-import { navigate } from "../../internal/router";
+import { navigate } from "internal/router/client";
 import { ClientSendWSMessage } from "../hotServer";
 import { DevWebSocketContext } from "../dev";
 import "./panel.css";

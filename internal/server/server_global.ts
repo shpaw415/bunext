@@ -4,7 +4,6 @@ import type { ServerWebSocket } from "bun";
 import type { BunextType, ServerConfig } from "../types.ts";
 import type { BunextServer } from "./index.ts";
 
-
 if (typeof process.env.NODE_ENV == "undefined") {
   if (process.argv[2] === "dev") {
     process.env.NODE_ENV = "development";

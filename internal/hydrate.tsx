@@ -2,22 +2,22 @@
 import { hydrateRoot, type ErrorInfo } from "react-dom/client";
 import { CreatePage, RouterHost } from "./router/index";
 import { getRouteMatcher } from "./router/utils/get-route-matcher";
-import type { ReactShellComponent, _GlobalData } from "./types";
-import React, { type JSX } from "react";
-import { ErrorBoundary } from "../components/ErrorBoundary";
+import type { _GlobalData } from "./types";
+import React, { StrictMode, type JSX } from "react";
+import { initClientBunext } from "internal/client/bunext_global";
 
+await initClientBunext();
 
 const match =
   typeof window == "undefined" ? () => { } : getRouteMatcher(globalThis.__ROUTES__);
 
 export async function hydrate(
-  Shell: ReactShellComponent,
   {
     onRecoverableError = () => void 8,
     ...options
   }: Omit<
     React.ComponentPropsWithoutRef<typeof RouterHost>,
-    "Shell" | "children"
+    "children"
   > & {
     onRecoverableError?: (error: unknown, errorInfo: ErrorInfo) => void;
   } = {}
@@ -34,16 +34,11 @@ export async function hydrate(
 
   return hydrateRoot(
     document,
-    <RouterHost Shell={Shell} {...options}>
-      <Shell
-        route={globalThis.__INITIAL_ROUTE__}
-        props={globalThis.__SERVERSIDE_PROPS__}
-      >
-        <ErrorBoundary>
-          {jsxPage}
-        </ErrorBoundary>
-      </Shell>
-    </RouterHost>,
+    <StrictMode>
+      <RouterHost {...options}>
+        {jsxPage}
+      </RouterHost>
+    </StrictMode>,
     { onRecoverableError }
   );
 }

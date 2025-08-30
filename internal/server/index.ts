@@ -40,7 +40,6 @@ import OnServerStart, { OnServerStartCluster } from "./server-start.ts";
 import "../../plugins/fetch-caching/fetch.ts";
 import {
   benchmark_console,
-  DevConsole,
   TerminalIcon,
   TextColor,
   ToColor,
@@ -379,10 +378,7 @@ class BunextServer {
       const response = await router.serve(
         request,
         headers,
-        serverActionData,
-        {
-          Shell: this.Shell,
-        }
+        serverActionData
       );
 
       return response;

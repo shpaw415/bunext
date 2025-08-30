@@ -52,15 +52,9 @@ export function HeadProvider({
     children: React.ReactNode;
 }) {
     const [data, setData] = useState<HeadData>(globalThis.__HEAD_DATA__);
-    const [pendingData, setPendingData] = useState<HeadData>(globalThis.__HEAD_DATA__);
     const currentPath = usePathname();
-    useEffect(() => {
-        setPendingData((current) => {
-            console.log({ current });
-            setData(removeDuplicate(current));
-            return {};
-        })
-    }, [currentPath]);
+
+    useReloadEffect(() => setData({}));
 
     // Clean up query parameters from the path
     const cleanPath = useMemo(() => currentPath.split("?")[0], [currentPath]);
@@ -105,11 +99,10 @@ export function HeadProvider({
     }
 
     const providerData: headProviderType = useMemo(
-        () => [(data: HeadData) => setPendingData((current_data) => {
-            console.log("providerData", { current_data, data });
-            return safeMerge(current_data, data);
+        () => [(data: HeadData) => setData((current_data) => {
+            return removeDuplicate(safeMerge(current_data, data));
         }), path],
-        [setPendingData, path]
+        [setData, path]
     );
     return (
         <HeadErrorBoundary>

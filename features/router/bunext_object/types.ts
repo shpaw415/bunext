@@ -1,5 +1,6 @@
 import type { Link as _Link } from "../components";
-import type { navigate, usePathname } from "../../../internal/router/index";
+import type { usePathname } from "internal/router";
+import type { navigate } from "internal/router/client";
 import type {
   revalidateStatic,
 } from "plugins/static_page";

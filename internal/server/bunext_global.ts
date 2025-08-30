@@ -11,14 +11,10 @@ import ContentTypeInit from "features/components/bunext_global/server";
 
 globalThis.Bunext ??= {
   version: packageJson.version,
-  //@ts-ignore
   request: BunextGlobalRequestInit,
-  //@ts-ignore
   database: BunextGlobalDatabaseInit,
-  //@ts-ignore
   plugins: BunextGlobalPluginsInit,
   router: BunextGlobalRouterInit,
-  //@ts-ignore
   session: BunextGlobalSessionInit,
   components: ContentTypeInit,
 };

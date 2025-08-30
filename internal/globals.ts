@@ -2,7 +2,7 @@ import type { HeadData } from "public/head";
 import { jsxDEV, Fragment, type JSXSource } from "react/jsx-dev-runtime";
 import { jsxs, jsx } from "react/jsx-runtime";
 import React from "react";
-import { navigate } from "./router/index";
+import { navigate } from "./router/client";
 import type { _GlobalData, ServerConfig } from "./types";
 
 declare global {

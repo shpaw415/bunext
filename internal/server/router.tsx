@@ -32,6 +32,7 @@ import type { JsxToStringWorkerMessage } from "../dev/types";
 import { BunextError } from "./server_global";
 import { ErrorFallback } from "components/fallback";
 import { DirectiveTool } from "plugins/utils";
+import { Shell } from "public/client/shell";
 
 
 type RouteEntry = [string, string];
@@ -47,35 +48,10 @@ const STATIC_FILE_SUFFIXES = [
 ] as const;
 
 
-
-
-/**
- * Custom error for client-only components
- */
-class ClientOnlyError extends Error {
-  constructor(message = "Component can only be rendered on the client side") {
-    super(message);
-    this.name = "ClientOnlyError";
-  }
-}
-
-
-
 export class RouteNotFoundError extends BunextError { }
-class ComponentNotFoundError extends BunextError { }
 export class RenderingError extends BunextError { }
 
 class FileSystemError extends BunextError { }
-
-/**
- * Error for missing server-side routes
- */
-class ServerRouteNotFoundError extends Error {
-  constructor(pathname: string) {
-    super(`No server-side script found for ${pathname}`);
-    this.name = "ServerRouteNotFoundError";
-  }
-}
 
 const fileDirectives = new DirectiveTool();
 
@@ -345,7 +321,6 @@ class StaticRouters extends PluginLoader {
     request: Request,
     request_header: Record<string, string>,
     data: FormData,
-    { Shell }: { Shell: ReactShellComponent }
   ): Promise<Response> {
     await this.isInited();
 
@@ -356,7 +331,6 @@ class StaticRouters extends PluginLoader {
       data,
       request_header,
       router: this,
-      Shell,
     })
     await manager.make();
     let response = await manager.bunextReq.toResponse();
@@ -557,7 +531,6 @@ type RequestManagerProps = {
   server: FileSystemRouter;
   client: FileSystemRouter;
   router: StaticRouters;
-  Shell: ReactShellComponent;
 };
 
 /**
@@ -583,7 +556,6 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
   public relatedCssPaths: string[];
 
   // Components and state
-  public readonly Shell: ReactShellComponent;
   public bunextReq: BunextRequest<ContextType>;
 
   constructor(init: RequestManagerProps) {
@@ -596,7 +568,6 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
     this.server = init.server;
     this.client = init.client;
     this.router = init.router;
-    this.Shell = init.Shell;
 
     // Parse URL
     const { pathname, search } = new URL(this.request.url);
@@ -730,14 +701,11 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
   public async WrapPageWithShell(page: JSX.Element): Promise<JSX.Element> {
     const ShellJSX = (
       <RequestContext.Provider value={this.bunextReq}>
-        <this.Shell
-          route={this.serverSide?.pathname + this.search}
-          request={this.bunextReq}
-        >
+        <Shell request={this.bunextReq}>
           {page}
           <script src="/.bunext/react-ssr/hydrate.js" type="module" />
           <script id="_BUNEXT_BOOTSTRAP_SCRIPT_" />
-        </this.Shell>
+        </Shell>
       </RequestContext.Provider>
     );
     return ShellJSX;

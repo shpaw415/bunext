@@ -224,6 +224,9 @@ class Builder extends PluginLoader {
       splitting: true,
       publicPath: "./",
       target: "browser",
+      naming: {
+        chunk: "chunk-[name]-[hash].[ext]"
+      },
       entrypoints: [
         "react",
         "react-dom",

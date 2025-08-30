@@ -231,9 +231,6 @@ export type routePageFunction = ({ params, props }: { params?: Params, props?: S
 
 export type ReactShellComponent = React.ComponentType<{
   children: React.ReactNode;
-  props?: ServerSideProps<unknown>;
-  params?: Params;
-  route: string;
   request?: BunextRequest;
 }>;
 

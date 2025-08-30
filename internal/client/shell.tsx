@@ -6,7 +6,6 @@ import type { ReactShellComponent } from "internal/types";
 
 export const Shell: ReactShellComponent = ({
   children,
-  route,
   request
 }) => {
   return (

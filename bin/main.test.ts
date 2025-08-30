@@ -506,9 +506,7 @@ describe("Bunext Framework Test Suite", () => {
       };
       const req = new Request(`${baseUrl}/serversideprops`, { headers });
 
-      const res = await router.serve(req, headers, new FormData(), {
-        Shell: Shell as any,
-      });
+      const res = await router.serve(req, headers, new FormData());
 
       expect(res).toBeDefined();
       if (!res) throw new Error("No response");
@@ -523,9 +521,7 @@ describe("Bunext Framework Test Suite", () => {
       };
       const req = new Request(`${baseUrl}/serversideprops/undefined`, { headers });
 
-      const res = await router.serve(req, headers, new FormData(), {
-        Shell: Shell as any,
-      });
+      const res = await router.serve(req, headers, new FormData());
 
       expect(res).toBeDefined();
       if (!res) throw new Error("No response");
@@ -541,9 +537,7 @@ describe("Bunext Framework Test Suite", () => {
         };
         const req = new Request(`${baseUrl}/serversideprops/static`, { headers });
 
-        const res = await router.serve(req, headers, new FormData(), {
-          Shell: Shell as any,
-        });
+        const res = await router.serve(req, headers, new FormData());
 
         expect(res).toBeDefined();
         if (!res) throw new Error("No response");
@@ -567,9 +561,7 @@ describe("Bunext Framework Test Suite", () => {
         };
         const req = new Request(`${baseUrl}/serversideprops/static/undefined`, { headers });
 
-        const res = await router.serve(req, headers, new FormData(), {
-          Shell: Shell as any,
-        });
+        const res = await router.serve(req, headers, new FormData());
 
         expect(res).toBeDefined();
         if (!res) throw new Error("No response");
@@ -609,9 +601,7 @@ describe("Bunext Framework Test Suite", () => {
         const badReq = new Request(`${baseUrl}/serversideprops`, {
           headers: { accept: "invalid/mime-type" }
         });
-        const res = await router.serve(badReq, {}, new FormData(), {
-          Shell: Shell as any,
-        });
+        const res = await router.serve(badReq, {}, new FormData());
         expect(res).toBeDefined(); // Should handle gracefully
       } catch (error) {
         // Error handling is acceptable

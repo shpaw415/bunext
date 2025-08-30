@@ -15,7 +15,7 @@ import React, {
 } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher, type Match } from "./utils/get-route-matcher";
-import type { _GlobalData, ReactShellComponent, ServerSideProps } from "../types";
+import type { _GlobalData, ServerSideProps } from "../types";
 import {
   BunextSession,
   SessionContext,
@@ -25,7 +25,10 @@ import { AddServerActionCallback, GetSessionFromResponse } from "../globals";
 import { RequestContext } from "../server/context";
 import type { RoutesType } from "../../plugins/typed-route/type";
 import { preloadModule } from "react-dom";
-import ErrorBoundary from "../../components/ErrorBoundary";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { Shell } from "bunext-js/client/shell";
+import { events, navigate } from "./client";
+
 
 /**
  * Enhanced type definitions for better type safety
@@ -528,16 +531,12 @@ export function PreLoadPaths(paths: string[]): Promise<PromiseSettledResult<void
 export const RouterHost = ({
   children,
   normalizeUrl = (url: string) => url,
-  Shell,
   onRouteUpdated,
-  errorBoundary: ErrorBoundary,
   loadingComponent: LoadingComponent,
 }: {
   children: React.ReactElement;
   normalizeUrl?: (url: string) => string;
-  Shell: ReactShellComponent;
   onRouteUpdated?: (path: string) => void;
-  errorBoundary?: ComponentType<{ error: Error; retry: () => void }>;
   loadingComponent?: ComponentType;
   enablePreloading?: boolean;
 }) => {
@@ -547,6 +546,7 @@ export const RouterHost = ({
   );
 
   const [current, setCurrent] = useState(children);
+  const [current_props, setCurrent_props] = useState<{ route: string, props: ServerSideProps<unknown> }>({ route: globalThis.__INITIAL_ROUTE__, props: globalThis.__SERVERSIDE_PROPS__ });
   const [version, setVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -555,6 +555,7 @@ export const RouterHost = ({
 
   const reload = useCallback(
     async (target: string = location.pathname + location.search): Promise<void> => {
+      ``
       if (typeof target !== "string") {
         throw new Error(`Invalid target: ${target}`);
       }
@@ -596,7 +597,6 @@ export const RouterHost = ({
           currentVersion,
           matched,
         });
-        const JSXToDisplayEl = () => JsxToDisplay;
         if (currentVersion === versionRef.current) {
           if (typeof props == "object" && props?.redirect) {
             navigate(props.redirect as RoutesType);
@@ -604,11 +604,8 @@ export const RouterHost = ({
             onRouteUpdated?.(target);
             setVersion(currentVersion);
             setIsLoading(false);
-            setCurrent(
-              <Shell route={target} props={props}>
-                <JSXToDisplayEl />
-              </Shell>
-            );
+            setCurrent_props({ route: target, props });
+            setCurrent(JsxToDisplay);
           }
         }
       } catch (error) {
@@ -644,23 +641,16 @@ export const RouterHost = ({
     }
   }, [pathname, reload, onRouteUpdated, ErrorBoundary]);
 
-  // Render error boundary if error exists and ErrorBoundary component is provided
-  if (error && ErrorBoundary) {
-    return (
-      <ErrorBoundary
-        error={error}
-        retry={() => {
-          setError(null);
-          reload(pathname);
-        }}
-      />
-    );
-  }
-
   return (
     <ReloadContext.Provider value={reload}>
       <VersionContext.Provider value={version}>
-        {isLoading && LoadingComponent ? <LoadingComponent /> : current}
+        <ErrorBoundary>
+          <Shell>
+            {isLoading && LoadingComponent ? <LoadingComponent /> : current}
+          </Shell>
+        </ErrorBoundary>
+
+
       </VersionContext.Provider>
     </ReloadContext.Provider>
   );
@@ -1312,53 +1302,7 @@ export function usePathname(): string {
   return "/";
 }
 
-/**
- * Programmatically navigate to a different route with type safety.
- * Updates browser history and triggers route changes in the application.
- * 
- * @param to - The route path to navigate to (typed with RoutesType)
- * @param options - Navigation options
- * @param options.replace - Whether to replace current history entry instead of pushing new one
- * 
- * @example
- * // Basic navigation
- * navigate('/dashboard');
- * 
- * // Replace current history entry
- * navigate('/login', { replace: true });
- * 
- * // Navigate with query parameters
- * navigate('/search?q=react');
- * 
- * // Navigate in event handlers
- * function LoginButton() {
- *   const handleLogin = async () => {
- *     await loginUser();
- *     navigate('/dashboard');
- *   };
- *   
- *   return <button onClick={handleLogin}>Login</button>;
- * }
- */
-export const navigate = (
-  to: RoutesType,
-  options: { replace?: boolean } = {}
-): void => {
-  const { replace = false } = options;
-  const method = replace ? eventReplaceState : eventPushState;
 
-  try {
-    history[method](null, "", to);
-  } catch (error) {
-    console.error("Navigation failed:", error);
-    // Fallback to location assignment
-    if (replace) {
-      location.replace(to);
-    } else {
-      location.assign(to);
-    }
-  }
-};
 
 export async function CreatePage({
   matched,
@@ -1387,33 +1331,5 @@ export async function CreatePage({
     }</ErrorBoundary>
 }
 
-// Event constants for better maintainability
-const eventPopstate = "popstate" as const;
-const eventPushState = "pushState" as const;
-const eventReplaceState = "replaceState" as const;
-const events = [eventPopstate, eventPushState, eventReplaceState] as const;
 
-/**
- * Enhanced history patching with better error handling
- */
-if (typeof history !== "undefined") {
-  for (const type of [eventPushState, eventReplaceState] as const) {
-    const original = history[type];
 
-    history[type] = function (...args: Parameters<typeof original>) {
-      try {
-        const result = original.apply(this, args);
-        const event = new Event(type);
-
-        unstable_batchedUpdates(() => {
-          dispatchEvent(event);
-        });
-
-        return result;
-      } catch (error) {
-        console.error(`History ${type} failed:`, error);
-        throw error;
-      }
-    };
-  }
-}

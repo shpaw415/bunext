@@ -26,7 +26,6 @@ export function useHead({ data }: { data?: HeadData } = {}) {
     const request = useRequest();
     const pluginContext = usePluginContext<PreBuildContextType>();
     const currentRoute = usePathname();
-
     // Validate data if provided
     const validatedData = useMemo(() => {
         if (data && !validateHeadData(data)) {
@@ -75,7 +74,6 @@ export function useHead({ data }: { data?: HeadData } = {}) {
     }, [updater]);
 
     useEffect(() => {
-        console.log("useHead", validatedData);
         validatedData && updater(validatedData);
     }, [currentRoute]);
 

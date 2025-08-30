@@ -1,5 +1,6 @@
 import type { Router } from "./types";
-import { navigate, usePathname } from "../../../internal/router/index.tsx";
+import { navigate } from "internal/router/client";
+import { usePathname } from "internal/router";
 import { Link } from "../components.tsx";
 
 const RouterInit: Router = {
@@ -20,6 +21,7 @@ const RouterInit: Router = {
     },
   },
 };
+
 
 globalThis.Link = Link;
 
