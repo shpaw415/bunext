@@ -10,6 +10,7 @@ export async function serveFromBuildDirectory(manager: RequestManager) {
         path: manager.pathname,
     });
     if (!staticResponse) return false;
+
     manager.bunextReq.preventRewrite().preventGlobalValuesInjection();
     const date = new Date();
     date.setTime(date.getTime() + 360000);
@@ -24,6 +25,19 @@ export async function serveFromBuildDirectory(manager: RequestManager) {
     const ProductionHeader = {
         "Cache-Control": "public max-age=3600",
     };
+    /*
+        if (!manager.bunextReq.isClientNavigating) {
+            manager.bunextReq.setResponse(staticResponse, {
+                headers: {
+                    "Content-Type": staticResponse.type,
+                    ...(process.env.NODE_ENV == "production"
+                        ? ProductionHeader
+                        : DevHeader),
+                }
+            });
+            return true;
+        }
+    */
     if (staticResponse.name && extname(staticResponse.name) == ".js") {
 
         manager.bunextReq.setResponse([await staticResponse.text(), manager.bunextReq.globalDataToJSFormat()].join("\n"), {

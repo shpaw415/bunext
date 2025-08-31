@@ -52,9 +52,9 @@ export default {
         },
         async request(manager) {
             for await (const handler of [
+                serveFromBuildDirectory,
                 onRequestSSRPage,
                 serveDynamicPage,
-                serveFromBuildDirectory,
                 serveStaticAssets,
                 serveFromNodeModule,
                 sessionOnRequestHandler,
