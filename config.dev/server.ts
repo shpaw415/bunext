@@ -23,6 +23,7 @@ const Config: ServerConfig = {
   },
   bunext_plugins: [
     {
+      name: "bunext-dev-plugin",
       build: {
         buildOptions: {
           "minify": false
@@ -32,7 +33,8 @@ const Config: ServerConfig = {
   ],
   html_lang(request) {
     const params = request.match?.params as { lang?: string };
-    return params.lang || "en";
+
+    return params?.lang || "en";
   },
 };
 

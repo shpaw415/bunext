@@ -28,7 +28,7 @@ export function makeType(routeDump: string) {
 }
 
 export default {
-  priority: 11,
+  name: "bunext-typed-route-plugin",
   async onFileSystemChange(filePath) {
     if (filePath == undefined) return;
     try {

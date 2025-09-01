@@ -14,6 +14,7 @@ globalThis.__HEAD_CACHE__ ??= await CacheManager.create("__HEAD_CACHE__");
 export const headCache = globalThis.__HEAD_CACHE__;
 
 export default {
+    name: "bunext-head-plugin",
     router: {
         async request(manager) {
             if (!manager.bunextReq.isAskingHTML && !manager.bunextReq.isClientNavigating) return;

@@ -43,7 +43,7 @@ async function MakeEntryPoints() {
 const entrypoints = await MakeEntryPoints();
 
 export default {
-  priority: 11,
+  name: "bunext-dynamic-component-plugin",
   build: { buildOptions: { entrypoints } },
   router: {
     html_rewrite: {

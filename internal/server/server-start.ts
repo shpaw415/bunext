@@ -1,7 +1,8 @@
 "server only";
-// this is called on server start
 
-import { router } from "./router";
+import { pluginLoader } from "./plugin-loader";
+
+// this is called on server start
 
 declare global {
   var __BUNEXT_SERVER_START_PLUGIN_DRY__: boolean;
@@ -13,28 +14,29 @@ export default async function Make() {
     return;
   }
   globalThis.__BUNEXT_SERVER_START_PLUGIN_DRY__ = true;
-  await router.initPlugins();
-  const plugins = router
-    .getPluginByName("serverStart")
-  const mains = plugins.map((p) => p.main).filter((p) => p != undefined);
 
   if (process.env.NODE_ENV == "development") {
-    const devs = plugins.map((p) => p.dev).filter((p) => p != undefined);
-    await Promise.all(devs.map((plugin) => plugin()));
+    await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "dev").map((plugin) => {
+      try {
+        return plugin.subPlugin();
+      } catch (e) {
+        console.error(`OnServerStart plugin failed, name: ${plugin.name}:`, e);
+      }
+    }));
   }
 
   await Promise.all(
-    mains.map(async (plugin) => {
+    pluginLoader.getSubPluginsByParentName("serverStart", "main").map(async (plugin) => {
       try {
-        await plugin();
+        await plugin.subPlugin();
       } catch (e) {
-        console.error(`OnServerStart plugin failed`, e);
+        console.error(`OnServerStart plugin failed, name: ${plugin.name}:`, e);
       }
     })
   );
 }
 
 export async function OnServerStartCluster() {
-  await router.initPlugins();
-  await Promise.all(router.getSubPluginsByParentName("serverStart", "cluster").map((p) => p()));
+  await pluginLoader.init();
+  await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "cluster").map((p) => p.subPlugin()));
 }

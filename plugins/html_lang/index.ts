@@ -19,10 +19,11 @@ async function getHtmlLang(bunext: BunextRequest) {
 }
 
 export default {
-    priority: -1,
+    name: "bunext-html-lang-plugin",
+    priority: 1,
     router: {
         async request(req) {
-            if (!req.bunextReq.isAskingHTML && !req.bunextReq.isClientNavigating) return;
+            if (!req.bunextReq.isAskingHTML && !req.bunextReq.isClientNavigating || req.bunextReq.isResponseSetted()) return;
 
             const lang = await getHtmlLang(req.bunextReq);
             req.bunextReq.InjectGlobalValues({

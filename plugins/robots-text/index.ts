@@ -3,6 +3,7 @@ import "internal/server/server_global";
 import RobotText from "robots.txt";
 export default {
     priority: 0,
+    name: "bunext-robots-text-plugin",
     router: {
         request(request) {
             try {

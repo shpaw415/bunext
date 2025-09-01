@@ -2,7 +2,7 @@ import { SVGCache } from "./init";
 import type { BunextPlugin } from "plugins/types";
 
 export default {
-  priority: 11,
+  name: "bunext-svg-plugin",
   build: {
     plugin: {
       name: "svg-to-react-plugin",

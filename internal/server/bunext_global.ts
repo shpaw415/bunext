@@ -9,12 +9,17 @@ import BunextGlobalSessionInit from "features/session/bunext_object/server";
 import BunextGlobalRequestInit from "features/request/bunext_object/server";
 import ContentTypeInit from "features/components/bunext_global/server";
 
-globalThis.Bunext ??= {
-  version: packageJson.version,
-  request: BunextGlobalRequestInit,
-  database: BunextGlobalDatabaseInit,
-  plugins: BunextGlobalPluginsInit,
-  router: BunextGlobalRouterInit,
-  session: BunextGlobalSessionInit,
-  components: ContentTypeInit,
-};
+
+function initBunextGlobal() {
+  return globalThis.Bunext ??= {
+    version: packageJson.version,
+    request: BunextGlobalRequestInit,
+    database: BunextGlobalDatabaseInit,
+    plugins: BunextGlobalPluginsInit,
+    router: BunextGlobalRouterInit,
+    session: BunextGlobalSessionInit,
+    components: ContentTypeInit,
+  };
+}
+
+export { initBunextGlobal };

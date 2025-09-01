@@ -1,11 +1,6 @@
 "server only";
 
-import "./bunext_global.ts";
 import { terminal } from 'terminal-kit';
-
-declare global {
-  var BunextConsole: ScrollingConsole;
-}
 
 const separator = "-----------------------------------";
 const bunextBlue = ToColor("blue", "BUNEXT:");
@@ -134,7 +129,6 @@ function formatForConsole(data: any): string {
 
 // Enhanced Scrolling Console Implementation with terminal-kit
 class ScrollingConsole {
-  private static instance: ScrollingConsole;
   private headerLines: string[] = [];
   private scrollingMessages: string[] = [];
   private maxScrollingLines = 50;
@@ -146,12 +140,15 @@ class ScrollingConsole {
   private originalConsole: Console = { ...console };
   private isConsoleRedirected = false;
 
-  private constructor() {
+  constructor() {
     if (process.env?.__DISABLE_DEV_CONSOLE_ == "true") return;
     // Store the original console methods
-
     this.terminalHeight = terminal.height;
     this.terminalWidth = terminal.width;
+  }
+
+  init() {
+    if (process.env?.__DISABLE_DEV_CONSOLE_ == "true") return;
 
     terminal.grabInput({
       mouse: "button",
@@ -199,22 +196,22 @@ class ScrollingConsole {
         this.scrollUp();
       }
     });
-  }
 
-  static getInstance(): ScrollingConsole {
-    if (!ScrollingConsole.instance) {
-      ScrollingConsole.instance = new ScrollingConsole();
-    }
-    return ScrollingConsole.instance;
-  }
+    this.redirectConsole();
+    this.render();
 
-  initialize() {
-    if (process.env?.__DISABLE_DEV_CONSOLE_ == "true") return;
-    if (this.isInitialized) {
-      //console.clear();
-      this.render();
-      return;
-    }
+    process.on('SIGINT', () => {
+      console.log('\nReceived SIGINT, cleaning up...');
+      this.destroy();
+      setTimeout(() => process.exit(0), 1000);
+    });
+
+    process.on('SIGTERM', () => {
+      console.log('\nReceived SIGTERM, cleaning up...');
+      this.destroy();
+      setTimeout(() => process.exit(0), 1000);
+    });
+
     this.headerLines = getStartLog().split("\n");
     this.headerHeight = this.headerLines.length + 1;
     this.isInitialized = true;
@@ -637,82 +634,13 @@ class ScrollingConsole {
   }
 }
 
+declare global {
+  var __BUNEXT__CONSOLE__: ScrollingConsole;
+}
+
 // Initialize global instance
-globalThis.BunextConsole ??= ScrollingConsole.getInstance();
+globalThis.__BUNEXT__CONSOLE__ ??= new ScrollingConsole();
 
-// Initialize the console (call this on server startup)
-export function initializeDevConsole() {
-  if (process.env?.__DISABLE_DEV_CONSOLE_ == "true") return;
-  globalThis.BunextConsole.initialize();
-  globalThis.BunextConsole.redirectConsole();
-
-  // Handle graceful shutdown
-  process.on('SIGINT', () => {
-    console.log('\nReceived SIGINT, cleaning up...');
-    globalThis.BunextConsole.destroy();
-    setTimeout(() => process.exit(0), 1000);
-  });
-
-  process.on('SIGTERM', () => {
-    console.log('\nReceived SIGTERM, cleaning up...');
-    globalThis.BunextConsole.destroy();
-    setTimeout(() => process.exit(0), 1000);
-  });
-}
-
-// Enhanced DevConsole that uses scrolling
-export function DevConsole(data?: any) {
-  const message = formatForConsole(data);
-  if (data) globalThis.BunextConsole.addMessage(message);
-
-  return {
-    success: DevConsoleSuccess,
-    info: DevConsoleInfo,
-    warning: DevConsoleWarning,
-    error: DevConsoleError,
-  }
-}
-
-// Enhanced console functions
-export function DevConsoleSuccess(message: string) {
-  DevConsole(`${TerminalIcon.success} ${message}`);
-}
-
-export function DevConsoleInfo(message: string) {
-  DevConsole(`${TerminalIcon.info} ${message}`);
-}
-
-export function DevConsoleWarning(message: string) {
-  DevConsole(`${TerminalIcon.warning} ${message}`);
-}
-
-export function DevConsoleError(message: string, error?: any) {
-  DevConsole(`${TerminalIcon.error} ${message}`);
-  if (error) {
-    // Use the enhanced formatting for error objects
-    DevConsole(error);
-  }
-}
-
-export function clearDevConsole() {
-  if (process.env.NODE_ENV === "development") {
-    globalThis.BunextConsole.clear();
-  }
-}
-
-// Console redirection control functions
-export function redirectConsoleToScrolling() {
-  globalThis.BunextConsole.redirectConsole();
-}
-
-export function restoreOriginalConsole() {
-  globalThis.BunextConsole.restoreConsole();
-}
-
-// Check if console is redirected
-export function isConsoleRedirected(): boolean {
-  return globalThis.BunextConsole?.redirected ?? false;
-}
 /**
  * time in ms
  */
@@ -728,8 +656,10 @@ export async function benchmark_console<T>(
   const enabled = process.env.NODE_ENV == "development" || onProduction;
 
   if (res && enabled) {
-    DevConsole(res);
+    console.log(res);
   }
 
   return measuringRes;
 }
+
+export default globalThis.__BUNEXT__CONSOLE__;

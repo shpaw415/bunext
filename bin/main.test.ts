@@ -21,6 +21,7 @@ import { ssrAsDefaultRoutes, SSRCache } from "plugins/server-features/ssr-page";
 import { DirectiveTool } from "plugins/utils";
 
 import { revalidate } from "plugins/server-features/ssr-page";
+import { pluginLoader } from "internal/server/plugin-loader";
 
 // Add custom matcher for toBeOneOf
 expect.extend({
@@ -803,9 +804,9 @@ describe("Bunext Framework Test Suite", () => {
 
   describe("Framework Integration", () => {
     test("plugin system functionality", () => {
-      expect(router.getPlugins).toBeDefined();
+      expect(pluginLoader.getPlugins).toBeDefined();
 
-      const plugins = router.getPlugins();
+      const plugins = pluginLoader.getPlugins();
       expect(Array.isArray(plugins)).toBe(true);
 
       console.log(`Loaded plugins: ${plugins.length}`);

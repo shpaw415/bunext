@@ -1,16 +1,18 @@
 import { generateRandomString } from "features/utils";
 import { RequestManager, router } from "internal/server/router";
 import { extname } from "path";
+import type { BunextPlugin } from "plugins/types";
 
 
-export async function serveFromBuildDirectory(manager: RequestManager) {
-    if (!manager.pathname.split("/").at(-1)?.includes(".")) return false;
+async function serveFromBuildDirectory(manager: RequestManager): Promise<void> {
+    if (!manager.pathname.split("/").at(-1)?.includes(".")) return;
     const staticResponse = await router.serveFromDir({
         directory: router.buildDir,
         path: manager.pathname,
+        suffixes: [""]
     });
-    if (!staticResponse) return false;
-
+    if (!staticResponse) return;
+    manager.bunextReq.isStaticAsset = true;
     manager.bunextReq.preventRewrite().preventGlobalValuesInjection();
     const date = new Date();
     date.setTime(date.getTime() + 360000);
@@ -35,10 +37,10 @@ export async function serveFromBuildDirectory(manager: RequestManager) {
                         : DevHeader),
                 }
             });
-            return true;
+            return;
         }
     */
-    if (staticResponse.name && extname(staticResponse.name) == ".js") {
+    if (staticResponse.name && extname(staticResponse.name) == ".js" && manager.bunextReq.URL.pathname.startsWith("/" + manager.router.pageDir)) {
 
         manager.bunextReq.setResponse([await staticResponse.text(), manager.bunextReq.globalDataToJSFormat()].join("\n"), {
             headers: {
@@ -48,7 +50,7 @@ export async function serveFromBuildDirectory(manager: RequestManager) {
                     : DevHeader),
             }
         });
-        return true;
+        return;
     }
 
     manager.bunextReq.setResponse(staticResponse, {
@@ -58,7 +60,17 @@ export async function serveFromBuildDirectory(manager: RequestManager) {
                 ? ProductionHeader
                 : DevHeader),
         }
-    });
-
-    return true;
+    }).sendNow();
 }
+
+
+export default {
+    name: "bunext-build-dir-plugin",
+    priority: 0,
+    router: {
+        request(manager) {
+            if (manager.bunextReq.isResponseSetted()) return;
+            return serveFromBuildDirectory(manager);
+        }
+    }
+} as BunextPlugin;

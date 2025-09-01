@@ -526,12 +526,12 @@ async function analyzeMergeableData(backupPath: string, newTables: string[]): Pr
     incompatibleTables: string[];
 }> {
     try {
-        const fs = require('fs');
+        const fs = await import('fs');
         const { Database: BunDB } = require('bun:sqlite');
 
         // Decompress and read backup
         const compressedData = fs.readFileSync(backupPath);
-        const decompressed = Bun.gunzipSync(compressedData);
+        const decompressed = Bun.gunzipSync(new Uint8Array(compressedData));
         const tempBackupPath = backupPath.replace('.gz', '.tmp');
         fs.writeFileSync(tempBackupPath, decompressed);
 
@@ -599,7 +599,7 @@ async function performSelectiveMerge(
 
         // Decompress backup
         const compressedData = fs.readFileSync(backupPath);
-        const decompressed = Bun.gunzipSync(compressedData);
+        const decompressed = Bun.gunzipSync(new Uint8Array(compressedData));
         const tempBackupPath = backupPath.replace('.gz', '.merge-tmp');
         fs.writeFileSync(tempBackupPath, decompressed);
 
@@ -607,7 +607,7 @@ async function performSelectiveMerge(
 
         try {
             // Attach backup database
-            dbManager.databaseInstance.exec(`ATTACH DATABASE '${tempBackupPath}' AS backup_db`);
+            dbManager.databaseInstance.run(`ATTACH DATABASE '${tempBackupPath}' AS backup_db`);
 
             for (const table of compatibleTables) {
                 console.log(`🔄 Merging table: ${table.name}...`);

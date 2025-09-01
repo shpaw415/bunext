@@ -10,8 +10,8 @@ import { BunextError } from "./server_global";
 import { formatParams, RenderingError, RequestManager, router } from "./router";
 import { formatHTML } from "internal/utils";
 import type { DirectiveTool } from "plugins/utils";
-import path, { join, resolve } from "path";
-import type { MatchedRoute } from "bun";
+import { join, resolve } from "path";
+import { pluginLoader } from "./plugin-loader";
 
 export type CookieOptions = _webToken & {
   encrypted?: boolean;
@@ -45,6 +45,8 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public webtoken: webToken<any>;
   public path: string = "";
   public __BYPASS_RESPONSE__: Response | undefined;
+  public isSendNowEnabled: boolean = false;
+  public __ERROR__?: Error;
   /**
    * Indicates if the request is asking for HTML.
    *
@@ -55,7 +57,18 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * Indicates if the request is a client-side navigation.
    */
   public readonly isClientNavigating: boolean;
+  /**
+   * Matching values applied when it is a client-side navigation or a first request to a route.
+   */
   public readonly match?: BunextRequestMatch;
+
+  /**
+   * Indicates if the request is for a static asset.
+   *
+   * From the Build dir or the Static dir
+   */
+  public isStaticAsset: boolean = false;
+
   /**
    * only available when serverConfig.session.type == "database:hard" | "database:memory"
    */
@@ -87,6 +100,13 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this.isClientNavigating = this.URL.searchParams.has("__BUNEXT_NAVIGATE__");
     this.isAskingHTML = this.isClientNavigating ? false : Boolean(this.request.headers.get("accept")?.includes("text/html"));
     this.match = this.initMatch();
+  }
+
+  /**
+   * Skip all transformation and other plugins modification and send the response
+   */
+  public sendNow() {
+    this.isSendNowEnabled = true;
   }
 
   private initMatch() {
@@ -162,12 +182,17 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * @param response The response object.
    * @returns The current instance for chaining.
    */
-  public setResponse(body: BodyInit | null, init?: ResponseInit): void | BunextResponseAlreadySetError {
-    if (this._response_setted) return new BunextResponseAlreadySetError("Response already set");
+  public setResponse(body: BodyInit | null, init?: ResponseInit): this {
+    if (this._response_setted) throw new BunextResponseAlreadySetError("Response already set");
     this._response_body = body;
     this._response_init = init;
     this._response_setted = true;
+    return this;
   }
+  /**
+   * Checks if the response has been set.
+   * @returns True if the response has been set, false otherwise.
+   */
   public isResponseSetted(): boolean {
     return this._response_setted || Boolean(this.__BYPASS_RESPONSE__);
   }
@@ -293,6 +318,8 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     return this._prevent_global_values_injection;
   }
   public async toResponse(): Promise<Response | BunextResponseNotSetError> {
+    if (this.__ERROR__) return new BunextError("Error occured during serving", this.__ERROR__);
+
     try {
       // Return bypass response if set
       if (this.__BYPASS_RESPONSE__) return this.__BYPASS_RESPONSE__;
@@ -385,23 +412,34 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   private async applyRewritePlugins(html: string): Promise<string> {
     if (this._prevent_rewrite) return html;
     const rewriter = new HTMLRewriter();
-    const plugins = router
+    const plugins = pluginLoader
       .getSubPluginsByParentName("router", "html_rewrite");
-    const afters = await Promise.all(
+    const afters = (await Promise.all(
       plugins.map(async (plugin) => {
-        const context: unknown = plugin.initContext?.(this);
-        await plugin.rewrite?.(rewriter, this.manager, context);
-        return {
-          after: plugin.after,
-          context: context,
-        };
+        try {
+          const context: unknown = plugin.subPlugin.initContext?.(this);
+          await plugin.subPlugin.rewrite?.(rewriter, this.manager, context);
+          return {
+            after: plugin.subPlugin.after,
+            context: context,
+            name: plugin.name
+          };
+        } catch (e) {
+          console.error(`Error in html_rewrite plugin, name: ${plugin.name}:`, e);
+        }
       })
-    );
+    )).filter((e) => e !== undefined);
 
     const transformedText = rewriter.transform(html);
 
     await Promise.all(
-      afters.map(({ context, after }) => after?.(context, this.manager, transformedText))
+      afters.map(({ context, after, name }) => {
+        try {
+          return after?.(context, this.manager, transformedText)
+        } catch (e) {
+          console.error(`Error in html_rewrite plugin, name: ${name}:`, e);
+        }
+      })
     );
 
     return [HTML_DOCTYPE, transformedText].join("\n");

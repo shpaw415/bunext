@@ -297,9 +297,10 @@ export class BunextFetchCaching {
         body: serializedBody,
       });
 
+      const encodedData = new TextEncoder().encode(keyData);
       const hashBuffer = await crypto.subtle.digest(
         "SHA-256",
-        new TextEncoder().encode(keyData)
+        encodedData as BufferSource
       );
 
       return Array.from(new Uint8Array(hashBuffer))
@@ -696,6 +697,7 @@ export const fetchCaching = new BunextFetchCaching();
 
 
 export default {
+  name: "fetch-caching-plugin",
   build_worker: {
     before_build() {
       fetchCaching.destroy();

@@ -41,6 +41,7 @@ const GETCSSPATH_PATHNAME = "/GetCssPaths";
 const plugin: BunextPlugin =
   process.env.NODE_ENV === "development"
     ? {
+      name: "bunext-dev-plugin",
       priority: -1,
       router: {
         request: async (manager) => {
@@ -57,7 +58,9 @@ const plugin: BunextPlugin =
         },
       },
     }
-    : {};
+    : {
+      name: "bunext-dev-plugin",
+    };
 
 
 /**
@@ -188,6 +191,7 @@ async function buildRoute(match: MatchedRoute) {
       await resetPath(match.filePath);
       await builder.makeBuild(match.filePath);
       router.client.reload();
+      router.server.reload();
     }
   );
 }

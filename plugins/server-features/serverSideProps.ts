@@ -9,7 +9,7 @@ import type { BunextPlugin } from "plugins/types";
 
 class ServerSidePropsError extends BunextError { }
 
-type ServerSidePropsTyped = ServerSideProps<{}> | null;
+type ServerSidePropsTyped = ServerSideProps<{}> | null | undefined;
 
 
 declare global {
@@ -144,14 +144,15 @@ function setRedirectToPath(to: string): Response {
 }
 
 export default {
-    priority: 0,
+    name: "bunext-server-side-props",
+    priority: 1,
     router: {
         async request(manager) {
             if (manager.request.headers.get("accept") == "application/vnd.server-side-props" && manager.serverSide?.filePath) {
                 let props = await serverSidePropsManager.getFromCache(manager);
                 if (!props) props = await serverSidePropsManager.makeForPath(manager.serverSide.filePath, manager);
                 return serveServerSideProps(manager, props);
-            } else if (manager.bunextReq.isAskingHTML) {
+            } else if (manager.bunextReq.isAskingHTML && manager.bunextReq.match) {
                 let props = await serverSidePropsManager.getFromCache(manager);
                 if (!props) props = await serverSidePropsManager.make(manager);
                 if (props?.redirect) {

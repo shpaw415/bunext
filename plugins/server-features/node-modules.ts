@@ -1,7 +1,8 @@
 import type { RequestManager } from "internal/server/router";
 import { extname, normalize } from "path";
+import type { BunextPlugin } from "plugins/types";
 
-export async function serveFromNodeModule(manager: RequestManager): Promise<void> {
+async function serveFromNodeModule(manager: RequestManager): Promise<void> {
     if (!manager.pathname.startsWith("/node_modules")) return;
     manager.bunextReq.preventGlobalValuesInjection().preventRewrite();
     const nodeModuleFile = await manager.router.serveFromDir({
@@ -26,7 +27,6 @@ export async function serveFromNodeModule(manager: RequestManager): Promise<void
             entrypoints: [path],
             outdir: manager.router.buildDir + "/node_modules",
             root: "node_modules",
-            splitting: false,
             minify: process.env.NODE_ENV == "production",
         });
     const path = Bun.fileURLToPath(import.meta.resolve(manager.pathname));
@@ -72,20 +72,31 @@ export async function serveFromNodeModule(manager: RequestManager): Promise<void
     }
 }
 
-
 function makeErrorResponse(manager: RequestManager, status: number) {
-    manager.bunextReq.setResponse(null, { status });
+    manager.bunextReq.setResponse(null, { status }).sendNow();
 }
 
 function MakeTextRes(manager: RequestManager, content: Bun.BunFile | string, mimeType?: string) {
     if (content instanceof Blob) {
-        manager.bunextReq.setResponse(content);
+        manager.bunextReq.setResponse(content).sendNow();
     } else {
         manager.bunextReq.setResponse(
             content, {
             headers: {
                 "Content-Type": `text/${mimeType}`,
             },
-        });
+        }).sendNow();
     }
 }
+
+
+export default {
+    name: "bunext-node-modules",
+    priority: 1,
+    router: {
+        request(manager) {
+            if (manager.bunextReq.isResponseSetted()) return;
+            return serveFromNodeModule(manager);
+        }
+    }
+} as BunextPlugin;

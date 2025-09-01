@@ -9,7 +9,6 @@ import {
 import { NJSON } from "next-json";
 import { join, relative, sep, normalize, resolve } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
 import {
   renderToString,
 } from "react-dom/server";
@@ -18,12 +17,10 @@ import { type JSX } from "react";
 // Internal imports
 import type {
   _GlobalData,
-  ReactShellComponent,
   ServerSideProps,
 } from "../types";
 import { BunextRequest, BunextResponseNotSetError } from "./bunextRequest";
 import { RequestContext } from "./context";
-import { PluginLoader } from "./plugin-loader";
 
 // Global imports
 import "./server_global";
@@ -33,11 +30,15 @@ import { BunextError } from "./server_global";
 import { ErrorFallback } from "components/fallback";
 import { DirectiveTool } from "plugins/utils";
 import { Shell } from "public/client/shell";
+import { pluginLoader } from "./plugin-loader";
+
+declare global {
+  var __ROUTER__: StaticRouters;
+}
 
 
 type RouteEntry = [string, string];
 
-const SUPPORTED_FILE_EXTENSIONS = [".tsx", ".ts", ".js", ".jsx"] as const;
 const STATIC_FILE_SUFFIXES = [
   "",
   ".html",
@@ -59,7 +60,7 @@ const fileDirectives = new DirectiveTool();
  * Main router class that handles static and dynamic routing for Bunext applications
  * Extends PluginLoader to support routing plugins
  */
-class StaticRouters extends PluginLoader {
+class StaticRouters {
   // Core routers
   public server: FileSystemRouter;
   public client: FileSystemRouter;
@@ -74,7 +75,7 @@ class StaticRouters extends PluginLoader {
   private initResolver?: (value: boolean | PromiseLike<boolean>) => void;
   private inited = false;
 
-  public fileDirectives?: DirectiveTool;
+  public fileDirectives!: DirectiveTool;
 
   // Directory configuration
   public readonly baseDir = process.cwd();
@@ -83,7 +84,6 @@ class StaticRouters extends PluginLoader {
   public readonly staticDir = "static" as const;
 
   constructor() {
-    super();
     try {
       this.server = this.createFileSystemRouter(this.pageDir);
       this.client = this.createFileSystemRouter(
@@ -98,14 +98,6 @@ class StaticRouters extends PluginLoader {
     } catch (error) {
       throw new Error(`Failed to initialize StaticRouters: ${error}`);
     }
-  }
-  /**
-   * Gets the singleton instance of the StaticRouters class initalized
-   */
-  static async getInstance() {
-    const instance = new StaticRouters();
-    await instance.init();
-    return instance;
   }
 
   /**
@@ -218,12 +210,11 @@ class StaticRouters extends PluginLoader {
     if (this.inited) return;
 
     try {
-      await this.initPlugins();
       await this.initFileDirectives();
 
       this.inited = true;
-
-      this.initResolver?.(true);
+      if (!this.initResolver) throw new Error("Router initResolver is not set");
+      this.initResolver(true);
     } catch (error) {
       console.error("Router initialization failed:", error);
       this.initResolver?.(false);
@@ -332,9 +323,9 @@ class StaticRouters extends PluginLoader {
       request_header,
       router: this,
     })
+
     await manager.make();
     let response = await manager.bunextReq.toResponse();
-
     if (response instanceof BunextResponseNotSetError) return new Response(null, {
       headers: {
         "Content-Type": "text/plain",
@@ -345,16 +336,27 @@ class StaticRouters extends PluginLoader {
 
     if (response instanceof BunextError) {
       this.Logger(response, "error");
-      return new Response(renderToString(ErrorFallback({ error: response })));
-    }
+      return new Response(renderToString(ErrorFallback({ error: response })), {
+        headers: {
+          "content-type": "text/html"
+        },
+        status: 500
+      });
+    } else if (manager.bunextReq.isSendNowEnabled) return response;
+
     for await (const after_request of
-      this.getSubPluginsByParentName("router", "after_request")) {
-      const result = await after_request(manager, response);
-      if (result instanceof Response) {
-        response = result;
+      pluginLoader.getSubPluginsByParentName("router", "after_request")) {
+      try {
+        const result = await after_request.subPlugin(manager, response);
+        if (result instanceof Response) {
+          response = result;
+        }
+      } catch (e) {
+        console.error(`Error occurred in after_request plugin, name: ${after_request.name}:`, e);
       }
     }
     return response;
+
   }
 
   public async CreateDynamicPage(
@@ -386,12 +388,6 @@ class StaticRouters extends PluginLoader {
     );
 
     return JSXElement();
-  }
-
-  private getlayoutPaths() {
-    return this.getFilesFromPageDir()
-      .filter((f) => f.split("/").at(-1)?.includes("layout."))
-      .map((l) => normalize(`//${l}`.split("/").slice(0, -1).join("/")));
   }
 
   /**
@@ -483,10 +479,6 @@ class StaticRouters extends PluginLoader {
     path: string;
     suffixes?: string[];
   }): Promise<BunFile | null> {
-
-
-
-
     try {
       const suffixes = config.suffixes ?? [...STATIC_FILE_SUFFIXES];
 
@@ -544,9 +536,6 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
   public readonly request_header: Record<string, string>;
   public readonly data: FormData;
 
-  //cache
-  private buildFileCache: Map<string, Uint8Array<ArrayBufferLike>> = new Map();
-
   // Routing
   public readonly server: FileSystemRouter;
   public readonly client: FileSystemRouter;
@@ -594,7 +583,6 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
    */
   async make(): Promise<void> {
     process.env.__SESSION_MUST_NOT_BE_INITED__ = "false";
-
     await this.checkPluginServing();
 
   }
@@ -603,11 +591,15 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
    * Checks and applies plugin-based request handling
    */
   private async checkPluginServing(): Promise<void> {
-    const plugins = this.router
-      .getSubPluginsByParentName("router", "request");
+    const plugins = pluginLoader.getSubPluginsByParentName("router", "request");
     for await (const plugin of plugins) {
-      await plugin(this);
-      if (this.bunextReq.__BYPASS_RESPONSE__) break;
+      try {
+        await plugin.subPlugin(this);
+        if (this.bunextReq.__BYPASS_RESPONSE__ || this.bunextReq.isSendNowEnabled === true) break;
+      } catch (e) {
+        this.bunextReq.__ERROR__ = new Error(`Error occurred in plugin ${plugin.name}`, { cause: e as Error });
+        return;
+      }
     }
   }
   /**
@@ -731,19 +723,11 @@ export function formatParams(match: MatchedRoute["params"] | undefined): Record<
 }
 
 
-async function Init() {
-  await rm(".bunext/build/node_modules", {
-    recursive: true,
-    force: true,
-  });
-  await router.init();
-}
 
 if (!existsSync(".bunext/build/src/pages"))
   mkdirSync(".bunext/build/src/pages", { recursive: true });
 
-const router: StaticRouters = Boolean(globalThis.__INIT__)
-  ? (undefined as any)
-  : new StaticRouters();
+globalThis.__ROUTER__ ??= new StaticRouters();
+const router = globalThis.__ROUTER__;
 
-export { router, StaticRouters, RequestManager, Init };
+export { router, StaticRouters, RequestManager };

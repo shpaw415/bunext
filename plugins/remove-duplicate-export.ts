@@ -92,6 +92,6 @@ async function processBundleFile(file: Bun.BuildArtifact) {
 }
 
 export default {
-  priority: 11,
+  name: "bunext-remove-duplicate-export-plugin",
   after_build: processBundleFile,
 } as BunextPlugin;

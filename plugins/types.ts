@@ -78,7 +78,9 @@ type onFileSystemChangePlugin = (
   preventBuild: () => void,
 ) => void | Promise<void>;
 
-export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<string, unknown> = {}> = Partial<{
+export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<string, unknown> = {}> = Required<{
+  name: string;
+}> & Partial<{
 
   /**
    * Triggered on the main thread after the build step.

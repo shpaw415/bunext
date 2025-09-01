@@ -1,11 +1,11 @@
 "use client";
 import { generateRandomString } from "../utils";
-import type { BunextRequest } from "../../internal/server/bunextRequest";
-import { getSessionById } from "../../internal/session.ts";
+import type { BunextRequest } from "internal/server/bunextRequest";
+import { getSessionById } from "internal/session.ts";
 import { createContext, useContext, useEffect, useState } from "react";
-import { RequestContext } from "../../internal/server/context";
+import { RequestContext } from "internal/server/context";
 export { GetSession } from "../request/bunextRequest";
-import { DevConsole, SessionNotInitedWarning } from "../../internal/server/logs.ts";
+import { SessionNotInitedWarning } from "internal/server/logs.ts";
 import { GetSessionFromResponse } from "internal/globals";
 
 /**

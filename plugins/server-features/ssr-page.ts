@@ -16,7 +16,8 @@ import { renderToString } from "react-dom/server";
 import { normalize, resolve } from "path";
 import { baseDir, pageDir } from "internal/server/server_global";
 import { Wrapper } from "./ssr-page-preload";
-import type { BunextPlugin, PreBuildContextDefaultValues } from "plugins/types";
+import type { PreBuildContextDefaultValues } from "plugins/types";
+import { pluginLoader } from "internal/server/plugin-loader";
 
 const Schema: DBSchema = [
     {
@@ -340,14 +341,20 @@ class PreBuildContext {
     private paths: Set<string> = new Set();
     private MainRoute: string | undefined;
     private MainModulePath: string | undefined;
-    private plugins = builder.getPluginByName("pre_build_context");
+    private plugins = pluginLoader.getPluginByName("pre_build_context");
 
-    private async getPluginContexts() {
-        return Object.assign({}, ...await Promise.all(this.plugins.map((context) => context.init_context()))) || {} as Record<string, unknown>;
+    private async getPluginContexts(): Promise<Record<string, unknown>> {
+        return Object.assign({}, ...await Promise.all(this.plugins.map((context) => {
+            try {
+                return context.pluginParent.init_context()
+            } catch (e) {
+                throw new Error(`Error while initializing plugin context, name: ${context.name}`, { cause: e as Error })
+            }
+        }))) || {} as Record<string, unknown>;
     }
 
     getAfterPluginContextCallback() {
-        return this.plugins.map((context) => context.after_pre_build);
+        return this.plugins.map((context) => context.pluginParent.after_pre_build);
     }
 
     async preBuild(modulePath: string) {
@@ -490,6 +497,10 @@ class PreBuildContext {
 }
 
 export async function preBuild(modulePath: string): Promise<void> {
+    await pluginLoader.init();
+    await router.init();
+    await builder.init();
+
     const context = new PreBuildContext();
     await context.preBuild(modulePath);
 

@@ -6,12 +6,10 @@ import { builder } from "./build";
 import { join, normalize, relative } from "node:path";
 import {
   benchmark_console,
-  DevConsole,
   TerminalIcon,
   TextColor,
   ToColor,
 } from "./logs";
-import { router } from "./router";
 import { resetPath } from "plugins/server-features/ssr-page";
 
 type initFunction = (path?: string) => Promise<any>;
@@ -64,12 +62,13 @@ export const doWatchBuild = () =>
     async (path) => {
       let isBuildPrevented = false;
       const preventBuildFn = () => { isBuildPrevented = true; };
+      const { pluginLoader } = await import("./plugin-loader");
       await Promise.all(
-        router.getPluginByName("onFileSystemChange").map(async (plugin) => {
+        pluginLoader.getPluginByName("onFileSystemChange").map(async (plugin) => {
           try {
-            await plugin(path, preventBuildFn);
+            await plugin.pluginParent(path, preventBuildFn);
           } catch (error) {
-            console.error(`Error in plugin's onFileSystemChange hook:`, error);
+            console.error(`Error in plugin's onFileSystemChange hook, name: ${plugin.name}: `, error);
           }
         })
       );

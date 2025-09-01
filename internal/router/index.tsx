@@ -156,7 +156,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 async function fetchServerSideProps(
   pathname: string,
   options: { useCache?: boolean; retries?: number } = {}
-): Promise<ServerSideProps<{}> | undefined> {
+): Promise<ServerSideProps<{}> | undefined | null> {
   const { useCache = true, retries = 2 } = options;
 
   // Check cache first
@@ -1311,7 +1311,7 @@ export async function CreatePage({
   currentVersion
 }: {
   matched: Exclude<Match, null>,
-  props?: ServerSideProps<{}>,
+  props?: ServerSideProps<{}> | null,
   currentVersion: number,
   module: { default: (args: { props: unknown; params: Record<string, unknown> }) => JSX.Element }
 }): Promise<JSX.Element> {

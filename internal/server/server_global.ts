@@ -4,6 +4,7 @@ import type { ServerWebSocket } from "bun";
 import type { BunextType, ServerConfig } from "../types.ts";
 import type { BunextServer } from "./index.ts";
 
+
 if (typeof process.env.NODE_ENV == "undefined") {
   if (process.argv[2] === "dev") {
     process.env.NODE_ENV = "development";
@@ -34,9 +35,10 @@ declare global {
  * Base error class for Bunext-specific errors
  */
 export class BunextError extends Error {
-  constructor(message: string) {
+  constructor(message: string, cause?: Error) {
     super(message);
     this.name = this.constructor.name;
+    this.cause = cause;
   }
 }
 

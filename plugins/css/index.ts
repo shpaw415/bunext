@@ -1,7 +1,6 @@
 import type { BunextPlugin } from "../types";
 import { readdir, readFile, stat } from "fs/promises";
 import { join } from "path";
-import { DevConsole } from "../../internal/server/logs";
 
 interface CSSModulesConfig {
     srcDir?: string;
@@ -12,8 +11,7 @@ const DEFAULT_CONFIG: CSSModulesConfig = {
 };
 
 export const cssModulesTypesPlugin: BunextPlugin = {
-    priority: 11,
-
+    name: "css-modules-types-plugin",
     serverStart: {
         async main() {
             await generateAllCSSModuleTypes(DEFAULT_CONFIG);
@@ -130,7 +128,7 @@ export function createCSSModulesTypesPlugin(config: CSSModulesConfig = {}) {
         ...cssModulesTypesPlugin,
         serverStart: {
             async dev() {
-                DevConsole("🎨 Generating CSS Module types with custom config...");
+                console.log("🎨 Generating CSS Module types with custom config...");
                 await generateAllCSSModuleTypes(mergedConfig);
             },
             async main() {

@@ -2,19 +2,17 @@ import type { BunextPlugin } from "plugins/types";
 import { InitServerActions, onRequestServerAction, ServerActionCompiler, ServerActionToTag, ServerComponentsToTag } from "./serverActions";
 import { builder } from "internal/server/build";
 import { basename, join, normalize } from "path";
-import { onRequestSSRPage, clearSSRPage, ServerComponentsCompiler, initSSRPage, SSRCache } from "./ssr-page";
+import { onRequestSSRPage, clearSSRPage, ServerComponentsCompiler, initSSRPage } from "./ssr-page";
 import { generateRandomString } from "features/utils";
 import { serveDynamicPage } from "./dynamic-page";
 import { getRelatedCssContent } from "./style-insert";
 import { sessionOnRequestHandler } from "plugins/session";
-import { serveFromBuildDirectory } from "./build-dir";
-import { serveFromNodeModule } from "./node-modules";
-import { serveStaticAssets } from "./static-path";
 import { DirectiveTool } from "plugins/utils";
 
 
 
 export default {
+    name: "bunext-server-features",
     priority: 2,
     serverStart: {
         async main() {
@@ -51,12 +49,10 @@ export default {
             },
         },
         async request(manager) {
+            if (!manager.bunextReq.match) return;
             for await (const handler of [
-                serveFromBuildDirectory,
                 onRequestSSRPage,
                 serveDynamicPage,
-                serveStaticAssets,
-                serveFromNodeModule,
                 sessionOnRequestHandler,
                 onRequestServerAction,
             ]) {

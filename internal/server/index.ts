@@ -43,12 +43,11 @@ import {
   TerminalIcon,
   TextColor,
   ToColor,
-  initializeDevConsole,
-} from "./logs.ts";
+} from "./logs";
 import { DevWsMessageHandler, type DevWsMessageTypes } from "../../dev/hotServer.ts";
 import { ExitCodeDescription } from "../../bin/exit-codes.ts";
 import { Shell } from "internal/client/shell";
-
+import { initServerSide } from "./init";
 
 declare global {
   namespace NodeJS {
@@ -165,8 +164,10 @@ class BunextServer {
 
   startServer() {
     this.server = Bun.serve({
-      ...globalThis.serverConfig?.HTTPServer.config,
-      ...{ port: this.port },
+      ...{
+        port: this.port as any,
+        ...globalThis.serverConfig?.HTTPServer.config,
+      },
       fetch: this.createFetchHandler(),
       error: (error: Error) => {
         //console.error(error);
@@ -178,7 +179,6 @@ class BunextServer {
     console.info("Shutting down server...");
     await this.server?.stop();
     await this.hotServer?.stop();
-    globalThis.BunextConsole.destroy();
   }
 
   Reboot() {
@@ -186,7 +186,7 @@ class BunextServer {
     process.exit(ExitCodeDescription[3].code);
   }
 
-  private createFetchHandler() {
+  private createFetchHandler(): (request: Request) => Promise<Response> {
     return async (request: Request) => {
       const headers = request.headers.toJSON();
       return benchmark_console(
@@ -288,7 +288,8 @@ class BunextServer {
     const dry = Boolean(globalThis.dryRun);
 
     // Initialize the enhanced terminal console
-    !this.preventDevConsole && initializeDevConsole();
+    await initServerSide(true);
+
     dry && console.info("Starting...");
 
     dry && await benchmark_console(
@@ -374,6 +375,7 @@ class BunextServer {
       await this.checkBuildOnDevMode({
         filePath: router.server?.match(request)?.filePath,
       });
+
 
       const response = await router.serve(
         request,

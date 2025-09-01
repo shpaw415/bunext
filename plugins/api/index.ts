@@ -63,8 +63,12 @@ async function serveAPIEndpoint(manager: RequestManager): Promise<boolean> {
 }
 
 export default {
+    name: "api-route-plugin",
     priority: 1,
     router: {
-        request(manager) { serveAPIEndpoint(manager); }
+        request(manager) {
+            if (manager.bunextReq.isResponseSetted()) return;
+            serveAPIEndpoint(manager);
+        }
     }
 } as BunextPlugin;

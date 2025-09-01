@@ -1,9 +1,20 @@
 import { preBuild, preBuildAll, SSRCache } from "plugins/server-features/ssr-page";
 import { builder, type BuildOuts } from "./build.ts";
 import type { BuildOutput } from "bun";
+import { pluginLoader } from "./plugin-loader"
+import { initServerSide } from "./init";
 
 
-await Promise.all(builder.getSubPluginsByParentName("build_worker", "start").map((onBuilderWorker) => onBuilderWorker()));
+initServerSide(false);
+
+
+await Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "start").map((onBuilderWorker) => {
+  try {
+    onBuilderWorker.subPlugin();
+  } catch (e) {
+    console.error(`Error in build_worker start hook, name: ${onBuilderWorker.name}:`, e);
+  }
+}));
 
 export type BuildWorkerMessage = {
   type: "build";
@@ -87,16 +98,28 @@ async function build(
 }
 
 async function afterBuild(build: BuildOutput) {
-  const afterBuildPlugins = builder.getSubPluginsByParentName("build_worker", "after_build");
+  const afterBuildPlugins = pluginLoader.getSubPluginsByParentName("build_worker", "after_build");
   const awaiters: Promise<any>[] = [];
   for (const output of build.outputs) {
-    awaiters.push(...afterBuildPlugins.map((plugin) => plugin(output)));
+    awaiters.push(...afterBuildPlugins.map((plugin) => {
+      try {
+        return plugin.subPlugin(output);
+      } catch (e) {
+        console.error(`Error in build_worker after_build hook, name: ${plugin.name}:`, e);
+      }
+    }));
   }
   await Promise.all(awaiters);
 }
 
 function beforeBuild() {
-  return Promise.all(builder.getSubPluginsByParentName("build_worker", "before_build").map((plugin) => plugin()));
+  return Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "before_build").map((plugin) => {
+    try {
+      plugin.subPlugin();
+    } catch (e) {
+      console.error(`Error in build_worker before_build hook, name: ${plugin.name}:`, e);
+    }
+  }));
 }
 
 if (import.meta.main) init();

@@ -122,13 +122,13 @@ class StaticPageCache {
 export const StaticPageCacheInstance = await StaticPageCache.create();
 
 export default {
-  priority: 1,
+  name: "static-page-plugin",
+  priority: 2,
   router: {
     async request(manager) {
       if (process.env.NODE_ENV == "development" || manager.bunextReq.isResponseSetted()) return;
 
-
-      const isUseStatic = manager.serverSide?.filePath ? (await manager.router.fileDirectives?.pathIs("use-static", manager.serverSide?.filePath)) as boolean : false;
+      const isUseStatic = manager.bunextReq.match?.filePaths.src ? (await manager.router.fileDirectives.pathIs("use-static", manager.bunextReq.match.filePaths.src)) : false;
       if (!isUseStatic) return;
 
       if (isRequestGetServerSideProps(manager)) {

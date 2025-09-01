@@ -10,12 +10,10 @@ import {
 import { normalize } from "path";
 import { mkdirSync, rmSync, unlinkSync } from "node:fs";
 import "../globals";
-import { Head } from "public/head";
-import { DevConsole } from "./logs";
 import { router } from "./router";
 import * as React from "react";
+import { pluginLoader } from "internal/server/plugin-loader.ts";
 
-import { PluginLoader } from "./plugin-loader.ts";
 import type {
   BuildWorkerMessage,
   BuildWorkerResponse,
@@ -45,7 +43,7 @@ declare global {
 
 const cwd = process.cwd();
 
-class Builder extends PluginLoader {
+class Builder {
   public options: _Mainoptions = {
     pageDir: join("src", "pages") as "src/pages",
     buildDir: join(".bunext", "build") as ".bunext/build",
@@ -69,10 +67,6 @@ class Builder extends PluginLoader {
 
   public remove_node_modules_files_path: string[] = [];
 
-  constructor() {
-    super();
-  }
-
   clearBuildDir() {
     try {
       rmSync(this.options.buildDir as string, {
@@ -93,14 +87,14 @@ class Builder extends PluginLoader {
     }
   }
 
-  async Init() {
+  async init() {
     if (this.inited) return this;
     this.inited = true;
     this.Check_remove_node_modules_files_path();
     await this.InitGetCustomPluginsFromUser();
-    await this.initPlugins();
+
     this.remove_node_modules_files_path.push(
-      ...this.getPluginByName("removeFromBuild").flatMap((p) => p ?? [])
+      ...pluginLoader.getPluginByName("removeFromBuild").flatMap((p) => p.pluginParent ?? [])
     );
     try {
       this.InitGetPlugins();
@@ -111,7 +105,7 @@ class Builder extends PluginLoader {
   }
 
   private async InitGetPlugins() {
-    const pluginsData = this.getPluginByName("build");
+    const pluginsData = pluginLoader.getPluginByName("build").map((e) => e.pluginParent);
 
     const config = pluginsData
       .map((p) => p.buildOptions)
@@ -221,8 +215,9 @@ class Builder extends PluginLoader {
       sourcemap: "none",
       ...this.BuildPluginsConfig,
       outdir: join(baseDir, buildDir as string),
-      splitting: true,
       publicPath: "./",
+      //@ts-ignore
+      splitting: true,
       target: "browser",
       naming: {
         chunk: "chunk-[name]-[hash].[ext]"
@@ -273,7 +268,13 @@ class Builder extends PluginLoader {
     this.revalidates = data.revalidates;
     globalThis.Server?.updateWorkerData();
     await Promise.all(
-      this.getPluginByName("after_build_main").map((after_build_main) => after_build_main())
+      pluginLoader.getPluginByName("after_build_main").map((after_build_main) => {
+        try {
+          after_build_main.pluginParent();
+        } catch (e) {
+          console.error(`Error in after_build_main hook, name: ${after_build_main.name}:`, e);
+        }
+      })
     );
   }
 
@@ -342,7 +343,13 @@ class Builder extends PluginLoader {
     if (!this.BuilderWorker) throw new Error("BuilderWorker not found");
 
     await Promise.all(
-      this.getPluginByName("before_build_main").map((before_build_main) => before_build_main())
+      pluginLoader.getPluginByName("before_build_main").map((before_build_main) => {
+        try {
+          before_build_main.pluginParent();
+        } catch (e) {
+          console.error(`Error in before_build_main hook, name: ${before_build_main.name}:`, e);
+        }
+      })
     );
     await this.awaitBuildFinish();
     this.createAwaiter();
@@ -374,9 +381,12 @@ class Builder extends PluginLoader {
 }
 
 
-const builder: Builder = Boolean(process.env.__INIT__)
-  ? (undefined as any)
-  : new Builder();
-await builder.Init();
+declare global {
+  var __BUILDER__: Builder;
+}
 
-export { builder, Builder };
+globalThis.__BUILDER__ ??= new Builder();
+
+const builder = globalThis.__BUILDER__;
+
+export { builder };

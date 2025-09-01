@@ -17,13 +17,13 @@
   "devDependencies": {
     "@tailwindcss/cli": "4.1.4",
     "@types/bun": "latest",
-    "@types/react": "^19.1.9",
-    "@types/react-dom": "^19.1.7",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
     "@types/terminal-kit": "^2.5.7",
     "@types/web": "^0.0.216",
-    "typescript": "^5.8.3",
+    "typescript": "^5.9.2",
     "tailwind-bunext-plugin": "0.1.0",
-    "tailwindcss": "^4.1.11"
+    "tailwindcss": "^4.1.12"
   },
   "peerDependencies": {
     "react": "^19.1.0",

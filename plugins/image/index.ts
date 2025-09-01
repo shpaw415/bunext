@@ -160,7 +160,7 @@ async function transformImage(req: BunextRequest) {
 }
 
 export default {
-  priority: 10,
+  name: "bunext-image-plugin",
   router: {
     request: async (manager) => {
       if (manager.bunextReq.URL.pathname == "/bunext/image") {

@@ -34,6 +34,7 @@ export async function sessionOnRequestHandler(request: RequestManager): Promise<
 }
 
 export default {
+    name: "bunext-session-plugin",
     priority: 0,
     router: {
         async request(manager) {
