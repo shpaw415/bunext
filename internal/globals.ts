@@ -5,6 +5,7 @@ import React from "react";
 import { navigate } from "./router/client";
 import type { _GlobalData, ServerConfig } from "./types";
 
+
 declare global {
   var MakeServerActionRequest: (
     props: Array<any>,

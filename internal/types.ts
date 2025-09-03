@@ -2,13 +2,7 @@ import type { BunFile, BunPlugin } from "bun";
 import type { HeadData } from "public/head";
 import type { BunextRequest } from "./server/bunextRequest.ts";
 import type { revalidate } from "plugins/server-features/ssr-page.ts";
-import type { Plugins } from "../plugins/bunext_object/type.ts";
-import type { Router } from "../features/router/bunext_object/types.ts";
-import type { Database } from "../database/bunext_object/types.ts";
-import type { Session } from "../features/session/bunext_object/types.ts";
-import type { _Request } from "../features/request/bunext_object/types.ts";
 import type { BunextPlugin } from "../plugins/types.ts";
-import type { ComponentType } from "../features/components/bunext_global/types.ts";
 import type { RequestManager } from "./server/router.tsx";
 import type { JSX } from "react";
 import type React from "react";
@@ -252,17 +246,6 @@ export type PageModule = {
   }) => Promise<JSX.Element>;
   getServerSideProps?: getServerSidePropsFunction;
 }
-
-
-export type BunextType = {
-  version: string;
-  request: _Request;
-  router: Router;
-  session: Session;
-  plugins: Plugins;
-  database: Database;
-  components: ComponentType;
-};
 
 export type PluginData = {
   globalData: Record<string, string>;

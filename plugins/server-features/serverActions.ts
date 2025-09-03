@@ -2,6 +2,7 @@ import { RequestManager, router } from "internal/server/router";
 import type { ServerAction, ServerActionDataType, ServerActionDataTypeHeader } from "internal/types";
 import { normalize, parse } from "path";
 import { SSRCache } from "./ssr-page";
+import type { BunextPlugin } from "plugins/types";
 
 
 let serverActions: Array<ServerAction> = [];
@@ -152,16 +153,13 @@ export function getServerActions() {
     return serverActions;
 }
 
-export async function onRequestServerAction(manager: RequestManager): Promise<boolean> {
+export async function onRequestServerAction(manager: RequestManager): Promise<void> {
     if (manager.bunextReq.URL.pathname == "/ServerActionGetter") {
         await manager.bunextReq.session.initData();
         manager.bunextReq.preventRewrite();
         manager.bunextReq.preventGlobalValuesInjection();
         manager.bunextReq.setResponse(...(await serverActionGetter(manager)));
-
-        return true;
     }
-    return false;
 }
 
 /**
@@ -265,3 +263,14 @@ function ServerActionToClient(func: AnyFn, ModulePath: string): string {
 function isFunction(functionToCheck: any) {
     return typeof functionToCheck == "function";
 }
+
+
+export default {
+    name: "bunext-server-actions-request-plugin",
+    priority: 0,
+    router: {
+        request(manager) {
+            return onRequestServerAction(manager)
+        }
+    }
+} as BunextPlugin;

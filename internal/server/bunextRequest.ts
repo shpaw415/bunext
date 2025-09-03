@@ -9,7 +9,7 @@ import type { _GlobalData, PluginData, ServerConfig } from "internal/types";
 import { BunextError } from "./server_global";
 import { formatParams, RenderingError, RequestManager, router } from "./router";
 import { formatHTML } from "internal/utils";
-import type { DirectiveTool } from "plugins/utils";
+import { DirectiveTool, type Directives } from "plugins/utils";
 import { join, resolve } from "path";
 import { pluginLoader } from "./plugin-loader";
 
@@ -32,6 +32,7 @@ export type BunextRequestMatch = {
   route: string;
   filePaths: { build: string; src: string };
   params: Record<string, string | string[]> | undefined;
+  directive: Directives;
 };
 
 export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
@@ -61,6 +62,8 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * Matching values applied when it is a client-side navigation or a first request to a route.
    */
   public readonly match?: BunextRequestMatch;
+
+  public readonly directivesTools: DirectiveTool;
 
   /**
    * Indicates if the request is for a static asset.
@@ -94,6 +97,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this.SessionID = (
       this.webtoken.session() as undefined | { id: string }
     )?.id;
+    this.directivesTools = props.directivesTools;
     this.URL = new URL(this.request.url);
     this.manager = props.manager;
 
@@ -109,28 +113,37 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this.isSendNowEnabled = true;
   }
 
-  private initMatch() {
+  private initMatch(): BunextRequestMatch | undefined {
     if (this.isClientNavigating) {
-      const checkExists = [this.URL.searchParams.get("__BUNEXT_PATHNAME__"), this.URL.searchParams.get("__BUNEXT_ROUTE__"), this.URL.searchParams.get("__BUNEXT_PARAMS__")];
-      if (checkExists.some((e) => e === null)) throw new BunextNoServerSideMatchError(`missing maching information ${JSON.stringify(checkExists, null, 2)}`);
+      const pathname = this.URL.searchParams.get("__BUNEXT_PATHNAME__");
+      if (!pathname) throw new BunextNoServerSideMatchError(`missing matching information for __BUNEXT_PATHNAME__`);
+      const matchServer = this.manager.router.server.match(pathname);
+      const matchClient = this.manager.router.client.match(pathname);
+      if (!matchServer || !matchClient) throw new BunextNoServerSideMatchError(`no matching route found for __BUNEXT_PATHNAME__`);
+
+
+      const directive = this.directivesTools.getDirectiveFromFilePath(matchServer.filePath) as Directives;
       return {
-        pathname: checkExists[0] as string,
-        route: checkExists[1] as string,
+        pathname: matchServer.pathname,
+        route: matchServer.name,
         filePaths: {
-          build: this.sanitizePath("." + this.URL.pathname, join(CURRENT_PATH, this.manager.router.buildDir)),
-          src: this.jsToTsx(this.sanitizePath("." + this.URL.pathname, CURRENT_PATH))
+          build: this.sanitizePath("." + pathname, join(CURRENT_PATH, this.manager.router.buildDir)),
+          src: this.sanitizePath("." + pathname, join(CURRENT_PATH, this.manager.router.pageDir)),
         },
-        params: JSON.parse(decodeURI(checkExists[2] as string))
+        params: formatParams(matchServer.params),
+        directive
       };
     } else if (this.isAskingHTML && this.manager.serverSide) {
+      const directive = this.directivesTools.getDirectiveFromFilePath(this.manager.serverSide.filePath) as Directives;
       return {
         pathname: this.manager.serverSide.pathname,
         route: this.manager.serverSide.name,
         filePaths: {
           build: this.manager.clientSide?.filePath as string,
-          src: this.manager.serverSide.filePath as string
+          src: this.manager.serverSide.filePath
         },
-        params: formatParams(this.manager.serverSide.params)
+        params: formatParams(this.manager.serverSide.params) as Record<string, string | string[]>,
+        directive
       };
     } else return undefined;
   }

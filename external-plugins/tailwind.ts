@@ -65,8 +65,10 @@ export const tailwindPlugin: BunextPlugin = {
     }
   },
 
-  before_build_main: async () => {
-    if (process.env.NODE_ENV === "development") await compileTailwindCSS(DEFAULT_CONFIG);
+  build_main: {
+    async before_build() {
+      if (process.env.NODE_ENV === "development") await compileTailwindCSS(DEFAULT_CONFIG);
+    }
   },
 
   onFileSystemChange: async (filePath?: string) => {
@@ -220,8 +222,10 @@ export function createTailwindPlugin(userConfig: Partial<TailwindConfig> = {}): 
       }
     },
 
-    before_build_main: async () => {
-      if (process.env.NODE_ENV === "development") await compileTailwindCSS(config);
+    build_main: {
+      async before_build() {
+        if (process.env.NODE_ENV === "development") await compileTailwindCSS(config);
+      },
     },
 
     onFileSystemChange: async (filePath?: string) => {

@@ -1,16 +1,21 @@
 import { generateRandomString } from "features/utils";
 import { RequestManager, router } from "internal/server/router";
-import { extname } from "path";
+import { extname, join } from "path";
 import type { BunextPlugin } from "plugins/types";
 
 
+let files: Array<Bun.BunFile> = [];
+const cwd = process.cwd();
+
+function getFileFromPathname(pathname: string): Bun.BunFile | undefined {
+    const path = join(cwd, router.buildDir, pathname);
+    return files.find(file => file.name === path);
+}
+
 async function serveFromBuildDirectory(manager: RequestManager): Promise<void> {
     if (!manager.pathname.split("/").at(-1)?.includes(".")) return;
-    const staticResponse = await router.serveFromDir({
-        directory: router.buildDir,
-        path: manager.pathname,
-        suffixes: [""]
-    });
+
+    const staticResponse = getFileFromPathname(manager.pathname);
     if (!staticResponse) return;
     manager.bunextReq.isStaticAsset = true;
     manager.bunextReq.preventRewrite().preventGlobalValuesInjection();
@@ -71,6 +76,14 @@ export default {
         request(manager) {
             if (manager.bunextReq.isResponseSetted()) return;
             return serveFromBuildDirectory(manager);
+        }
+    },
+    build_main: {
+        before_build() {
+            files = [];
+        },
+        after_build(filesPaths) {
+            files.push(...filesPaths.map(path => Bun.file(path)));
         }
     }
 } as BunextPlugin;

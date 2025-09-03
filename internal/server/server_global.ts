@@ -1,8 +1,10 @@
 "server only";
 
 import type { ServerWebSocket } from "bun";
-import type { BunextType, ServerConfig } from "../types.ts";
+import type { ServerConfig } from "../types.ts";
 import type { BunextServer } from "./index.ts";
+import { type BunextType } from "internal/bunext_global";
+
 
 
 if (typeof process.env.NODE_ENV == "undefined") {

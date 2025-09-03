@@ -1,7 +1,6 @@
 "server only";
 
 import "./server_global.ts";
-import "./bunext_global";
 import { join } from "node:path";
 import {
   type BuildOutput,
@@ -267,12 +266,19 @@ class Builder {
   async updateData(data: BuildOuts) {
     this.revalidates = data.revalidates;
     globalThis.Server?.updateWorkerData();
+    const allBuildDirFilePaths = await Array.fromAsync(
+      new Bun.Glob("**/*").scan({
+        cwd: this.options.buildDir,
+        onlyFiles: true,
+        absolute: true,
+        dot: true
+      }));
     await Promise.all(
-      pluginLoader.getPluginByName("after_build_main").map((after_build_main) => {
+      pluginLoader.getSubPluginsByParentName("build_main", "after_build").map((after_build_main) => {
         try {
-          after_build_main.pluginParent();
+          after_build_main.subPlugin(allBuildDirFilePaths);
         } catch (e) {
-          console.error(`Error in after_build_main hook, name: ${after_build_main.name}:`, e);
+          console.error(`Error in build_main.after_build hook, name: ${after_build_main.name}:`, e);
         }
       })
     );
@@ -341,13 +347,12 @@ class Builder {
     let strRes: BuildOuts | undefined;
     this.createBuildWorker();
     if (!this.BuilderWorker) throw new Error("BuilderWorker not found");
-
     await Promise.all(
-      pluginLoader.getPluginByName("before_build_main").map((before_build_main) => {
+      pluginLoader.getSubPluginsByParentName("build_main", "before_build").map((before_build_main) => {
         try {
-          before_build_main.pluginParent();
+          before_build_main.subPlugin();
         } catch (e) {
-          console.error(`Error in before_build_main hook, name: ${before_build_main.name}:`, e);
+          console.error(`Error in build_main.before_build hook, name: ${before_build_main.name}:`, e);
         }
       })
     );

@@ -553,10 +553,10 @@ export const RouterHost = ({
   const [error, setError] = useState<Error | null>(null);
   const versionRef = useRef<number>(version);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const firstLoad = useRef(true);
 
   const reload = useCallback(
     async (target: string = location.pathname + location.search): Promise<void> => {
-      ``
       if (typeof target !== "string") {
         throw new Error(`Invalid target: ${target}`);
       }
@@ -581,12 +581,12 @@ export const RouterHost = ({
         const [props, module] = await Promise.all([
           fetchServerSideProps(target),
           import(
-            [
+            firstLoad ? [
+              matched.value
+            ].join("") : [
               matched.value,
-              `?__BUNEXT_PARAMS__=${encodeURI(JSON.stringify(matched.params))}`,
               "&__BUNEXT_NAVIGATE__=true",
               `&__BUNEXT_PATHNAME__=${encodeURI(target)}`,
-              `&__BUNEXT_ROUTE__=${encodeURI(matched.path)}`,
               (process.env.NODE_ENV === "development" ? `&__BUNEXT_VERSION__=${currentVersion}` : "")
             ].join("")
           ),

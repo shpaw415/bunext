@@ -24,7 +24,6 @@ import { RequestContext } from "./context";
 
 // Global imports
 import "./server_global";
-import "./bunext_global";
 import type { JsxToStringWorkerMessage } from "../dev/types";
 import { BunextError } from "./server_global";
 import { ErrorFallback } from "components/fallback";
@@ -53,8 +52,6 @@ export class RouteNotFoundError extends BunextError { }
 export class RenderingError extends BunextError { }
 
 class FileSystemError extends BunextError { }
-
-const fileDirectives = new DirectiveTool();
 
 /**
  * Main router class that handles static and dynamic routing for Bunext applications
@@ -572,7 +569,7 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
       request: this.request,
       response: new Response(),
       manager: this,
-      directivesTools: fileDirectives
+      directivesTools: this.router.fileDirectives
     });
 
     this.relatedCssPaths = [];
@@ -708,7 +705,7 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
   }
 }
 
-export function formatParams(match: MatchedRoute["params"] | undefined): Record<string, unknown> {
+export function formatParams(match: MatchedRoute["params"] | undefined): Record<string, string | string[]> {
   if (!match) return {};
   const params =
     Object.entries(match).map(([key, value]) => {

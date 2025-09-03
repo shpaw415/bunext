@@ -1,19 +1,18 @@
 import type { BunextPlugin } from "plugins/types";
-import { InitServerActions, onRequestServerAction, ServerActionCompiler, ServerActionToTag, ServerComponentsToTag } from "./serverActions";
+import { InitServerActions, ServerActionCompiler, ServerActionToTag, ServerComponentsToTag } from "./serverActions";
 import { builder } from "internal/server/build";
 import { basename, join, normalize } from "path";
 import { onRequestSSRPage, clearSSRPage, ServerComponentsCompiler, initSSRPage } from "./ssr-page";
 import { generateRandomString } from "features/utils";
 import { serveDynamicPage } from "./dynamic-page";
 import { getRelatedCssContent } from "./style-insert";
-import { sessionOnRequestHandler } from "plugins/session";
-import { DirectiveTool } from "plugins/utils";
+import { router } from "internal/server/router";
 
 
 
 export default {
     name: "bunext-server-features",
-    priority: 2,
+    priority: 3,
     serverStart: {
         async main() {
             clearSSRPage();
@@ -53,8 +52,6 @@ export default {
             for await (const handler of [
                 onRequestSSRPage,
                 serveDynamicPage,
-                sessionOnRequestHandler,
-                onRequestServerAction,
             ]) {
                 if (manager.bunextReq.isResponseSetted()) break;
                 await handler(manager);
@@ -67,7 +64,6 @@ export default {
             name: "server-features",
             target: "browser",
             async setup(build) {
-                const fileDirective = new DirectiveTool();
                 build.onLoad(
                     {
                         filter: new RegExp(
@@ -116,7 +112,7 @@ export default {
                     { namespace: "client", filter: /\.tsx$/ },
                     async ({ path }) => {
                         let fileContent = await Bun.file(path).text();
-                        if (await fileDirective.pathIs("server-only", path)) {
+                        if (await router.fileDirectives.pathIs("server-only", path)) {
                             return {
                                 contents: "",
                                 loader: "js",
@@ -138,7 +134,7 @@ export default {
                             };
                         }
 
-                        if (await fileDirective.pathIs("use-client", path))
+                        if (await router.fileDirectives.pathIs("use-client", path))
                             return {
                                 contents: await ClientSideFeatures(fileContent, path, _module_),
                                 loader: "js",
@@ -201,7 +197,7 @@ export default {
                     async ({ path }) => {
 
 
-                        if (await fileDirective.pathIs("server-only", path)) {
+                        if (await router.fileDirectives.pathIs("server-only", path)) {
                             return {
                                 contents: "",
                                 loader: "js",
@@ -262,7 +258,7 @@ export default {
                         if (
                             builder.remove_node_modules_files_path.includes(
                                 path.replace(builder.options.baseDir + "/node_modules/", "")
-                            ) || await fileDirective.pathIs("server-only", path)
+                            ) || await router.fileDirectives.pathIs("server-only", path)
                         ) {
                             return returnEmptyFile(loader);
                         }

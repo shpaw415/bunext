@@ -5,12 +5,9 @@ import { BunextRequest } from "../server/bunextRequest";
 import type { JsxToStringWorkerMessage } from "./types";
 import { ErrorFallback } from "../../components/fallback";
 import { DirectiveTool } from "plugins/utils";
-import { builder } from "internal/server/build";
-import { initBunextGlobal } from "internal/server/bunext_global";
+import { initServerSide } from "internal/server/init";
 
-await router.init();
-await builder.init();
-initBunextGlobal();
+await initServerSide(false);
 
 // Redirect all console methods to send process messages
 function createConsoleRedirect(methodName: keyof typeof console) {

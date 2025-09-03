@@ -21,7 +21,7 @@ async function serveDeleteSession(req: BunextRequest): Promise<void> {
     req.__BYPASS_RESPONSE__ = new Response("session deleted");
 }
 
-export async function sessionOnRequestHandler(request: RequestManager): Promise<Boolean> {
+async function sessionOnRequestHandler(request: RequestManager): Promise<boolean> {
     switch (request.bunextReq.URL.pathname) {
         case "/bunextgetSessionData":
             await serveSessionData(request.bunextReq);
@@ -30,7 +30,7 @@ export async function sessionOnRequestHandler(request: RequestManager): Promise<
             await serveDeleteSession(request.bunextReq);
             return true;
     }
-    return false;
+    return false
 }
 
 export default {
@@ -38,7 +38,12 @@ export default {
     priority: 0,
     router: {
         async request(manager) {
-            if (!manager.bunextReq.isAskingHTML) return;
+            if (
+                manager.bunextReq.isResponseSetted() ||
+                await sessionOnRequestHandler(manager) ||
+                !manager.bunextReq.isAskingHTML
+            ) return;
+
             const session = manager.bunextReq.session;
             await session.initData();
             const createdAt =

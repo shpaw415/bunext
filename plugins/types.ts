@@ -26,7 +26,7 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
   after?: (context: T, manager: RequestManager, HTML: string) => void | Promise<void>;
 };
 
-export type AfterBuildMain = () => Promise<any> | any;
+export type AfterBuildMain = (filePaths: string[]) => Promise<any> | any;
 export type BeforeBuild = () => Promise<any> | any;
 
 export type Request_Plugin = (
@@ -81,20 +81,29 @@ type onFileSystemChangePlugin = (
 export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<string, unknown> = {}> = Required<{
   name: string;
 }> & Partial<{
+  /**
+   * Build related hooks Triggered on the main thread
+   *
+   * this will share the same context as the main thread but not the build_worker thread.
+   */
+  build_main: Partial<{
+    /**
+    * Triggered on the main thread before the build step.
+    */
+    before_build: BeforeBuild;
+    /**
+    * Triggered on the main thread after the build step.
+    * @param filePaths - The absolute paths of all files in the build directory.
+    */
+    after_build: AfterBuildMain;
+  }>
 
   /**
-   * Triggered on the main thread after the build step.
+   * ***Triggered on the build worker thread***
+   *
+   * this will not share the same context as the main thread.
    */
-  after_build_main: AfterBuildMain;
-  /**
-   * Triggered on the main thread before the build step.
-   */
-  before_build_main: BeforeBuild;
-
-  /**
-   * Triggered on the build worker thread
-   */
-  build_worker: {
+  build_worker: Partial<{
     /**
      * Triggered on the **Build-Worker-Thread** when the Thread is spawned.
      */
@@ -107,7 +116,7 @@ export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<s
      * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing.
      */
     after_build: (BuildArtifact: Bun.BuildArtifact) => Promise<any> | any;
-  }
+  }>
   /**
    * Add Bun.build plugins and build config
    */

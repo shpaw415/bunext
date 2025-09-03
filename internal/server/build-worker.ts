@@ -5,7 +5,7 @@ import { pluginLoader } from "./plugin-loader"
 import { initServerSide } from "./init";
 
 
-initServerSide(false);
+await initServerSide(false);
 
 
 await Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "start").map((onBuilderWorker) => {

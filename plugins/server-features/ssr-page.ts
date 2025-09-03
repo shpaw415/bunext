@@ -10,7 +10,6 @@ import type { Table } from "database/class";
 import { builder } from "internal/server/build";
 import type { DBSchema } from "database/schema";
 import { generateRandomString } from "features/utils";
-import { DirectiveTool } from "plugins/utils";
 import reactElementToJSXString from "internal/jsxToString";
 import { renderToString } from "react-dom/server";
 import { normalize, resolve } from "path";
@@ -65,7 +64,6 @@ const Schema: DBSchema = [
     },
 ];
 const DBPath = join(import.meta.dirname, "ssr_cache.sqlite");
-const fileDirective = new DirectiveTool();
 class SSRPageCache {
 
     private poolManager!: CacheManagerPool;
@@ -367,7 +365,7 @@ class PreBuildContext {
         const _module = (await import(
             modulePath + this.getDevKey()
         ) as Record<string, unknown>);
-        if (await fileDirective.pathIs("use-client", modulePath)) return;
+        if (await router.fileDirectives.pathIs("use-client", modulePath)) return;
 
 
         const existingImports = await this.getModuleImportsFromFilePath(modulePath);

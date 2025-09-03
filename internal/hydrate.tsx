@@ -4,9 +4,9 @@ import { CreatePage, RouterHost } from "./router/index";
 import { getRouteMatcher } from "./router/utils/get-route-matcher";
 import type { _GlobalData } from "./types";
 import React, { StrictMode, type JSX } from "react";
-import { initClientBunext } from "internal/client/bunext_global";
+import { initBunextGlobal } from "internal/bunext_global";
 
-await initClientBunext();
+await initBunextGlobal();
 
 const match =
   typeof window == "undefined" ? () => { } : getRouteMatcher(globalThis.__ROUTES__);

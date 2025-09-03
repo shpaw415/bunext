@@ -175,7 +175,9 @@ class CacheManager<T extends Record<string, unknown>> {
       });
     });
   }
-
+  /**
+   * Clears the cache for the current tag.
+   */
   public clear() {
     return this.cacheTable(table => {
       return table.delete({

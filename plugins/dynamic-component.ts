@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import "../internal/server/server_global";
+import "internal/server/server_global";
 import type { BunextPlugin } from "./types";
 import { join, resolve, normalize } from "path";
 import type { JSX } from "react";

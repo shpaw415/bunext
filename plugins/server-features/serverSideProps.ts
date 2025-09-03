@@ -33,8 +33,12 @@ class ServerSidePropsManager {
         return instance;
     }
 
-    getFromCache(manager: RequestManagerContexted): Promise<ServerSidePropsTyped | null> {
-        if (!manager.bunextReq.match) return Promise.resolve(null);
+    clear() {
+        return this.cache.clear();
+    }
+
+    getFromCache(manager: RequestManagerContexted): Promise<ServerSidePropsTyped> | null {
+        if (!manager.bunextReq.match) return null;
         return this.cache.get(manager.bunextReq.match?.pathname);
     }
     getFromCacheByPath(pathname: string) {
@@ -114,7 +118,7 @@ class ServerSidePropsManager {
 export const serverSidePropsManager = await ServerSidePropsManager.create();
 
 
-export function serveServerSideProps(manager: RequestManagerContexted, props: ServerSidePropsTyped): void {
+function serveServerSideProps(manager: RequestManagerContexted, props: ServerSidePropsTyped): void {
     try {
         manager.bunextReq.preventGlobalValuesInjection();
         manager.bunextReq.preventRewrite();
@@ -143,6 +147,11 @@ function setRedirectToPath(to: string): Response {
     });
 }
 
+
+export function isRequestGetServerSideProps(manager: RequestManager): boolean {
+    return (manager.request.headers.get("Accept")?.includes("application/vnd.server-side-props") && (typeof manager.serverSide !== "undefined")) as boolean;
+}
+
 export default {
     name: "bunext-server-side-props",
     priority: 1,
@@ -162,6 +171,12 @@ export default {
                 manager.bunextReq.InjectGlobalValues<ServerSidePropsContext>({
                     __SERVERSIDE_PROPS__: props
                 });
+                manager.bunextReq.setContext<ServerSidePropsContext>({
+                    __SERVERSIDE_PROPS__: props
+                });
+            } else if (manager.bunextReq.isClientNavigating) {
+                let props = await serverSidePropsManager.getFromCache(manager);
+                if (!props) props = await serverSidePropsManager.make(manager);
                 manager.bunextReq.setContext<ServerSidePropsContext>({
                     __SERVERSIDE_PROPS__: props
                 });

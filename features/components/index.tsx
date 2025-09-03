@@ -63,6 +63,7 @@ export function DynamicComponent<Props extends {}, ElementName extends string>({
   useEffect(() => {
     import(`${pathName}.js${devKey}`)
       .then((module) => {
+        console.log({ module, elementName })
         const Component = module[elementName];
         if (!Component) {
           throw new Error(`Component ${elementName} not found in module ${pathName}`);
