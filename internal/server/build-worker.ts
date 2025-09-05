@@ -3,14 +3,23 @@ import { builder, type BuildOuts } from "./build.ts";
 import type { BuildOutput } from "bun";
 import { pluginLoader } from "./plugin-loader"
 import { initServerSide } from "./init";
+import { IPCManager } from "plugins/utils";
 
+
+declare global {
+  var __IS_BUILDER_WORKER__: boolean;
+}
+
+globalThis.__IS_BUILDER_WORKER__ = true;
 
 await initServerSide(false);
 
 
-await Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "start").map((onBuilderWorker) => {
+const IPCHelper = IPCManager.getInstanceForCurrentProcess() as IPCManager<"builder">;
+
+await Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "start").map(async (onBuilderWorker) => {
   try {
-    onBuilderWorker.subPlugin();
+    await onBuilderWorker.subPlugin(IPCHelper);
   } catch (e) {
     console.error(`Error in build_worker start hook, name: ${onBuilderWorker.name}:`, e);
   }
@@ -54,9 +63,13 @@ function init() {
   process.on("disconnect", () => process.exit(0))
 }
 
+let currentlyBuilding = false;
+
 async function build(
   BuildPath?: string
-): Promise<Omit<BuildWorkerResponse, "type">> {
+): Promise<Omit<BuildWorkerResponse, "type"> | null> {
+  if (currentlyBuilding) return null;
+  currentlyBuilding = true;
   try {
     BuildPath
       ? await preBuild(BuildPath)
@@ -101,9 +114,9 @@ async function afterBuild(build: BuildOutput) {
   const afterBuildPlugins = pluginLoader.getSubPluginsByParentName("build_worker", "after_build");
   const awaiters: Promise<any>[] = [];
   for (const output of build.outputs) {
-    awaiters.push(...afterBuildPlugins.map((plugin) => {
+    awaiters.push(...afterBuildPlugins.map(async (plugin) => {
       try {
-        return plugin.subPlugin(output);
+        await plugin.subPlugin(output, IPCHelper);
       } catch (e) {
         console.error(`Error in build_worker after_build hook, name: ${plugin.name}:`, e);
       }
@@ -113,9 +126,9 @@ async function afterBuild(build: BuildOutput) {
 }
 
 function beforeBuild() {
-  return Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "before_build").map((plugin) => {
+  return Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "before_build").map(async (plugin) => {
     try {
-      plugin.subPlugin();
+      await plugin.subPlugin(IPCHelper);
     } catch (e) {
       console.error(`Error in build_worker before_build hook, name: ${plugin.name}:`, e);
     }

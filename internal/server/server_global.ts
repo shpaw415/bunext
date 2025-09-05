@@ -22,7 +22,6 @@ declare global {
   var webSocket: undefined | WebSocket;
   //@ts-ignore
   var Server: void | BunextServer;
-  var clusterStatus: boolean;
   //@ts-ignore
   var serverConfig: ServerConfig;
   var dev: {

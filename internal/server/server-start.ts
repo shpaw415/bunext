@@ -1,24 +1,25 @@
 "server only";
 
+import { IPCManager } from "plugins/utils";
 import { pluginLoader } from "./plugin-loader";
-
+import cluster from "node:cluster";
 // this is called on server start
 
-declare global {
-  var __BUNEXT_SERVER_START_PLUGIN_DRY__: boolean;
-}
-globalThis.__BUNEXT_SERVER_START_PLUGIN_DRY__ ??= false;
 
-export default async function Make() {
-  if (globalThis.__BUNEXT_SERVER_START_PLUGIN_DRY__) {
+
+export async function onServerStartPlugins() {
+
+  const ipc = IPCManager.getInstanceForCurrentProcess() as IPCManager<"main" | "cluster">;
+
+  if (cluster.isWorker) {
+    await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "cluster").map((p) => p.subPlugin(ipc as IPCManager<"cluster">)));
     return;
   }
-  globalThis.__BUNEXT_SERVER_START_PLUGIN_DRY__ = true;
 
   if (process.env.NODE_ENV == "development") {
     await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "dev").map((plugin) => {
       try {
-        return plugin.subPlugin();
+        return plugin.subPlugin(ipc as IPCManager<"main">);
       } catch (e) {
         console.error(`OnServerStart plugin failed, name: ${plugin.name}:`, e);
       }
@@ -28,15 +29,10 @@ export default async function Make() {
   await Promise.all(
     pluginLoader.getSubPluginsByParentName("serverStart", "main").map(async (plugin) => {
       try {
-        await plugin.subPlugin();
+        await plugin.subPlugin(ipc as IPCManager<"main">);
       } catch (e) {
         console.error(`OnServerStart plugin failed, name: ${plugin.name}:`, e);
       }
     })
   );
-}
-
-export async function OnServerStartCluster() {
-  await pluginLoader.init();
-  await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "cluster").map((p) => p.subPlugin()));
 }

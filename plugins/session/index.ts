@@ -1,6 +1,10 @@
 import type { RequestManager } from "internal/server/router";
+import { cleanExpiredSessions, initializeSessionDatabase } from "internal/session";
 import type { BunextPlugin } from "plugins/types";
 import { BunextRequest } from "public/request";
+
+
+const SESSION_CLEANUP_INTERVAL = 1800 * 1000; // 30 minutes
 
 
 async function serveSessionData(req: BunextRequest): Promise<void> {
@@ -31,6 +35,24 @@ async function sessionOnRequestHandler(request: RequestManager): Promise<boolean
             return true;
     }
     return false
+}
+
+async function initSessionDatabase() {
+    const sessionConfigType = globalThis.serverConfig.session?.type;
+    const setClearSessionInterval = () =>
+        setInterval(() => cleanExpiredSessions(), SESSION_CLEANUP_INTERVAL);
+
+    switch (sessionConfigType) {
+        case "database:hard":
+            await initializeSessionDatabase();
+            setClearSessionInterval();
+            break;
+        case "database:memory":
+            //if (cluster.isWorker) break;
+            await initializeSessionDatabase();
+            setClearSessionInterval();
+            break;
+    }
 }
 
 export default {
@@ -67,4 +89,19 @@ export default {
         },
 
     },
+    serverStart: {
+        main(ipc) {
+
+            ipc.onMessage("test", (msg, from) => {
+                console.log(`Message from ${from} process:`, msg);
+            });
+
+            return initializeSessionDatabase();
+        },
+    },
+    build_worker: {
+        start(ipc) {
+            ipc.send("main", "test", { message: "Hello from worker!" })
+        },
+    }
 } as BunextPlugin;

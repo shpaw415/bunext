@@ -16,25 +16,8 @@ import type { Server as _Server } from "bun";
 
 // Node.js modules
 import { cpus, type as OSType } from "node:os";
-import cluster from "node:cluster";
-
-// Features
-import { resetPath, revalidate } from "plugins/server-features/ssr-page.ts";
-import {
-  cleanExpiredSessions,
-  deleteSessionById,
-  getSessionById,
-  initializeSessionDatabase,
-  setSessionById,
-} from "../session.ts";
-
-// Types and server startup
-import type {
-  ClusterMessageType,
-  OnRequestType,
-  ReactShellComponent,
-} from "../types.ts";
-import OnServerStart, { OnServerStartCluster } from "./server-start.ts";
+import cluster, { type Cluster } from "node:cluster";
+import { onServerStartPlugins } from "./server-start.ts";
 
 // Caching and logging
 import "../../plugins/fetch-caching/fetch.ts";
@@ -46,8 +29,8 @@ import {
 } from "./logs";
 import { DevWsMessageHandler, type DevWsMessageTypes } from "../../dev/hotServer.ts";
 import { ExitCodeDescription } from "../../bin/exit-codes.ts";
-import { Shell } from "internal/client/shell";
 import { initServerSide } from "./init";
+import { IPCManager } from "plugins/utils";
 
 declare global {
   namespace NodeJS {
@@ -56,10 +39,6 @@ declare global {
     }
   }
 }
-
-
-// Global initialization
-globalThis.clusterStatus ??= false;
 
 // Constants
 const EXCLUDED_PATHS_FROM_LOGGING = [
@@ -70,7 +49,6 @@ const EXCLUDED_PATHS_FROM_LOGGING = [
   "/chunk-",
 ] as const;
 
-const SESSION_CLEANUP_INTERVAL = 1800 * 1000; // 30 minutes
 const SOCKET_CLEANUP_INTERVAL = 10000; // 10 seconds
 
 // Utility functions
@@ -107,48 +85,27 @@ function createRequestLogMessage(
 }
 
 type BunextServerProps = {
-  onRequest?: OnRequestType;
-  preloadModulePath: string;
-  Shell: ReactShellComponent;
   preventDevConsole?: boolean;
 };
 
 const DEFAULT_PROPS: BunextServerProps = {
-  onRequest: undefined,
-  preloadModulePath: "./preload.ts",
-  Shell,
   preventDevConsole: false,
 };
 
 class BunextServer {
-  public onRequest?: OnRequestType;
-  public preloadModulePath: string;
-  public Shell: ReactShellComponent;
-
   public port = globalThis.serverConfig.HTTPServer.port || 3000;
   public server?: _Server;
   public hotServerPort = globalThis.serverConfig.Dev.hotServerPort || 3001;
   public hotServer?: _Server;
   public hostName = "localhost";
-  public isClustered = false;
 
   public waittingBuildFinish: Promise<boolean> | undefined;
   public WaitingBuildFinishResolver:
     | ((value: boolean | PromiseLike<boolean>) => void)
     | undefined;
 
-  private preventDevConsole: boolean;
-
   constructor({
-    onRequest,
-    preloadModulePath,
-    Shell,
-    preventDevConsole
   }: BunextServerProps) {
-    this.onRequest = onRequest;
-    this.preloadModulePath = preloadModulePath;
-    this.Shell = Shell;
-    this.preventDevConsole = preventDevConsole ?? false;
   }
 
   static async getInitedInstance(props: BunextServerProps = DEFAULT_PROPS): Promise<BunextServer> {
@@ -199,14 +156,11 @@ class BunextServer {
           return undefined;
         },
         async () => {
-          const customResponse = await this.onRequest?.(request);
-          if (customResponse) return customResponse;
-
           try {
             const response = await this.serve(request);
             if (response instanceof Response) return response;
           } catch (error) {
-            //console.error(error);
+            console.error(error);
           }
 
           return new Response("Not found!!", { status: 404 });
@@ -266,101 +220,62 @@ class BunextServer {
     setInterval(clearInactiveSockets, SOCKET_CLEANUP_INTERVAL);
   }
 
-  async initSessionDatabase() {
-    const sessionConfigType = globalThis.serverConfig.session?.type;
-    const setClearSessionInterval = () =>
-      setInterval(() => cleanExpiredSessions(), SESSION_CLEANUP_INTERVAL);
-
-    switch (sessionConfigType) {
-      case "database:hard":
-        await initializeSessionDatabase();
-        setClearSessionInterval();
-        break;
-      case "database:memory":
-        if (cluster.isWorker) break;
-        await initializeSessionDatabase();
-        setClearSessionInterval();
-        break;
-    }
-  }
-
   async init() {
-    const dry = Boolean(globalThis.dryRun);
-
-    // Initialize the enhanced terminal console
-    await initServerSide(true);
-
-    dry && console.info("Starting...");
-
-    dry && await benchmark_console(
+    console.info("Starting...");
+    await benchmark_console(
       (time) =>
-        dry && `Ready in ${time}ms`,
-      () => this._init()
+        `Ready in ${time}ms`,
+      () => this._init_()
     );
   }
 
-  private async _init() {
-    const isDev = process.env.NODE_ENV == "development";
-    const isDryRun = globalThis.dryRun;
-    const isMainThread = cluster.isPrimary;
-    if (isDryRun) {
-      globalThis.clusterStatus = this.createCluster();
-      await this.initSessionDatabase();
-    }
-
-    router.server?.reload();
-    router.client?.reload();
-    if (!globalThis.clusterStatus) {
-      if (isMainThread) {
-        await import(this.preloadModulePath);
-      }
-      if (isDryRun) {
-        await OnServerStart();
-        this.startServer();
-        if (isDev) {
-          doWatchBuild();
-          this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
-        } else {
-          const buildoutput = await builder.makeBuild();
-          if (!buildoutput) {
-            throw new Error("Production build failed", { cause: buildoutput });
-          }
-          setRevalidate(buildoutput.revalidates);
-        }
-      }
-    } else if (isMainThread) {
-      if (isDryRun) {
-        //@ts-ignore
-        await import(this.preloadModulePath);
-        await OnServerStart();
-        if (isDev) {
-          doWatchBuild();
-          this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
-        } else {
-          const buildoutput = await builder.makeBuild();
-          if (!buildoutput) throw new Error("Production build failed");
-          this.updateWorkerData();
-          setRevalidate(buildoutput.revalidates);
-        }
-      }
-    } else if (!isMainThread) {
-      if (isDryRun) this.startServer();
-      await OnServerStartCluster();
-    }
-
-    if (isDryRun) globalThis.dryRun = false;
-
-    if (this.isClustered && !isDev && isMainThread)
-      console.info("Starting Bunext in Multi-threaded mode");
-
-    return this;
+  private isClusterEnabled(): boolean {
+    return (
+      OSType() === "Linux" &&
+      Bun.semver.satisfies(Bun.version, "1.1.25 - x.x.x") &&
+      process.env.NODE_ENV !== "development" &&
+      Boolean(serverConfig.HTTPServer?.threads) &&
+      (
+        typeof serverConfig.HTTPServer?.threads !== "number" || serverConfig.HTTPServer?.threads > 1
+      )
+    );
   }
 
-  private async checkBuildOnDevMode({ filePath }: { filePath?: string }) {
-    if (this.isClustered && filePath)
-      await this.updateWorkerData({
-        path: filePath,
-      });
+  private __init_dev__() {
+    doWatchBuild();
+    this.serveHotServer(globalThis.serverConfig.Dev.hotServerPort);
+  }
+
+  private async __init_prod__() {
+    const isClusteredEnabled = this.isClusterEnabled();
+
+    if (isClusteredEnabled && cluster.isPrimary) {
+      const workers = this.createCluster();
+      IPCManager.getInstanceForMain().setClusterProcesses(workers);
+      console.info("Starting Bunext in Multi-threaded mode");
+    } else if (isClusteredEnabled && cluster.isWorker) {
+      IPCManager.getInstanceForCluster();
+    }
+
+    if (cluster.isPrimary) {
+      const buildoutput = await builder.makeBuild();
+      if (!buildoutput) {
+        throw new Error("Production build failed", { cause: buildoutput });
+      }
+      setRevalidate(buildoutput.revalidates);
+    }
+  }
+
+  private async _init_() {
+    const isDev = process.env.NODE_ENV == "development";
+
+    await initServerSide(true);
+    await onServerStartPlugins();
+    this.startServer();
+
+    isDev ? this.__init_dev__() : await this.__init_prod__();
+
+    return this;
   }
 
   async serve(request: Request): Promise<Response | null> {
@@ -372,11 +287,6 @@ class BunextServer {
     }
 
     try {
-      await this.checkBuildOnDevMode({
-        filePath: router.server?.match(request)?.filePath,
-      });
-
-
       const response = await router.serve(
         request,
         headers,
@@ -404,45 +314,12 @@ class BunextServer {
     });
   }
 
-  createCluster(): boolean {
-    if (
-      OSType() !== "Linux" ||
-      !Bun.semver.satisfies(Bun.version, "1.1.25 - x.x.x") ||
-      process.env.NODE_ENV === "development" ||
-      !serverConfig.HTTPServer?.threads ||
-      (typeof serverConfig.HTTPServer?.threads === "number" &&
-        serverConfig.HTTPServer?.threads <= 1)
-    ) {
-      return false;
-    }
-
-    this.isClustered = true;
-
-    if (cluster.isWorker) {
-      this.setupWorkerMessageHandler();
-      return true;
-    }
-
-    return this.setupMasterCluster();
-  }
-
-  private setupWorkerMessageHandler() {
-    process.on("message", (data) => {
-      if (data === "build_done") return;
-      if (this.WaitingBuildFinishResolver) {
-        this.WaitingBuildFinishResolver(true);
-      }
-    });
-  }
-
-  private setupMasterCluster(): boolean {
+  createCluster(): Array<Cluster["worker"]> {
     const cpuCoreCount = cpus().length;
     let count = this.calculateWorkerCount(cpuCoreCount);
 
     this.forkWorkers(count);
-    this.setupClusterMessageHandler();
-
-    return true;
+    return Object.values(cluster.workers || {}).filter((worker): worker is Cluster["worker"] => worker !== undefined) as Array<Cluster["worker"]>;
   }
 
   private calculateWorkerCount(cpuCoreCount: number): number {
@@ -474,81 +351,8 @@ class BunextServer {
   }
 
   private setupClusterMessageHandler() {
-    cluster.on("message", async (worker, _message) => {
-      const message = _message as ClusterMessageType;
+    const ipc = IPCManager.getInstanceForMain();
 
-      switch (message.task) {
-        case "revalidate":
-          revalidate(...message.data.path);
-          break;
-        case "update_build":
-          await this.handleUpdateBuild(message.data.path);
-          break;
-        case "getSession":
-          this.handleGetSession(worker, message);
-          break;
-        case "setSession":
-          this.handleSetSession(message);
-          break;
-        case "deleteSession":
-          deleteSessionById(message.data.id);
-          break;
-      }
-    });
-  }
-
-  private async handleUpdateBuild(path?: string) {
-    if (path) await resetPath(path);
-    await builder.makeBuild();
-    await this.updateWorkerData();
-  }
-
-  private handleGetSession(worker: any, message: ClusterMessageType) {
-    if (message.task === "getSession" && "id" in message.data) {
-      worker.send({
-        data: {
-          data: getSessionById(message.data.id) || false,
-          id: message.data.id,
-        },
-        task: "getSession",
-      } as ClusterMessageType);
-    }
-  }
-
-  private handleSetSession(message: ClusterMessageType) {
-    if (message.task === "setSession" && "type" in message.data && "id" in message.data && "sessionData" in message.data) {
-      setSessionById(
-        message.data.type,
-        message.data.id,
-        message.data.sessionData
-      );
-    }
-  }
-  private makeBuildAwaiter() {
-    this.waittingBuildFinish = new Promise((resolve) => {
-      this.WaitingBuildFinishResolver = resolve;
-    });
-  }
-
-  async updateWorkerData(data?: { path?: string }) {
-    if (!this.isClustered) {
-      this.WaitingBuildFinishResolver?.(true);
-      return;
-    }
-
-    if (!cluster.isPrimary) {
-      this.makeBuildAwaiter();
-      process.send?.({
-        task: "update_build",
-        data: {
-          path: data?.path,
-        },
-      } as ClusterMessageType);
-    } else {
-      for (const worker of Object.values(cluster.workers || [])) {
-        worker?.send("build_done");
-      }
-    }
   }
 }
 

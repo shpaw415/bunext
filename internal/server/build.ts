@@ -17,6 +17,7 @@ import type {
   BuildWorkerMessage,
   BuildWorkerResponse,
 } from "./build-worker.ts";
+import { IPCManager } from "plugins/utils";
 
 globalThis.React = React;
 
@@ -34,12 +35,6 @@ type _Mainoptions = {
   hydrate: ".bunext/react-ssr/hydrate.ts";
 };
 
-declare global {
-  var __BUNEXT_BUILD_PROCESS__:
-    | Bun.Subprocess<"ignore", "inherit", "inherit">
-    | undefined;
-}
-
 const cwd = process.cwd();
 
 class Builder {
@@ -51,7 +46,6 @@ class Builder {
   };
   public preBuildPaths: Array<string> = [];
   public plugins: BunPlugin[] = [];
-  private BuildPluginsConfig: Partial<Bun.BuildConfig> = {};
   /**
    * absolute path
    */
@@ -91,24 +85,21 @@ class Builder {
     this.inited = true;
     this.Check_remove_node_modules_files_path();
     await this.InitGetCustomPluginsFromUser();
+    this.createBuildWorker();
 
     this.remove_node_modules_files_path.push(
       ...pluginLoader.getPluginByName("removeFromBuild").flatMap((p) => p.pluginParent ?? [])
     );
-    try {
-      this.InitGetPlugins();
-    } catch (e) {
-      console.error("Plugin has not loaded correctly!", (e as Error).stack);
-    }
     return this;
   }
 
-  private async InitGetPlugins() {
+  private async getPluginBuildConfig() {
     const pluginsData = pluginLoader.getPluginByName("build").map((e) => e.pluginParent);
 
-    const config = pluginsData
+    const config = await Promise.all(pluginsData
       .map((p) => p.buildOptions)
-      .filter((p) => p != undefined);
+      .filter((p) => p != undefined)
+      .map((p) => (typeof p === "function" ? p() : p)));
 
     const plugins = pluginsData
       .map((p) => p.plugin)
@@ -129,13 +120,13 @@ class Builder {
       ...config.map((p) => p.define).filter((p) => p != undefined)
     );
 
-    this.BuildPluginsConfig = {
+    return {
       ...Object.assign({}, ...config),
       entrypoints,
       external,
       define,
       plugins,
-    };
+    } as Partial<Bun.BuildConfig>;
   }
 
   private async InitGetCustomPluginsFromUser() {
@@ -151,7 +142,7 @@ class Builder {
       entrypoints.push(path);
     }
     entrypoints = entrypoints.filter((e) => {
-      const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx", "loading.tsx"];
+      const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx", "loading.tsx", "error.tsx"];
       if (
         allowedEndsWith.includes(e.split("/").at(-1) as string) ||
         /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(e)
@@ -197,13 +188,14 @@ class Builder {
 
   async build(onlyPath?: string) {
     const { baseDir, hydrate, buildDir } = this.options;
-
+    const pluginsConfig = await this.getPluginBuildConfig();
     const entrypoints =
       onlyPath && process.env.NODE_ENV == "development"
         ? [
           join(baseDir, hydrate),
           onlyPath,
           ...(await this.getLayoutEntryPoints(onlyPath)),
+          ...(pluginsConfig?.entrypoints ?? []),
         ]
         : await this.getEntryPoints();
     const build = await Bun.build({
@@ -212,7 +204,7 @@ class Builder {
         : "*",
       minify: process.env.NODE_ENV == "production",
       sourcemap: "none",
-      ...this.BuildPluginsConfig,
+      ...pluginsConfig,
       outdir: join(baseDir, buildDir as string),
       publicPath: "./",
       //@ts-ignore
@@ -228,14 +220,14 @@ class Builder {
         "react-dom/client",
         "react/jsx-dev-runtime",
         ...entrypoints,
-        ...(this.BuildPluginsConfig?.entrypoints ?? []),
+        ...(pluginsConfig?.entrypoints ?? []),
       ],
-      plugins: [...this.plugins, ...(this.BuildPluginsConfig?.plugins || [])],
+      plugins: [...this.plugins, ...(pluginsConfig?.plugins || [])],
       define: {
         "process.env.NODE_ENV": JSON.stringify(
           process.env.NODE_ENV
         ),
-        ...this.BuildPluginsConfig.define,
+        ...pluginsConfig?.define,
       },
       external: [
         "bun",
@@ -244,7 +236,7 @@ class Builder {
         "crypto",
         "node:path",
         import.meta.filename,
-        ...(this.BuildPluginsConfig?.external || []),
+        ...(pluginsConfig?.external || []),
       ],
     });
     this.cleanBuildDir(build);
@@ -265,7 +257,6 @@ class Builder {
 
   async updateData(data: BuildOuts) {
     this.revalidates = data.revalidates;
-    globalThis.Server?.updateWorkerData();
     const allBuildDirFilePaths = await Array.fromAsync(
       new Bun.Glob("**/*").scan({
         cwd: this.options.buildDir,
@@ -274,9 +265,9 @@ class Builder {
         dot: true
       }));
     await Promise.all(
-      pluginLoader.getSubPluginsByParentName("build_main", "after_build").map((after_build_main) => {
+      pluginLoader.getSubPluginsByParentName("build_main", "after_build").map(async (after_build_main) => {
         try {
-          after_build_main.subPlugin(allBuildDirFilePaths);
+          await after_build_main.subPlugin(allBuildDirFilePaths);
         } catch (e) {
           console.error(`Error in build_main.after_build hook, name: ${after_build_main.name}:`, e);
         }
@@ -292,15 +283,13 @@ class Builder {
   }
 
   private createBuildWorker() {
-    if (process.env.NODE_ENV == "development") {
-      if (!globalThis.__BUNEXT_BUILD_PROCESS__)
-        globalThis.__BUNEXT_BUILD_PROCESS__ = this.makeBuildWorker();
-      this.BuilderWorker = globalThis.__BUNEXT_BUILD_PROCESS__;
-    }
-    if (!this.BuilderWorker) this.BuilderWorker = this.makeBuildWorker();
+    if (this.BuilderWorker || globalThis.__IS_BUILDER_WORKER__) return;
+    this.BuilderWorker = this.makeBuildWorker();
+    IPCManager.getInstanceForMain().setBuilderProcess(this.BuilderWorker);
   }
 
   private makeBuildWorker() {
+
     const self = this;
     return Bun.spawn({
       cmd: ["bun", join(import.meta.dirname, "build-worker.ts")],
@@ -313,10 +302,11 @@ class Builder {
       stderr: "inherit",
       onExit: () => {
         self.BuilderWorker = undefined;
-        globalThis.__BUNEXT_BUILD_PROCESS__ = undefined;
+        IPCManager.getInstanceForCurrentProcess().setBuilderProcess(null);
       },
       ipc(_message) {
         const message = _message as BuildWorkerResponse;
+        if (!message.type) return IPCManager.getInstanceForCurrentProcess().__DISPATCH__(_message);
         switch (message.type) {
           case "build":
             if (!message.success) {
@@ -348,9 +338,9 @@ class Builder {
     this.createBuildWorker();
     if (!this.BuilderWorker) throw new Error("BuilderWorker not found");
     await Promise.all(
-      pluginLoader.getSubPluginsByParentName("build_main", "before_build").map((before_build_main) => {
+      pluginLoader.getSubPluginsByParentName("build_main", "before_build").map(async (before_build_main) => {
         try {
-          before_build_main.subPlugin();
+          await before_build_main.subPlugin();
         } catch (e) {
           console.error(`Error in build_main.before_build hook, name: ${before_build_main.name}:`, e);
         }

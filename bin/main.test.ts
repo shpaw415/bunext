@@ -79,9 +79,6 @@ async function InitServer() {
 
 function createServer() {
   return BunextServer.getInitedInstance({
-    onRequest: undefined,
-    preloadModulePath: `${cwd}/config/preload.ts`,
-    Shell: Shell,
     preventDevConsole: true,
   });
 }
@@ -867,9 +864,7 @@ describe("Bunext Framework Test Suite", () => {
         expect(serverConfig.HTTPServer.threads).toBeDefined();
 
         // Test cluster status
-        expect(typeof globalThis.clusterStatus).toBe('boolean');
 
-        console.log(`Cluster status: ${globalThis.clusterStatus}`);
         console.log(`Thread configuration: ${serverConfig.HTTPServer.threads}`);
       } else {
         console.log("Server configuration not available in test environment");

@@ -1,19 +1,20 @@
 import type { BunextRequest } from "../internal/server/bunextRequest";
 import type { RequestManager } from "../internal/server/router";
+import type { ClientIPCManager } from "./utils";
 
 export type ServerStart = Partial<{
   /**
    * executed on the main thread
    */
-  main: () => Promise<any> | any;
+  main: (ipc: ClientIPCManager<"main">) => Promise<any> | any;
   /**
    * executed on clusters in multi-threaded mode
    */
-  cluster: () => Promise<any> | any;
+  cluster: (ipc: ClientIPCManager<"cluster">) => Promise<any> | any;
   /**
    * executed on dev mode
    */
-  dev: () => Promise<any> | any;
+  dev: (ipc: ClientIPCManager<"main">) => Promise<any> | any;
 }>;
 
 type HTML_Rewrite_plugin_function<T = unknown> = {
@@ -29,18 +30,20 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
 export type AfterBuildMain = (filePaths: string[]) => Promise<any> | any;
 export type BeforeBuild = () => Promise<any> | any;
 
-export type Request_Plugin = (
-  request: RequestManager
+export type Request_Plugin<MultiTreaded extends boolean = false> = (
+  request: RequestManager,
+  ipc: MultiTreaded extends true ? ClientIPCManager<"cluster"> : ClientIPCManager<"main">
 ) => Promise<void> | void;
 
-export type AfterRequest_Plugin = (
+export type AfterRequest_Plugin<MultiTreaded extends boolean = false> = (
   request: RequestManager,
-  response: Response
+  response: Response,
+  ipc: MultiTreaded extends true ? ClientIPCManager<"cluster"> : ClientIPCManager<"main">
 ) => Promise<void | Response> | void | Response;
 
 type Build_Plugins = {
   plugin?: Bun.BunPlugin;
-  buildOptions?: Partial<Bun.BuildConfig>;
+  buildOptions?: Partial<Bun.BuildConfig> | (() => Promise<Partial<Bun.BuildConfig>> | Partial<Bun.BuildConfig>);
 };
 
 export type PreBuildContextDefaultValues = { route: string };
@@ -72,10 +75,12 @@ type buildContextPlugin<T extends Record<string, unknown> = {}> = {
 type onFileSystemChangePlugin = (
   filePath: string | undefined,
   /**
-   * Prevent the build from running <br />
+   * Prevent the build from running
+   * 
    * This is useful if you want to prevent the build from running when a file is changed
    */
   preventBuild: () => void,
+  ipc: ClientIPCManager<"main">
 ) => void | Promise<void>;
 
 export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<string, unknown> = {}> = Required<{
@@ -107,18 +112,20 @@ export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<s
     /**
      * Triggered on the **Build-Worker-Thread** when the Thread is spawned.
      */
-    start: () => Promise<any> | any;
+    start: (ipc: ClientIPCManager<"builder">) => Promise<any> | any;
     /**
      * Triggered on the **Build-Worker-Thread** before the build step.
      */
-    before_build: () => Promise<any> | any;
+    before_build: (ipc: ClientIPCManager<"builder">) => Promise<any> | any;
     /**
      * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing.
      */
-    after_build: (BuildArtifact: Bun.BuildArtifact) => Promise<any> | any;
-  }>
+    after_build: (BuildArtifact: Bun.BuildArtifact, ipc: ClientIPCManager<"builder">) => Promise<any> | any;
+  }>;
   /**
    * Add Bun.build plugins and build config
+   *
+   * **Run on the build worker thread**
    */
   build: Build_Plugins;
   /**
@@ -188,6 +195,8 @@ export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<s
   removeFromBuild: Array<string>;
   /**
    * Triggered when a change is made in ./src and ./static, (add, delete, update) a file.
+   *
+   * **Run on the main thread**
    *
    * **ONLY DEV MODE**
    */

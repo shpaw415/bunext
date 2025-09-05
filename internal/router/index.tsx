@@ -33,7 +33,7 @@ import { events, navigate } from "./client";
 /**
  * Enhanced type definitions for better type safety
  */
-interface RouterConfig {
+export type RouterConfig = {
   normalizeUrl?: (url: string) => string;
   onRouteUpdated?: (path: string) => void;
   errorBoundary?: ComponentType<{ error: Error; retry: () => void }>;
@@ -493,6 +493,21 @@ export function PreLoadPaths(paths: string[]): Promise<PromiseSettledResult<void
   return Promise.allSettled(paths.map(PreLoadPath));
 }
 
+function formatSameLevelPath(fileName: string, basePath: string): string {
+  const pathArray = basePath.split("/");
+  pathArray.pop();
+  pathArray.push(fileName);
+  return pathArray.join("/");
+}
+
+function importIfExists<T>(path: string, checkList: string[]): Promise<{ default: T }> | undefined {
+  console.log(`Checking import for:s ${path}`, { checkList });
+  if (checkList.includes(path)) {
+    return import(path);
+  }
+  return undefined;
+}
+
 /**
  * Main router component that manages application routing and navigation.
  * Provides comprehensive features including error boundaries, loading states,
@@ -550,7 +565,6 @@ export const RouterHost = ({
   const [current, setCurrent] = useState(children);
   const [version, setVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
   const versionRef = useRef<number>(version);
   const abortControllerRef = useRef<AbortController | null>(null);
   const firstLoad = useRef(true);
@@ -568,7 +582,6 @@ export const RouterHost = ({
 
       try {
         setIsLoading(true);
-        setError(null);
 
         const matched = match(target.split("?")[0] as string);
         if (!matched) {
@@ -577,20 +590,24 @@ export const RouterHost = ({
 
         await OnDevRouterUpdate(matched);
 
+        const loadingComponent = await importIfExists(formatSameLevelPath("loading.js", matched.value), globalThis.__LOADING_COMPONENTS__);
+        const errorComponent = await importIfExists(formatSameLevelPath("error.js", matched.value), globalThis.__ERROR_COMPONENTS__);
 
         const [props, module] = await Promise.all([
-          fetchServerSideProps(target),
+          fetchServerSideProps(target, {
+            useCache: process.env.NODE_ENV == "production",
+          }),
           import(
-            firstLoad ? [
-              matched.value
-            ].join("") : [
+            firstLoad.current ? matched.value : [
               matched.value,
-              "&__BUNEXT_NAVIGATE__=true",
+              "?__BUNEXT_NAVIGATE__=true",
               `&__BUNEXT_PATHNAME__=${encodeURI(target)}`,
               (process.env.NODE_ENV === "development" ? `&__BUNEXT_VERSION__=${currentVersion}` : "")
             ].join("")
           ),
         ]);
+
+        firstLoad.current = false;
 
         const JsxToDisplay = await CreatePage({
           module,
@@ -615,7 +632,6 @@ export const RouterHost = ({
         );
 
         console.error("Router error:", routeError);
-        setError(routeError);
         setIsLoading(false);
 
         if (!ErrorBoundary) {

@@ -27,7 +27,7 @@ import "./server_global";
 import type { JsxToStringWorkerMessage } from "../dev/types";
 import { BunextError } from "./server_global";
 import { ErrorFallback } from "components/fallback";
-import { DirectiveTool } from "plugins/utils";
+import { DirectiveTool, IPCManager } from "plugins/utils";
 import { Shell } from "public/client/shell";
 import { pluginLoader } from "./plugin-loader";
 
@@ -341,10 +341,12 @@ class StaticRouters {
       });
     } else if (manager.bunextReq.isSendNowEnabled) return response;
 
+    const ipc = IPCManager.getInstanceForCurrentProcess() as IPCManager<"main">;
+
     for await (const after_request of
       pluginLoader.getSubPluginsByParentName("router", "after_request")) {
       try {
-        const result = await after_request.subPlugin(manager, response);
+        const result = await after_request.subPlugin(manager, response, ipc);
         if (result instanceof Response) {
           response = result;
         }
@@ -589,9 +591,10 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
    */
   private async checkPluginServing(): Promise<void> {
     const plugins = pluginLoader.getSubPluginsByParentName("router", "request");
+    const ipc = IPCManager.getInstanceForCurrentProcess() as IPCManager<"main">;
     for await (const plugin of plugins) {
       try {
-        await plugin.subPlugin(this);
+        await plugin.subPlugin(this, ipc);
         if (this.bunextReq.__BYPASS_RESPONSE__ || this.bunextReq.isSendNowEnabled === true) break;
       } catch (e) {
         this.bunextReq.__ERROR__ = new Error(`Error occurred in plugin ${plugin.name}`, { cause: e as Error });

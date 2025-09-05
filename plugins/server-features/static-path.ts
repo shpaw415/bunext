@@ -20,6 +20,7 @@ async function serveStaticAssets(manager: RequestManager) {
 
 
 export default {
+    name: "static-assets-plugin",
     priority: 0,
     router: {
         request(manager) {
