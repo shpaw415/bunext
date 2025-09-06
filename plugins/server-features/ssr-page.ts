@@ -17,6 +17,7 @@ import { baseDir, pageDir } from "internal/server/server_global";
 import { Wrapper } from "./ssr-page-preload";
 import type { PreBuildContextDefaultValues } from "plugins/types";
 import { pluginLoader } from "internal/server/plugin-loader";
+import { IPCManager } from "plugins/utils";
 
 const Schema: DBSchema = [
     {
@@ -552,7 +553,7 @@ export async function resetPath(path: string) {
 export async function findPathIndex(path: string): Promise<boolean> {
     return Boolean(await SSRCache.getSSR(path));
 }
-
+const ipc = IPCManager.getInstanceForCurrentProcess<"main" | "cluster">();
 export async function revalidate(...path: string[]) {
     const _paths = path.map((p) => findRouteOrThrow(p));
 
@@ -575,7 +576,7 @@ export async function revalidate(...path: string[]) {
         pathname
     ));
     await Promise.all(route.map(({ filePath }) => resetPath(filePath)));
-    await builder.makeBuild();
+    await ipc.actions.builder.build();
 }
 /**
  *

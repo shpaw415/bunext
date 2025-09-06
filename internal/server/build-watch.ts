@@ -9,8 +9,9 @@ import {
   TerminalIcon,
   TextColor,
   ToColor,
-} from "./logs";
+} from "plugins/console";
 import { resetPath } from "plugins/server-features/ssr-page";
+import { IPCManager } from "plugins/utils";
 
 type initFunction = (path?: string) => Promise<any>;
 
@@ -56,7 +57,7 @@ export function watchBuild(build: initFunction, paths: string[]) {
   );
 }
 const cwd = process.cwd();
-
+const ipc = IPCManager.getInstanceForCurrentProcess<"main">();
 export const doWatchBuild = () =>
   watchBuild(
     async (path) => {
@@ -66,7 +67,7 @@ export const doWatchBuild = () =>
       await Promise.all(
         pluginLoader.getPluginByName("onFileSystemChange").map(async (plugin) => {
           try {
-            await plugin.pluginParent(path, preventBuildFn);
+            await plugin.pluginParent(path, preventBuildFn, ipc);
           } catch (error) {
             console.error(`Error in plugin's onFileSystemChange hook, name: ${plugin.name}: `, error);
           }
@@ -103,7 +104,7 @@ export const doWatchBuild = () =>
           async () => {
             if (isBuildPrevented) return;
             await resetPath(probablePath);
-            await builder.makeBuild(probablePath);
+            await ipc.actions.builder.build(probablePath);
           }
         );
       }

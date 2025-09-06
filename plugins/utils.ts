@@ -1,4 +1,6 @@
+import type { BuildWorkerResponse } from "internal/server/build";
 import cluster, { type Cluster } from "node:cluster";
+import type { consoleLogMessage } from "./console";
 
 export type Directives = "use-client" | "use-server" | "use-static" | "server-only";
 
@@ -118,7 +120,9 @@ type IPCMessageFormat<T extends unknown> = {
     from: IPCProcessType;
     to: IPCProcessType;
     id: string;
-    data: T
+    data: T;
+    requestID: string;
+    type: "request" | "response";
 };
 
 export type ClientIPCManager<T extends IPCProcessType> = Omit<
@@ -142,7 +146,7 @@ declare global {
 
 export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
     public type: ProcessType = "main" as ProcessType;
-    private onMessageCallbacks: Map<string, (message: any, from: IPCProcessType) => void> = new Map();
+    private onMessageCallbacks: Map<string, (message: any, from: IPCProcessType) => Promise<unknown> | unknown> = new Map();
 
     private processes: IPCProcesses = {
         builder: null,
@@ -151,6 +155,30 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
     private isBuilderInited: boolean = false;
     private isClusterInited: boolean = false;
     private queuedMessages: Array<IPCMessageFormat<unknown>> = [];
+
+    private responseAwaiters: Map<string, (data: unknown) => void> = new Map();
+
+    public actions = {
+        builder: {
+            /**
+             * Trigger build.
+             * @param buildPath Optional build path, default all the app
+             * @example ipc.actions.builder.build();
+             * @example ipc.actions.builder.build("/profile/[id]");
+             * @returns 
+             */
+            build: (buildPath?: string) => this.send<{ buildPath?: string }, BuildWorkerResponse | null>("builder", "build", { buildPath }),
+        },
+        main: {
+            /**
+             * Log a message to the console.
+             * @param logType The type of log (log, info, warn, error).
+             * @param args The arguments to log.
+             * @returns void
+             */
+            log: (logType: keyof typeof console, ...args: any[]) => this.send<consoleLogMessage, void>("main", "log-to-console", { log: logType, args }),
+        }
+    };
 
     constructor({ type }: IPCManagerOptions) {
         this.type = type as ProcessType;
@@ -184,13 +212,13 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
         this.queuedMessages = this.queuedMessages.filter(msg => msg.to !== "cluster");
     }
 
-    public static getInstanceForCurrentProcess() {
+    public static getInstanceForCurrentProcess<T extends IPCProcessType>(): IPCManager<T> {
         if (cluster.isWorker) {
-            return IPCManager.getInstanceForCluster();
+            return IPCManager.getInstanceForCluster() as IPCManager<T>;
         } else if (globalThis.__IS_BUILDER_WORKER__) {
-            return IPCManager.getInstanceForBuilder();
+            return IPCManager.getInstanceForBuilder() as IPCManager<T>;
         } else {
-            return IPCManager.getInstanceForMain();
+            return IPCManager.getInstanceForMain() as IPCManager<T>;
         }
     }
 
@@ -218,24 +246,46 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
         globalThis.IPCManagerCluster ??= new IPCManager<"cluster">({ type: "cluster" });
         return globalThis.IPCManagerCluster;
     }
-    public send<T extends unknown>(to: IPCProcessType, id: string, data: T) {
+    private createResponseAwaiter(requestID: string) {
+        return new Promise<unknown>((resolve) => {
+            this.responseAwaiters.set(requestID, resolve);
+        });
+    }
+    /**
+     * send a message to another process and await a response.
+     * @param to Process type to send the message to
+     * @param id Message ID
+     * @param data Message data
+     * @returns Promise that resolves with the response data
+     */
+    public async send<RequestData extends unknown = unknown, ResponseData extends unknown = unknown>(to: IPCProcessType, id: string, data: RequestData): Promise<ResponseData> {
+        const requestID = Bun.randomUUIDv7();
         if (!this.isBuilderInited && to === "builder" || !this.isClusterInited && to === "cluster") {
-            this.queuedMessages.push({ from: this.type, to, id, data });
-            return;
+            this.queuedMessages.push({ from: this.type, to, id, data, requestID, type: "request" });
+            return this.createResponseAwaiter(requestID) as Promise<ResponseData>;
         }
         if (this.type === to) {
             console.warn(`IPCManager: Attempting to send a message to the same process type (${to}). Message ignored.`);
-            return;
+            return null as unknown as ResponseData;
         }
-        const message: IPCMessageFormat<T> = {
+        const message: IPCMessageFormat<RequestData> = {
             from: this.type,
             to: to as IPCProcessType,
             id,
-            data
+            data,
+            requestID,
+            type: "request"
         };
+        const responsePromise = this.createResponseAwaiter(requestID) as Promise<ResponseData>;
         this.__DISPATCH__(message);
+        return responsePromise;
     }
-    public onMessage<T extends unknown>(id: string, callback: (message: T, from: IPCProcessType) => void) {
+    /**
+     * Register a callback to be called when a message with the specified ID is received.
+     * @param id The ID of the message to listen for.
+     * @param callback The callback to be called when the message is received. Then return value will be sent back to the sender as a response.
+     */
+    public onMessage<RequestData extends unknown = unknown, ResponseData extends unknown = unknown>(id: string, callback: (message: RequestData, from: IPCProcessType) => Promise<ResponseData> | ResponseData) {
         this.onMessageCallbacks.set(id, callback);
     }
     /**
@@ -250,7 +300,13 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
             return;
         }
         if (this.type === message.to) {
-            this.call(message.id, message);
+            if (message.type === "response") {
+                this.responseAwaiters.get(message.requestID)?.(message.data);
+                this.responseAwaiters.delete(message.requestID);
+            }
+            else if (message.type === "request") {
+                this.call(message.id, message);
+            }
         } else if (this.type !== "main") {
             process.send?.(message);
         } else if (message.to == "builder") {
@@ -283,8 +339,20 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
             return false;
         }
     }
-    private call(id: string, message: IPCMessageFormat<unknown>) {
-        this.onMessageCallbacks.get(id)?.(message.data, message.from);
+    private async call(id: string, message: IPCMessageFormat<unknown>) {
+        const res = await this.onMessageCallbacks.get(id)?.(message.data, message.from);
+        this.respond(message.requestID, message.from, res);
+    }
+    private respond<T extends unknown>(requestID: string, to: IPCProcessType, data: T) {
+        const message: IPCMessageFormat<T> = {
+            from: this.type,
+            to,
+            requestID,
+            data,
+            type: "response",
+            id: ""
+        };
+        this.__DISPATCH__(message);
     }
 
 }

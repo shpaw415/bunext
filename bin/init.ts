@@ -2,8 +2,8 @@
 
 import { cpSync } from "fs";
 import { paths } from "../internal/globals";
-import { generateRandomString, generateUuid } from "../features/utils";
-import { AfterBunextInitMessage } from "../internal/server/logs";
+import { generateRandomString } from "../features/utils";
+import { AfterBunextInitMessage } from "plugins/console";
 
 await install(false);
 

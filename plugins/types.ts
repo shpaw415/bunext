@@ -4,17 +4,37 @@ import type { ClientIPCManager } from "./utils";
 
 export type ServerStart = Partial<{
   /**
-   * executed on the main thread
+   * **executed on the main thread**
    */
   main: (ipc: ClientIPCManager<"main">) => Promise<any> | any;
   /**
-   * executed on clusters in multi-threaded mode
+   * **executed on clusters in multi-threaded mode on the clusters thread**
+   * 
+   * This will not share the same context as the main thread.
+   * 
+   * **ONLY IN MULTI-THREADED MODE**
+   * 
+   * @param ipc IPC manager for the cluster thread
+   * @returns
    */
   cluster: (ipc: ClientIPCManager<"cluster">) => Promise<any> | any;
   /**
-   * executed on dev mode
+   * executed on dev mode on the main thread
+   * 
+   * **ONLY DEV MODE**
+   * 
+   * @param ipc IPC manager for the main thread
+   * @returns
    */
   dev: (ipc: ClientIPCManager<"main">) => Promise<any> | any;
+
+  /**
+   * ***Executed on the build worker thread***
+   *
+   * @param ipc IPC manager for the builder worker
+   * @returns 
+   */
+  build_worker: (ipc: ClientIPCManager<"builder">) => Promise<any> | any;
 }>;
 
 type HTML_Rewrite_plugin_function<T = unknown> = {
@@ -26,9 +46,6 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
   ) => void | Promise<void>;
   after?: (context: T, manager: RequestManager, HTML: string) => void | Promise<void>;
 };
-
-export type AfterBuildMain = (filePaths: string[]) => Promise<any> | any;
-export type BeforeBuild = () => Promise<any> | any;
 
 export type Request_Plugin<MultiTreaded extends boolean = false> = (
   request: RequestManager,
@@ -86,22 +103,6 @@ type onFileSystemChangePlugin = (
 export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<string, unknown> = {}> = Required<{
   name: string;
 }> & Partial<{
-  /**
-   * Build related hooks Triggered on the main thread
-   *
-   * this will share the same context as the main thread but not the build_worker thread.
-   */
-  build_main: Partial<{
-    /**
-    * Triggered on the main thread before the build step.
-    */
-    before_build: BeforeBuild;
-    /**
-    * Triggered on the main thread after the build step.
-    * @param filePaths - The absolute paths of all files in the build directory.
-    */
-    after_build: AfterBuildMain;
-  }>
 
   /**
    * ***Triggered on the build worker thread***
@@ -110,17 +111,13 @@ export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<s
    */
   build_worker: Partial<{
     /**
-     * Triggered on the **Build-Worker-Thread** when the Thread is spawned.
-     */
-    start: (ipc: ClientIPCManager<"builder">) => Promise<any> | any;
-    /**
      * Triggered on the **Build-Worker-Thread** before the build step.
      */
     before_build: (ipc: ClientIPCManager<"builder">) => Promise<any> | any;
     /**
      * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing.
      */
-    after_build: (BuildArtifact: Bun.BuildArtifact, ipc: ClientIPCManager<"builder">) => Promise<any> | any;
+    after_build: (BuildArtifact: Bun.BuildOutput, ipc: ClientIPCManager<"builder">) => Promise<any> | any;
   }>;
   /**
    * Add Bun.build plugins and build config

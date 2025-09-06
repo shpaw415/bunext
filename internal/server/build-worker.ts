@@ -1,9 +1,10 @@
 import { preBuild, preBuildAll, SSRCache } from "plugins/server-features/ssr-page";
-import { builder, type BuildOuts } from "./build.ts";
+import { builder, type BuildWorkerResponse, type ErrorObject } from "./build.ts";
 import type { BuildOutput } from "bun";
 import { pluginLoader } from "./plugin-loader"
 import { initServerSide } from "./init";
-import { IPCManager } from "plugins/utils";
+import { IPCManager, type ClientIPCManager } from "plugins/utils";
+
 
 
 declare global {
@@ -12,12 +13,12 @@ declare global {
 
 globalThis.__IS_BUILDER_WORKER__ = true;
 
-await initServerSide(false);
+await initServerSide();
 
 
-const IPCHelper = IPCManager.getInstanceForCurrentProcess() as IPCManager<"builder">;
+const IPCHelper = IPCManager.getInstanceForCurrentProcess() as ClientIPCManager<"builder">;
 
-await Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "start").map(async (onBuilderWorker) => {
+await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "build_worker").map(async (onBuilderWorker) => {
   try {
     await onBuilderWorker.subPlugin(IPCHelper);
   } catch (e) {
@@ -25,40 +26,16 @@ await Promise.all(pluginLoader.getSubPluginsByParentName("build_worker", "start"
   }
 }));
 
-export type BuildWorkerMessage = {
-  type: "build";
-  BuildPath?: string;
-};
-export type BuildWorkerResponse = {
-  type: "build" | "log";
-  success: boolean;
-  data?: BuildOuts;
-  error?: Error;
-  message?: string;
-};
-
-function Log(message: string | Object, error?: Error) {
-  process.send?.({
-    type: "log",
-    message:
-      typeof message === "string"
-        ? message
-        : JSON.stringify(message, null, 2),
-    error
-  } as BuildWorkerResponse);
-}
 
 
 function init() {
-  process.on("message", async (_message) => {
-    const message = _message as BuildWorkerMessage;
-    if (message.type == "build") {
-      const result = await build(message.BuildPath);
-      process.send?.({
-        type: "build",
-        ...result,
-      } as BuildWorkerResponse);
-    }
+  let isBuilding = false;
+  IPCHelper.onMessage<{ buildPath?: string }, BuildWorkerResponse | null>("build", async (message) => {
+    if (isBuilding) return null;
+    isBuilding = true;
+    const result = await build(message.buildPath);
+    isBuilding = false;
+    return result;
   });
   process.on("disconnect", () => process.exit(0))
 }
@@ -67,7 +44,7 @@ let currentlyBuilding = false;
 
 async function build(
   BuildPath?: string
-): Promise<Omit<BuildWorkerResponse, "type"> | null> {
+): Promise<BuildWorkerResponse | null> {
   if (currentlyBuilding) return null;
   currentlyBuilding = true;
   try {
@@ -77,7 +54,7 @@ async function build(
   } catch (e) {
     return {
       success: false,
-      error: e as Error,
+      error: serializeError(e),
       message: "Prebuild failed",
     };
   }
@@ -88,14 +65,14 @@ async function build(
     if (!output.success) {
       return {
         success: false,
-        error: new Error(output.logs.join("\n")),
+        error: serializeError(new Error(output.logs.join("\n"))),
         message: "Build failed",
       };
     }
   } catch (e: any) {
     return {
       success: false,
-      error: e,
+      error: serializeError(e),
       message: "Build failed",
     };
   }
@@ -110,19 +87,76 @@ async function build(
   };
 }
 
+
+function serializeError(error: unknown, visited = new WeakSet()): ErrorObject {
+  // Handle null/undefined or non-object inputs
+  if (!error || typeof error !== 'object') {
+    return {
+      name: 'UnknownError',
+      message: String(error ?? 'Unknown error occurred'),
+      stack: undefined,
+      cause: undefined,
+    };
+  }
+
+  // Handle non-Error objects that might have error-like properties
+  const errorObj = error as any;
+
+  // Protect against circular references
+  if (visited.has(errorObj)) {
+    return {
+      name: 'CircularReferenceError',
+      message: 'Circular reference detected in error chain',
+      stack: undefined,
+      cause: undefined,
+    };
+  }
+
+  visited.add(errorObj);
+
+  let cause: ErrorObject["cause"] | undefined = undefined;
+
+  // Handle error cause with better safety
+  if (errorObj.cause !== undefined) {
+    if (errorObj.cause instanceof Error || (errorObj.cause && typeof errorObj.cause === 'object')) {
+      try {
+        cause = serializeError(errorObj.cause, visited);
+      } catch (causeError) {
+        // If serializing the cause fails, create a fallback
+        cause = {
+          name: 'SerializationError',
+          message: 'Failed to serialize error cause',
+          stack: undefined,
+          cause: undefined,
+        };
+      }
+    } else {
+      // For primitive cause values, safely convert to string
+      try {
+        cause = JSON.parse(JSON.stringify(errorObj.cause));
+      } catch {
+        cause = String(errorObj.cause);
+      }
+    }
+  }
+
+  return {
+    name: errorObj.name || errorObj.constructor?.name || 'Error',
+    message: String(errorObj.message || errorObj.toString?.() || 'No error message'),
+    stack: typeof errorObj.stack === 'string' ? errorObj.stack : undefined,
+    cause,
+  };
+}
+
 async function afterBuild(build: BuildOutput) {
   const afterBuildPlugins = pluginLoader.getSubPluginsByParentName("build_worker", "after_build");
-  const awaiters: Promise<any>[] = [];
-  for (const output of build.outputs) {
-    awaiters.push(...afterBuildPlugins.map(async (plugin) => {
-      try {
-        await plugin.subPlugin(output, IPCHelper);
-      } catch (e) {
-        console.error(`Error in build_worker after_build hook, name: ${plugin.name}:`, e);
-      }
-    }));
-  }
-  await Promise.all(awaiters);
+  await Promise.all(afterBuildPlugins.map(async (plugin) => {
+    try {
+      await plugin.subPlugin(build, IPCHelper);
+    } catch (e) {
+      console.error(`Error in build_worker after_build hook, name: ${plugin.name}:`, e);
+    }
+  }));
 }
 
 function beforeBuild() {
@@ -135,4 +169,7 @@ function beforeBuild() {
   }));
 }
 
-if (import.meta.main) init();
+if (!import.meta.main) throw new Error("This file should be run as a child process!");
+init();
+
+

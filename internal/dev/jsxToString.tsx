@@ -7,7 +7,7 @@ import { ErrorFallback } from "../../components/fallback";
 import { DirectiveTool } from "plugins/utils";
 import { initServerSide } from "internal/server/init";
 
-await initServerSide(false);
+await initServerSide();
 
 // Redirect all console methods to send process messages
 function createConsoleRedirect(methodName: keyof typeof console) {

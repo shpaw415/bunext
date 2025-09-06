@@ -20,15 +20,8 @@ declare global {
   var dryRun: boolean;
   var __BUNEXT_DEV_INIT: boolean;
   var webSocket: undefined | WebSocket;
-  //@ts-ignore
   var Server: void | BunextServer;
-  //@ts-ignore
   var serverConfig: ServerConfig;
-  var dev: {
-    current_dev_path?: string;
-    pathname?: string;
-  };
-  //@ts-ignore
   var Bunext: BunextType;
 }
 
@@ -45,10 +38,6 @@ export class BunextError extends Error {
 
 globalThis.socketList ??= [];
 globalThis.dryRun ??= true;
-globalThis.dev ??= {
-  current_dev_path: undefined,
-  pathname: undefined,
-};
 
 if (process.argv[2] == "init") {
   globalThis.__INIT__ = true;

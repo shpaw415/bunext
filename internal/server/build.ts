@@ -13,10 +13,7 @@ import { router } from "./router";
 import * as React from "react";
 import { pluginLoader } from "internal/server/plugin-loader.ts";
 
-import type {
-  BuildWorkerMessage,
-  BuildWorkerResponse,
-} from "./build-worker.ts";
+
 import { IPCManager } from "plugins/utils";
 
 globalThis.React = React;
@@ -28,6 +25,20 @@ export type BuildOuts = {
   }[];
 };
 
+export type ErrorObject = {
+  name: string;
+  message: string;
+  stack?: string;
+  cause?: ErrorObject | unknown;
+};
+
+export type BuildWorkerResponse = {
+  success: boolean;
+  data?: BuildOuts;
+  error?: ErrorObject;
+  message?: string;
+};
+
 type _Mainoptions = {
   baseDir: string;
   buildDir: ".bunext/build";
@@ -36,6 +47,7 @@ type _Mainoptions = {
 };
 
 const cwd = process.cwd();
+const ipc = IPCManager.getInstanceForCurrentProcess<"main" | "builder">();
 
 class Builder {
   public options: _Mainoptions = {
@@ -55,30 +67,8 @@ class Builder {
   }[] = [];
   private inited = false;
   public BuilderWorker?: Bun.Subprocess<"ignore", "inherit", "inherit">;
-  public BuildWorkerAwaiter: Promise<void> = Promise.resolve();
-  private BuildWorkerResolver: () => void = () => { };
 
   public remove_node_modules_files_path: string[] = [];
-
-  clearBuildDir() {
-    try {
-      rmSync(this.options.buildDir as string, {
-        recursive: true,
-        force: true,
-      });
-    } catch { }
-    mkdirSync(
-      normalize(`${this.options.buildDir as string}/${this.options.pageDir}`),
-      { recursive: true }
-    );
-  }
-
-  private Check_remove_node_modules_files_path() {
-    for (const path of this.remove_node_modules_files_path) {
-      if (!import.meta.resolve(path))
-        throw new Error(`${path} does not resolve`);
-    }
-  }
 
   async init() {
     if (this.inited) return this;
@@ -93,47 +83,7 @@ class Builder {
     return this;
   }
 
-  private async getPluginBuildConfig() {
-    const pluginsData = pluginLoader.getPluginByName("build").map((e) => e.pluginParent);
-
-    const config = await Promise.all(pluginsData
-      .map((p) => p.buildOptions)
-      .filter((p) => p != undefined)
-      .map((p) => (typeof p === "function" ? p() : p)));
-
-    const plugins = pluginsData
-      .map((p) => p.plugin)
-      .filter((p) => p != undefined);
-
-    const entrypoints = config
-      .map((p) => p.entrypoints)
-      .filter((p) => p != undefined)
-      .reduce((p, n) => [...p, ...n], []);
-
-    const external = config
-      .map((p) => p.external)
-      .filter((p) => p != undefined)
-      .reduce((p, n) => [...p, ...n], []);
-
-    const define = Object.assign(
-      {},
-      ...config.map((p) => p.define).filter((p) => p != undefined)
-    );
-
-    return {
-      ...Object.assign({}, ...config),
-      entrypoints,
-      external,
-      define,
-      plugins,
-    } as Partial<Bun.BuildConfig>;
-  }
-
-  private async InitGetCustomPluginsFromUser() {
-    this.plugins.push(...globalThis.serverConfig.build.plugins);
-  }
-
-  async getEntryPoints() {
+  public async getEntryPoints() {
     const { baseDir, hydrate, pageDir } = this.options;
 
     let entrypoints = [join(baseDir, hydrate)];
@@ -158,7 +108,7 @@ class Builder {
    * @param fromPath the current path to get the layout entry points from
    * @returns absolute paths of layouts
    */
-  async getLayoutEntryPoints(fromPath?: string) {
+  public async getLayoutEntryPoints(fromPath?: string) {
     const { baseDir, pageDir } = this.options;
 
     const layoutsPaths = router.layoutPaths;
@@ -186,7 +136,7 @@ class Builder {
     return entrypoints;
   }
 
-  async build(onlyPath?: string) {
+  public async build(onlyPath?: string) {
     const { baseDir, hydrate, buildDir } = this.options;
     const pluginsConfig = await this.getPluginBuildConfig();
     const entrypoints =
@@ -243,6 +193,68 @@ class Builder {
 
     return build;
   }
+
+  public clearBuildDir() {
+    try {
+      rmSync(this.options.buildDir, {
+        recursive: true,
+        force: true,
+      });
+    } catch { }
+    mkdirSync(
+      normalize(`${this.options.buildDir}/${this.options.pageDir}`),
+      { recursive: true }
+    );
+  }
+
+  private Check_remove_node_modules_files_path() {
+    for (const path of this.remove_node_modules_files_path) {
+      if (!import.meta.resolve(path))
+        throw new Error(`${path} does not resolve`);
+    }
+  }
+
+  private async getPluginBuildConfig() {
+    const pluginsData = pluginLoader.getPluginByName("build").map((e) => e.pluginParent);
+
+    const config = await Promise.all(pluginsData
+      .map((p) => p.buildOptions)
+      .filter((p) => p != undefined)
+      .map((p) => (typeof p === "function" ? p() : p)));
+
+    const plugins = pluginsData
+      .map((p) => p.plugin)
+      .filter((p) => p != undefined);
+
+    const entrypoints = config
+      .map((p) => p.entrypoints)
+      .filter((p) => p != undefined)
+      .reduce((p, n) => [...p, ...n], []);
+
+    const external = config
+      .map((p) => p.external)
+      .filter((p) => p != undefined)
+      .reduce((p, n) => [...p, ...n], []);
+
+    const define = Object.assign(
+      {},
+      ...config.map((p) => p.define).filter((p) => p != undefined)
+    );
+
+    return {
+      ...Object.assign({}, ...config),
+      entrypoints,
+      external,
+      define,
+      plugins,
+    } as Partial<Bun.BuildConfig>;
+  }
+
+  private async InitGetCustomPluginsFromUser() {
+    this.plugins.push(...globalThis.serverConfig.build.plugins);
+  }
+
+
   private async cleanBuildDir(buildOutput: BuildOutput) {
     for await (const file of this.glob(this.options.buildDir as string, "**")) {
       if (buildOutput.outputs.find((e) => e.path == file)) continue;
@@ -255,37 +267,10 @@ class Builder {
     }
   }
 
-  async updateData(data: BuildOuts) {
-    this.revalidates = data.revalidates;
-    const allBuildDirFilePaths = await Array.fromAsync(
-      new Bun.Glob("**/*").scan({
-        cwd: this.options.buildDir,
-        onlyFiles: true,
-        absolute: true,
-        dot: true
-      }));
-    await Promise.all(
-      pluginLoader.getSubPluginsByParentName("build_main", "after_build").map(async (after_build_main) => {
-        try {
-          await after_build_main.subPlugin(allBuildDirFilePaths);
-        } catch (e) {
-          console.error(`Error in build_main.after_build hook, name: ${after_build_main.name}:`, e);
-        }
-      })
-    );
-  }
-
-  private createAwaiter() {
-    const self = this;
-    self.BuildWorkerAwaiter = new Promise<void>((resolve) => {
-      self.BuildWorkerResolver = resolve;
-    });
-  }
-
   private createBuildWorker() {
     if (this.BuilderWorker || globalThis.__IS_BUILDER_WORKER__) return;
     this.BuilderWorker = this.makeBuildWorker();
-    IPCManager.getInstanceForMain().setBuilderProcess(this.BuilderWorker);
+    ipc.setBuilderProcess(this.BuilderWorker);
   }
 
   private makeBuildWorker() {
@@ -302,65 +287,12 @@ class Builder {
       stderr: "inherit",
       onExit: () => {
         self.BuilderWorker = undefined;
-        IPCManager.getInstanceForCurrentProcess().setBuilderProcess(null);
+        ipc.setBuilderProcess(null);
       },
       ipc(_message) {
-        const message = _message as BuildWorkerResponse;
-        if (!message.type) return IPCManager.getInstanceForCurrentProcess().__DISPATCH__(_message);
-        switch (message.type) {
-          case "build":
-            if (!message.success) {
-              message.message && console.error(message.message);
-              message.error && console.error(message.error);
-              self.BuildWorkerResolver();
-              break;
-            }
-            if (message.data) {
-              self.updateData(message.data).then(() => {
-                self.BuildWorkerResolver();
-              });
-              break;
-            }
-            break;
-          case "log":
-            message.message && console.info(message.message);
-            message.error && console.error("Error From Build Worker: ", message.error);
-            break;
-        }
+        ipc.__DISPATCH__(_message);
       },
     });
-  }
-  public awaitBuildFinish() {
-    return this.BuildWorkerAwaiter;
-  }
-  async makeBuild(path?: string) {
-    let strRes: BuildOuts | undefined;
-    this.createBuildWorker();
-    if (!this.BuilderWorker) throw new Error("BuilderWorker not found");
-    await Promise.all(
-      pluginLoader.getSubPluginsByParentName("build_main", "before_build").map(async (before_build_main) => {
-        try {
-          await before_build_main.subPlugin();
-        } catch (e) {
-          console.error(`Error in build_main.before_build hook, name: ${before_build_main.name}:`, e);
-        }
-      })
-    );
-    await this.awaitBuildFinish();
-    this.createAwaiter();
-    this.BuilderWorker.send({
-      type: "build",
-      BuildPath: path,
-    } as BuildWorkerMessage);
-    await this.awaitBuildFinish();
-    if (this.BuilderWorker.exitCode) {
-      this.createBuildWorker();
-    }
-    strRes = {
-      revalidates: this.revalidates,
-    };
-
-    return strRes;
   }
 
   public glob(

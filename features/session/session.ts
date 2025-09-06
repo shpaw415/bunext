@@ -5,7 +5,7 @@ import { getSessionById } from "internal/session.ts";
 import { createContext, useContext, useEffect, useState } from "react";
 import { RequestContext } from "internal/server/context";
 export { GetSession } from "../request/bunextRequest";
-import { SessionNotInitedWarning } from "internal/server/logs.ts";
+import { SessionNotInitedWarning } from "plugins/console";
 import { GetSessionFromResponse } from "internal/globals";
 
 /**

@@ -90,18 +90,8 @@ export default {
 
     },
     serverStart: {
-        main(ipc) {
-
-            ipc.onMessage("test", (msg, from) => {
-                console.log(`Message from ${from} process:`, msg);
-            });
-
-            return initializeSessionDatabase();
+        main() {
+            return initSessionDatabase();
         },
     },
-    build_worker: {
-        start(ipc) {
-            ipc.send("main", "test", { message: "Hello from worker!" })
-        },
-    }
 } as BunextPlugin;

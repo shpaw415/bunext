@@ -20,13 +20,13 @@ import cluster, { type Cluster } from "node:cluster";
 import { onServerStartPlugins } from "./server-start.ts";
 
 // Caching and logging
-import "../../plugins/fetch-caching/fetch.ts";
+import "plugins/fetch-caching/fetch.ts";
 import {
   benchmark_console,
   TerminalIcon,
   TextColor,
   ToColor,
-} from "./logs";
+} from "plugins/console";
 import { DevWsMessageHandler, type DevWsMessageTypes } from "../../dev/hotServer.ts";
 import { ExitCodeDescription } from "../../bin/exit-codes.ts";
 import { initServerSide } from "./init";
@@ -258,18 +258,18 @@ class BunextServer {
     }
 
     if (cluster.isPrimary) {
-      const buildoutput = await builder.makeBuild();
+      const buildoutput = await IPCManager.getInstanceForCurrentProcess().actions.builder.build();
       if (!buildoutput) {
         throw new Error("Production build failed", { cause: buildoutput });
       }
-      setRevalidate(buildoutput.revalidates);
+      buildoutput.data?.revalidates && setRevalidate(buildoutput.data.revalidates);
     }
   }
 
   private async _init_() {
     const isDev = process.env.NODE_ENV == "development";
 
-    await initServerSide(true);
+    await initServerSide();
     await onServerStartPlugins();
     this.startServer();
 

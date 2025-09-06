@@ -26,8 +26,21 @@ import {
   TerminalIcon,
   TextColor,
   ToColor,
-} from "internal/server/logs";
+} from "plugins/console";
 import { resetPath } from "./server-features/ssr-page";
+import { IPCManager } from "./utils";
+
+declare global {
+  var dev: {
+    current_dev_path?: string;
+    pathname?: string;
+  };
+}
+
+globalThis.dev ??= {
+  current_dev_path: undefined,
+  pathname: undefined,
+};
 
 // Constants
 const CWD = process.cwd();
@@ -57,6 +70,18 @@ const plugin: BunextPlugin =
           }
         },
       },
+      serverStart: {
+        main(ipc) {
+          ipc.onMessage<string>("set-current-dev-path", (msg) => {
+            globalThis.dev.current_dev_path = msg;
+          });
+        },
+        build_worker(ipc) {
+          ipc.onMessage<string>("set-current-dev-path", (msg) => {
+            globalThis.dev.current_dev_path = msg;
+          });
+        }
+      }
     }
     : {
       name: "bunext-dev-plugin",
@@ -144,6 +169,7 @@ async function handleIndexJsRequest(request: RequestManager) {
 /**
  * Sets the current development path for tracking active builds
  */
+const ipc = IPCManager.getInstanceForCurrentProcess<"main">();
 function setCurrentDevPath(match: MatchedRoute) {
   const relativePathFromSrc = relative(CWD + "/src", match.filePath);
   const pathnameWithoutExtension = relativePathFromSrc.split(".").slice(0, -1).join(".");
@@ -152,6 +178,8 @@ function setCurrentDevPath(match: MatchedRoute) {
     current_dev_path: relativePathFromSrc,
     pathname: pathnameWithoutExtension,
   };
+
+  ipc.send("builder", "set-current-dev-path", globalThis.dev.current_dev_path);
 }
 
 /**
@@ -170,13 +198,11 @@ function isCurrentDevPath(match: MatchedRoute): boolean {
  * Builds a specific route with logging and timing
  */
 async function buildRoute(match: MatchedRoute) {
-  await builder.awaitBuildFinish();
-
   console.info(
     ToColor(
       TextColor,
       `compiling ${match.pathname} ...`
-    ).toString()
+    )
   );
 
   setCurrentDevPath(match);
@@ -189,7 +215,7 @@ async function buildRoute(match: MatchedRoute) {
       )}`,
     async () => {
       await resetPath(match.filePath);
-      await builder.makeBuild(match.filePath);
+      await IPCManager.getInstanceForCurrentProcess().actions.builder.build(match.filePath);
       router.client.reload();
       router.server.reload();
     }

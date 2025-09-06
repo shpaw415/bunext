@@ -78,12 +78,22 @@ export default {
             return serveFromBuildDirectory(manager);
         }
     },
-    build_main: {
-        before_build() {
-            files = [];
+    serverStart: {
+        main(ipc) {
+            ipc.onMessage<string[]>("set-build-dir-files", (filesPaths) => {
+                files.push(...filesPaths.map(path => Bun.file(path)));
+            });
+            ipc.onMessage("reset-build-dir-files", () => {
+                files = [];
+            });
         },
-        after_build(filesPaths) {
-            files.push(...filesPaths.map(path => Bun.file(path)));
-        }
+    },
+    build_worker: {
+        before_build(ipc) {
+            ipc.send("main", "reset-build-dir-files", null);
+        },
+        after_build(artefact, ipc) {
+            ipc.send<string[]>("main", "set-build-dir-files", artefact.outputs.map(({ path }) => path));
+        },
     }
 } as BunextPlugin;
