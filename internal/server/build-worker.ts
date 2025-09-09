@@ -1,10 +1,11 @@
 import { preBuild, preBuildAll, SSRCache } from "plugins/server-features/ssr-page";
-import { builder, type BuildWorkerResponse, type ErrorObject } from "./build.ts";
-import type { BuildOutput } from "bun";
+import { builder, type BuildWorkerResponse } from "./build.ts";
+import { type BuildOutput } from "bun";
 import { pluginLoader } from "./plugin-loader"
 import { initServerSide } from "./init";
 import { IPCManager, type ClientIPCManager } from "plugins/utils";
-
+import { serializeError } from "plugins/utils";
+import { router } from "./router";
 
 
 declare global {
@@ -26,6 +27,15 @@ await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "build_w
   }
 }));
 
+if (process.env.NODE_ENV === "development") {
+  await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "dev_build_worker").map(async (onBuilderWorker) => {
+    try {
+      await onBuilderWorker.subPlugin(IPCHelper);
+    } catch (e) {
+      console.error(`Error in dev_build_worker start hook, name: ${onBuilderWorker.name}:`, e);
+    }
+  }));
+}
 
 
 function init() {
@@ -40,27 +50,32 @@ function init() {
   process.on("disconnect", () => process.exit(0))
 }
 
-let currentlyBuilding = false;
-
 async function build(
-  BuildPath?: string
+  pathname?: string
 ): Promise<BuildWorkerResponse | null> {
-  if (currentlyBuilding) return null;
-  currentlyBuilding = true;
+  const filePath = pathname ? router.server.match(pathname)?.filePath : undefined;
+  if (pathname && !filePath) {
+    return {
+      success: false,
+      error: serializeError(new Error("Route not found")),
+      message: "Build failed",
+    };
+  }
   try {
-    BuildPath
-      ? await preBuild(BuildPath)
+
+    filePath
+      ? await preBuild(filePath)
       : await preBuildAll(await SSRCache.getAllSSR());
   } catch (e) {
     return {
       success: false,
-      error: serializeError(e),
+      error: serializeError(e as Error),
       message: "Prebuild failed",
     };
   }
   try {
     await beforeBuild();
-    const output = await builder.build(BuildPath);
+    const output = await builder.build(filePath);
     await afterBuild(output);
     if (!output.success) {
       return {
@@ -88,65 +103,7 @@ async function build(
 }
 
 
-function serializeError(error: unknown, visited = new WeakSet()): ErrorObject {
-  // Handle null/undefined or non-object inputs
-  if (!error || typeof error !== 'object') {
-    return {
-      name: 'UnknownError',
-      message: String(error ?? 'Unknown error occurred'),
-      stack: undefined,
-      cause: undefined,
-    };
-  }
 
-  // Handle non-Error objects that might have error-like properties
-  const errorObj = error as any;
-
-  // Protect against circular references
-  if (visited.has(errorObj)) {
-    return {
-      name: 'CircularReferenceError',
-      message: 'Circular reference detected in error chain',
-      stack: undefined,
-      cause: undefined,
-    };
-  }
-
-  visited.add(errorObj);
-
-  let cause: ErrorObject["cause"] | undefined = undefined;
-
-  // Handle error cause with better safety
-  if (errorObj.cause !== undefined) {
-    if (errorObj.cause instanceof Error || (errorObj.cause && typeof errorObj.cause === 'object')) {
-      try {
-        cause = serializeError(errorObj.cause, visited);
-      } catch (causeError) {
-        // If serializing the cause fails, create a fallback
-        cause = {
-          name: 'SerializationError',
-          message: 'Failed to serialize error cause',
-          stack: undefined,
-          cause: undefined,
-        };
-      }
-    } else {
-      // For primitive cause values, safely convert to string
-      try {
-        cause = JSON.parse(JSON.stringify(errorObj.cause));
-      } catch {
-        cause = String(errorObj.cause);
-      }
-    }
-  }
-
-  return {
-    name: errorObj.name || errorObj.constructor?.name || 'Error',
-    message: String(errorObj.message || errorObj.toString?.() || 'No error message'),
-    stack: typeof errorObj.stack === 'string' ? errorObj.stack : undefined,
-    cause,
-  };
-}
 
 async function afterBuild(build: BuildOutput) {
   const afterBuildPlugins = pluginLoader.getSubPluginsByParentName("build_worker", "after_build");

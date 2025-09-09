@@ -27,8 +27,6 @@ export type _GlobalData = {
   __INITIAL_ROUTE__: string;
   __LAYOUT_ROUTE__: string[];
   __HEAD_DATA__: HeadData;
-  __PUBLIC_SESSION_DATA__: unknown | undefined;
-  __SESSION_TIMEOUT__: number;
   __CSS_PATHS__?: Array<string>;
   serverConfig: {
     Dev: {
@@ -108,7 +106,15 @@ export type ServerConfig = {
   };
   session?: {
     timeout: number;
-    type: "cookie" | "database:hard" | "database:memory";
+    /**
+     * Session storage strategy:
+     * - "cookie": Store in browser cookies (max 4096 chars, good for small session data)
+     * - "database:hard": Store in persistent database on disk (good for large data, slower than memory)
+     * - "database:memory": Store in in-memory database (good for large data, requires sufficient RAM)
+     * 
+     * TODO: implement "database:memory" session type
+     */
+    type: "cookie" | "database:hard"; // | "database:memory" 
   };
   router?: {
     /**
@@ -247,7 +253,3 @@ export type PageModule = {
   getServerSideProps?: getServerSidePropsFunction;
 }
 
-export type PluginData = {
-  globalData: Record<string, string>;
-  rawGlobalData: Record<string, unknown>;
-};

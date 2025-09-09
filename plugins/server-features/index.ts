@@ -7,7 +7,39 @@ import { generateRandomString } from "features/utils";
 import { serveDynamicPage } from "./dynamic-page";
 import { getRelatedCssContent } from "./style-insert";
 import { router } from "internal/server/router";
+import { pluginLoader } from "internal/server/plugin-loader";
 
+
+type PluginCacheType<T extends "tsx" | "ts"> = {
+    pluginName: string;
+    func: Required<Required<Exclude<BunextPlugin["build"], undefined>>["partialPluginOverRide"]>[T];
+};
+
+declare global {
+    var __PLUGIN_CACHE__: {
+        ts: Array<PluginCacheType<"ts">> | null;
+        tsx: Array<PluginCacheType<"tsx">> | null;
+    }
+}
+
+globalThis.__PLUGIN_CACHE__ ??= {
+    ts: null,
+    tsx: null,
+};
+
+function getPluginInstance<T extends "tsx" | "ts">(fileExt: T): Array<PluginCacheType<T>> {
+
+    if (globalThis.__PLUGIN_CACHE__[fileExt]) {
+        return globalThis.__PLUGIN_CACHE__[fileExt] as Array<PluginCacheType<T>>;
+    }
+
+    const value = pluginLoader.getSubPluginsByParentName("build", "partialPluginOverRide")
+        .map((p) => ({ pluginName: p.name, func: p.subPlugin[fileExt] }))
+        .filter((p) => p.func !== undefined) as Array<PluginCacheType<T>>;
+    globalThis.__PLUGIN_CACHE__[fileExt as "ts"] = value as Array<PluginCacheType<"ts">>;
+
+    return globalThis.__PLUGIN_CACHE__[fileExt] as unknown as Array<PluginCacheType<T>>;
+}
 
 
 export default {
@@ -110,22 +142,35 @@ export default {
                 );
                 build.onLoad(
                     { namespace: "client", filter: /\.tsx$/ },
-                    async ({ path }) => {
-                        let fileContent = await Bun.file(path).text();
-                        if (await router.fileDirectives.pathIs("server-only", path)) {
+                    async (args) => {
+                        if (await router.fileDirectives.pathIs("server-only", args.path)) {
                             return {
                                 contents: "",
                                 loader: "js",
                             };
                         }
+
+                        let fileContent = await Bun.file(args.path).text();
+                        for await (const { pluginName, func } of getPluginInstance("tsx")) {
+                            try {
+                                const result = await func(args, fileContent);
+                                if (result?.contents) {
+                                    fileContent = result.contents;
+                                }
+                            } catch (e) {
+                                console.error(`Error occurred while processing partialPluginOverride[tsx] plugin ${pluginName}:`);
+                                throw e;
+                            }
+                        }
+
                         const _module_ = await import(
                             process.env.NODE_ENV == "production"
-                                ? path
-                                : path + `?${generateRandomString(5)}`
+                                ? args.path
+                                : args.path + `?${generateRandomString(5)}`
                         ) as Record<string, unknown>;
                         if (
                             ["layout.tsx"]
-                                .map((endsWith) => path.endsWith(endsWith))
+                                .map((endsWith) => args.path.endsWith(endsWith))
                                 .filter((t) => t == true).length > 0
                         ) {
                             return {
@@ -134,14 +179,14 @@ export default {
                             };
                         }
 
-                        if (await router.fileDirectives.pathIs("use-client", path))
+                        if (await router.fileDirectives.pathIs("use-client", args.path))
                             return {
-                                contents: await ClientSideFeatures(fileContent, path, _module_),
+                                contents: await ClientSideFeatures(fileContent, args.path, _module_),
                                 loader: "js",
                             };
 
                         const serverComponents = await ServerComponentsToTag(
-                            path,
+                            args.path,
                             _module_
                         );
 
@@ -167,7 +212,7 @@ export default {
                         });
                         fileContent = transpiler.transformSync(fileContent);
                         fileContent = await ServerSideFeatures({
-                            modulePath: path,
+                            modulePath: args.path,
                             fileContent: fileContent,
                             serverComponents: serverComponents,
                             module: _module_,
@@ -194,27 +239,39 @@ export default {
                 );
                 build.onLoad(
                     { namespace: "client", filter: /\.ts$/ },
-                    async ({ path }) => {
-
-
-                        if (await router.fileDirectives.pathIs("server-only", path)) {
+                    async (args) => {
+                        if (await router.fileDirectives.pathIs("server-only", args.path)) {
                             return {
                                 contents: "",
                                 loader: "js",
                             };
                         }
-                        const fileContent = await Bun.file(path).text();
+
+                        let fileContent = await Bun.file(args.path).text();
+                        for await (const { pluginName, func } of getPluginInstance("ts")) {
+                            try {
+                                const result = await func(args, fileContent);
+                                if (result?.contents) {
+                                    fileContent = result.contents;
+                                }
+                            } catch (e) {
+                                console.error(`Error occurred while processing partialPluginOverride[ts] plugin ${pluginName}:`);
+                                throw e;
+                            }
+                        }
+
                         return {
                             contents: await ClientSideFeatures(
                                 fileContent,
-                                path,
+                                args.path,
                                 await import(
                                     process.env.NODE_ENV == "production"
-                                        ? path
-                                        : path + `?${generateRandomString(5)}`
+                                        ? args.path
+                                        : args.path + `?${generateRandomString(5)}`
                                 )
                             ),
                             loader: "js",
+
                         };
                     }
                 );

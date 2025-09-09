@@ -55,7 +55,7 @@ const DEFAULT_CONFIG: TailwindConfig = {
 export const tailwindPlugin: BunextPlugin = {
   name: "tailwind-plugin",
   serverStart: {
-    async dev() {
+    async dev_main() {
       await initializeTailwind(DEFAULT_CONFIG);
     },
     async main() {
@@ -212,7 +212,7 @@ export function createTailwindPlugin(userConfig: Partial<TailwindConfig> = {}): 
   return {
     name: "tailwind-plugin",
     serverStart: {
-      async dev() {
+      async dev_main() {
         await initializeTailwind(config);
       },
       async main() {

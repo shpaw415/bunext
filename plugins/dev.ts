@@ -14,11 +14,7 @@ import { RequestManager, router } from "internal/server/router";
 
 // Types
 import type { BunextPlugin } from "./types";
-import type { MatchedRoute } from "bun";
 import type { BunextRequest } from "internal/server/bunextRequest";
-
-// Node.js path utilities
-import { relative, normalize } from "node:path";
 
 // Logging utilities
 import {
@@ -29,18 +25,8 @@ import {
 } from "plugins/console";
 import { resetPath } from "./server-features/ssr-page";
 import { IPCManager } from "./utils";
+import type { MatchedRoute } from "bun";
 
-declare global {
-  var dev: {
-    current_dev_path?: string;
-    pathname?: string;
-  };
-}
-
-globalThis.dev ??= {
-  current_dev_path: undefined,
-  pathname: undefined,
-};
 
 // Constants
 const CWD = process.cwd();
@@ -49,43 +35,34 @@ const SERVER_SIDE_PROPS_HEADER = "application/vnd.server-side-props";
 const GETCSSPATH_PATHNAME = "/GetCssPaths";
 
 
+declare global {
+  var __DEV_PATH_MATCH__: MatchedRoute | undefined | null;
+}
 
 // Plugin configuration
-const plugin: BunextPlugin =
-  process.env.NODE_ENV === "development"
-    ? {
-      name: "bunext-dev-plugin",
-      priority: -1,
-      router: {
-        request: async (manager) => {
-          await handleDevRequest(manager);
-          (handleDevtoolsJson(manager.bunextReq)) || (await handleCssPaths(manager.bunextReq));
+const plugin: BunextPlugin = {
+  name: "bunext-dev-plugin",
+  priority: 0,
+  router: process.env.NODE_ENV === "development" && {
+    async before_request(manager) {
+      await handleDevRequest(manager);
+    },
+    request: async (manager) => {
+      if (manager.bunextReq.isResponseSetted()) return;
+      else if (handleDevtoolsJson(manager.bunextReq)) return;
+      else if (await handleCssPaths(manager.bunextReq)) return;
 
-          if (
-            manager.request.method === "PATCH" &&
-            !manager.bunextReq.isResponseSetted()
-          ) {
-            manager.bunextReq.preventGlobalValuesInjection().preventRewrite();
-            manager.bunextReq.setResponse("update-path");
-          }
-        },
-      },
-      serverStart: {
-        main(ipc) {
-          ipc.onMessage<string>("set-current-dev-path", (msg) => {
-            globalThis.dev.current_dev_path = msg;
-          });
-        },
-        build_worker(ipc) {
-          ipc.onMessage<string>("set-current-dev-path", (msg) => {
-            globalThis.dev.current_dev_path = msg;
-          });
-        }
+      if (manager.request.method === "PATCH") {
+        manager.bunextReq.setResponse("update-path").sendNow();
       }
-    }
-    : {
-      name: "bunext-dev-plugin",
-    };
+    },
+  } || undefined,
+  serverStart: {
+    dev_main() {
+      builder.clearBuildDir();
+    },
+  }
+};
 
 
 /**
@@ -93,12 +70,13 @@ const plugin: BunextPlugin =
  * This function collects CSS paths for the current route and returns them.
  */
 async function handleCssPaths(req: BunextRequest) {
-  if (req.URL.pathname !== GETCSSPATH_PATHNAME) return;
-  return req.__BYPASS_RESPONSE__ = new Response(JSON.stringify(await router.getCssPaths()), {
+  if (req.URL.pathname !== GETCSSPATH_PATHNAME) return false;
+  req.setResponse(JSON.stringify(await router.getCssPaths()), {
     headers: {
       "Content-Type": "application/json",
-    },
-  });
+    }
+  }).sendNow();
+  return true
 }
 
 /**
@@ -106,118 +84,61 @@ async function handleCssPaths(req: BunextRequest) {
  */
 function handleDevtoolsJson(req: BunextRequest): boolean {
   if (req.URL.pathname !== DEVTOOLS_ENDPOINT) return false;
-
-  req.__BYPASS_RESPONSE__ = new Response(
-    JSON.stringify({
-      name: "Bunext",
-      workspace: {
-        root: CWD,
-        uuid: Bun.randomUUIDv7(),
-      },
-    })
-  );
+  req.setResponse(JSON.stringify({
+    name: "Bunext",
+    workspace: {
+      root: CWD,
+      uuid: Bun.randomUUIDv7(),
+    },
+  })).sendNow();
   return true;
 }
-
-/**
- * Checks if a route should trigger a rebuild in development mode
- */
-function shouldRebuildRoute(match: MatchedRoute | null, request: Request): boolean {
-  return !!(
-    match &&
-    !match.src.endsWith("layout.tsx") &&
-    match.pathname !== "/favicon.ico" &&
-    request.headers.get("accept") !== SERVER_SIDE_PROPS_HEADER &&
-    match.filePath.endsWith(".tsx") &&
-    !isCurrentDevPath(match)
-  );
-}
-
 /**
  * Handles development-specific request processing
  */
 async function handleDevRequest(request: RequestManager) {
-  const match = request.serverSide;
-  if (shouldRebuildRoute(match, request.request)) {
-    await buildRoute(match!);
-    return;
-  }
 
-  await handleIndexJsRequest(request);
-}
+  if (!request.bunextReq.isAskingHTML && !request.bunextReq.isClientNavigating) return;
+  else if (!request.bunextReq.match?.filePaths.src) return;
 
-/**
- * Handles requests for index.js files that might need rebuilding
- */
-async function handleIndexJsRequest(request: RequestManager) {
-  const url = request.bunextReq.URL;
+  globalThis.__DEV_PATH_MATCH__ = router.server.match(request.bunextReq.match.pathname);
 
-  if (!url.pathname.endsWith("index.js")) {
-    return;
-  }
-
-  const normalizedPath = normalize(
-    url.pathname.replace("index.js", "").replace(router.pageDir, "")
+  await buildRoute(
+    request.bunextReq.match.pathname
   );
-
-  const match = router.server.match(normalizedPath);
-
-  if (match?.filePath?.endsWith("tsx") && !isCurrentDevPath(match)) {
-    await buildRoute(match);
-  }
 }
 /**
  * Sets the current development path for tracking active builds
  */
 const ipc = IPCManager.getInstanceForCurrentProcess<"main">();
-function setCurrentDevPath(match: MatchedRoute) {
-  const relativePathFromSrc = relative(CWD + "/src", match.filePath);
-  const pathnameWithoutExtension = relativePathFromSrc.split(".").slice(0, -1).join(".");
-
-  globalThis.dev = {
-    current_dev_path: relativePathFromSrc,
-    pathname: pathnameWithoutExtension,
-  };
-
-  ipc.send("builder", "set-current-dev-path", globalThis.dev.current_dev_path);
-}
-
-/**
- * Checks if the given match corresponds to the currently active development path
- */
-function isCurrentDevPath(match: MatchedRoute): boolean {
-  if (!globalThis.dev?.current_dev_path) {
-    return false;
-  }
-
-  const relativePathFromSrc = relative(CWD + "/src", match.filePath);
-  return globalThis.dev.current_dev_path === relativePathFromSrc;
-}
 
 /**
  * Builds a specific route with logging and timing
  */
-async function buildRoute(match: MatchedRoute) {
+async function buildRoute(pathname: string) {
   console.info(
     ToColor(
       TextColor,
-      `compiling ${match.pathname} ...`
+      `compiling ${pathname} ...`
     )
   );
-
-  setCurrentDevPath(match);
 
   await benchmark_console(
     (time) =>
       `${ToColor("green", TerminalIcon.success)} ${ToColor(
         TextColor,
-        `compiled ${match.pathname} in ${time}ms`
+        `compiled ${pathname} in ${time}ms`
       )}`,
     async () => {
-      await resetPath(match.filePath);
-      await IPCManager.getInstanceForCurrentProcess().actions.builder.build(match.filePath);
-      router.client.reload();
-      router.server.reload();
+      await resetPath(pathname);
+      const res = await ipc.actions.builder.build(pathname);
+      if (res && !res.success) {
+        console.error(ToColor("red", TerminalIcon.error), ToColor("red", res.message || "Unknown error during build"));
+      } else if (res && res.success) {
+        router.client.reload();
+        router.server.reload();
+      }
+
     }
   );
 }

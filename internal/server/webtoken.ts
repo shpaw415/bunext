@@ -30,6 +30,13 @@ interface TokenValidationResult {
     payload?: any;
 }
 
+export type SetDataOptions = {
+    expiresInSeconds?: number;
+    notBefore?: Date;
+    preserveExpiration?: boolean;
+    jti?: string;
+}
+
 /**
  * Enhanced WebToken Class for Secure Session Management
  * 
@@ -245,12 +252,7 @@ export class webToken<_Data> {
     /** Create or replace token data with enhanced security */
     public setData(
         data: { [key: string]: any },
-        options?: {
-            expiresInSeconds?: number;
-            notBefore?: Date;
-            preserveExpiration?: boolean;
-            jti?: string;
-        }
+        options?: SetDataOptions
     ): string {
         const now = Math.floor(Date.now() / 1000);
         const expiresIn = options?.expiresInSeconds || this.maxAge;

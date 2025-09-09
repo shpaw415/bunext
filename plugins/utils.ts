@@ -1,6 +1,25 @@
+"server only";
+
 import type { BuildWorkerResponse } from "internal/server/build";
 import cluster, { type Cluster } from "node:cluster";
 import type { consoleLogMessage } from "./console";
+import { type as OSType } from "node:os";
+
+export function isClusterEnabled(): boolean {
+    return (
+        OSType() === "Linux" &&
+        Bun.semver.satisfies(Bun.version, "1.1.25 - x.x.x") &&
+        process.env.NODE_ENV !== "development" &&
+        Boolean(globalThis?.serverConfig?.HTTPServer?.threads) &&
+        (
+            typeof globalThis?.serverConfig?.HTTPServer?.threads !== "number" ||
+            globalThis?.serverConfig?.HTTPServer?.threads > 1
+        )
+    );
+}
+
+const clusterEnabled = isClusterEnabled();
+
 
 export type Directives = "use-client" | "use-server" | "use-static" | "server-only";
 
@@ -184,6 +203,9 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
         this.type = type as ProcessType;
         if (type !== "main") this.initSubProcesses();
         else this.initMain();
+
+        if (type === "builder") this.isBuilderInited = true;
+        else if (type === "cluster") this.isClusterInited = true;
     }
 
     private initMain() {
@@ -197,19 +219,37 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
             const messageObj = message as IPCMessageFormat<unknown>;
             this.__DISPATCH__(messageObj);
         });
+        this.onMessage("builder-ready", () => {
+            this.isBuilderInited = true;
+        });
+        this.onMessage("cluster-ready", () => {
+            this.isClusterInited = true;
+        });
+    }
+
+    private aknowledgeReadyState(type: IPCProcessType) {
+        if (type === "builder") {
+            this.send("cluster", "builder-ready", null);
+        } else if (type === "cluster") {
+            this.send("builder", "cluster-ready", null);
+        }
     }
 
     public setBuilderProcess(builder: Bun.Subprocess<"ignore", "inherit", "inherit"> | null) {
+        if (this.type !== "main") throw new Error("setBuilderProcess can only be called from the main process");
         this.processes.builder = builder;
         this.isBuilderInited = true;
         this.queuedMessages.filter(msg => msg.to === "builder").forEach(msg => this.__DISPATCH__(msg));
         this.queuedMessages = this.queuedMessages.filter(msg => msg.to !== "builder");
+        this.aknowledgeReadyState("builder");
     }
     public setClusterProcesses(clusters: Array<Cluster["worker"]>) {
+        if (this.type !== "main") throw new Error("setClusterProcesses can only be called from the main process");
         this.processes.clusters = clusters;
         this.isClusterInited = true;
         this.queuedMessages.filter(msg => msg.to === "cluster").forEach(msg => this.__DISPATCH__(msg));
         this.queuedMessages = this.queuedMessages.filter(msg => msg.to !== "cluster");
+        this.aknowledgeReadyState("cluster");
     }
 
     public static getInstanceForCurrentProcess<T extends IPCProcessType>(): IPCManager<T> {
@@ -260,13 +300,15 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
      */
     public async send<RequestData extends unknown = unknown, ResponseData extends unknown = unknown>(to: IPCProcessType, id: string, data: RequestData): Promise<ResponseData> {
         const requestID = Bun.randomUUIDv7();
-        if (!this.isBuilderInited && to === "builder" || !this.isClusterInited && to === "cluster") {
+
+        if (to == "cluster" && !clusterEnabled) return null as unknown as ResponseData;
+
+        if (
+            this.type == "main" && !this.isBuilderInited && to == "builder" ||
+            this.type == "main" && !this.isClusterInited && to == "cluster"
+        ) {
             this.queuedMessages.push({ from: this.type, to, id, data, requestID, type: "request" });
             return this.createResponseAwaiter(requestID) as Promise<ResponseData>;
-        }
-        if (this.type === to) {
-            console.warn(`IPCManager: Attempting to send a message to the same process type (${to}). Message ignored.`);
-            return null as unknown as ResponseData;
         }
         const message: IPCMessageFormat<RequestData> = {
             from: this.type,
@@ -300,12 +342,12 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
             return;
         }
         if (this.type === message.to) {
-            if (message.type === "response") {
+            if (message.type === "request") {
+                this.call(message.id, message);
+            }
+            else if (message.type === "response") {
                 this.responseAwaiters.get(message.requestID)?.(message.data);
                 this.responseAwaiters.delete(message.requestID);
-            }
-            else if (message.type === "request") {
-                this.call(message.id, message);
             }
         } else if (this.type !== "main") {
             process.send?.(message);
@@ -324,7 +366,7 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
                 cluster?.send(message);
             });
         } else {
-            console.warn(`IPCManager: Message intended for ${message.to} received by ${this.type}. Message ignored.`);
+            console.warn(`IPCManager: Message intended for ${message.to} received by ${this.type}. Message ignored. Message:`, message);
         }
     }
     /**
@@ -348,11 +390,78 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
             from: this.type,
             to,
             requestID,
-            data,
+            data: typeof data == "undefined" ? null as T : data,
             type: "response",
             id: ""
         };
         this.__DISPATCH__(message);
     }
 
+}
+
+export type ErrorObject = {
+    name: string;
+    message: string;
+    stack?: string;
+    cause?: ErrorObject | unknown;
+};
+
+export function serializeError(error: Error, visited = new WeakSet()): ErrorObject {
+    // Handle null/undefined or non-object inputs
+    if (!error || typeof error !== 'object') {
+        return {
+            name: 'UnknownError',
+            message: String(error ?? 'Unknown error occurred'),
+            stack: undefined,
+            cause: undefined,
+        };
+    }
+
+    // Handle non-Error objects that might have error-like properties
+    const errorObj = error as any;
+
+    // Protect against circular references
+    if (visited.has(errorObj)) {
+        return {
+            name: 'CircularReferenceError',
+            message: 'Circular reference detected in error chain',
+            stack: undefined,
+            cause: undefined,
+        };
+    }
+
+    visited.add(errorObj);
+
+    let cause: ErrorObject["cause"] | undefined = undefined;
+
+    // Handle error cause with better safety
+    if (errorObj.cause !== undefined) {
+        if (errorObj.cause instanceof Error || (errorObj.cause && typeof errorObj.cause === 'object')) {
+            try {
+                cause = serializeError(errorObj.cause, visited);
+            } catch (causeError) {
+                // If serializing the cause fails, create a fallback
+                cause = {
+                    name: 'SerializationError',
+                    message: 'Failed to serialize error cause',
+                    stack: undefined,
+                    cause: undefined,
+                };
+            }
+        } else {
+            // For primitive cause values, safely convert to string
+            try {
+                cause = JSON.parse(JSON.stringify(errorObj.cause));
+            } catch {
+                cause = String(errorObj.cause);
+            }
+        }
+    }
+
+    return {
+        name: errorObj.name || errorObj.constructor?.name || 'Error',
+        message: String(errorObj.message || errorObj.toString?.() || 'No error message'),
+        stack: typeof errorObj.stack === 'string' ? errorObj.stack : undefined,
+        cause,
+    };
 }

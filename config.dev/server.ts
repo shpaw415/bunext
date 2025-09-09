@@ -4,7 +4,7 @@ import tailwindPlugin from "../external-plugins/tailwind";
 const Config: ServerConfig = {
   HTTPServer: {
     port: 3010,
-    threads: 1,
+    threads: "all_cpu_core",
   },
   Dev: {
     hotServerPort: 3005,

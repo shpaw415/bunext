@@ -1,7 +1,7 @@
 "server only";
 
-import { _Database, DatabaseManager, Table, type PoolConfig, type PooledConnection } from "../../database/class";
-import type { _DataType, DBSchema } from "../../database/schema";
+import { _Database, DatabaseManager, Table, type PoolConfig, type PooledConnection } from "database/class";
+import type { _DataType, DBSchema } from "database/schema";
 
 
 type CacheManagerPoolConfig = { schema: DBSchema; dbPath?: string, poolConfig?: Partial<PoolConfig> };
@@ -98,18 +98,32 @@ const CacheManagerPoolDefaultConfig: CacheManagerPoolConfig = {
   }
 };
 
+
+export type CacheManagerOptions = {
+  clearTimeout?: number; // in ms, default 60000 * 60 (1 hour)
+};
 class CacheManager<T extends Record<string, unknown>> {
   private cache!: CacheManagerPool;
   private tag: string;
 
-  constructor(tag: string) {
+
+  constructor(tag: string, options: CacheManagerOptions) {
     this.tag = tag;
-    if (arguments[1] != "_") throw new Error("CacheManager must be created with CacheManager.create()");
+    if (arguments[2] != "_") throw new Error("CacheManager must be created with CacheManager.create()");
+    if (options.clearTimeout && options.clearTimeout > 0) {
+      setInterval(() => {
+        this.clearExpired();
+      }, options.clearTimeout);
+    } else {
+      setInterval(() => {
+        this.clearExpired();
+      }, 60000 * 60); // default 1 hour
+    }
   }
 
-  static async create<T extends Record<string, unknown>>(tag: string, config?: { dbPath?: string, poolConfig?: Partial<PoolConfig> }) {
+  static async create<T extends Record<string, unknown>>(tag: string, config?: { dbPath?: string, poolConfig?: Partial<PoolConfig>, clearExpiredTimeout?: number }) {
     //@ts-ignore
-    const instance = new CacheManager<T>(tag, "_");
+    const instance = new CacheManager<T>(tag, { clearTimeout: config?.clearExpiredTimeout }, "_");
     await instance.__initialize__(config);
     return instance;
   }
@@ -183,6 +197,63 @@ class CacheManager<T extends Record<string, unknown>> {
       return table.delete({
         where: {
           tag: this.tag
+        }
+      });
+    });
+  }
+  public getAll() {
+    return this.cacheTable(table => {
+      const res = table.select({
+        where: {
+          tag: this.tag,
+        },
+        select: {
+          value: true,
+          expiresAt: true,
+          key: true
+        }
+      });
+
+      if (!res) return null;
+      const valid = res.filter(r => r.expiresAt && r.expiresAt.getTime() > Date.now()).map(r => r.value);
+      const expired = res.filter(r => !r.expiresAt || (r.expiresAt && r.expiresAt.getTime() < Date.now()));
+      this.cacheTable(t => t.delete({
+        where: {
+          OR: [...expired.map(e => ({ key: this.tag + ":" + e.key }))]
+        }
+      }))
+
+      return valid || null;
+    });
+  }
+  /**
+   * Clears all expired cache entries for the current tag.
+   * @returns 
+   */
+  public clearExpired() {
+    return this.cacheTable(table => {
+      return table.delete({
+        where: {
+          tag: this.tag,
+          lessThan: {
+            expiresAt: new Date()
+          }
+        }
+      });
+    });
+  }
+  /**
+   * Retrieves all expired cache entries for the current tag.
+   * @returns All expired cache entries for the current tag.
+   */
+  public getEpired() {
+    return this.cacheTable(table => {
+      return table.select({
+        where: {
+          tag: this.tag,
+          lessThan: {
+            expiresAt: new Date()
+          }
         }
       });
     });

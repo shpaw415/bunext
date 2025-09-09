@@ -12,9 +12,8 @@ import "../globals";
 import { router } from "./router";
 import * as React from "react";
 import { pluginLoader } from "internal/server/plugin-loader.ts";
-
-
-import { IPCManager } from "plugins/utils";
+import { type ErrorObject, IPCManager } from "plugins/utils";
+import cluster from "node:cluster";
 
 globalThis.React = React;
 
@@ -25,12 +24,7 @@ export type BuildOuts = {
   }[];
 };
 
-export type ErrorObject = {
-  name: string;
-  message: string;
-  stack?: string;
-  cause?: ErrorObject | unknown;
-};
+
 
 export type BuildWorkerResponse = {
   success: boolean;
@@ -179,6 +173,7 @@ class Builder {
         ),
         ...pluginsConfig?.define,
       },
+
       external: [
         "bun",
         "node",
@@ -268,7 +263,7 @@ class Builder {
   }
 
   private createBuildWorker() {
-    if (this.BuilderWorker || globalThis.__IS_BUILDER_WORKER__) return;
+    if (this.BuilderWorker || globalThis.__IS_BUILDER_WORKER__ || cluster.isWorker) return;
     this.BuilderWorker = this.makeBuildWorker();
     ipc.setBuilderProcess(this.BuilderWorker);
   }

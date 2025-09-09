@@ -1,7 +1,11 @@
 import type { BunextPlugin } from "plugins/types";
 import type { BunextRequest } from "public/request";
 
+
 declare global {
+    /**
+    * This global is for client side rendering to set the lang attribute in the HTML tag
+    */
     var __HTML_LANG__: string | undefined;
 }
 
@@ -20,18 +24,11 @@ async function getHtmlLang(bunext: BunextRequest) {
 
 export default {
     name: "bunext-html-lang-plugin",
-    priority: 1,
     router: {
-        async request(req) {
-            if (!req.bunextReq.isAskingHTML && !req.bunextReq.isClientNavigating || req.bunextReq.isResponseSetted()) return;
-
-            const lang = await getHtmlLang(req.bunextReq);
-            req.bunextReq.InjectGlobalValues({
-                __HTML_LANG__: lang
-            });
-            req.bunextReq.setContext({
-                __HTML_LANG__: lang
-            })
+        async before_request(req) {
+            if ((!req.bunextReq.isAskingHTML && !req.bunextReq.isClientNavigating)) return;
+            const lang = { __HTML_LANG__: await getHtmlLang(req.bunextReq) };
+            req.bunextReq.InjectGlobalValues(lang).setContext(lang);
         }
     },
 

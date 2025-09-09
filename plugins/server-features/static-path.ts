@@ -21,7 +21,7 @@ async function serveStaticAssets(manager: RequestManager) {
 
 export default {
     name: "static-assets-plugin",
-    priority: 0,
+    priority: 1,
     router: {
         request(manager) {
             if (manager.bunextReq.isResponseSetted() || manager.bunextReq.isClientNavigating) return;

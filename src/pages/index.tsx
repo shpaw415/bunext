@@ -1,7 +1,7 @@
 
 
 import { TestElement } from "./test";
-import { useSession, GetSession } from "bunext-js/session";
+import { useSession, getSession } from "bunext-js/session";
 import { generateRandomString } from "../../features/utils";
 import { TestServerElement2 } from "./serverElement";
 
@@ -38,7 +38,7 @@ function DynamicFileImport() {
  * @returns The main page JSX element.
  */
 export default async function Page() {
-  //Bunext.router.revalidate.ssr.every("/", 5);
+  Bunext.router.revalidate.ssr.every("/", 10); // revalidate this page every 10 seconds
   return (
     <Head data={{
       title: "Main page",
@@ -105,7 +105,7 @@ function DeleteSessionButton() {
 
 export function TestElement3({ params }: { params?: any }) {
   return (
-    <div>
+    <div className="some-css">
       <div>test</div>
     </div>
   );
@@ -119,7 +119,7 @@ function IsLogged() {
 }
 
 export async function ServerSetSession() {
-  const session = GetSession(arguments);
+  const session = getSession(arguments);
   session.setData(
     {
       test: true,
@@ -131,11 +131,11 @@ export async function ServerSetSession() {
 
 export async function ServerPrintSession() {
   console.log(Bunext.version);
-  console.log(GetSession(arguments).getData());
+  console.log(getSession(arguments).getData());
 }
 
 export async function ServerDeleteSession() {
-  GetSession(arguments).delete();
+  getSession(arguments).delete();
 }
 
 export async function ServerRevalidateNow() {

@@ -9,7 +9,7 @@ declare global {
 }
 
 class __PluginLoader__ {
-  protected Plugins: BunextPlugin[] = [];
+  protected Plugins: Array<BunextPlugin & { filePaths: string }> = [];
   private plugin_cache: Map<keyof BunextPlugin, Array<{ name: string, pluginParent: BunextPlugin[keyof BunextPlugin] }>> = new Map();
   private sub_plugin_cache: Map<string, Array<any>> = new Map();
   private plugin_inited = false;
@@ -27,19 +27,19 @@ class __PluginLoader__ {
 
     this.Plugins.push(
       ...(
-        await Promise.all(
+        (await Promise.all(
           plugins_files_paths.map(
-            async (path) =>
-              (
-                await import(path)
-              )?.default as BunextPlugin | undefined
+            async (path) => {
+              const plugin = (await import(path) as { default: BunextPlugin | undefined })?.default;
+              if (!plugin) return undefined;
+              return { ...plugin, filePaths: path };
+            }
           )
-        )
-      ).filter((f) => f != undefined)
+        )).filter((f) => f != undefined))
     );
 
     this.Plugins.push(
-      ...((serverConfig?.bunext_plugins as Array<BunextPlugin>) ?? [])
+      ...((serverConfig?.bunext_plugins as Array<BunextPlugin>).map((p) => ({ ...p, filePaths: "client-plugin" })) ?? [])
     );
 
     this.Plugins = this.Plugins.sort((a, b) => {

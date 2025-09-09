@@ -2,10 +2,8 @@ import "../globals.ts";
 import "./server_global.ts";
 
 // Build and routing
-import { builder } from "./build.ts";
 import { router } from "./router.tsx";
 import { doWatchBuild } from "./build-watch.ts";
-import { setRevalidate } from "./server-features.ts";
 
 // React and error handling
 import { renderToString } from "react-dom/server";
@@ -221,7 +219,7 @@ class BunextServer {
   }
 
   async init() {
-    console.info("Starting...");
+    if (cluster.isPrimary) console.info("Starting...");
     await benchmark_console(
       (time) =>
         `Ready in ${time}ms`,
@@ -229,7 +227,7 @@ class BunextServer {
     );
   }
 
-  private isClusterEnabled(): boolean {
+  static isClusterEnabled(): boolean {
     return (
       OSType() === "Linux" &&
       Bun.semver.satisfies(Bun.version, "1.1.25 - x.x.x") &&
@@ -247,23 +245,24 @@ class BunextServer {
   }
 
   private async __init_prod__() {
-    const isClusteredEnabled = this.isClusterEnabled();
+    const ipc = IPCManager.getInstanceForCurrentProcess();
 
-    if (isClusteredEnabled && cluster.isPrimary) {
+    if (BunextServer.isClusterEnabled() && cluster.isPrimary) {
       const workers = this.createCluster();
-      IPCManager.getInstanceForMain().setClusterProcesses(workers);
+      ipc.setClusterProcesses(workers);
       console.info("Starting Bunext in Multi-threaded mode");
-    } else if (isClusteredEnabled && cluster.isWorker) {
-      IPCManager.getInstanceForCluster();
     }
 
     if (cluster.isPrimary) {
-      const buildoutput = await IPCManager.getInstanceForCurrentProcess().actions.builder.build();
+      const buildoutput = await ipc.actions.builder.build();
       if (!buildoutput) {
         throw new Error("Production build failed", { cause: buildoutput });
       }
-      buildoutput.data?.revalidates && setRevalidate(buildoutput.data.revalidates);
     }
+  }
+
+  private clusterOrMainOnClusterDisabled() {
+    return !BunextServer.isClusterEnabled() || cluster.isWorker;
   }
 
   private async _init_() {
@@ -271,7 +270,7 @@ class BunextServer {
 
     await initServerSide();
     await onServerStartPlugins();
-    this.startServer();
+    if (this.clusterOrMainOnClusterDisabled()) this.startServer();
 
     isDev ? this.__init_dev__() : await this.__init_prod__();
 

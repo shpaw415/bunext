@@ -2,6 +2,7 @@ import { generateRandomString } from "features/utils";
 import { RequestManager, router } from "internal/server/router";
 import { extname, join } from "path";
 import type { BunextPlugin } from "plugins/types";
+import type { ClientIPCManager } from "plugins/utils";
 
 
 let files: Array<Bun.BunFile> = [];
@@ -9,7 +10,8 @@ const cwd = process.cwd();
 
 function getFileFromPathname(pathname: string): Bun.BunFile | undefined {
     const path = join(cwd, router.buildDir, pathname);
-    return files.find(file => file.name === path);
+    const file = files.find(file => file.name === path);
+    return file;
 }
 
 async function serveFromBuildDirectory(manager: RequestManager): Promise<void> {
@@ -58,6 +60,7 @@ async function serveFromBuildDirectory(manager: RequestManager): Promise<void> {
         return;
     }
 
+
     manager.bunextReq.setResponse(staticResponse, {
         headers: {
             "Content-Type": staticResponse.type,
@@ -68,6 +71,13 @@ async function serveFromBuildDirectory(manager: RequestManager): Promise<void> {
     }).sendNow();
 }
 
+
+function setListeners(ipc: ClientIPCManager<"main" | "cluster">) {
+    ipc.onMessage<string[]>("set-build-dir-files", (filesPaths) => {
+        files = [];
+        files.push(...filesPaths.map(path => Bun.file(path)));
+    });
+}
 
 export default {
     name: "bunext-build-dir-plugin",
@@ -80,20 +90,17 @@ export default {
     },
     serverStart: {
         main(ipc) {
-            ipc.onMessage<string[]>("set-build-dir-files", (filesPaths) => {
-                files.push(...filesPaths.map(path => Bun.file(path)));
-            });
-            ipc.onMessage("reset-build-dir-files", () => {
-                files = [];
-            });
+            setListeners(ipc);
+        },
+        cluster(ipc) {
+            setListeners(ipc);
         },
     },
     build_worker: {
-        before_build(ipc) {
-            ipc.send("main", "reset-build-dir-files", null);
-        },
         after_build(artefact, ipc) {
-            ipc.send<string[]>("main", "set-build-dir-files", artefact.outputs.map(({ path }) => path));
+            const paths = artefact.outputs.map(({ path }) => path);
+            ipc.send<string[]>("main", "set-build-dir-files", paths);
+            ipc.send<string[]>("cluster", "set-build-dir-files", paths);
         },
     }
 } as BunextPlugin;

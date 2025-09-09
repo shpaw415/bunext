@@ -2,7 +2,7 @@
 
 import { terminal } from 'terminal-kit';
 import type { BunextPlugin } from 'plugins/types';
-import type { ClientIPCManager, IPCManager } from 'plugins/utils';
+import type { ClientIPCManager } from 'plugins/utils';
 
 const separator = "-----------------------------------";
 const bunextBlue = ToColor("blue", "BUNEXT:");
@@ -704,6 +704,8 @@ export function redirectConsole(IPCHelper: ClientIPCManager<"cluster" | "builder
         console.debug = originalDebug;
     };
 }
+
+
 
 
 declare global {

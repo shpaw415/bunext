@@ -1,7 +1,6 @@
 "use client";
 import React, {
   createContext,
-  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -13,21 +12,22 @@ import React, {
   type JSX,
   type ComponentType,
 } from "react";
-import { unstable_batchedUpdates } from "react-dom";
 import { getRouteMatcher, type Match } from "./utils/get-route-matcher";
 import type { _GlobalData, ServerSideProps } from "../types";
 import {
   BunextSession,
+  GetSessionFromResponse,
   SessionContext,
   SessionDidUpdateContext,
-} from "../../features/session/session";
-import { AddServerActionCallback, GetSessionFromResponse } from "../globals";
+  SessionTimeoutheaderName,
+} from "plugins/session/client";
 import { RequestContext } from "../server/context";
 import type { RoutesType } from "../../plugins/typed-route/type";
 import { preloadModule } from "react-dom";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { Shell } from "bunext-js/client/shell";
 import { events, navigate } from "./client";
+import { AddServerActionCallback } from "plugins/server-features/server-action-client";
 
 
 /**
@@ -51,14 +51,6 @@ interface RouteParams {
 
 interface LayoutComponent {
   (props: { children: JSX.Element; params: RouteParams }): JSX.Element | Promise<JSX.Element>;
-}
-
-interface RouteCache {
-  [path: string]: {
-    module: any;
-    props?: ServerSideProps;
-    timestamp: number;
-  };
 }
 
 /**
@@ -749,27 +741,34 @@ export function SessionProvider({
   children: React.ReactNode;
   config?: {
     enableLogging?: boolean;
-    autoCleanup?: boolean;
-    syncInterval?: number;
   };
 }) {
   const {
     enableLogging = process.env.NODE_ENV === "development",
-    autoCleanup = true,
-    syncInterval = 1000
   } = config;
 
   const [updater, setUpdater] = useState(false);
   const session = useMemo(
-    () => new BunextSession({
-      updateFunction: setUpdater,
-      enableLogging
-    }),
+    () => {
+      const session = new BunextSession({
+        updateFunction: setUpdater,
+        enableLogging,
+        sessionTimeout: globalThis.__SESSION_TIMEOUT__ ?? undefined,
+        exists: globalThis.__PUBLIC_SESSION_DATA__ ? true : false,
+        data: {
+          private: {},
+          public: globalThis.__PUBLIC_SESSION_DATA__ ?? {}
+        }
+      });
+
+      session.init(null);
+
+      return session;
+    },
     [enableLogging]
   );
 
   const [sessionTimer, setSessionTimer] = useState<Timer>();
-  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const mountedRef = useRef(true);
 
   const timerSetter = useCallback(() => {
@@ -792,7 +791,7 @@ export function SessionProvider({
         });
 
         return setTimeout(() => {
-          if (mountedRef.current && autoCleanup) {
+          if (mountedRef.current) {
             try {
               RouterLogger.log("Session expired (global timeout), cleaning up");
               session.delete();
@@ -829,7 +828,7 @@ export function SessionProvider({
         });
 
         return setTimeout(() => {
-          if (mountedRef.current && autoCleanup) {
+          if (mountedRef.current) {
             try {
               RouterLogger.log("Session expired (calculated), cleaning up");
               session.delete();
@@ -847,7 +846,7 @@ export function SessionProvider({
         return undefined;
       }
     });
-  }, [session, autoCleanup]);
+  }, [session]);
 
   const addToServerActionCallback = useCallback(
     () =>
@@ -861,7 +860,7 @@ export function SessionProvider({
           const sessionData = GetSessionFromResponse(res);
 
           // Get timeout from response headers
-          const timeoutHeader = res.headers.get("__bunext_session_timeout__");
+          const timeoutHeader = res.headers.get(SessionTimeoutheaderName);
           let sessionTimeout: number | undefined;
 
           if (timeoutHeader) {
@@ -877,7 +876,7 @@ export function SessionProvider({
           }
 
           // Use the enhanced updateFromServerAction method
-          if (sessionData && Object.keys(sessionData).length > 0) {
+          if (sessionData?.session && Object.keys(sessionData.session).length > 0) {
             session.updateFromServerAction(sessionData, {
               updateTimeout: sessionTimeout,
               triggerRerender: true
@@ -898,7 +897,7 @@ export function SessionProvider({
           }
           else if (sessionData && Object.keys(sessionData).length === 0) {
             RouterLogger.log("Received empty session data from server, clearing session");
-            session.clearData();
+            session.reset();
           }
           else {
             RouterLogger.log("No session data received from server action");
@@ -930,15 +929,8 @@ export function SessionProvider({
         triggerRerender: true
       });
 
-      // Synchronize session metadata with global timeout
-      session.synchronizeWithGlobalTimeout();
-
       // Set up timer if we have a valid timeout
       if (sessionTimeout && sessionTimeout > Date.now()) {
-        RouterLogger.log("Setting up session timer from immediately available data", {
-          timeout: sessionTimeout,
-          currentTime: Date.now()
-        });
         timerSetter();
       }
 
@@ -951,147 +943,10 @@ export function SessionProvider({
       };
     }
 
-    // Initial session synchronization - check for session data from script tag
-    let initialSessionCheckCount = 0;
-    const maxInitialChecks = 10; // Maximum number of checks
-    const initialCheckInterval = 100; // Check every 100ms for faster detection
-
-    const initialSessionChecker = setInterval(() => {
-      if (!mountedRef.current) {
-        clearInterval(initialSessionChecker);
-        return;
-      }
-
-      initialSessionCheckCount++;
-
-      try {
-        // Check if session data is available from script tag
-        if (globalThis.__PUBLIC_SESSION_DATA__ && Object.keys(globalThis.__PUBLIC_SESSION_DATA__).length > 0) {
-          RouterLogger.log("Session data found from script tag, initializing client session", {
-            keys: Object.keys(globalThis.__PUBLIC_SESSION_DATA__)
-          });
-
-          // Get session data and timeout
-          const sessionData = globalThis.__PUBLIC_SESSION_DATA__;
-          const sessionTimeout = globalThis.__SESSION_TIMEOUT__;
-
-          // Update session and trigger rerender
-          session.updateFromServerAction(sessionData, {
-            updateTimeout: sessionTimeout,
-            triggerRerender: true
-          });
-
-          // Synchronize session metadata with global timeout
-          session.synchronizeWithGlobalTimeout();
-
-          // Set up timer if we have a valid timeout
-          if (sessionTimeout && sessionTimeout > Date.now()) {
-            RouterLogger.log("Setting up session timer from script tag data", {
-              timeout: sessionTimeout,
-              currentTime: Date.now()
-            });
-            timerSetter();
-          }
-
-          // Stop checking since we found session data
-          clearInterval(initialSessionChecker);
-          return;
-        }
-
-        // Stop checking after max attempts - no session available
-        if (initialSessionCheckCount >= maxInitialChecks) {
-          RouterLogger.log("Completed initial session checks, no session data in script tag");
-          clearInterval(initialSessionChecker);
-        }
-
-      } catch (error) {
-        RouterLogger.warn("Error during initial session check", { error });
-
-        // Stop checking on error after a few attempts
-        if (initialSessionCheckCount >= 5) {
-          clearInterval(initialSessionChecker);
-        }
-      }
-    }, initialCheckInterval);
-
-    // Enhanced session data synchronization for ongoing updates
-    const sessionDataTimer = setInterval(() => {
-      if (!mountedRef.current) return;
-
-      try {
-        // Only process if we have session data from script tag or server actions
-        if (globalThis.__PUBLIC_SESSION_DATA__ && Object.keys(globalThis.__PUBLIC_SESSION_DATA__).length > 0) {
-          RouterLogger.log("Processing session data from global state");
-
-          // Update session data first
-          const publicData = globalThis.__PUBLIC_SESSION_DATA__;
-          session.setData(publicData, true); // Set as public data
-
-          // Synchronize session metadata with global timeout
-          session.synchronizeWithGlobalTimeout();
-
-          session.update();
-
-          // Check if session has valid expiration
-          const globalSessionTimeout = globalThis.__SESSION_TIMEOUT__;
-          const sessionTimeoutSeconds = session.getExpiration();
-          const sessionCreatedAt = session.getMetadata().created;
-
-          if (globalSessionTimeout && globalSessionTimeout > Date.now()) {
-            // Use the global session timeout from server response (it's a timestamp)
-            RouterLogger.log("Valid session data found using global timeout, setting up timer", {
-              globalTimeout: globalSessionTimeout,
-              currentTime: Date.now()
-            });
-            timerSetter();
-          } else if (sessionCreatedAt && sessionTimeoutSeconds > 0) {
-            // Fallback to calculated expiration time
-            const expirationTime = sessionCreatedAt + (sessionTimeoutSeconds * 1000);
-            if (expirationTime > Date.now()) {
-              RouterLogger.log("Valid session data found using calculated expiration, setting up timer", {
-                expirationTime,
-                sessionTimeoutSeconds
-              });
-              timerSetter();
-            } else {
-              RouterLogger.log("Session data found but calculated expiration is expired", {
-                expirationTime,
-                sessionTimeoutSeconds
-              });
-            }
-          } else {
-            RouterLogger.log("Session data found but no valid expiration", {
-              globalTimeout: globalSessionTimeout,
-              sessionTimeoutSeconds,
-              sessionCreatedAt,
-              currentTime: Date.now()
-            });
-          }
-
-          // Clear the interval after successful processing to prevent unnecessary polling
-          clearInterval(sessionDataTimer);
-          syncIntervalRef.current = undefined;
-        }
-      } catch (error) {
-        RouterLogger.error("Failed to process session data", error);
-      }
-    }, syncInterval);
-
-    syncIntervalRef.current = sessionDataTimer;
-
     return () => {
       mountedRef.current = false;
-
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-        syncIntervalRef.current = undefined;
-      }
-
-      if (sessionTimer) {
-        clearTimeout(sessionTimer);
-      }
     };
-  }, [addToServerActionCallback, timerSetter, session, syncInterval]);
+  }, [addToServerActionCallback, timerSetter]);
 
   return (
     <SessionContext.Provider value={session}>

@@ -1,23 +1,29 @@
+import type { OnLoadArgs } from "bun";
 import type { BunextRequest } from "../internal/server/bunextRequest";
 import type { RequestManager } from "../internal/server/router";
 import type { ClientIPCManager } from "./utils";
+
+/**
+ * IPCManager for the main thred
+ * used for sending messages between main, cluster and builder threads
+ */
+type IPCMain = ClientIPCManager<"main">;
+/**
+ * IPCManager for the cluster thread
+ * used for sending messages between main, cluster and builder threads
+ */
+type IPCCluster = ClientIPCManager<"cluster">;
+/**
+ * IPCManager for the builder thread
+ * used for sending messages between main, cluster and builder threads
+ */
+type IPCBuilder = ClientIPCManager<"builder">;
 
 export type ServerStart = Partial<{
   /**
    * **executed on the main thread**
    */
-  main: (ipc: ClientIPCManager<"main">) => Promise<any> | any;
-  /**
-   * **executed on clusters in multi-threaded mode on the clusters thread**
-   * 
-   * This will not share the same context as the main thread.
-   * 
-   * **ONLY IN MULTI-THREADED MODE**
-   * 
-   * @param ipc IPC manager for the cluster thread
-   * @returns
-   */
-  cluster: (ipc: ClientIPCManager<"cluster">) => Promise<any> | any;
+  main: (ipc: IPCMain) => Promise<any> | any;
   /**
    * executed on dev mode on the main thread
    * 
@@ -26,7 +32,7 @@ export type ServerStart = Partial<{
    * @param ipc IPC manager for the main thread
    * @returns
    */
-  dev: (ipc: ClientIPCManager<"main">) => Promise<any> | any;
+  dev_main: (ipc: IPCMain) => Promise<any> | any;
 
   /**
    * ***Executed on the build worker thread***
@@ -34,7 +40,27 @@ export type ServerStart = Partial<{
    * @param ipc IPC manager for the builder worker
    * @returns 
    */
-  build_worker: (ipc: ClientIPCManager<"builder">) => Promise<any> | any;
+  build_worker: (ipc: IPCBuilder) => Promise<any> | any;
+
+  /**
+   * ***Executed on the build worker thread***
+   * 
+   * **ONLY DEV MODE**
+   * 
+   * @param ipc IPC manager for the builder worker
+   */
+  dev_build_worker: (ipc: IPCBuilder) => Promise<any> | any;
+  /**
+ * **executed on clusters in multi-threaded mode on the clusters thread**
+ * 
+ * This will not share the same context as the main thread.
+ * 
+ * **ONLY IN MULTI-THREADED MODE**
+ * 
+ * @param ipc IPC manager for the cluster thread
+ * @returns
+ */
+  cluster: (ipc: IPCCluster) => Promise<any> | any;
 }>;
 
 type HTML_Rewrite_plugin_function<T = unknown> = {
@@ -47,21 +73,52 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
   after?: (context: T, manager: RequestManager, HTML: string) => void | Promise<void>;
 };
 
-export type Request_Plugin<MultiTreaded extends boolean = false> = (
+
+
+
+export type Request_Plugin = (
   request: RequestManager,
-  ipc: MultiTreaded extends true ? ClientIPCManager<"cluster"> : ClientIPCManager<"main">
+  ipc: ClientIPCManager<"cluster" | "main">
 ) => Promise<void> | void;
 
-export type AfterRequest_Plugin<MultiTreaded extends boolean = false> = (
+export type AfterRequest_Plugin = (
   request: RequestManager,
-  response: Response,
-  ipc: MultiTreaded extends true ? ClientIPCManager<"cluster"> : ClientIPCManager<"main">
+  ipc: ClientIPCManager<"cluster" | "main">
 ) => Promise<void | Response> | void | Response;
 
-type Build_Plugins = {
-  plugin?: Bun.BunPlugin;
-  buildOptions?: Partial<Bun.BuildConfig> | (() => Promise<Partial<Bun.BuildConfig>> | Partial<Bun.BuildConfig>);
-};
+type PartialOverRideResponse = Partial<{
+  /**
+   * Parsed contents before Bunext processes it for internal features. 
+   */
+  contents: string;
+}> | undefined;
+
+type Build_Plugins = Partial<{
+  plugin: Bun.BunPlugin;
+  buildOptions: Partial<Bun.BuildConfig> | (() => Promise<Partial<Bun.BuildConfig>> | Partial<Bun.BuildConfig>);
+  /**
+   * Add your own custom onLoad handlers for ts and tsx files in the **src/pages** directory.
+   * 
+   * use the fileContent parameter to get the content of the file and modify it to be returned after.
+   * 
+   * **You must modify the fileContent variable and return it as contents in the response object.**
+   * 
+   * **Otherwise it will break Plugin chaining**
+   * 
+   * @example
+   * partialPluginOverRide: {
+   *  tsx: (args, fileContent) => {
+   *    // modify the fileContent as needed
+   *    const modifiedContent = fileContent.replace("oldValue", "newValue");
+   *    return { contents: modifiedContent };
+   *  }
+   * }
+   */
+  partialPluginOverRide: Partial<{
+    tsx: (args: OnLoadArgs, fileContent: string) => Promise<PartialOverRideResponse> | PartialOverRideResponse;
+    ts: (args: OnLoadArgs, fileContent: string) => Promise<PartialOverRideResponse> | PartialOverRideResponse;
+  }>
+}>;
 
 export type PreBuildContextDefaultValues = { route: string };
 
@@ -97,7 +154,7 @@ type onFileSystemChangePlugin = (
    * This is useful if you want to prevent the build from running when a file is changed
    */
   preventBuild: () => void,
-  ipc: ClientIPCManager<"main">
+  ipc: IPCMain
 ) => void | Promise<void>;
 
 export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<string, unknown> = {}> = Required<{
@@ -113,11 +170,11 @@ export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<s
     /**
      * Triggered on the **Build-Worker-Thread** before the build step.
      */
-    before_build: (ipc: ClientIPCManager<"builder">) => Promise<any> | any;
+    before_build: (ipc: IPCBuilder) => Promise<any> | any;
     /**
      * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing.
      */
-    after_build: (BuildArtifact: Bun.BuildOutput, ipc: ClientIPCManager<"builder">) => Promise<any> | any;
+    after_build: (BuildArtifact: Bun.BuildOutput, ipc: IPCBuilder) => Promise<any> | any;
   }>;
   /**
    * Add Bun.build plugins and build config
@@ -164,25 +221,47 @@ export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<s
      */
     request: Request_Plugin;
     /**
+     * Triggered before the request is processed.
+     * 
+     * Allows context initialization or other pre-processing tasks.
+     * 
+     * **Do not use this for modifying or setting the response.**
+     * @param manager RequestManager
+     * @example (manager: RequestManager) => {
+     *  manager.bunextReq.setContext({ customValue: "value" });
+     *  manager.bunextReq.InjectGlobalValues({ __CUSTOM_GLOBAL__: "value" });
+     * }
+     */
+    before_request: (manager: RequestManager, ipc: ClientIPCManager<"main" | "cluster">) => void | Promise<void>;
+    /**
      * Triggered after the request is processed.
-     * Allows for modifying the response before it is sent to the client.
+     * Allows for modifying the response before it is sent to the client or overriding the current response.
      *
      * if a response is returned this will overwrite the original response
      *
-     * @example (manager: RequestManager, response: Response) => {
-     *  // Modify response headers or return a new response
+     * @example (manager: RequestManager, ipc: ClientIPCManager<"main" | "cluster">) => {
+     *  // Modify response headers and return a new response
      *  const newHeaders = new Headers(response.headers);
      *  newHeaders.set("X-Custom-Header", "value");
-     *  return new Response(response.body, { 
+     *  return new Response(manager.bunextReq.response.body, { 
      *    status: response.status, 
      *    headers: newHeaders 
      *  });
+     * }
+     * 
+     * @example (manager: RequestManager, ipc: ClientIPCManager<"main" | "cluster">) => {
+     * // Add custom headers to the existing response
+     *  manager.bunextReq.response.headers.set("X-Custom-Header", "value");
      * }
      */
     after_request: AfterRequest_Plugin
   }>;
   /**
    * Triggered once when the server starts
+   * 
+   * Initialize resources, connections, or perform startup tasks.
+   * 
+   * You should create IPC listeners here if needed.
    */
   serverStart: ServerStart;
   /**

@@ -16,16 +16,6 @@ export async function onServerStartPlugins() {
     return;
   }
 
-  if (process.env.NODE_ENV == "development") {
-    await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "dev").map((plugin) => {
-      try {
-        return plugin.subPlugin(ipc as IPCManager<"main">);
-      } catch (e) {
-        console.error(`OnServerStart plugin failed, name: ${plugin.name}:`, e);
-      }
-    }));
-  }
-
   await Promise.all(
     pluginLoader.getSubPluginsByParentName("serverStart", "main").map(async (plugin) => {
       try {
@@ -35,4 +25,14 @@ export async function onServerStartPlugins() {
       }
     })
   );
+
+  if (process.env.NODE_ENV == "development") {
+    await Promise.all(pluginLoader.getSubPluginsByParentName("serverStart", "dev_main").map((plugin) => {
+      try {
+        return plugin.subPlugin(ipc as IPCManager<"main">);
+      } catch (e) {
+        console.error(`OnServerStart plugin failed, name: ${plugin.name}:`, e);
+      }
+    }));
+  }
 }

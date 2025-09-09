@@ -5,6 +5,7 @@ import { CacheManager } from "internal/caching";
 import { RouteNotFoundError, type RequestManager } from "internal/server/router";
 import { BunextError } from "internal/server/server_global";
 import type { getServerSidePropsFunction, ServerSideProps } from "internal/types";
+import type { SessionPluginContext } from "plugins/session";
 import type { BunextPlugin } from "plugins/types";
 
 class ServerSidePropsError extends BunextError { }
@@ -99,8 +100,8 @@ class ServerSidePropsManager {
             return null;
         }
 
-        // Initialize session if needed
-        await manager.bunextReq.session.initData();
+        // Initialize session
+        await manager.bunextReq.getContext<SessionPluginContext>().__INIT_SESSION__();
 
         // Call the getServerSideProps function
         const result = await module.getServerSideProps(
@@ -140,11 +141,12 @@ function serveServerSideProps(manager: RequestManagerContexted, props: ServerSid
  * @param manager The request manager.
  * @param to The path to redirect to.
  */
-function setRedirectToPath(to: string): Response {
-    return new Response(null, {
-        headers: { Location: to },
-        status: 302
-    });
+function setRedirectToPath(to: string) {
+    return [null,
+        {
+            headers: { Location: to },
+            status: 302
+        }] as const
 }
 
 
@@ -165,8 +167,7 @@ export default {
                 let props = await serverSidePropsManager.getFromCache(manager);
                 if (!props) props = await serverSidePropsManager.make(manager);
                 if (props?.redirect) {
-                    return manager.bunextReq.__BYPASS_RESPONSE__ = setRedirectToPath(props.redirect);
-
+                    return manager.bunextReq.setResponse(...setRedirectToPath(props.redirect)).sendNow();
                 }
                 manager.bunextReq.InjectGlobalValues<ServerSidePropsContext>({
                     __SERVERSIDE_PROPS__: props

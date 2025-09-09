@@ -1,13 +1,14 @@
 // Public API: session
 export {
     useSession,
-    GetSession,
     BunextSession,
     SessionContext,
     SessionDidUpdateContext,
-} from "features/session/session";
+} from "plugins/session/client";
 export type {
     SessionData,
     SessionOptions,
     InAppSession,
-} from "features/session/session";
+} from "plugins/session/client";
+
+export { getSession, type SessionPluginContext } from "plugins/session";

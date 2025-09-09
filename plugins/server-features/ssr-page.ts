@@ -15,9 +15,10 @@ import { renderToString } from "react-dom/server";
 import { normalize, resolve } from "path";
 import { baseDir, pageDir } from "internal/server/server_global";
 import { Wrapper } from "./ssr-page-preload";
-import type { PreBuildContextDefaultValues } from "plugins/types";
+import type { BunextPlugin, PreBuildContextDefaultValues } from "plugins/types";
 import { pluginLoader } from "internal/server/plugin-loader";
 import { IPCManager } from "plugins/utils";
+import type { SessionPluginContext } from "plugins/session";
 
 const Schema: DBSchema = [
     {
@@ -156,7 +157,7 @@ export function clearSSRPage() {
 export async function onRequestSSRPage(manager: RequestManager): Promise<boolean> {
     // Handle SSR page requests
     if (!isSSRDefaultExportPath(manager, true) || !manager.bunextReq.isAskingHTML) return false;
-    manager.bunextReq.session.prevent_session_init();
+    manager.bunextReq.getContext<SessionPluginContext>().session.prevent_session_init();
     const stringPage = await getSSRDefaultPage(manager);
     if (stringPage) {
         manager.bunextReq.setResponse(stringPage, {
@@ -436,6 +437,10 @@ class PreBuildContext {
 
         if (moduleSSR.elements.length > 0) await SSRCache.addSSR(modulePath, moduleSSR.elements);
     }
+    async preBuildbyPathname(pathname: string) {
+        const route = findRouteOrThrow(pathname);
+        await this.preBuild(route.filePath);
+    }
 
 
     private getDevKey() {
@@ -504,6 +509,16 @@ export async function preBuild(modulePath: string): Promise<void> {
     await context.preBuild(modulePath);
 
 }
+
+export async function preBuildbyPathname(pathname: string): Promise<void> {
+    await pluginLoader.init();
+    await router.init();
+    await builder.init();
+
+    const context = new PreBuildContext();
+    await context.preBuildbyPathname(pathname);
+}
+
 export async function preBuildAll(skip?: ssrElement[]) {
     const files = await Array.fromAsync(
         builder.glob(
@@ -553,8 +568,8 @@ export async function resetPath(path: string) {
 export async function findPathIndex(path: string): Promise<boolean> {
     return Boolean(await SSRCache.getSSR(path));
 }
-const ipc = IPCManager.getInstanceForCurrentProcess<"main" | "cluster">();
 export async function revalidate(...path: string[]) {
+    const ipc = IPCManager.getInstanceForCurrentProcess<"main" | "cluster">();
     const _paths = path.map((p) => findRouteOrThrow(p));
 
     const route = (await Promise.all(_paths
@@ -563,15 +578,6 @@ export async function revalidate(...path: string[]) {
             return res ? route : null;
         }))).filter(t => t !== null);
 
-    if ((await import("node:cluster")).default.isWorker) {
-        process.send?.({
-            task: "revalidate",
-            data: {
-                path,
-            },
-        } as ClusterMessageType);
-        return;
-    }
     SSRCache.removeSSRDefaultPage(...route.map(({ pathname }) =>
         pathname
     ));
@@ -584,13 +590,41 @@ export async function revalidate(...path: string[]) {
  * @param seconde every x seconde to revalide
  */
 
-export async function revalidateEvery(path: string | string[], seconde: number) {
-    if (!Array.isArray(path)) path = [path];
-    if (builder.revalidates.find((r: any) => r.path === path)) return;
-    for (const p of path) {
-        builder.revalidates.push({
-            path: p,
-            time: seconde * 1000,
-        });
-    }
+declare global {
+    var __REVALIDATE_SCHEDULE__: Map<string, NodeJS.Timeout>;
 }
+
+globalThis.__REVALIDATE_SCHEDULE__ ??= new Map<string, NodeJS.Timeout>([]);
+
+type RevalidateItem = {
+    path: string | string[];
+    time: number;
+};
+
+export function revalidateEvery(path: string | string[], seconde: number) {
+    const ipc = IPCManager.getInstanceForCurrentProcess<"main" | "builder">();
+    ipc.send<RevalidateItem, string>("builder", "set-revalidate-every", { path, time: seconde * 1000 });
+}
+
+function addInterval(path: string, time: number) {
+    if (globalThis.__REVALIDATE_SCHEDULE__.has(path)) {
+        clearInterval(globalThis.__REVALIDATE_SCHEDULE__.get(path)!);
+        globalThis.__REVALIDATE_SCHEDULE__.delete(path);
+    }
+    globalThis.__REVALIDATE_SCHEDULE__.set(path, setInterval(() => {
+        revalidate(path);
+    }, time));
+}
+
+export default {
+    name: "ssr-page-revalidate",
+    serverStart: {
+        build_worker: process.env.NODE_ENV == "production" ? (ipc) => {
+            ipc.onMessage<RevalidateItem>("set-revalidate-every", (item) => {
+                for (const p of Array.isArray(item.path) ? item.path : [item.path]) {
+                    addInterval(p, item.time);
+                }
+            });
+        } : undefined,
+    }
+} as BunextPlugin;

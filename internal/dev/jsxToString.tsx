@@ -7,6 +7,8 @@ import { ErrorFallback } from "../../components/fallback";
 import { DirectiveTool } from "plugins/utils";
 import { initServerSide } from "internal/server/init";
 
+
+
 await initServerSide();
 
 // Redirect all console methods to send process messages
@@ -113,7 +115,6 @@ let jsx: JSX.Element;
 
 const req = new BunextRequest({
   request: new Request(url),
-  response: new Response(),
   manager: undefined as any,
   directivesTools: await DirectiveTool.getInstance()
 });

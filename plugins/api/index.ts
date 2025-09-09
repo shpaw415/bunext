@@ -1,5 +1,6 @@
 import type { RequestManager } from "internal/server/router";
 import { BunextError } from "internal/server/server_global";
+import type { SessionPluginContext } from "plugins/session";
 import type { BunextPlugin } from "plugins/types";
 import { BunextRequest } from "public/request";
 
@@ -44,7 +45,7 @@ async function serveAPIEndpoint(manager: RequestManager): Promise<boolean> {
             return false;
         }
 
-        await manager.bunextReq.session.initData();
+        await manager.bunextReq.getContext<SessionPluginContext>().__INIT_SESSION__()
 
         const res = await ApiModule[method](manager.bunextReq);
 

@@ -2,8 +2,6 @@ import { watch } from "node:fs";
 import { sendSignal } from "../../dev/hotServer";
 import "./server_global";
 import { paths } from "../globals";
-import { builder } from "./build";
-import { join, normalize, relative } from "node:path";
 import {
   benchmark_console,
   TerminalIcon,
@@ -12,6 +10,7 @@ import {
 } from "plugins/console";
 import { resetPath } from "plugins/server-features/ssr-page";
 import { IPCManager } from "plugins/utils";
+import type { MatchedRoute } from "bun";
 
 type initFunction = (path?: string) => Promise<any>;
 
@@ -74,40 +73,30 @@ export const doWatchBuild = () =>
         })
       );
 
-      if (!path || !globalThis.dev.current_dev_path) return;
-      const EntryPoints = await builder.getEntryPoints();
-      const probablePath = normalize(
-        `${process.cwd()}/src/${globalThis.dev.current_dev_path}`
-      );
-      if (EntryPoints.includes(probablePath)) {
-        const pathnameArray = relative(`${cwd}/src/pages`, probablePath).split(
-          "/"
-        );
-        pathnameArray.pop();
-        const pathname = pathnameArray.length > 0 ? join(...pathnameArray) : "/";
-        setTimeout(
-          () =>
-            console.log(
-              `${ToColor("blue", TerminalIcon.info)} ${ToColor(
-                TextColor,
-                `compiling ${pathname} ...`
-              )}`
-            ),
-          100
-        );
-        await benchmark_console(
-          (time) =>
-            `${ToColor("green", TerminalIcon.success)} ${ToColor(
+      if (!path || !globalThis.__DEV_PATH_MATCH__) return;
+      const matched = globalThis.__DEV_PATH_MATCH__ as MatchedRoute;
+      setTimeout(
+        () =>
+          console.log(
+            `${ToColor("blue", TerminalIcon.info)} ${ToColor(
               TextColor,
-              `compiled ${pathname} in ${time}ms`
-            )}`,
-          async () => {
-            if (isBuildPrevented) return;
-            await resetPath(probablePath);
-            await ipc.actions.builder.build(probablePath);
-          }
-        );
-      }
+              `compiling ${matched.name} ...`
+            )}`
+          ),
+        100
+      );
+      await benchmark_console(
+        (time) =>
+          `${ToColor("green", TerminalIcon.success)} ${ToColor(
+            TextColor,
+            `compiled ${matched.pathname} in ${time}ms`
+          )}`,
+        async () => {
+          if (isBuildPrevented) return;
+          await resetPath(matched.filePath);
+          await ipc.actions.builder.build(matched.filePath);
+        }
+      );
       if (!isBuildPrevented) sendSignal();
     },
     [paths.staticPath, paths.basePath]

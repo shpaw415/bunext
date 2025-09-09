@@ -1,11 +1,8 @@
 "server only";
 
-import { BunextSession } from "../../features/session/session";
-import { webToken, type _webToken } from "./webtoken";
+import { webToken, type _webToken, type SetDataOptions } from "./webtoken";
 import "./server_global";
-import { deleteSessionById, setSessionById } from "../session";
-import { generateRandomString } from "../../features/utils";
-import type { _GlobalData, PluginData, ServerConfig } from "internal/types";
+import type { _GlobalData, ServerConfig } from "internal/types";
 import { BunextError } from "./server_global";
 import { formatParams, RenderingError, RequestManager, router } from "./router";
 import { formatHTML } from "internal/utils";
@@ -15,6 +12,14 @@ import { pluginLoader } from "./plugin-loader";
 
 export type CookieOptions = _webToken & {
   encrypted?: boolean;
+};
+
+export type DeleteCookieOptions = {
+  path?: string;
+  domain?: string;
+  secure?: boolean;
+  sameSite?: "Lax" | "Strict" | "None";
+  httpOnly?: boolean;
 };
 
 const HTML_DOCTYPE = "<!DOCTYPE html>";
@@ -27,27 +32,44 @@ export class BunextNoServerSideMatchError extends BunextError { }
 
 const CURRENT_PATH = process.cwd();
 
+export type BunextRequestState = "before_request" | "request" | "after_request";
+
 export type BunextRequestMatch = {
   pathname: string;
   route: string;
-  filePaths: { build: string; src: string };
+  filePaths: { build?: string; src: string };
   params: Record<string, string | string[]> | undefined;
   directive: Directives;
 };
 
+export type GlobalDataInjectionType = {
+  data: Record<string, string>;
+  rawData: Record<string, unknown>;
+};
+
 export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public request: Request;
-  private _response: Response;
+
+  public currentState: BunextRequestState = "before_request";
+
+  private _response?: Response;
+
   private _response_setted: boolean = false;
   private _response_body: BodyInit | null = null;
   private _response_init?: ResponseInit;
-  private _session?: BunextSession<any>;
+
   public manager: RequestManager;
-  public webtoken: webToken<any>;
   public path: string = "";
-  public __BYPASS_RESPONSE__: Response | undefined;
+
   public isSendNowEnabled: boolean = false;
+
   public __ERROR__?: Error;
+
+  private _awaitingCookies: Array<{ name: string, data: any, options?: CookieOptions, dataOptions?: SetDataOptions }> = [];
+  private _awaitingCookieDeletion: Array<{ name: string, options?: DeleteCookieOptions }> = [];
+
+  private _cookieCache: Map<string, Record<string, unknown>> = new Map();
+
   /**
    * Indicates if the request is asking for HTML.
    *
@@ -72,13 +94,10 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    */
   public isStaticAsset: boolean = false;
 
-  /**
-   * only available when serverConfig.session.type == "database:hard" | "database:memory"
-   */
-  public SessionID?: string;
-  public plugins: PluginData = {
-    globalData: {},
-    rawGlobalData: {},
+
+  public globalDataInjection: GlobalDataInjectionType = {
+    data: {},
+    rawData: {},
   };
   private _prevent_global_values_injection: boolean = false;
   private _prevent_rewrite: boolean = false;
@@ -88,15 +107,9 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   public context: ContextType = {} as ContextType;
   public URL: URL;
 
-  constructor(props: { request: Request; response: Response, manager: RequestManager, directivesTools: DirectiveTool }) {
+  constructor(props: { request: Request, manager: RequestManager, directivesTools: DirectiveTool }) {
     this.request = props.request;
-    this._response = props.response;
-    this.webtoken = new webToken<any>(this.request, {
-      cookieName: "bunext_session_token"
-    });
-    this.SessionID = (
-      this.webtoken.session() as undefined | { id: string }
-    )?.id;
+
     this.directivesTools = props.directivesTools;
     this.URL = new URL(this.request.url);
     this.manager = props.manager;
@@ -106,19 +119,14 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this.match = this.initMatch();
   }
 
-  /**
-   * Skip all transformation and other plugins modification and send the response
-   */
-  public sendNow() {
-    this.isSendNowEnabled = true;
-  }
+
 
   private initMatch(): BunextRequestMatch | undefined {
     if (this.isClientNavigating) {
       const pathname = this.URL.searchParams.get("__BUNEXT_PATHNAME__");
       if (!pathname) throw new BunextNoServerSideMatchError(`missing matching information for __BUNEXT_PATHNAME__`);
       const matchServer = this.manager.router.server.match(pathname);
-      const matchClient = this.manager.router.client.match(pathname);
+      const matchClient = this.manager.router.client.match(pathname) || process.env.NODE_ENV === "development";
       if (!matchServer || !matchClient) throw new BunextNoServerSideMatchError(`no matching route found for __BUNEXT_PATHNAME__`);
 
 
@@ -139,7 +147,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
         pathname: this.manager.serverSide.pathname,
         route: this.manager.serverSide.name,
         filePaths: {
-          build: this.manager.clientSide?.filePath as string,
+          build: this.manager.clientSide?.filePath,
           src: this.manager.serverSide.filePath
         },
         params: formatParams(this.manager.serverSide.params) as Record<string, string | string[]>,
@@ -148,46 +156,38 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     } else return undefined;
   }
 
-  private jsToTsx(filename: string) {
-    if (filename.endsWith('.js')) {
-      return filename.replace(/\.js$/, '.tsx');
-    } else return filename;
-  }
-  sanitizePath(unsafePath: string, basePath: string) {
+  private sanitizePath(unsafePath: string, basePath: string) {
     const resolvedPath = resolve(basePath, unsafePath);
     if (!resolvedPath.startsWith(basePath)) {
       throw new Error('Access to path is not allowed.');
     }
     return resolvedPath;
   }
+
+  /**
+ * Skip all transformation and other plugins modification and send the response
+ */
+  sendNow() {
+    this._ensureisInState(["request"], "You can only send the response in the request state.");
+    this._ensureResponseIsSet("You can only trigger sendNow if the response is set.");
+    this.isSendNowEnabled = true;
+  }
   /**
    * Gets the context for the request.
    * @returns The context for the request.
    */
-  public getContext<CutsomContextType extends unknown = undefined>(): CutsomContextType extends undefined ? ContextType : CutsomContextType {
+  getContext<CutsomContextType extends unknown = undefined>(): CutsomContextType extends undefined ? ContextType : CutsomContextType {
     return this.context as any;
   }
   /**
-   * Sets the context for the request.
+   * Sets the context data for the request.
    * @param context The context to set for the request. will merge with existing context
    */
-  public setContext<CutsomContextType extends unknown = undefined>(context: CutsomContextType extends undefined ? ContextType : CutsomContextType) {
+  setContext<CutsomContextType extends unknown = undefined>(context: CutsomContextType extends undefined ? ContextType : CutsomContextType) {
     this.context = { ...this.context, ...context as any };
+    return context;
   }
-
-  /**
-   * Lazy getter for session - only creates session when accessed
-   */
-  public get session(): BunextSession<any> {
-    if (!this._session) {
-      this._session = new BunextSession({
-        sessionTimeout: globalThis?.serverConfig?.session?.timeout,
-        request: this,
-      });
-    }
-    return this._session;
-  }
-  public get response(): Response {
+  public get response(): Response | undefined {
     return this._response;
   }
   /**
@@ -195,7 +195,8 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * @param response The response object.
    * @returns The current instance for chaining.
    */
-  public setResponse(body: BodyInit | null, init?: ResponseInit): this {
+  setResponse(body: BodyInit | null, init?: ResponseInit): this {
+    this._ensureisInState(["request"], "You can only set the response in the request state.");
     if (this._response_setted) throw new BunextResponseAlreadySetError("Response already set");
     this._response_body = body;
     this._response_init = init;
@@ -206,143 +207,165 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * Checks if the response has been set.
    * @returns True if the response has been set, false otherwise.
    */
-  public isResponseSetted(): boolean {
-    return this._response_setted || Boolean(this.__BYPASS_RESPONSE__);
+  isResponseSetted(): boolean {
+    return this._response_setted;
   }
-  public unsetResponse(): void {
+  unsetResponse(): void {
+    this._ensureisInState(["request"], "You can only unset the response in the request state.");
     this._response_setted = false;
     this._response_body = null;
     this._response_init = undefined;
   }
 
-  /**
-   * <strong>DO NOT USE. BUNEXT INTERNAL USE ONLY</strong>
-   * set the session cookie
-   */
-  public async setSessionCookie(response: Response) {
-    switch (globalThis.serverConfig.session?.type) {
-      case "database:hard":
-      case "database:memory":
-        const correctID = this.SessionID || generateRandomString(32);
-        this.webtoken.setData({
-          id: correctID,
-        });
-        if (this.session.isSessionUpdated()) {
-          await setSessionById(
-            this.SessionID ? "update" : "insert",
-            correctID,
-            this.session.getRawSessionData()
-          );
-        }
-        if (this.session.isSessionDeleted()) {
-          await deleteSessionById(correctID);
-        }
-        break;
-      case "cookie":
-      case undefined:
-        this.webtoken.setData(this.session.getRawSessionData());
-        break;
-    }
-    if (this.session.isSessionDeleted()) {
-      this.webtoken.setData({});
-      this.session.reset();
-    }
-    const setExpire = () => {
-      if (this.session.isSessionDeleted()) return -100000;
-      return (
-        this.session?.session_expiration_override ??
-        globalThis.serverConfig.session?.timeout ??
-        3600
-      );
-    };
-
-    (response || this.response).headers.append(
-      "session",
-      this.encodeSessionData(this.session.getPublicSessionData() || {})
-    );
-    (response || this.response).headers.append(
-      "__bunext_session_timeout__",
-      JSON.stringify(
-        this.session.sessionTimeoutFromNow * 1000 + new Date().getTime()
-      )
-    );
-
-    return this.webtoken.setCookie(response || this.response, {
-      maxAge: setExpire(),
-      httpOnly: true,
-      secure: false,
-    });
-  }
-  /**
-   * Sets a cookie for the response.
-   * @param name The name of the cookie.
-   * @param data The data to store in the cookie.
-   * @param options Options for the cookie.
-   */
-  public setCookie<T extends Record<string, unknown>>(name: string, data: T, options?: CookieOptions) {
-    const wt = new webToken(this.request, {
-      cookieName: name
-    });
-    if (options?.encrypted) {
-      wt.setData(data);
-      //wt.setCookie(this.response);
+  private _setCookie<T extends Record<string, unknown>>(name: string, data: T, options?: CookieOptions, dataOptions?: SetDataOptions) {
+    this._ensureResponseIsSet("error when setting cookie");
+    const { encrypted, ...wtOptions } = options || {};
+    const wt = new webToken(this.request, wtOptions);
+    if (encrypted) {
+      wt.setData(data, dataOptions);
+      wt.setCookie(this.response as Response);
     } else {
-      wt.setPlainJsonCookie(this.response, name, data, options);
+      wt.setPlainJsonCookie(this.response as Response, name, data, wtOptions);
     }
     return this;
   }
   /**
-   * Gets a cookie from the request.
+ * Sets a cookie for the response.
+ * @param name The name of the cookie.
+ * @param data The data to store in the cookie.
+ * @param options Options for the cookie.
+ */
+  setCookie<T extends Record<string, unknown>>(name: string, data: T, options?: CookieOptions, dataOptions?: SetDataOptions) {
+    if (this.isResponseSetted()) return this._setCookie(name, data, options, dataOptions);
+    this._awaitingCookies.push({ name, data, options, dataOptions });
+    return this;
+  }
+  /**
+   * Gets a cookie from the request as an object.
    * @param name The name of the cookie.
    * @param encrypted Whether the cookie is encrypted.
    * @returns The cookie data or undefined if not found.
    */
-  public getCookie<_Data extends Record<string, unknown>>(name: string, encrypted: boolean = false): _Data | undefined {
+  getCookie<_Data extends Record<string, unknown>>(name: string, encrypted: boolean = false): _Data | undefined {
+    if (this._cookieCache.has(name)) {
+      return this._cookieCache.get(name) as _Data;
+    }
     const wt = new webToken<_Data>(this.request, { cookieName: name });
-    return encrypted ? wt.session() : wt.getPlainJsonCookie(name);
+    const res = encrypted ? wt.session() : wt.getPlainJsonCookie(name);
+
+    this._cookieCache.set(name, res || {});
+
+    return res;
+  }
+  private _deleteCookie(name: string, options?: DeleteCookieOptions) {
+    this._ensureResponseIsSet("error when deleting cookie");
+    const opts = options || {};
+    const parts = [`${name}=`, `path=${opts.path || "/"}`];
+    if (opts.domain) parts.push(`domain=${opts.domain}`);
+    parts.push("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    if (opts.secure) parts.push("secure");
+    if (opts.httpOnly) parts.push("httponly");
+    parts.push(`samesite=${opts.sameSite || "Lax"}`);
+    this.response?.headers.append("Set-Cookie", parts.join("; "));
+    return this;
+  }
+  /**
+ * Deletes a cookie from the response.
+ * @param name The name of the cookie.
+ * @param options Options for deleting the cookie.
+ * @returns The current instance for chaining.
+ */
+  deleteCookie(name: string, options?: DeleteCookieOptions) {
+    if (this.isResponseSetted()) return this._deleteCookie(name, options);
+    this._awaitingCookieDeletion.push({ name, options });
+    return this;
+  }
+  public _triggerAwaitingCookies() {
+    for (const cookie of this._awaitingCookies) {
+      this._setCookie(cookie.name, cookie.data, cookie.options, cookie.dataOptions);
+    }
+    for (const cookie of this._awaitingCookieDeletion) {
+      this._deleteCookie(cookie.name, cookie.options);
+    }
+    this._awaitingCookies = [];
+    this._awaitingCookieDeletion = [];
   }
   /**
    * Injects global values into the request. they can be accessed into client-side in the globalThis object.
    * @param values The global values to inject. must be serializable.
+   * @example
+   * // first declare the global variable
+   * declare global {
+   *  var __MY_GLOBAL_VALUE__: string | undefined;
+   * }
+   * // then inject the value
+   * req.bunextReq.InjectGlobalValues({ __MY_GLOBAL_VALUE__: "my value" });
+   * // then access it in the client-side
+   * console.log(globalThis.__MY_GLOBAL_VALUE__); // "my value"
+   * @returns The current instance for chaining.
+   * @throws Error if the global values injection is not enabled.
+   * @throws Error if the value is not serializable.
+   * 
+   * **Note**: This method can only be used in the `before_request` and `request` plugins.
+   * 
+   * **Note**: If you want to prevent the injection of global values, you can use the `preventGlobalValuesInjection` method.
    */
-  public InjectGlobalValues<T extends Record<string, unknown> = {}>(values: T) {
+  InjectGlobalValues<T extends Partial<typeof globalThis>>(values: T) {
+    this._ensureisInState(["before_request", "request"], "Global values injection is only available in the before_request and request states.");
     for (const [key, val] of Object.entries(values)) {
       try {
-        this.plugins.globalData[key] = typeof val == "undefined" ? "undefined" : JSON.stringify(val);
-        this.plugins.rawGlobalData[key] = val;
+        this.globalDataInjection.data[key] = typeof val == "undefined" ? "undefined" : JSON.stringify(val);
+        this.globalDataInjection.rawData[key] = val;
       } catch (error) {
         console.error(`Failed to serialize value for key "${key}":`, error);
       }
     }
     return this;
   }
-  public preventGlobalValuesInjection() {
+  /**
+   * Prevent the injection of global values into the request.
+   *
+   * Prevent unnecessary data exposure, useless server processing or resource corruption.
+   * @returns The current instance for chaining.
+   */
+  preventGlobalValuesInjection() {
     this._prevent_global_values_injection = true;
     return this;
   }
-  public isGlobalValuesInjectionPrevented() {
+  /**
+   * Checks if the global values injection is prevented.
+   * @returns True if the global values injection is prevented, false otherwise.
+   */
+  isGlobalValuesInjectionPrevented() {
     return this._prevent_global_values_injection;
   }
-  public preventRewrite() {
+  /**
+   * 
+   * @returns The current instance for chaining.
+   * 
+   * Prevent all HTML rewrite plugins from modifying the HTML.
+   * 
+   * **Note**: This method can only be used in the `before_request` and `request` plugins.
+   */
+  preventRewrite() {
+
     this._prevent_rewrite = true;
     return this;
   }
-  public GlobalValueInjectionIsPrevented() {
+  GlobalValueInjectionIsPrevented() {
     return this._prevent_global_values_injection;
   }
   public async toResponse(): Promise<Response | BunextResponseNotSetError> {
     if (this.__ERROR__) return new BunextError("Error occured during serving", this.__ERROR__);
 
     try {
-      // Return bypass response if set
-      if (this.__BYPASS_RESPONSE__) return this.__BYPASS_RESPONSE__;
 
       if (!this._response_setted) {
         return new BunextResponseNotSetError("Response not set");
       }
 
       // Handle string responses with potential HTML processing
-      if (typeof this._response_body !== "string") return new Response(this._response_body, this._response_init);
+      if (typeof this._response_body !== "string") return this.setResponseThenReturn(new Response(this._response_body, this._response_init));
 
 
       let formattedStringData: string;
@@ -395,26 +418,27 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
           headers.set("Content-Encoding", "gzip");
           headers.set("Vary", "Accept-Encoding");
 
-          return new Response(compressedData, this._response_init);
+          return this.setResponseThenReturn(new Response(compressedData, this._response_init));
         } catch (error) {
           console.warn("Failed to compress response:", error);
           // Fall back to uncompressed
         }
       }
 
-      return new Response(formattedStringData, this._response_init);
-
-      // Handle non-string responses (buffers, streams, etc.)
-
-
+      return this.setResponseThenReturn(new Response(formattedStringData, this._response_init));
     } catch (error) {
       console.error("Error in toResponse():", error);
       // Return a basic error response instead of throwing
-      return new Response("Internal Server Error", {
+      return this.setResponseThenReturn(new Response("Internal Server Error", {
         status: 500,
         headers: { "Content-Type": "text/plain" }
-      });
+      }));
     }
+  }
+
+  private setResponseThenReturn(res: Response) {
+    this._response = res;
+    return this._response;
   }
 
   /**
@@ -508,7 +532,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
               .map(([key, value]) => ({ [key]: value }))
           ),
         }),
-        ...(this.plugins.globalData)
+        ...(this.globalDataInjection.data)
       };
     } catch (error) {
       console.error('Error creating preload object:', error);
@@ -522,7 +546,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    * Converts global data to JS format for script injection
    */
   globalDataToJSFormat() {
-    return this.preloadToStringArray(this.plugins.globalData).join(";");
+    return this.preloadToStringArray(this.globalDataInjection.data).join(";");
   }
   /**
    * Converts preload object to string array for script injection
@@ -533,6 +557,16 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     return Object.entries(preload)
       .map(([key, value]) => `globalThis["${key}"]=${value}`)
       .filter(Boolean);
+  }
+  private _ensureisInState(state: Array<BunextRequestState>, customMessage?: string) {
+    if (!state.includes(this.currentState)) {
+      throw new Error(`This action is only available in the following states: ${state.join(", ")}. Current state: ${this.currentState}. ${customMessage || ""}`);
+    }
+  }
+  private _ensureResponseIsSet(customMessage?: string) {
+    if (!this._response_setted) {
+      throw new BunextResponseNotSetError(`Response not set: ${customMessage || ""}`);
+    }
   }
 
   encodeSessionData(data: unknown) {

@@ -1,18 +1,6 @@
 import { renderToString } from "react-dom/server";
-import { revalidate } from "plugins/server-features/ssr-page";
 import { type JSX } from "react";
-function setRevalidate(
-  revalidates: {
-    path: string;
-    time: number;
-  }[]
-) {
-  for (const reval of revalidates) {
-    setInterval(async () => {
-      await revalidate(reval.path);
-    }, reval.time);
-  }
-}
+
 
 export async function MakeDynamicComponent({
   id,
@@ -33,4 +21,3 @@ export async function MakeDynamicComponent({
   };
 }
 
-export { setRevalidate };

@@ -9,6 +9,7 @@ import { router, type RequestManager } from "../../internal/server/router";
 import { renderToString } from "react-dom/server";
 import type { Table } from "public/database/class";
 import { isRequestGetServerSideProps, serverSidePropsManager, type ServerSidePropsContext } from "plugins/server-features/serverSideProps";
+import type { SessionPluginContext } from "plugins/session";
 
 const staticPageCacheShema: DBSchema = [
   {
@@ -176,7 +177,7 @@ export default {
 async function MakeStaticPage(manager: RequestManager, props: ServerSideProps) {
   if (!manager.serverSide)
     throw new Error(`no serverSide path found for ${manager.pathname}`);
-  manager.bunextReq.session.prevent_session_init();
+  manager.bunextReq.getContext<SessionPluginContext>().session.prevent_session_init();
 
   const pageJSX = await manager.makeDynamicJSXPage({
     serverSideProps: props,

@@ -2,6 +2,7 @@ import { RenderingError, type RequestManager } from "internal/server/router";
 import { serverSidePropsManager } from "./serverSideProps";
 import type { JSX } from "react";
 import { fallBackComponents } from "internal/server/fallbacks";
+import type { SessionPluginContext } from "plugins/session";
 
 export async function serveDynamicPage(manager: RequestManager): Promise<boolean> {
 
@@ -11,7 +12,8 @@ export async function serveDynamicPage(manager: RequestManager): Promise<boolean
 
     try {
         const serverSideProps = (await serverSidePropsManager.make(manager));
-        manager.bunextReq.session.prevent_session_init();
+        manager.bunextReq.getContext<SessionPluginContext>().session.prevent_session_init();
+
         let pageJSX: JSX.Element | null = null;
         try {
             pageJSX = await manager.makeDynamicJSXPage({ serverSideProps });

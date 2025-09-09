@@ -3,17 +3,12 @@ import { test, expect, describe, afterAll, beforeAll, beforeEach } from "bun:tes
 import "../database/class.ts";
 
 import "internal/server/server_global.ts";
-import { RequestManager, router } from "internal/server/router";
+import { router } from "internal/server/router";
 import { Shell } from "internal/client/shell.tsx";
 import { ParseServerSideProps } from "internal/router/index.tsx";
 
 // Additional imports for enhanced testing
-import { BunextSession } from "features/session/session.ts";
-import {
-  initializeSessionDatabase,
-  cleanExpiredSessions,
-  getSessionStats
-} from "internal/session.ts";
+import { BunextSession } from "plugins/session/client";
 import { BunextRequest } from "internal/server/bunextRequest.ts";
 import { BunextServer } from "internal/server/index.ts";
 import { getServerActions, InitServerActions } from "plugins/server-features/serverActions";
@@ -213,6 +208,10 @@ describe("Bunext Framework Test Suite", () => {
 
   describe("Session Management", () => {
     let testSession: BunextSession;
+    const emptySessionData = {
+      public: {},
+      private: {}
+    }
 
     beforeEach(async () => {
       testSession = new BunextSession({
@@ -220,16 +219,14 @@ describe("Bunext Framework Test Suite", () => {
         enableLogging: false,
         request: new BunextRequest({
           request: new Request("http://localhost:3010/"),
-          response: new Response(),
           manager: undefined as any,
           directivesTools: await DirectiveTool.getInstance()
         }),
       });
-      return testSession.initData();
+      return testSession.init(emptySessionData);
     });
 
     test("session initialization and database setup", async () => {
-      expect(initializeSessionDatabase).toBeDefined();
 
       // Test session configuration
       const sessionConfig = globalThis.serverConfig?.session;
@@ -253,12 +250,11 @@ describe("Bunext Framework Test Suite", () => {
       const shortLivedSession = new BunextSession({
         sessionTimeout: 1, request: new BunextRequest({
           request: new Request("http://localhost:3010/"),
-          response: new Response(),
           manager: undefined as any,
           directivesTools: await DirectiveTool.getInstance()
         }),
       }); // 1 second
-      await shortLivedSession.initData();
+      shortLivedSession.init(emptySessionData);
       shortLivedSession.setData({ test: "data" }, true);
 
       expect(shortLivedSession.exists()).toBe(true);
@@ -280,21 +276,6 @@ describe("Bunext Framework Test Suite", () => {
       expect(testSession.getPublicData()).not.toHaveProperty('secretKey');
     });
 
-    test("session cleanup and statistics", async () => {
-      // Test session cleanup functionality
-      expect(cleanExpiredSessions).toBeDefined();
-      expect(getSessionStats).toBeDefined();
-
-      try {
-        const stats = await getSessionStats();
-        expect(stats).toHaveProperty('total');
-        expect(stats).toHaveProperty('expired');
-        expect(stats).toHaveProperty('active');
-      } catch (error) {
-        // Expected in test environment without proper database setup
-        expect(error).toBeDefined();
-      }
-    });
   });
   describe("Build Features & SSR", () => {
     test("router initialization and route matching", async () => {

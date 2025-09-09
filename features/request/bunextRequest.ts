@@ -1,27 +1,27 @@
-import type { BunextRequest } from "../../internal/server/bunextRequest";
-import type { InAppSession } from "../session/session";
+"server only";
 
-const isClient = typeof window != "undefined";
+import type { RequestManager } from "internal/server/router";
 
-function GetBunextRequest(args: IArguments) {
-  return Array.from(args).at(-1) as BunextRequest;
+
+function getRequestManager(args: IArguments): RequestManager | undefined {
+  return Array.from<RequestManager | undefined>(args).at(-1);
 }
 
+
 /**
- * get session from a server context ( ServerAction, getServerSideProps )
- * @param args
- * @example GetSession(arguments)
- */
-export function GetSession<DataType>(args: IArguments) {
-  if (args) return GetBunextRequest(args).session as InAppSession<DataType>;
-  else throw new Error("you must set arguments from a server context");
-}
-/**
- * get request Object from a server context ( ServerAction, getServerSideProps )
+ * get BunextRequest Object from a server context ( ServerAction, getServerSideProps )
  * @param args arguments
  * @example GetRequest(arguments)
  */
-export function GetRequest(args: IArguments) {
-  if (isClient) throw new Error("cannot call GetRequest from a client context");
-  return GetBunextRequest(args).request;
+export function getRequest(args: IArguments) {
+  const req = getRequestManager(args)?.request;
+  if (!req) throw new Error("request is not defined ensure you are calling this function in top level of a server context");
+  return req;
+}
+
+export function getBunextRequest(args: IArguments) {
+  const req = getRequestManager(args)?.bunextReq;
+  if (!req) throw new Error("request is not defined ensure you are calling this function in top level of a server context");
+  return req;
+
 }

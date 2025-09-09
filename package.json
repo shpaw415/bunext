@@ -8,7 +8,7 @@
     "name": "Justin Halle"
   },
   "engines": {
-    "bun": "1.1.x - 1.2.x"
+    "bun": "1.2.x"
   },
   "os": [
     "linux"
@@ -53,7 +53,8 @@
     "start": "bun .bunext/react-ssr/server.ts production",
     "build": "bun ./bin/index.ts build",
     "db:create": "bun ./bin/index.ts database:create",
-    "bunext": "bun ./bin/index.ts"
+    "bunext": "bun ./bin/index.ts",
+    "check-plugin-order": "bun ./bin/check-plugin-order.ts"
   },
   "keywords": [
     "react",

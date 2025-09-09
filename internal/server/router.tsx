@@ -321,40 +321,77 @@ class StaticRouters {
       router: this,
     })
 
-    await manager.make();
-    let response = await manager.bunextReq.toResponse();
-    if (response instanceof BunextResponseNotSetError) return new Response(null, {
+    const ipc = IPCManager.getInstanceForCurrentProcess() as IPCManager<"main" | "cluster">;
+
+    manager.bunextReq.currentState = "before_request";
+    await Promise.all(pluginLoader.getSubPluginsByParentName("router", "before_request").map(async (before_request) => {
+      try {
+        await before_request.subPlugin(manager, ipc);
+      } catch (e) {
+        console.error(`Error occurred in before_request plugin, name: ${before_request.name}:`, e);
+        manager.bunextReq.__ERROR__ = new Error(`Error occurred in plugin ${before_request.name}`, { cause: e as Error });
+      }
+    }));
+
+    manager.bunextReq.currentState = "request";
+    const plugins = pluginLoader.getSubPluginsByParentName("router", "request");
+    for await (const plugin of plugins) {
+      try {
+        await plugin.subPlugin(manager, ipc);
+        if (manager.bunextReq.isSendNowEnabled === true) {
+          break;
+        }
+      } catch (e) {
+        console.error(`Error occurred in request plugin, name: ${plugin.name}:`, e);
+        manager.bunextReq.__ERROR__ = new Error(`Error occurred in plugin ${plugin.name}`, { cause: e as Error });
+        break;
+      }
+    }
+
+
+    const responseError = await manager.bunextReq.toResponse();
+
+    if (responseError instanceof BunextResponseNotSetError) return new Response(null, {
       headers: {
         "Content-Type": "text/plain",
       },
       status: 404,
     });
 
+    manager.bunextReq._triggerAwaitingCookies();
 
-    if (response instanceof BunextError) {
-      this.Logger(response, "error");
-      return new Response(renderToString(ErrorFallback({ error: response })), {
+
+    if (responseError instanceof BunextError) {
+      this.Logger(manager.bunextReq.response, "error");
+      return new Response(renderToString(ErrorFallback({ error: responseError })), {
         headers: {
           "content-type": "text/html"
         },
         status: 500
       });
-    } else if (manager.bunextReq.isSendNowEnabled) return response;
+    }
 
-    const ipc = IPCManager.getInstanceForCurrentProcess() as IPCManager<"main">;
+
+    if (manager.bunextReq.isSendNowEnabled && manager.bunextReq.response) return manager.bunextReq.response;
+
+
+    manager.bunextReq.currentState = "after_request";
 
     for await (const after_request of
       pluginLoader.getSubPluginsByParentName("router", "after_request")) {
       try {
-        const result = await after_request.subPlugin(manager, response, ipc);
+        const result = await after_request.subPlugin(manager, ipc);
         if (result instanceof Response) {
-          response = result;
+          return result;
         }
       } catch (e) {
         console.error(`Error occurred in after_request plugin, name: ${after_request.name}:`, e);
       }
     }
-    return response;
+
+    manager.bunextReq._triggerAwaitingCookies();
+
+    return manager.bunextReq.response as Response;
 
   }
 
@@ -569,38 +606,11 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
     // Initialize Bunext request
     this.bunextReq = new BunextRequest({
       request: this.request,
-      response: new Response(),
       manager: this,
       directivesTools: this.router.fileDirectives
     });
 
     this.relatedCssPaths = [];
-  }
-
-  /**
-   * Main request processing method that routes requests through the middleware chain
-   */
-  async make(): Promise<void> {
-    process.env.__SESSION_MUST_NOT_BE_INITED__ = "false";
-    await this.checkPluginServing();
-
-  }
-
-  /**
-   * Checks and applies plugin-based request handling
-   */
-  private async checkPluginServing(): Promise<void> {
-    const plugins = pluginLoader.getSubPluginsByParentName("router", "request");
-    const ipc = IPCManager.getInstanceForCurrentProcess() as IPCManager<"main">;
-    for await (const plugin of plugins) {
-      try {
-        await plugin.subPlugin(this, ipc);
-        if (this.bunextReq.__BYPASS_RESPONSE__ || this.bunextReq.isSendNowEnabled === true) break;
-      } catch (e) {
-        this.bunextReq.__ERROR__ = new Error(`Error occurred in plugin ${plugin.name}`, { cause: e as Error });
-        return;
-      }
-    }
   }
   /**
    * Creates an error for missing server-side routes

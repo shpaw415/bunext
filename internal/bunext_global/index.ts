@@ -1,4 +1,5 @@
-import { GetRequest, GetSession } from "features/request/bunextRequest";
+import { getRequest } from "features/request/bunextRequest";
+import { getSession } from "public/session";
 import { useRequest } from "features/request/hooks";
 import { BunextRequest } from "public/request";
 import { version } from "package.json";
@@ -29,29 +30,36 @@ function switchContextAsClient<T, K>(server: () => T, client: () => K): K {
     return (typeof window == "undefined" ? server() : client()) as K;
 }
 
+function onClientThrow() {
+    throw new Error("This function is only available on the server side");
+}
+function onServerThrow() {
+    throw new Error("This function is only available on the client side");
+}
+
 const _BunextRequest = {
     bunext: switchContext(() => BunextRequest, () => undefined),
     hook: {
         useRequest,
     },
     get: {
-        request: GetRequest,
+        request: switchContext(() => getRequest, () => onClientThrow),
     },
 };
 
 const _Router = {
     revalidate: {
-        static: switchContext(() => revalidateStatic, () => undefined),
+        static: switchContext(() => revalidateStatic, () => onClientThrow),
         ssr: {
-            every: switchContext(() => revalidateEvery, () => undefined),
-            now: switchContext(() => revalidate, () => undefined),
+            every: switchContext(() => revalidateEvery, () => onClientThrow),
+            now: switchContext(() => revalidate, () => onClientThrow),
         },
     },
     hooks: {
         usePathname,
     },
     navigate: {
-        to: switchContextAsClient(() => undefined, () => navigate),
+        to: switchContextAsClient(() => onServerThrow, () => navigate),
         components: {
             link: Link,
         },
@@ -68,7 +76,7 @@ const _Session = {
     hook: {
         useSession,
     },
-    get: GetSession,
+    get: switchContext(() => getSession, () => onClientThrow),
 };
 
 export async function initBunextGlobal(): Promise<BunextType> {
