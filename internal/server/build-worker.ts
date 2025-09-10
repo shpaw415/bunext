@@ -37,14 +37,16 @@ if (process.env.NODE_ENV === "development") {
   }));
 }
 
-
+let currentResult: BuildWorkerResponse | null = null;
 function init() {
   let isBuilding = false;
   IPCHelper.onMessage<{ buildPath?: string }, BuildWorkerResponse | null>("build", async (message) => {
-    if (isBuilding) return null;
+    if (isBuilding) return currentResult;
     isBuilding = true;
     const result = await build(message.buildPath);
+    currentResult = result;
     isBuilding = false;
+    currentResult = null;
     return result;
   });
   process.on("disconnect", () => process.exit(0))

@@ -157,8 +157,8 @@ export function clearSSRPage() {
 export async function onRequestSSRPage(manager: RequestManager): Promise<boolean> {
     // Handle SSR page requests
     if (!isSSRDefaultExportPath(manager, true) || !manager.bunextReq.isAskingHTML) return false;
-    manager.bunextReq.getContext<SessionPluginContext>().session.prevent_session_init();
     const stringPage = await getSSRDefaultPage(manager);
+    await manager.bunextReq.getContext<SessionPluginContext>().__INIT_SESSION__();
     if (stringPage) {
         manager.bunextReq.setResponse(stringPage, {
             headers: {

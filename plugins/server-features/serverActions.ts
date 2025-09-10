@@ -79,7 +79,7 @@ export async function serverActionGetter(manager: RequestManager): Promise<[body
 
     try {
         let result = await call(
-            ...[...props, ...fillUndefinedParams, manager.bunextReq]
+            ...[...props, ...fillUndefinedParams, manager]
         );
         let dataType: ServerActionDataTypeHeader = "json";
         let fileDataHeader: Record<string, unknown> = {};
@@ -157,9 +157,7 @@ export function getServerActions() {
 export async function onRequestServerAction(manager: RequestManager): Promise<void> {
     if (manager.bunextReq.URL.pathname == "/ServerActionGetter") {
         await manager.bunextReq.getContext<SessionPluginContext>().__INIT_SESSION__();
-        manager.bunextReq.preventRewrite();
-        manager.bunextReq.preventGlobalValuesInjection();
-        manager.bunextReq.setResponse(...(await serverActionGetter(manager)));
+        manager.bunextReq.setResponse(...(await serverActionGetter(manager))).preventGlobalValuesInjection().preventRewrite();
     }
 }
 

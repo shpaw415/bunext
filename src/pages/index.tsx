@@ -56,7 +56,7 @@ export default async function Page() {
 
         <TestElement3 />
         <Bunext.router.navigate.components.link href="/other">
-          <button>Other page</button>
+          <button>Other pages</button>
         </Bunext.router.navigate.components.link>
         <SetSessionButton />
         <DeleteSessionButton />
@@ -79,6 +79,7 @@ export default async function Page() {
     </Head>
   );
 }
+
 
 export function TestElement4() {
   return <div>{Bun.hash("allô").toLocaleString()}</div>;

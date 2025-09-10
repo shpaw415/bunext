@@ -1,7 +1,7 @@
 import "bunext-js/client/globals";
 import { Dev } from "public/dev";
 import { HeadProvider } from "../../plugins/head/provider";
-import { SessionProvider } from "internal/router";
+import { SessionProvider } from "plugins/session/provider";
 import type { ReactShellComponent } from "internal/types";
 
 export const Shell: ReactShellComponent = ({

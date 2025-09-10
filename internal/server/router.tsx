@@ -19,14 +19,13 @@ import type {
   _GlobalData,
   ServerSideProps,
 } from "../types";
-import { BunextRequest, BunextResponseNotSetError } from "./bunextRequest";
+import { BunextRequest } from "./bunextRequest";
 import { RequestContext } from "./context";
 
 // Global imports
 import "./server_global";
 import type { JsxToStringWorkerMessage } from "../dev/types";
 import { BunextError } from "./server_global";
-import { ErrorFallback } from "components/fallback";
 import { DirectiveTool, IPCManager } from "plugins/utils";
 import { Shell } from "public/client/shell";
 import { pluginLoader } from "./plugin-loader";
@@ -324,14 +323,14 @@ class StaticRouters {
     const ipc = IPCManager.getInstanceForCurrentProcess() as IPCManager<"main" | "cluster">;
 
     manager.bunextReq.currentState = "before_request";
-    await Promise.all(pluginLoader.getSubPluginsByParentName("router", "before_request").map(async (before_request) => {
+    for (const plugin of pluginLoader.getSubPluginsByParentName("router", "before_request")) {
       try {
-        await before_request.subPlugin(manager, ipc);
+        await plugin.subPlugin(manager, ipc);
       } catch (e) {
-        console.error(`Error occurred in before_request plugin, name: ${before_request.name}:`, e);
-        manager.bunextReq.__ERROR__ = new Error(`Error occurred in plugin ${before_request.name}`, { cause: e as Error });
+        console.error(`Error occurred in before_request plugin, name: ${plugin.name}:`, e);
+        manager.bunextReq.__ERROR__ = new Error(`Error occurred in plugin before_request ${plugin.name}`, { cause: e as Error });
       }
-    }));
+    }
 
     manager.bunextReq.currentState = "request";
     const plugins = pluginLoader.getSubPluginsByParentName("router", "request");
@@ -343,53 +342,34 @@ class StaticRouters {
         }
       } catch (e) {
         console.error(`Error occurred in request plugin, name: ${plugin.name}:`, e);
-        manager.bunextReq.__ERROR__ = new Error(`Error occurred in plugin ${plugin.name}`, { cause: e as Error });
+        manager.bunextReq.__ERROR__ = new Error(`Error occurred in plugin request ${plugin.name}`, { cause: e as Error });
         break;
       }
     }
+    if (manager.bunextReq.isSendNowEnabled || manager.bunextReq.__ERROR__) return manager.bunextReq.toResponse();
 
 
-    const responseError = await manager.bunextReq.toResponse();
-
-    if (responseError instanceof BunextResponseNotSetError) return new Response(null, {
-      headers: {
-        "Content-Type": "text/plain",
-      },
-      status: 404,
-    });
-
-    manager.bunextReq._triggerAwaitingCookies();
-
-
-    if (responseError instanceof BunextError) {
-      this.Logger(manager.bunextReq.response, "error");
-      return new Response(renderToString(ErrorFallback({ error: responseError })), {
-        headers: {
-          "content-type": "text/html"
-        },
-        status: 500
-      });
-    }
-
-
-    if (manager.bunextReq.isSendNowEnabled && manager.bunextReq.response) return manager.bunextReq.response;
+    await manager.bunextReq._formatResponseBeforeSending();
 
 
     manager.bunextReq.currentState = "after_request";
-
     for await (const after_request of
       pluginLoader.getSubPluginsByParentName("router", "after_request")) {
       try {
         const result = await after_request.subPlugin(manager, ipc);
-        if (result instanceof Response) {
-          return result;
-        }
+        if (result instanceof Response) return result;
       } catch (e) {
         console.error(`Error occurred in after_request plugin, name: ${after_request.name}:`, e);
+        manager.bunextReq.__ERROR__ = new Error(`Error occurred in plugin after_request ${after_request.name}`, { cause: e as Error });
+        break;
       }
     }
 
-    manager.bunextReq._triggerAwaitingCookies();
+    if (manager.bunextReq.__ERROR__) {
+      return manager.bunextReq.toResponse();
+    } else {
+      manager.bunextReq._triggerAwaitingCookies();
+    }
 
     return manager.bunextReq.response as Response;
 
@@ -620,7 +600,7 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
   }
 
 
-  private async makeDevDynamicJSXElement(serverSideProps?: ServerSideProps<unknown>) {
+  private async makeDevDynamicJSXElement(modulePath: string, serverSideProps?: ServerSideProps<unknown>) {
     let pageString = "";
     let proc: Subprocess<"ignore", "inherit", "inherit"> | undefined =
       undefined as unknown as Subprocess<"ignore", "inherit", "inherit">;
@@ -633,7 +613,7 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
       proc = Bun.spawn({
         env: {
           ...process.env,
-          module_path: this.serverSide.filePath,
+          module_path: modulePath,
           props: JSON.stringify({
             props: serverSideProps,
             params: formatParams(this.serverSide.params),
@@ -665,11 +645,12 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
     );
   }
   private async makeProductionDynamicJSXElement(
+    modulePath: string,
     serverSideProps?: ServerSideProps<unknown>
   ) {
     if (!this.serverSide) return null;
     return this.router.CreateDynamicPage(
-      this.serverSide.filePath,
+      modulePath,
       {
         props: serverSideProps,
         params: formatParams(this.serverSide.params),
@@ -685,14 +666,16 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
    */
   public makeDynamicJSXPage({
     serverSideProps,
+    modulePath
   }: {
+    modulePath: string;
     serverSideProps?: ServerSideProps<{} | unknown>;
   }) {
     if (!this.serverSide) return null;
 
     if (process.env.NODE_ENV == "development")
-      return this.makeDevDynamicJSXElement(serverSideProps);
-    else return this.makeProductionDynamicJSXElement(serverSideProps);
+      return this.makeDevDynamicJSXElement(modulePath, serverSideProps);
+    else return this.makeProductionDynamicJSXElement(modulePath, serverSideProps);
   }
 
   /**

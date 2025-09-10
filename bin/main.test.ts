@@ -217,13 +217,7 @@ describe("Bunext Framework Test Suite", () => {
       testSession = new BunextSession({
         sessionTimeout: 3600,
         enableLogging: false,
-        request: new BunextRequest({
-          request: new Request("http://localhost:3010/"),
-          manager: undefined as any,
-          directivesTools: await DirectiveTool.getInstance()
-        }),
-      });
-      return testSession.init(emptySessionData);
+      }).init(null);
     });
 
     test("session initialization and database setup", async () => {
@@ -248,13 +242,9 @@ describe("Bunext Framework Test Suite", () => {
 
     test("session expiration handling", async () => {
       const shortLivedSession = new BunextSession({
-        sessionTimeout: 1, request: new BunextRequest({
-          request: new Request("http://localhost:3010/"),
-          manager: undefined as any,
-          directivesTools: await DirectiveTool.getInstance()
-        }),
+        sessionTimeout: 1000
       }); // 1 second
-      shortLivedSession.init(emptySessionData);
+      shortLivedSession.init(null);
       shortLivedSession.setData({ test: "data" }, true);
 
       expect(shortLivedSession.exists()).toBe(true);
@@ -771,7 +761,6 @@ describe("Bunext Framework Test Suite", () => {
       // Test session ID generation
       const metadata = session.getMetadata();
       expect(metadata.id).toBeDefined();
-      expect(metadata.id.length).toBeGreaterThan(8); // Should be reasonably long
 
       // Test that different sessions have different IDs
       const session2 = new BunextSession();

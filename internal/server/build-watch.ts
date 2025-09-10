@@ -92,9 +92,10 @@ export const doWatchBuild = () =>
             `compiled ${matched.pathname} in ${time}ms`
           )}`,
         async () => {
+
           if (isBuildPrevented) return;
           await resetPath(matched.filePath);
-          await ipc.actions.builder.build(matched.filePath);
+          await ipc.actions.builder.build(matched.name);
         }
       );
       if (!isBuildPrevented) sendSignal();

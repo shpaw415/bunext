@@ -11,8 +11,10 @@ import { router } from "internal/server/router";
 import type { Table } from "database/class";
 import type { DBSchema } from "database/schema";
 
+
+type blurredImageClient = Pick<blurredImage, "encoded" | "img_path">;
 declare global {
-  var blurImages: blurredImage[];
+  var blurImages: blurredImageClient[];
 }
 globalThis.blurImages ??= [];
 
@@ -68,7 +70,7 @@ class BlurredImageCache {
     return this.blurredCache(t => t.databaseInstance.query("DELETE from blured_image").all());
   }
 
-  async get(path: string) {
+  async get(path: string): Promise<blurredImageClient[]> {
     return this.blurredCache((t) => t.select({
       where: { path },
       select: { encoded: true, img_path: true },
@@ -112,12 +114,14 @@ class BlurredImageCache {
 
 export const cache = await BlurredImageCache.create();
 
-async function transformImage(req: BunextRequest) {
+async function transformImage(req: BunextRequest): Promise<[BodyInit, ResponseInit]> {
   const url = req.URL;
   const src = url.searchParams.get("src");
   const w = parseInt(url.searchParams.get("w") || "0");
   const h = parseInt(url.searchParams.get("h") || "0");
   const q = parseInt(url.searchParams.get("q") || "75");
+
+  new Response()
 
   if (
     !src ||
@@ -127,7 +131,7 @@ async function transformImage(req: BunextRequest) {
     src.includes("~") ||
     !src.startsWith("/")
   ) {
-    return new Response("Invalid params", { status: 400 });
+    return ["Invalid params", { status: 400 }];
   }
 
   try {
@@ -148,14 +152,14 @@ async function transformImage(req: BunextRequest) {
         .toFile(filePath);
     }
 
-    return new Response(Bun.file(filePath), {
+    return [Bun.file(filePath), {
       headers: {
         "Cache-Control": "public, max-age=31536000, immutable",
       },
-    });
+    }];
   } catch (err) {
     console.error("Image optimization error:", err);
-    return new Response("Image processing error", { status: 500 });
+    return ["Image processing error", { status: 500 }];
   }
 }
 
@@ -164,7 +168,7 @@ export default {
   router: {
     request: async (manager) => {
       if (manager.bunextReq.URL.pathname == "/bunext/image") {
-        manager.bunextReq.__BYPASS_RESPONSE__ = (await transformImage(manager.bunextReq));
+        manager.bunextReq.setResponse(...await transformImage(manager.bunextReq));
         return manager.bunextReq;
       } else if (manager.bunextReq.URL.pathname.endsWith(".js") && !manager.bunextReq.URL.pathname.endsWith("layout.js")) {
         const splited = manager.bunextReq.URL.pathname.replace(router.pageDir, "").split("/");

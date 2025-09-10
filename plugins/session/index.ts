@@ -1,9 +1,9 @@
 "server only";
 
 import type { BunextPlugin } from "plugins/types";
-import { BunextSession, NewSessionCookieName, SessionTimeoutheaderName, type InAppSession } from "./client";
+import { BunextSession, NewSessionHeaderName, SessionTimeoutheaderName, type InAppSession } from "./client";
 import type { SessionData } from "./common";
-import { getSessionById, deleteSessionById } from "./hard";
+import { getSessionById, deleteSessionById, getSessionCache } from "./hard";
 import { getBunextRequest } from "features/request/bunextRequest";
 import type { RequestManager } from "internal/server/router";
 
@@ -19,7 +19,6 @@ export type SessionPluginContext = {
      * @returns void
      */
     __INIT_SESSION__: () => Promise<void>;
-    __bunext_session_timeout__: number | null;
 };
 
 type CookieStructureTypeDatabaseHard = {
@@ -31,19 +30,32 @@ type CookieStructures = CookieStructureTypeDatabaseHard | CookieStructureTypeCoo
 
 
 
-function getSessionDataFromDatabaseHard(id: string): Promise<SessionData<unknown> | null> {
+function getSessionDataFromDatabaseHard(id: string): Promise<SessionData<{}, true> | null> {
     return getSessionById(id);
 }
 
-async function getSessionByConfigType(cookieValue?: CookieStructures): Promise<SessionData<unknown> | null> {
+async function getSessionByConfigType(cookieValue?: CookieStructures): Promise<SessionData<{}, true> | null> {
     if (!cookieValue) return null;
     switch (globalThis.serverConfig.session?.type) {
         case "database:hard":
             return await getSessionDataFromDatabaseHard((cookieValue as CookieStructureTypeDatabaseHard).id);
         case "cookie":
-            return cookieValue as SessionData<unknown>;
+            return cookieValue as SessionData<{}, true>;
         case undefined:
             return null;
+        default:
+            throw new Error("Unsupported session type");
+    }
+}
+
+function getCookieValueFromConfigType(session: BunextSession<{}>): CookieStructures {
+    switch (globalThis.serverConfig.session?.type) {
+        case "database:hard":
+            return { id: session.getSessionId() };
+        case "cookie":
+            return session._rawData;
+        case undefined:
+            throw new Error("Session is not configured");
         default:
             throw new Error("Unsupported session type");
     }
@@ -83,8 +95,7 @@ export default {
     router: {
         before_request(manager) {
             const session = new BunextSession({
-                sessionTimeout: globalThis?.serverConfig?.session?.timeout,
-                request: manager.bunextReq,
+                sessionTimeout: globalThis?.serverConfig?.session?.timeout || 3600,
             });
 
             manager.bunextReq.setContext<SessionPluginContext>({
@@ -93,38 +104,35 @@ export default {
                     if (session.isInitialized()) return;
                     const cookieValue = manager.bunextReq.getCookie(SessionCookieName, true);
                     session.init(await getSessionByConfigType(cookieValue));
-                    session._setExists(Boolean(cookieValue));
-
-                    const createdAt =
-                        session.getData<"private">()?.__BUNEXT_SESSION_CREATED_AT__ || 0;
-
-                    const sessionTimeout =
-                        createdAt === 0
-                            ? 0
-                            : createdAt +
-                            session.sessionTimeoutFromNow * 1000 -
-                            (new Date().getTime() - createdAt);
-
-                    manager.bunextReq.setContext<Partial<SessionPluginContext>>({
-                        __bunext_session_timeout__: sessionTimeout
-                    })
                 },
-                __bunext_session_timeout__: null,
             });
 
         },
         async after_request(manager) {
-            const { session, __bunext_session_timeout__ } = manager.bunextReq.getContext<SessionPluginContext>();
+            const { session } = manager.bunextReq.getContext<SessionPluginContext>();
             if (!session.isInitialized() || !manager.bunextReq.response) return;
 
             if (session.isSessionDeleted()) {
-                await deleteSessionByConfigType(manager);
+                return await deleteSessionByConfigType(manager);
             } else if (!session.isSessionUpdated()) return;
+
+            const rawData = session._rawData;
+            const expireAt = new Date();
+            expireAt.setTime(session.getExpiration());
+            (await getSessionCache()).set(session.getSessionId(), rawData, expireAt);
 
             const publicData = session.getPublicData();
             if (!publicData) return;
-            manager.bunextReq.setCookie(NewSessionCookieName, publicData, { httpOnly: false, encrypted: false });
-            manager.bunextReq.response.headers.set(SessionTimeoutheaderName, JSON.stringify(__bunext_session_timeout__));
+            if (!manager.bunextReq.isAskingHTML) {
+                manager.bunextReq.setHeader(NewSessionHeaderName, encodeURI(JSON.stringify(publicData)));
+                manager.bunextReq.setHeader(SessionTimeoutheaderName, JSON.stringify(session.getExpiration()));
+            }
+
+            manager.bunextReq.setCookie(
+                SessionCookieName,
+                getCookieValueFromConfigType(session),
+                { httpOnly: true, maxAge: Math.floor((session.getExpiration() - Date.now()) / 1000), encrypted: true }
+            );
         },
 
     }

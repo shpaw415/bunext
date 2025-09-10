@@ -31,7 +31,6 @@ import type { MatchedRoute } from "bun";
 // Constants
 const CWD = process.cwd();
 const DEVTOOLS_ENDPOINT = "/.well-known/appspecific/com.chrome.devtools.json";
-const SERVER_SIDE_PROPS_HEADER = "application/vnd.server-side-props";
 const GETCSSPATH_PATHNAME = "/GetCssPaths";
 
 
@@ -44,8 +43,8 @@ const plugin: BunextPlugin = {
   name: "bunext-dev-plugin",
   priority: 0,
   router: process.env.NODE_ENV === "development" && {
-    async before_request(manager) {
-      await handleDevRequest(manager);
+    before_request(manager) {
+      return handleDevRequest(manager);
     },
     request: async (manager) => {
       if (manager.bunextReq.isResponseSetted()) return;
@@ -53,7 +52,7 @@ const plugin: BunextPlugin = {
       else if (await handleCssPaths(manager.bunextReq)) return;
 
       if (manager.request.method === "PATCH") {
-        manager.bunextReq.setResponse("update-path").sendNow();
+        manager.bunextReq.setResponse("ok").preventRewrite().preventGlobalValuesInjection().sendNow();
       }
     },
   } || undefined,
@@ -100,12 +99,12 @@ async function handleDevRequest(request: RequestManager) {
 
   if (!request.bunextReq.isAskingHTML && !request.bunextReq.isClientNavigating) return;
   else if (!request.bunextReq.match?.filePaths.src) return;
+  const newDevRoute = router.server.match(request.bunextReq.match.pathname)
+  if (newDevRoute?.filePath != globalThis.__DEV_PATH_MATCH__?.filePath || request.request.method === "PATCH") {
+    await buildRoute(request.bunextReq.match.route);
+  }
+  globalThis.__DEV_PATH_MATCH__ = newDevRoute;
 
-  globalThis.__DEV_PATH_MATCH__ = router.server.match(request.bunextReq.match.pathname);
-
-  await buildRoute(
-    request.bunextReq.match.pathname
-  );
 }
 /**
  * Sets the current development path for tracking active builds

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ReloadContext } from "../internal/router/index";
 import DevToolPanel from "./devtool/panel";
 
@@ -11,19 +11,23 @@ export const DevWebSocketContext = createContext<WebSocket | undefined>(undefine
 
 export function Dev({ children }: { children?: any }) {
   const reload = useContext(ReloadContext);
-  const [_ws, setWs] = useState<WebSocket | undefined>(undefined);
+  const ws = useRef<WebSocket | undefined>(undefined);
+  const ws_interval = useRef<Timer | undefined>(undefined);
 
   const resetWs = useCallback(
-    (setter: React.Dispatch<React.SetStateAction<WebSocket | undefined>>) => {
-      setter((ws) => {
-        if (ws) ws.close();
-        return undefined;
-      });
+    () => {
+      if (ws.current) {
+        try {
+          ws.current.close();
+        } catch { }
+        ws.current = undefined;
+      }
     },
-    []
+    [ws.current]
   );
 
   const MakeWebSocket = useCallback(() => {
+
     const p = window.location;
     try {
       const ws = new WebSocket(
@@ -38,33 +42,41 @@ export function Dev({ children }: { children?: any }) {
           window.location.reload();
         }
       });
-      ws.addEventListener("close", () => resetWs(setWs));
-      ws.addEventListener("error", () => resetWs(setWs));
+      ws.addEventListener("close", () => resetWs());
+      ws.addEventListener("error", () => resetWs());
 
       return ws;
     } catch { }
-  }, []);
+  }, [ws.current]);
 
   const wsSetInterval = useCallback(
-    (setter: React.Dispatch<React.SetStateAction<WebSocket | undefined>>) => {
-      setInterval(() => {
-        setter((ws) => {
-          if (ws) return ws;
-          return MakeWebSocket();
-        });
+    () => {
+      return setInterval(() => {
+        ws.current ??= MakeWebSocket();
       }, 5000);
     },
-    []
+    [ws.current]
   );
 
   useEffect(() => {
     if (process.env.NODE_ENV != "development") return;
-    setWs(MakeWebSocket());
-    wsSetInterval(setWs);
+    if (!ws.current) ws.current = MakeWebSocket();
+    if (!ws_interval.current) ws_interval.current = wsSetInterval();
+
+    return () => {
+      if (ws_interval.current) clearInterval(ws_interval.current);
+      ws_interval.current = undefined;
+      if (ws.current) {
+        try {
+          ws.current.close();
+        } catch { }
+        ws.current = undefined;
+      }
+    }
   }, []);
 
   return (
-    <DevWebSocketContext.Provider value={_ws}>
+    <DevWebSocketContext.Provider value={ws.current}>
       {children}
       {globalThis.serverConfig?.Dev?.devtoolPanel &&
         process.env.NODE_ENV == "development" && <DevToolPanel />}

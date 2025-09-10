@@ -5,15 +5,16 @@ import type { SessionData } from "./common";
 import { join } from "node:path";
 
 
-let session_cache: CacheManager<SessionData<any>> | undefined;
+declare global {
+    var __BUNEXT_SESSION_CACHE__: CacheManager<SessionData<{}, true>>;
+}
+
+globalThis.__BUNEXT_SESSION_CACHE__ ??= await CacheManager.create<SessionData<{}, true>>("session", {
+    dbPath: join(process.cwd(), "config", "session.sqlite"),
+})
 
 export const getSessionCache = async () => {
-    if (!session_cache) {
-        session_cache = await CacheManager.create<SessionData<any>>("session", {
-            dbPath: join(process.cwd(), "config", "session.sqlite"),
-        });
-    }
-    return session_cache;
+    return globalThis.__BUNEXT_SESSION_CACHE__;
 };
 
 
@@ -21,7 +22,7 @@ export async function getSessionById(id: string) {
     return (await getSessionCache()).get(id);
 }
 
-export async function setSessionById(id: string, data: SessionData<any>, expireAt: Date) {
+export async function setSessionById(id: string, data: SessionData<{}, true>, expireAt: Date) {
     return (await getSessionCache()).set(id, data, expireAt);
 }
 

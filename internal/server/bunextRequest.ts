@@ -9,8 +9,10 @@ import { formatHTML } from "internal/utils";
 import { DirectiveTool, type Directives } from "plugins/utils";
 import { join, resolve } from "path";
 import { pluginLoader } from "./plugin-loader";
+import { renderToString } from "react-dom/server";
+import { ErrorFallback } from "components/fallback";
 
-export type CookieOptions = _webToken & {
+export type CookieOptions = Omit<_webToken, "cookieName"> & {
   encrypted?: boolean;
 };
 
@@ -56,7 +58,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
 
   private _response_setted: boolean = false;
   private _response_body: BodyInit | null = null;
-  private _response_init?: ResponseInit;
+  private _response_init: ResponseInit = {};
 
   public manager: RequestManager;
   public path: string = "";
@@ -199,7 +201,13 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this._ensureisInState(["request"], "You can only set the response in the request state.");
     if (this._response_setted) throw new BunextResponseAlreadySetError("Response already set");
     this._response_body = body;
-    this._response_init = init;
+    this._response_init = {
+      ...this._response_init,
+      headers: {
+        ...this._response_init?.headers,
+        ...init?.headers
+      },
+    };
     this._response_setted = true;
     return this;
   }
@@ -214,18 +222,17 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this._ensureisInState(["request"], "You can only unset the response in the request state.");
     this._response_setted = false;
     this._response_body = null;
-    this._response_init = undefined;
   }
 
   private _setCookie<T extends Record<string, unknown>>(name: string, data: T, options?: CookieOptions, dataOptions?: SetDataOptions) {
     this._ensureResponseIsSet("error when setting cookie");
     const { encrypted, ...wtOptions } = options || {};
-    const wt = new webToken(this.request, wtOptions);
+    const wt = new webToken(this.request, { ...wtOptions, cookieName: name });
     if (encrypted) {
       wt.setData(data, dataOptions);
-      wt.setCookie(this.response as Response);
+      wt.setCookie(this._response as Response);
     } else {
-      wt.setPlainJsonCookie(this.response as Response, name, data, wtOptions);
+      wt.setPlainJsonCookie(this._response as Response, name, data, wtOptions);
     }
     return this;
   }
@@ -266,7 +273,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     if (opts.secure) parts.push("secure");
     if (opts.httpOnly) parts.push("httponly");
     parts.push(`samesite=${opts.sameSite || "Lax"}`);
-    this.response?.headers.append("Set-Cookie", parts.join("; "));
+    this._response?.headers.append("Set-Cookie", parts.join("; "));
     return this;
   }
   /**
@@ -290,6 +297,19 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
     this._awaitingCookies = [];
     this._awaitingCookieDeletion = [];
   }
+
+  setHeader(name: string, value: string) {
+    if (this.currentState == "after_request") {
+      this._response?.headers.set(name, value);
+      return this;
+    }
+    this._response_init.headers = {
+      ...this._response_init.headers,
+      [name]: value
+    }
+    return this;
+  }
+
   /**
    * Injects global values into the request. they can be accessed into client-side in the globalThis object.
    * @param values The global values to inject. must be serializable.
@@ -355,13 +375,38 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   GlobalValueInjectionIsPrevented() {
     return this._prevent_global_values_injection;
   }
-  public async toResponse(): Promise<Response | BunextResponseNotSetError> {
-    if (this.__ERROR__) return new BunextError("Error occured during serving", this.__ERROR__);
+  /**
+   * **For Bunext internal use only**
+   * 
+   * Converts the BunextRequest to a Response object.
+   * @returns 
+   * 
+   * This method applies all necessary transformations to the response body, including HTML formatting and compression.
+   * It also handles any errors that may occur during the process and ensures that a valid Response object is returned.
+   * 
+   * If the response body is a string and the content type is HTML, it will be formatted using the `formatHTML` function.
+   * If the client supports gzip encoding and the response body is large enough, it will be compressed before being sent.
+   * 
+   * If any errors occur during the process, a 500 Internal Server Error response will be returned with a plain text message.
+   * 
+   * If an error was previously set on the BunextRequest, an error fallback component will be rendered and returned as the response.
+   * 
+   * This method ensures that the response is only sent once and that all necessary headers are set appropriately.
+   */
+  public async toResponse(): Promise<Response> {
+    if (this.__ERROR__) {
+      const error = new BunextError("Error occured during serving", this.__ERROR__)
+      return this.setResponseThenReturn(
+        new Response(renderToString(ErrorFallback({ error })), { status: 500, headers: { "Content-Type": "text/html" } })
+      );
+    }
 
     try {
 
       if (!this._response_setted) {
-        return new BunextResponseNotSetError("Response not set");
+        return this.setResponseThenReturn(new Response(null, {
+          status: 404,
+        }));
       }
 
       // Handle string responses with potential HTML processing
@@ -434,6 +479,11 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
         headers: { "Content-Type": "text/plain" }
       }));
     }
+  }
+
+  public async _formatResponseBeforeSending() {
+    await this.toResponse();
+    this._triggerAwaitingCookies();
   }
 
   private setResponseThenReturn(res: Response) {
