@@ -2,6 +2,8 @@
 
 # 🚀 Bunext
 
+### this new verison 0.12.0 will only be compatible with Bun version 1.2.22 & over
+
 > **High-performance Next.js-inspired framework for the Bun runtime**
 
 [![Version](https://img.shields.io/npm/v/bunext-js?color=success&label=version)](https://www.npmjs.com/package/bunext-js)

@@ -7,6 +7,11 @@ import { SessionAPIEndPoints } from "./endPoints";
 import type { InitializedPrivateSessionData, SessionData } from "./common";
 
 
+declare global {
+  var __BUNEXT_DEV_SESSION_FIX: InAppSession<{}>;
+}
+
+
 export const NewSessionHeaderName = "__BUNEXT_NEW_SESSION__";
 /**
  * Header name for session timeout in seconds
@@ -141,6 +146,9 @@ export class BunextSession<DataType extends Record<string, unknown> = {}> {
     if (this.isExpired()) this.reset();
 
     return this;
+  }
+  setUpdater(func: React.Dispatch<React.SetStateAction<boolean>>) {
+    this._updateFunction = func;
   }
 
   public _get_private_meta_data(): InitializedPrivateSessionData {
@@ -324,6 +332,7 @@ export class BunextSession<DataType extends Record<string, unknown> = {}> {
 
     // Update internal public data
     this._internalData.public = data as DataType;
+    globalThis.__PUBLIC_SESSION_DATA__ = this._internalData.public;
 
     // Update session timeout if provided
     if (updateTimeout && typeof updateTimeout === 'number' && updateTimeout > 0) {
@@ -343,7 +352,7 @@ export class BunextSession<DataType extends Record<string, unknown> = {}> {
    * Get session data (works on both server and client)
    */
   getData<DataAwaited extends keyof SessionData<DataType, true> = "public">(): SessionData<DataType, true>[DataAwaited] | undefined {
-    if (isServerSide()) this._ensureInitialized();
+    //if (isServerSide()) this._ensureInitialized();
 
     if (!this.exists()) return undefined;
     try {
@@ -420,6 +429,15 @@ export class BunextSession<DataType extends Record<string, unknown> = {}> {
     });
     this._isUpdated = true;
     return this;
+  }
+
+  clientDelete() {
+    this._exists = false;
+    this._internalData = {
+      public: {} as DataType,
+      private: {} as SessionData<DataType, true>["private"],
+    };
+    this._triggerUpdate();
   }
 
   /**
@@ -567,8 +585,9 @@ export class BunextSession<DataType extends Record<string, unknown> = {}> {
 }
 
 
+globalThis.__BUNEXT_DEV_SESSION_FIX ??= new BunextSession({});
 
-export const SessionContext = createContext<BunextSession<any>>(new BunextSession({}));
+export const SessionContext = createContext<InAppSession<{}>>(globalThis.__BUNEXT_DEV_SESSION_FIX);
 export const SessionDidUpdateContext = createContext(false);
 
 /**
@@ -583,8 +602,7 @@ export function useSession<DataType extends Record<string, unknown>>() {
   useEffect(() => setState(did_update), [did_update]);
 
   return (
-    (server_session?.getContext<SessionPluginContext>().session as unknown as InAppSession<DataType>) ??
-    (session as InAppSession<DataType>)
+    (server_session?.getContext<SessionPluginContext>().session as unknown as InAppSession<DataType>) || session
   );
 }
 

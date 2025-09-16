@@ -72,11 +72,13 @@ async function serveFromBuildDirectory(manager: RequestManager): Promise<void> {
 }
 
 
+function setFiles(filesPaths: string[]) {
+    files = [];
+    files.push(...filesPaths.map(path => Bun.file(path)));
+}
+
 function setListeners(ipc: ClientIPCManager<"main" | "cluster">) {
-    ipc.onMessage<string[]>("set-build-dir-files", (filesPaths) => {
-        files = [];
-        files.push(...filesPaths.map(path => Bun.file(path)));
-    });
+    ipc.onMessage<string[]>("set-build-dir-files", setFiles);
 }
 
 export default {
@@ -96,10 +98,10 @@ export default {
             setListeners(ipc);
         },
     },
-    build_worker: {
+    build: {
         after_build(artefact, ipc) {
             const paths = artefact.outputs.map(({ path }) => path);
-            ipc.send<string[]>("main", "set-build-dir-files", paths);
+            setFiles(paths);
             ipc.send<string[]>("cluster", "set-build-dir-files", paths);
         },
     }

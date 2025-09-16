@@ -2,15 +2,16 @@
 
 import { webToken, type _webToken, type SetDataOptions } from "./webtoken";
 import "./server_global";
-import type { _GlobalData, ServerConfig } from "internal/types";
+import type { _GlobalData, Params, ServerConfig } from "internal/types";
 import { BunextError } from "./server_global";
-import { formatParams, RenderingError, RequestManager, router } from "./router";
+import { RenderingError, RequestManager, router } from "./router";
 import { formatHTML } from "internal/utils";
 import { DirectiveTool, type Directives } from "plugins/utils";
 import { join, resolve } from "path";
 import { pluginLoader } from "./plugin-loader";
 import { renderToString } from "react-dom/server";
 import { ErrorFallback } from "components/fallback";
+import type { MatchedRoute } from "bun";
 
 export type CookieOptions = Omit<_webToken, "cookieName"> & {
   encrypted?: boolean;
@@ -61,7 +62,6 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   private _response_init: ResponseInit = {};
 
   public manager: RequestManager;
-  public path: string = "";
 
   public isSendNowEnabled: boolean = false;
 
@@ -140,7 +140,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
           build: this.sanitizePath("." + pathname, join(CURRENT_PATH, this.manager.router.buildDir)),
           src: this.sanitizePath("." + pathname, join(CURRENT_PATH, this.manager.router.pageDir)),
         },
-        params: formatParams(matchServer.params),
+        params: this.formatParams(matchServer.params),
         directive
       };
     } else if (this.isAskingHTML && this.manager.serverSide) {
@@ -152,10 +152,24 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
           build: this.manager.clientSide?.filePath,
           src: this.manager.serverSide.filePath
         },
-        params: formatParams(this.manager.serverSide.params) as Record<string, string | string[]>,
+        params: this.formatParams(this.manager.serverSide.params) as Record<string, string | string[]>,
         directive
       };
     } else return undefined;
+  }
+
+  formatParams(match: MatchedRoute["params"] | undefined): Params {
+    if (!match) return {};
+    const params =
+      Object.entries(match).map(([key, value]) => {
+        const val = value.split("/");
+        if (val.length > 1) {
+          return [key, val];
+        }
+        return [key, val[0]];
+      }) || [];
+
+    return Object.fromEntries(params);
   }
 
   private sanitizePath(unsafePath: string, basePath: string) {
@@ -167,7 +181,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
   }
 
   /**
- * Skip all transformation and other plugins modification and send the response
+ * Skip all other plugins, apply modifiers and send the response
  */
   sendNow() {
     this._ensureisInState(["request"], "You can only send the response in the request state.");
@@ -347,6 +361,7 @@ export class BunextRequest<ContextType extends Record<string, unknown> = {}> {
    *
    * Prevent unnecessary data exposure, useless server processing or resource corruption.
    * @returns The current instance for chaining.
+   * **Note**: This method can only be used in the `before_request` and `request` plugins.
    */
   preventGlobalValuesInjection() {
     this._prevent_global_values_injection = true;

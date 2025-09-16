@@ -1,6 +1,6 @@
 import { type BunextPlugin } from "plugins/types";
 import "internal/server/server_global";
-import RobotText from "robots.txt";
+import RobotText from "./robots.txt";
 
 export default {
     priority: 0,

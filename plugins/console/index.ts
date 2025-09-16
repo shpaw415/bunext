@@ -662,7 +662,7 @@ export async function benchmark_console<T>(
 }
 
 
-export function redirectConsole(IPCHelper: ClientIPCManager<"cluster" | "builder">) {
+export function redirectConsole(IPCHelper: ClientIPCManager<"cluster">) {
     // Store original console methods
     const originalLog = console.log;
     const originalError = console.error;
@@ -730,9 +730,6 @@ export default {
             });
         },
         cluster(ipc) {
-            redirectConsole(ipc);
-        },
-        build_worker(ipc) {
             redirectConsole(ipc);
         },
     }

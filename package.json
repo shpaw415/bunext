@@ -16,7 +16,7 @@
   "type": "module",
   "devDependencies": {
     "@tailwindcss/cli": "4.1.4",
-    "@types/bun": "latest",
+    "@types/bun": "^1.2.22",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@types/terminal-kit": "^2.5.7",

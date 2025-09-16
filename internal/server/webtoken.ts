@@ -1,4 +1,4 @@
-
+"server only";
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "crypto";
 

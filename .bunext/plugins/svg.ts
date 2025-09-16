@@ -14,7 +14,7 @@ const SvgPlugin: BunPlugin = {
           "use client";
         ${await SVGCache.get(path)}
           `,
-          loader: "js",
+          loader: "jsx",
         };
       }
     );

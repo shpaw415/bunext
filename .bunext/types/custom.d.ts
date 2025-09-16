@@ -14,6 +14,11 @@ declare module "*.svg" {
   export default Svg;
 }
 
+declare module "*.txt" {
+  const path: string;
+  export default path;
+}
+
 declare module "node_modules/@types/bun/node_modules/bun-types/extensions.d.ts" {
   export { }; // Empty export to shadow the original module
 }

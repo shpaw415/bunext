@@ -4,7 +4,6 @@ import {
   type BunFile,
   type FileSystemRouter,
   type MatchedRoute,
-  type Subprocess,
 } from "bun";
 import { NJSON } from "next-json";
 import { join, relative, sep, normalize, resolve } from "node:path";
@@ -17,6 +16,7 @@ import { type JSX } from "react";
 // Internal imports
 import type {
   _GlobalData,
+  Params,
   ServerSideProps,
 } from "../types";
 import { BunextRequest } from "./bunextRequest";
@@ -24,7 +24,6 @@ import { RequestContext } from "./context";
 
 // Global imports
 import "./server_global";
-import type { JsxToStringWorkerMessage } from "../dev/types";
 import { BunextError } from "./server_global";
 import { DirectiveTool, IPCManager } from "plugins/utils";
 import { Shell } from "public/client/shell";
@@ -374,32 +373,42 @@ class StaticRouters {
     return manager.bunextReq.response as Response;
 
   }
-
-  public async CreateDynamicPage(
+  /**
+   * Create a page wrapped in layouts from module path
+   * @param param0 Module path, server-side props, route name, and request manager
+   * @returns JSX page wrapped in layouts 
+   */
+  public async CreateDynamicPage({
+    module,
+    props,
+    routeName,
+    manager
+  }: {
     module: string,
-    props: { props: any; params: Record<string, unknown> },
-    serverSide: MatchedRoute,
-    bunextRequest: BunextRequest
-  ): Promise<JSX.Element> {
+    props: { props?: ServerSideProps<{}>; params: Params },
+    routeName: string,
+    manager?: RequestManager
+  }): Promise<JSX.Element> {
     const ModuleDefault = (
       (await import(module)) as {
         default: ({
           props,
           params,
         }: {
-          props: any;
-          params: any;
-          request?: BunextRequest;
+          props?: ServerSideProps<{}>;
+          params: Params;
+          manager?: RequestManager;
         }) => Promise<JSX.Element>;
       }
     ).default;
 
     const JSXElement = async () => (
-      <RequestContext.Provider value={bunextRequest}>
-        {await this.stackLayouts(
-          serverSide,
-          await ModuleDefault({ ...props, request: bunextRequest })
-        )}
+      <RequestContext.Provider value={manager?.bunextReq}>
+        {await this.stackLayouts({
+          pageElement: await ModuleDefault({ ...props, manager: manager }),
+          routeName,
+          params: props.params
+        })}
       </RequestContext.Provider>
     );
 
@@ -411,7 +420,15 @@ class StaticRouters {
    * @param route
    * @param pageElement The JSX Element to wrap layouts around
    */
-  public async stackLayouts(route: MatchedRoute, pageElement: JSX.Element) {
+  public async stackLayouts({
+    routeName,
+    pageElement,
+    params,
+  }: {
+    routeName: string;
+    pageElement: JSX.Element;
+    params?: Record<string, unknown>;
+  }): Promise<JSX.Element> {
     type _layout = ({
       children,
       params,
@@ -420,14 +437,14 @@ class StaticRouters {
       params: Record<string, unknown>;
     }) => JSX.Element | Promise<JSX.Element>;
 
-    const layouts = route.name == "/" ? [""] : route.name.split("/");
+    const layouts = routeName == "/" ? [""] : routeName.split("/");
     const layoutImports: Array<Promise<{ default: _layout }>> = [];
     layouts.reduce((prev, current) => {
       const pathFromPageDir = join(prev || sep, current);
       if (this.layoutPaths.includes(pathFromPageDir)) {
         layoutImports.push(
           import(
-            join(this.baseDir, this.pageDir, pathFromPageDir, "layout.tsx")
+            join(this.baseDir, this.pageDir, pathFromPageDir, `layout.tsx${process.env.NODE_ENV == "development" ? `?t=${Date.now()}` : ""}`)
           )
         );
       }
@@ -445,7 +462,7 @@ class StaticRouters {
       else
         currentJsx = await Layout({
           children: currentJsx,
-          params: formatParams(route.params),
+          params: params || {},
         });
     }
     return currentJsx;
@@ -592,73 +609,7 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
 
     this.relatedCssPaths = [];
   }
-  /**
-   * Creates an error for missing server-side routes
-   */
-  private createNoServerSideMatchError(): RouteNotFoundError {
-    return new RouteNotFoundError(`No server-side script found for ${this.pathname}`);
-  }
 
-
-  private async makeDevDynamicJSXElement(modulePath: string, serverSideProps?: ServerSideProps<unknown>) {
-    let pageString = "";
-    let proc: Subprocess<"ignore", "inherit", "inherit"> | undefined =
-      undefined as unknown as Subprocess<"ignore", "inherit", "inherit">;
-
-    await new Promise((resolve, reject) => {
-      if (!this.serverSide) {
-        reject(undefined);
-        throw this.createNoServerSideMatchError();
-      }
-      proc = Bun.spawn({
-        env: {
-          ...process.env,
-          module_path: modulePath,
-          props: JSON.stringify({
-            props: serverSideProps,
-            params: formatParams(this.serverSide.params),
-          }),
-          url: this.request.url,
-        },
-        cwd: process.cwd(),
-        cmd: ["bun", `${import.meta.dirname}/../dev/jsxToString.tsx`],
-        stdout: "inherit",
-        stderr: "inherit",
-        ipc: (message: JsxToStringWorkerMessage) => {
-          if (message.type == "jsxToString") {
-            pageString = message.jsx;
-            resolve(true);
-
-          } else (console[message.type] as any)(...message.message);
-
-        },
-      });
-    });
-
-    await proc.exited;
-
-    return (
-      <div
-        id="BUNEXT_INNER_PAGE_INSERTER"
-        dangerouslySetInnerHTML={{ __html: pageString }}
-      />
-    );
-  }
-  private async makeProductionDynamicJSXElement(
-    modulePath: string,
-    serverSideProps?: ServerSideProps<unknown>
-  ) {
-    if (!this.serverSide) return null;
-    return this.router.CreateDynamicPage(
-      modulePath,
-      {
-        props: serverSideProps,
-        params: formatParams(this.serverSide.params),
-      },
-      this.serverSide,
-      this.bunextReq
-    );
-  }
   /**
    * Creates a dynamic JSX element containing the page wrapped by all layouts from the current route
    * @param param0 - The server-side props for the page
@@ -666,16 +617,21 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
    */
   public makeDynamicJSXPage({
     serverSideProps,
-    modulePath
+    modulePath,
+    params,
+    routeName
   }: {
     modulePath: string;
-    serverSideProps?: ServerSideProps<{} | unknown>;
+    serverSideProps?: ServerSideProps<{}>;
+    params: Params;
+    routeName: string;
   }) {
-    if (!this.serverSide) return null;
-
-    if (process.env.NODE_ENV == "development")
-      return this.makeDevDynamicJSXElement(modulePath, serverSideProps);
-    else return this.makeProductionDynamicJSXElement(modulePath, serverSideProps);
+    return this.router.CreateDynamicPage({
+      module: modulePath,
+      manager: this,
+      props: { props: serverSideProps, params },
+      routeName
+    });
   }
 
   /**
@@ -683,10 +639,10 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
    * @param page layouts + page
    * @returns Shelled Page JSX
    */
-  public async WrapPageWithShell(page: JSX.Element): Promise<JSX.Element> {
+  public async WrapPageWithShell(page: JSX.Element, bunextReq: BunextRequest): Promise<JSX.Element> {
     const ShellJSX = (
-      <RequestContext.Provider value={this.bunextReq}>
-        <Shell request={this.bunextReq}>
+      <RequestContext.Provider value={bunextReq}>
+        <Shell request={bunextReq}>
           {page}
           <script src="/.bunext/react-ssr/hydrate.js" type="module" />
           <script id="_BUNEXT_BOOTSTRAP_SCRIPT_" />
@@ -701,19 +657,7 @@ class RequestManager<ContextType extends Record<string, unknown> = {}> {
   }
 }
 
-export function formatParams(match: MatchedRoute["params"] | undefined): Record<string, string | string[]> {
-  if (!match) return {};
-  const params =
-    Object.entries(match).map(([key, value]) => {
-      const val = value.split("/");
-      if (val.length > 1) {
-        return [key, val];
-      }
-      return [key, val[0]];
-    }) || [];
 
-  return Object.fromEntries(params);
-}
 
 
 

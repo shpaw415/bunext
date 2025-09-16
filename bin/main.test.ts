@@ -158,7 +158,7 @@ describe("Bunext Framework Test Suite", () => {
         expect(globalThis.serverConfig).toBeDefined();
         expect(globalThis.serverConfig.HTTPServer).toBeDefined();
         expect(globalThis.serverConfig.HTTPServer.port).toBeGreaterThan(0);
-        expect(globalThis.serverConfig.session?.type).toBeOneOf(['database:hard', 'database:memory', 'cookie']);
+        expect(globalThis.serverConfig.session?.type).toBeOneOf(['database:hard', 'cookie']);
       } else {
         console.log("Server configuration not available in test environment");
       }
@@ -370,10 +370,12 @@ describe("Bunext Framework Test Suite", () => {
       expect(getServerActions()).toBeDefined();
       expect(Array.isArray(getServerActions())).toBe(true);
 
-      const totalActions = Array.prototype.concat(
-        ...getServerActions().map((e) => e.actions)
-      ).length;
-      expect(totalActions).toBeGreaterThan(0);
+      expect(
+        getServerActions()
+          .values()
+          .map((e) => e.length)
+          .reduce((a, b) => a + b, 0)
+      ).toBeGreaterThan(0);
     });
 
     test("server action execution", async () => {
@@ -879,7 +881,7 @@ describe("Bunext Framework Test Suite", () => {
     test("environment variable handling", () => {
       // Test environment variable processing
       const nodeEnv = process.env.NODE_ENV;
-      expect(nodeEnv).toBeOneOf(['development', 'production', 'test']);
+      expect(nodeEnv).toBeOneOf(['development', 'production']);
 
       // Test public environment variables
       const publicEnvVars = Object.keys(process.env).filter(key =>

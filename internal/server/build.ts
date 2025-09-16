@@ -1,19 +1,18 @@
 "server only";
 
 import "./server_global.ts";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import {
   type BuildOutput,
   type BunPlugin,
 } from "bun";
-import { normalize } from "path";
 import { mkdirSync, rmSync, unlinkSync } from "node:fs";
 import "../globals";
 import { router } from "./router";
 import * as React from "react";
 import { pluginLoader } from "internal/server/plugin-loader.ts";
 import { type ErrorObject, IPCManager } from "plugins/utils";
-import cluster from "node:cluster";
+import type { BunextPlugin } from "plugins/types";
 
 globalThis.React = React;
 
@@ -24,6 +23,25 @@ export type BuildOuts = {
   }[];
 };
 
+
+declare global {
+  var __PLUGIN_CACHE__: {
+    ts: Array<PluginCacheType<"ts">> | null;
+    tsx: Array<PluginCacheType<"tsx">> | null;
+    others: Array<PluginCacheType<"others">> | null;
+  }
+}
+
+globalThis.__PLUGIN_CACHE__ ??= {
+  ts: null,
+  tsx: null,
+  others: null,
+};
+
+type PluginCacheType<T extends "tsx" | "ts" | "others"> = {
+  pluginName: string;
+  func: Required<Required<Exclude<BunextPlugin["build"], undefined>>["partialPluginOverRide"]>[T];
+};
 
 
 export type BuildWorkerResponse = {
@@ -41,7 +59,7 @@ type _Mainoptions = {
 };
 
 const cwd = process.cwd();
-const ipc = IPCManager.getInstanceForCurrentProcess<"main" | "builder">();
+const ipc = IPCManager.getInstanceForCurrentProcess<"main">();
 
 class Builder {
   public options: _Mainoptions = {
@@ -69,7 +87,7 @@ class Builder {
     this.inited = true;
     this.Check_remove_node_modules_files_path();
     await this.InitGetCustomPluginsFromUser();
-    this.createBuildWorker();
+    /*this.createBuildWorker();*/
 
     this.remove_node_modules_files_path.push(
       ...pluginLoader.getPluginByName("removeFromBuild").flatMap((p) => p.pluginParent ?? [])
@@ -85,8 +103,9 @@ class Builder {
     for await (const path of this.glob(absPageDir, "**/*.{tsx,jsx}")) {
       entrypoints.push(path);
     }
+
     entrypoints = entrypoints.filter((e) => {
-      const allowedEndsWith = ["hydrate.ts", "layout.tsx", "index.tsx", "loading.tsx", "error.tsx"];
+      const allowedEndsWith = ["hydrate.ts", "index.tsx"];
       if (
         allowedEndsWith.includes(e.split("/").at(-1) as string) ||
         /\[[A-Za-z0-9]+\]\.[A-Za-z]sx/.test(e)
@@ -130,6 +149,27 @@ class Builder {
     return entrypoints;
   }
 
+  private beforeBuild() {
+    return Promise.all(pluginLoader.getSubPluginsByParentName("build", "before_build").map(async (plugin) => {
+      try {
+        await plugin.subPlugin(ipc);
+      } catch (e) {
+        console.error(`Error in build.before_build hook, name: ${plugin.name}:`, e);
+      }
+    }));
+  }
+
+  private async afterBuild(build: BuildOutput) {
+    const afterBuildPlugins = pluginLoader.getSubPluginsByParentName("build", "after_build");
+    await Promise.all(afterBuildPlugins.map(async (plugin) => {
+      try {
+        await plugin.subPlugin(build, ipc);
+      } catch (e) {
+        console.error(`Error in build.after_build hook, name: ${plugin.name}:`, e);
+      }
+    }));
+  }
+
   public async build(onlyPath?: string) {
     const { baseDir, hydrate, buildDir } = this.options;
     const pluginsConfig = await this.getPluginBuildConfig();
@@ -142,16 +182,15 @@ class Builder {
           ...(pluginsConfig?.entrypoints ?? []),
         ]
         : await this.getEntryPoints();
+    const minify = process.env.NODE_ENV == "production";
+    await this.beforeBuild();
     const build = await Bun.build({
-      env: Bun.semver.satisfies(Bun.version, "1.1.39 - x.x.x")
-        ? "PUBLIC_*"
-        : "*",
-      minify: process.env.NODE_ENV == "production",
+      env: "PUBLIC_*",
+      minify,
       sourcemap: "none",
       ...pluginsConfig,
       outdir: join(baseDir, buildDir as string),
       publicPath: "./",
-      //@ts-ignore
       splitting: true,
       target: "browser",
       naming: {
@@ -166,14 +205,14 @@ class Builder {
         ...entrypoints,
         ...(pluginsConfig?.entrypoints ?? []),
       ],
-      plugins: [...this.plugins, ...(pluginsConfig?.plugins || [])],
+      plugins: [this.defaultPlugin(), ...this.plugins, ...(pluginsConfig?.plugins || [])],
       define: {
         "process.env.NODE_ENV": JSON.stringify(
           process.env.NODE_ENV
         ),
         ...pluginsConfig?.define,
-      },
 
+      },
       external: [
         "bun",
         "node",
@@ -185,8 +224,39 @@ class Builder {
       ],
     });
     this.cleanBuildDir(build);
+    await this.afterBuild(build);
 
     return build;
+  }
+
+  private defaultPlugin(): BunPlugin {
+    const self = this;
+
+    const removeFromBuild = pluginLoader.getPluginByName("removeFromBuild").flatMap((p) => p.pluginParent ?? []).map((p) => normalize(p));
+    return {
+      name: "bunext-main-build-plugin",
+      target: "browser",
+      setup(build) {
+        build.onLoad({ filter: self.pluginRegexMake({ path: ["src", "pages"], ext: ["tsx"] }) }, async (args) => {
+          const { contents, loader } = await self.jsFileHandler({ args, fileExt: "tsx" });
+          return { contents, loader: loader || args.loader };
+
+        });
+        build.onLoad({ filter: self.pluginRegexMake({ path: ["src", "pages"], ext: ["ts"] }) }, async (args) => {
+          const { contents, loader } = await self.jsFileHandler({ args, fileExt: "ts" });
+          return { contents, loader: loader || args.loader };
+        });
+        build.onLoad({ filter: self.pluginRegexMake({ path: [], ext: ["jsx", "tsx", "ts", "js"] }) }, async (args) => {
+          if (removeFromBuild.some((p) => args.path === join(cwd, "node_modules", p))) {
+            return self.returnEmptyFile("js", Object.keys(require(args.path)));
+          }
+
+          const { contents, loader } = await self.jsFileHandler({ args, fileExt: "others" });
+          return { contents, loader: loader || args.loader };
+
+        });
+      }
+    }
   }
 
   public clearBuildDir() {
@@ -262,33 +332,97 @@ class Builder {
     }
   }
 
+  private getPluginInstance<T extends "tsx" | "ts" | "others">(fileExt: T): Array<PluginCacheType<T>> {
+
+    if (globalThis.__PLUGIN_CACHE__[fileExt]) {
+      return globalThis.__PLUGIN_CACHE__[fileExt] as Array<PluginCacheType<T>>;
+    }
+
+    const value = pluginLoader.getSubPluginsByParentName("build", "partialPluginOverRide")
+      .map((p) => ({ pluginName: p.name, func: p.subPlugin[fileExt] }))
+      .filter((p) => p.func !== undefined) as Array<PluginCacheType<T>>;
+    globalThis.__PLUGIN_CACHE__[fileExt as "ts"] = value as Array<PluginCacheType<"ts">>;
+
+    return globalThis.__PLUGIN_CACHE__[fileExt] as unknown as Array<PluginCacheType<T>>;
+  }
+
+  private async jsFileHandler({ args, fileExt }: { args: Bun.OnLoadArgs, fileExt: "tsx" | "ts" | "others" }): Promise<{ contents: string, loader?: Bun.Loader }> {
+    if (await router.fileDirectives.pathIs("server-only", args.path)) {
+      return this.returnEmptyFile("js", Object.keys(await import(args.path)));
+    }
+
+    let fileContents = await Bun.file(args.path).text();
+
+    let loaderOverRide: Bun.Loader | undefined = undefined;
+    for await (const { pluginName, func } of this.getPluginInstance(fileExt as "ts")) {
+      try {
+        const result = await func({ ...args, loader: loaderOverRide || args.loader }, fileContents, router.fileDirectives);
+        const contents = await (result?.contents as unknown as Promise<string>);
+        if (contents) {
+          fileContents = contents;
+        }
+        if (result?.loader) {
+          loaderOverRide = result.loader;
+        }
+      } catch (e) {
+        console.error(`Error occurred while processing partialPluginOverride[${fileExt}] plugin ${pluginName}:`);
+        throw e;
+      }
+    }
+
+    return {
+      contents: fileContents,
+      loader: loaderOverRide,
+    };
+  }
+
+  public pluginRegexMake({ path, ext }: { path: string[], ext: string[] }) {
+    return new RegExp(`^${join(cwd, ...path).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\.(${ext.join("|")})$`)
+  }
+  /**
+   * returns a module file that exports all exports as functions that throw an error when called from client side
+   */
+  returnEmptyFile(loader: Bun.Loader, exports: string[]) {
+    const toErrorString = (e: string) => `throw new Error("[ ${e} ] This is server-only component and cannot be used in client-side.")`;
+    return {
+      contents: exports.map(
+        (e) => {
+          return e == "default" ? `export default function _default() { ${toErrorString("default")} };` : `export const ${e} = () => { ${toErrorString(e)} }`;
+        }).join("\n"),
+      loader,
+    };
+  }
+
+  /*
   private createBuildWorker() {
     if (this.BuilderWorker || globalThis.__IS_BUILDER_WORKER__ || cluster.isWorker) return;
     this.BuilderWorker = this.makeBuildWorker();
     ipc.setBuilderProcess(this.BuilderWorker);
   }
-
-  private makeBuildWorker() {
-
-    const self = this;
-    return Bun.spawn({
-      cmd: ["bun", join(import.meta.dirname, "build-worker.ts")],
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NODE_ENV: process.env.NODE_ENV,
-      },
-      stdout: "inherit",
-      stderr: "inherit",
-      onExit: () => {
-        self.BuilderWorker = undefined;
-        ipc.setBuilderProcess(null);
-      },
-      ipc(_message) {
-        ipc.__DISPATCH__(_message);
-      },
-    });
-  }
+    */
+  /*
+    private makeBuildWorker() {
+  
+      const self = this;
+      return Bun.spawn({
+        cmd: ["bun", join(import.meta.dirname, "build-worker.ts")],
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          NODE_ENV: process.env.NODE_ENV,
+        },
+        stdout: "inherit",
+        stderr: "inherit",
+        onExit: () => {
+          self.BuilderWorker = undefined;
+          ipc.setBuilderProcess(null);
+        },
+        ipc(_message) {
+          ipc.__DISPATCH__(_message);
+        },
+      });
+    }
+      */
 
   public glob(
     path: string,

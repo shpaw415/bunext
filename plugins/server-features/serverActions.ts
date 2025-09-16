@@ -1,12 +1,12 @@
 import { RequestManager, router } from "internal/server/router";
-import type { ServerAction, ServerActionDataType, ServerActionDataTypeHeader } from "internal/types";
+import type { ServerActionDataType, ServerActionDataTypeHeader } from "internal/types";
 import { normalize, parse } from "path";
 import { SSRCache } from "./ssr-page";
 import type { BunextPlugin } from "plugins/types";
 import type { SessionPluginContext } from "plugins/session";
 
-
-let serverActions: Array<ServerAction> = [];
+type Path = string;
+const serverActions: Map<Path, Array<Function>> = new Map();
 
 function extractServerActionHeader(header: Record<string, string>) {
     if (!header.serveractionid) return null;
@@ -60,18 +60,16 @@ export async function serverActionGetter(manager: RequestManager): Promise<[body
         throw new Error(`Failed to extract POST data for ServerAction ${reqData.path}:${reqData.call}. Error: ${error}`);
     }
 
-    const module = serverActions.find(
-        (s) => s.path === reqData.path.slice(1)
-    );
+    const module = serverActions.get(reqData.path.slice(1));
     if (!module) {
-        const availableModules = serverActions.map(s => s.path).join(', ');
-        throw new Error(`No module found for ServerAction path '${reqData.path}'. Available modules: [${availableModules}]. Total modules loaded: ${serverActions.length}`);
+        const availableModules = Array.from(serverActions.keys()).join(', ');
+        throw new Error(`No module found for ServerAction path '${reqData.path}'. Available modules: [${availableModules}]. Total modules loaded: ${serverActions.size}`);
     }
 
-    const call = module.actions.find((f) => f.name === reqData.call);
+    const call = module.find((f) => f.name === reqData.call);
     if (!call) {
-        const availableActions = module.actions.map(f => f.name).join(', ');
-        throw new Error(`No function found for ServerAction '${reqData.call}' in module '${reqData.path}'. Available actions: [${availableActions}]. Total actions in module: ${module.actions.length}`);
+        const availableActions = module.map(f => f.name).join(', ');
+        throw new Error(`No function found for ServerAction '${reqData.call}' in module '${reqData.path}'. Available actions: [${availableActions}]. Total actions in module: ${module.length}`);
     }
     const fillUndefinedParams = (
         Array.apply(null, Array(call.length)) as Array<null>
@@ -123,16 +121,12 @@ export async function InitServerActions() {
                 const filePath = normalize(`${router.pageDir}/${file}`);
                 const moduleImport = normalize(`${process.cwd()}/${filePath}`);
                 const moduleExports = await import(process.env.NODE_ENV == "development" ? `${moduleImport}?${Bun.randomUUIDv7()}` : moduleImport);
-
                 const serverActionNames = Object.keys(moduleExports).filter((name) =>
                     name.startsWith("Server")
                 );
 
                 if (serverActionNames.length > 0) {
-                    serverActions.push({
-                        path: file,
-                        actions: serverActionNames.map((name) => moduleExports[name]),
-                    });
+                    serverActions.set(file, serverActionNames.map((name) => moduleExports[name]));
                 }
             } catch (error) {
                 if ((error as Error)?.message == "Requested module is not instantiated yet.") continue;
@@ -147,7 +141,7 @@ export async function InitServerActions() {
 }
 
 export function clearServerActions() {
-    serverActions = [];
+    serverActions.clear();
 }
 
 export function getServerActions() {
@@ -164,7 +158,7 @@ export async function onRequestServerAction(manager: RequestManager): Promise<vo
 /**
  * used for transform serverAction to tag for Transpiler
  */
-export async function ServerActionToTag(moduleContent: Record<string, unknown>) {
+async function ServerActionToTag(moduleContent: Record<string, unknown>) {
     return Object.fromEntries(
         Object.keys(moduleContent)
             .filter((ex) => ex.startsWith("Server"))
@@ -172,43 +166,7 @@ export async function ServerActionToTag(moduleContent: Record<string, unknown>) 
     );
 }
 
-export async function ServerComponentsToTag(
-    modulePath: string,
-    _module: Record<string, unknown>
-) {
-    // ServerComponent
-    const ssrModule = await SSRCache.getSSR(modulePath);
-    const defaultName = (_module?.default as Function)?.name;
-    let replaceServerElement: {
-        [key: string]: {
-            tag: string;
-            reactElement: string;
-        };
-    } = {};
-    for await (const exported of Object.keys(_module)) {
-        const Func = _module[exported] as Function;
-
-        if (
-            !isFunction(Func) ||
-            Func.name.startsWith("Server") ||
-            Func.name == "getServerSideProps" ||
-            Func.length > 0
-        ) {
-            continue;
-        }
-
-        const ssrElement = ssrModule?.elements.find(
-            (e) => e.tag == `<!Bunext_Element_${Func.name}!>`
-        );
-
-        if (!ssrElement) continue;
-        if (defaultName == Func.name) replaceServerElement.default = ssrElement;
-        else replaceServerElement[Func.name] = ssrElement;
-    }
-    return replaceServerElement;
-}
-
-export function ServerActionCompiler(
+export function serverActionCompiler(
     _module: Record<string, unknown>,
     fileContent: string,
     modulePath: string
@@ -259,10 +217,29 @@ function ServerActionToClient(func: AnyFn, ModulePath: string): string {
     )}`;
 }
 
-function isFunction(functionToCheck: any) {
-    return typeof functionToCheck == "function";
-}
+async function makeModification(
+    fileContent: string,
+    filePath: string,
+    module: Record<string, unknown>,
+    loader: Bun.Loader
+) {
+    const transpiler = new Bun.Transpiler({
+        loader: loader as "tsx",
+        deadCodeElimination: true,
+        jsxOptimizationInline: true,
+        exports: {
+            replace: {
+                ...(await ServerActionToTag(module)),
+            },
+        },
+    });
 
+    return serverActionCompiler(
+        module,
+        transpiler.transformSync(fileContent),
+        filePath
+    );
+}
 
 export default {
     name: "bunext-server-actions-request-plugin",
@@ -271,6 +248,22 @@ export default {
         request(manager) {
             if (manager.bunextReq.isResponseSetted()) return;
             return onRequestServerAction(manager)
+        }
+    },
+    build: {
+        partialPluginOverRide: {
+            async tsx(args, fileContent) {
+                return {
+                    contents: makeModification(fileContent, args.path, await import([args.path, process.env.NODE_ENV == "development" ? `?${Bun.randomUUIDv7()}` : ""].join("")), args.loader || "tsx"),
+                    loader: "js"
+                };
+            },
+            async ts(args, fileContent) {
+                return {
+                    contents: makeModification(fileContent, args.path, await import([args.path, process.env.NODE_ENV == "development" ? `?${Bun.randomUUIDv7()}` : ""].join("")), args.loader || "tsx"),
+                    loader: "js"
+                };
+            },
         }
     }
 } as BunextPlugin;

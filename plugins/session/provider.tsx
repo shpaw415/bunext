@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BunextSession, GetSessionFromResponse, SessionContext, SessionDidUpdateContext, SessionTimeoutheaderName } from "./client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BunextSession, GetSessionFromResponse, SessionContext, SessionDidUpdateContext } from "./client";
 import { RouterLogger } from "internal/router";
 import { AddServerActionCallback } from "plugins/server-features/server-action-client";
 import type { InitializedPrivateSessionData } from "./common";
+
+
 
 /**
  * Enhanced SessionProvider with intelligent session management and performance optimizations.
@@ -41,33 +43,42 @@ import type { InitializedPrivateSessionData } from "./common";
  */
 export function SessionProvider({
     children,
-    config = {}
+    config = {},
+    session: _session
 }: {
     children: React.ReactNode;
     config?: {
         enableLogging?: boolean;
     };
+    session?: BunextSession<{}>;
 }) {
     const {
         enableLogging = process.env.NODE_ENV === "development",
     } = config;
 
     const [updater, setUpdater] = useState(false);
-    const session = useMemo(
-        () => {
-            const session = new BunextSession({
-                updateFunction: setUpdater,
-                enableLogging,
-                sessionTimeout: globalThis.serverConfig.session?.timeout || 3600,
-            }).init(globalThis.__PUBLIC_SESSION_DATA__ && globalThis.__SESSION_PRIVATE_INIT__ ? {
-                private: globalThis.__SESSION_PRIVATE_INIT__ as InitializedPrivateSessionData,
-                public: globalThis.__PUBLIC_SESSION_DATA__ ?? {}
-            } : null);
+    const session = useRef(_session || new BunextSession({
+        updateFunction: setUpdater,
+        enableLogging,
+        sessionTimeout: globalThis.serverConfig.session?.timeout || 3600,
+    }).init(globalThis.__PUBLIC_SESSION_DATA__ && globalThis.__SESSION_PRIVATE_INIT__ ? {
+        private: globalThis.__SESSION_PRIVATE_INIT__ as InitializedPrivateSessionData,
+        public: globalThis.__PUBLIC_SESSION_DATA__ ?? {}
+    } : null)).current;
 
-            return session;
-        },
-        [enableLogging]
-    );
+
+    if (!session.isInitialized()) {
+        console.log("Initializing session in SessionProvider");
+    }
+
+    console.log("SessionProvider initialized", session.getMetadata());
+
+    /*useReloadEffect(() => {
+        if(session.isInitialized()) return;
+        session.init();
+    });*/
+
+    //console.log("from <SessionProvider>", session.getData());
 
     const [sessionTimer, setSessionTimer] = useState<Timer>();
     const mountedRef = useRef(true);
@@ -95,7 +106,7 @@ export function SessionProvider({
                     if (mountedRef.current) {
                         try {
                             RouterLogger.log("Session expired (global timeout), cleaning up");
-                            session.delete();
+                            session.clientDelete();
                         } catch (error) {
                             RouterLogger.error("Failed to delete expired session", error);
                         }
@@ -191,13 +202,13 @@ export function SessionProvider({
         return () => {
             mountedRef.current = false;
         };
-    }, [addToServerActionCallback, timerSetter]);
+    }, [addToServerActionCallback, timerSetter, session]);
 
     return (
-        <SessionContext.Provider value={session}>
-            <SessionDidUpdateContext.Provider value={updater}>
+        <SessionContext value={session}>
+            <SessionDidUpdateContext value={updater}>
                 {children}
-            </SessionDidUpdateContext.Provider>
-        </SessionContext.Provider>
+            </SessionDidUpdateContext>
+        </SessionContext>
     );
 }

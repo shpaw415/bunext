@@ -153,7 +153,7 @@ async function handleBuild(): Promise<void> {
     const result = await builder.build();
     console.log("Build completed successfully:", result);
   } catch (error) {
-    console.error("Build failed");
+    console.error("Build failed", error);
     throw error;
   }
 }

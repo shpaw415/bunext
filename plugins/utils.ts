@@ -130,7 +130,7 @@ type IPCProcesses = {
     clusters: Array<Cluster["worker"]> | null;
 };
 
-type IPCProcessType = "builder" | "cluster" | "main";
+type IPCProcessType = "cluster" | "main";
 type IPCManagerOptions = {
     type: IPCProcessType;
 };
@@ -159,7 +159,6 @@ export type ClientIPCManager<T extends IPCProcessType> = Omit<
 
 declare global {
     var IPCManagerMain: IPCManager<"main">;
-    var IPCManagerBuilder: IPCManager<"builder">;
     var IPCManagerCluster: IPCManager<"cluster">;
 }
 
@@ -186,7 +185,7 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
              * @example ipc.actions.builder.build("/profile/[id]");
              * @returns 
              */
-            build: (buildPath?: string) => this.send<{ buildPath?: string }, BuildWorkerResponse | null>("builder", "build", { buildPath }),
+            build: (buildPath?: string) => this.send<{ buildPath?: string }, BuildWorkerResponse | null>("main", "build", { buildPath }),
         },
         main: {
             /**
@@ -204,8 +203,7 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
         if (type !== "main") this.initSubProcesses();
         else this.initMain();
 
-        if (type === "builder") this.isBuilderInited = true;
-        else if (type === "cluster") this.isClusterInited = true;
+        if (type === "cluster") this.isClusterInited = true;
     }
 
     private initMain() {
@@ -227,36 +225,17 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
         });
     }
 
-    private aknowledgeReadyState(type: IPCProcessType) {
-        if (type === "builder") {
-            this.send("cluster", "builder-ready", null);
-        } else if (type === "cluster") {
-            this.send("builder", "cluster-ready", null);
-        }
-    }
-
-    public setBuilderProcess(builder: Bun.Subprocess<"ignore", "inherit", "inherit"> | null) {
-        if (this.type !== "main") throw new Error("setBuilderProcess can only be called from the main process");
-        this.processes.builder = builder;
-        this.isBuilderInited = true;
-        this.queuedMessages.filter(msg => msg.to === "builder").forEach(msg => this.__DISPATCH__(msg));
-        this.queuedMessages = this.queuedMessages.filter(msg => msg.to !== "builder");
-        this.aknowledgeReadyState("builder");
-    }
     public setClusterProcesses(clusters: Array<Cluster["worker"]>) {
         if (this.type !== "main") throw new Error("setClusterProcesses can only be called from the main process");
         this.processes.clusters = clusters;
         this.isClusterInited = true;
         this.queuedMessages.filter(msg => msg.to === "cluster").forEach(msg => this.__DISPATCH__(msg));
         this.queuedMessages = this.queuedMessages.filter(msg => msg.to !== "cluster");
-        this.aknowledgeReadyState("cluster");
     }
 
     public static getInstanceForCurrentProcess<T extends IPCProcessType>(): IPCManager<T> {
         if (cluster.isWorker) {
             return IPCManager.getInstanceForCluster() as IPCManager<T>;
-        } else if (globalThis.__IS_BUILDER_WORKER__) {
-            return IPCManager.getInstanceForBuilder() as IPCManager<T>;
         } else {
             return IPCManager.getInstanceForMain() as IPCManager<T>;
         }
@@ -265,16 +244,6 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
     public static getInstanceForMain() {
         globalThis.IPCManagerMain ??= new IPCManager<"main">({ type: "main" });
         return globalThis.IPCManagerMain;
-    }
-    /**
-     * Get the singleton instance of IPCManager for builder process.
-     * @returns The singleton instance of IPCManager for builder process.
-     * 
-     * **process.on("message", ...) is already handled in initSubProcesses**
-     */
-    public static getInstanceForBuilder() {
-        globalThis.IPCManagerBuilder ??= new IPCManager<"builder">({ type: "builder" });
-        return globalThis.IPCManagerBuilder;
     }
     /**
      * Get the singleton instance of IPCManager for cluster processes.
@@ -304,7 +273,6 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
         if (to == "cluster" && !clusterEnabled) return null as unknown as ResponseData;
 
         if (
-            this.type == "main" && !this.isBuilderInited && to == "builder" ||
             this.type == "main" && !this.isClusterInited && to == "cluster"
         ) {
             this.queuedMessages.push({ from: this.type, to, id, data, requestID, type: "request" });
@@ -351,12 +319,6 @@ export class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
             }
         } else if (this.type !== "main") {
             process.send?.(message);
-        } else if (message.to == "builder") {
-            if (this.processes.builder === null) {
-                console.warn("IPCManager: Builder process is not initialized. Message ignored.");
-                return;
-            }
-            this.processes.builder.send(message);
         } else if (message.to == "cluster") {
             if (this.processes.clusters === null) {
                 console.warn("IPCManager: Cluster processes are not initialized. Message ignored.");

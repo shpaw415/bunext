@@ -170,10 +170,6 @@ export type revalidate = {
   time: number;
 };
 
-export type ServerAction = {
-  path: string;
-  actions: Array<Function>;
-}
 export type ServerActionDataType = File | string | Blob | Object | BunFile;
 export type ServerActionDataTypeHeader = "json" | "file" | "blob";
 
@@ -212,7 +208,7 @@ export type ClusterMessageType =
     };
   };
 
-export type Params = Record<string, unknown> | undefined;
+export type Params = Record<string, string | string[]> | undefined;
 
 export type getServerSidePropsFunction<T extends Record<string, unknown> = {}> = (
   request_data: { params: Params; request: Request },

@@ -4,7 +4,6 @@ import { useSession } from "public/session";
 
 export function getServerSideProps() {
   console.log("server side props");
-  Bun.sleepSync(2000);
   return {
     test: true,
   };
@@ -13,7 +12,7 @@ export function getServerSideProps() {
 export default function StaticPage({ props }: { props: any }) {
   return (
     <>
-      <p>static page {JSON.stringify(props)}</p>
+      <p>static pages {JSON.stringify(props)}</p>
       <Session />
     </>
   );
@@ -21,5 +20,6 @@ export default function StaticPage({ props }: { props: any }) {
 
 function Session() {
   const session = useSession();
+  console.log("session data", session.getMetadata());
   return <pre>{JSON.stringify(session.getData<"public">())}</pre>;
 }

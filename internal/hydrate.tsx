@@ -25,7 +25,7 @@ export async function hydrate(
   const matched = match(globalThis.__INITIAL_ROUTE__.split("?")[0])!;
   const Initial = await import(matched.value) as { default: (args: { props: unknown; params: Record<string, unknown> }) => JSX.Element };
 
-  const jsxPage = await CreatePage({
+  const JsxPage = await CreatePage({
     matched,
     props: globalThis.__SERVERSIDE_PROPS__,
     module: Initial,
@@ -34,11 +34,9 @@ export async function hydrate(
 
   return hydrateRoot(
     document,
-    <StrictMode>
-      <RouterHost {...options}>
-        {jsxPage}
-      </RouterHost>
-    </StrictMode>,
+    <RouterHost {...options}>
+      {JsxPage}
+    </RouterHost>,
     { onRecoverableError }
   );
 }

@@ -27,7 +27,7 @@ export async function ServerEndSession() {
 
 export async function ServerCheckSession() {
     const session = Bunext.session.get(arguments);
-    const data = await session.getData();
+    const data = session.getData();
     return data;
 }
 

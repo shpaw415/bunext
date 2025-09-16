@@ -1,3 +1,4 @@
+"server only";
 // Public API: request
 export {
     BunextRequest,

@@ -10,6 +10,7 @@ import React, {
   useSyncExternalStore,
   type JSX,
   type ComponentType,
+  type ReactNode,
 } from "react";
 import { getRouteMatcher, type Match } from "./utils/get-route-matcher";
 import type { _GlobalData, ServerSideProps } from "../types";
@@ -19,6 +20,8 @@ import { preloadModule } from "react-dom";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { Shell } from "bunext-js/client/shell";
 import { events, navigate } from "./client";
+import { SessionProvider } from "plugins/session/provider";
+import { ErrorFallback } from "components/fallback";
 
 
 /**
@@ -36,13 +39,9 @@ export type RouterConfig = {
   };
 }
 
-interface RouteParams {
-  [key: string]: string | string[];
-}
+type RouteParams = Record<string, string | string[]>;
 
-interface LayoutComponent {
-  (props: { children: JSX.Element; params: RouteParams }): JSX.Element | Promise<JSX.Element>;
-}
+type LayoutComponent = (props: { children: JSX.Element; params: RouteParams }) => JSX.Element;
 
 /**
  * Router error types for better error handling
@@ -127,8 +126,6 @@ const globalX = globalThis as unknown as _GlobalData;
 export const match = globalX.__ROUTES__
   ? getRouteMatcher(globalX.__ROUTES__)
   : () => null;
-
-const __MAIN_ROUTE__ = match(`${globalX.__INITIAL_ROUTE__}`)?.path;
 
 /**
  * Enhanced server-side props fetching with caching and retry logic
@@ -480,16 +477,18 @@ function formatSameLevelPath(fileName: string, basePath: string): string {
   const pathArray = basePath.split("/");
   pathArray.pop();
   pathArray.push(fileName);
+  console.log("Formatted same level path:", pathArray.join("/"));
   return pathArray.join("/");
 }
 
-function importIfExists<T>(path: string, checkList: string[]): Promise<{ default: T }> | undefined {
+function importIfExists<T>(path: string, checkList: string[]): Promise<{ default: T }> | null {
   console.log(`Checking import for:s ${path}`, { checkList });
   if (checkList.includes(path)) {
     return import(path);
   }
-  return undefined;
+  return null;
 }
+
 
 /**
  * Main router component that manages application routing and navigation.
@@ -532,12 +531,10 @@ export const RouterHost = ({
   children,
   normalizeUrl = (url: string) => url,
   onRouteUpdated,
-  loadingComponent: LoadingComponent,
 }: {
-  children: React.ReactElement;
+  children: React.ReactNode;
   normalizeUrl?: (url: string) => string;
   onRouteUpdated?: (path: string) => void;
-  loadingComponent?: ComponentType;
   enablePreloading?: boolean;
 }) => {
   const pathname = useLocationProperty(
@@ -546,10 +543,29 @@ export const RouterHost = ({
   );
 
   const [current, setCurrent] = useState(children);
+  const componentsRef = useRef<{
+    ErrorComponent: ((error: Error) => ReactNode) | null;
+    LoadingComponent: (() => JSX.Element) | null
+  }>({
+    ErrorComponent: null,
+    LoadingComponent: null
+  });
+
+  useEffect(() => {
+    Promise.all([
+      importIfExists<(error: Error) => ReactNode>(formatSameLevelPath("error.js", "/" + globalThis.__PAGES_DIR__ + location.pathname), globalThis.__ERROR_COMPONENTS__),
+      importIfExists<() => JSX.Element>(formatSameLevelPath("loading.js", "/" + globalThis.__PAGES_DIR__ + location.pathname), globalThis.__LOADING_COMPONENTS__)
+    ]).then(([errorComponent, loadingComponent]) => {
+      componentsRef.current = {
+        ErrorComponent: errorComponent?.default || null,
+        LoadingComponent: loadingComponent?.default || null
+      };
+    });
+  }, []);
+
   const [version, setVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const versionRef = useRef<number>(version);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const firstLoad = useRef(true);
 
   const reload = useCallback(
@@ -571,15 +587,20 @@ export const RouterHost = ({
           throw new RouteNotFoundError(target);
         }
 
-        await OnDevRouterUpdate(matched);
+        const awaitDev = OnDevRouterUpdate();
 
-        const loadingComponent = await importIfExists(formatSameLevelPath("loading.js", matched.value), globalThis.__LOADING_COMPONENTS__);
-        const errorComponent = await importIfExists(formatSameLevelPath("error.js", matched.value), globalThis.__ERROR_COMPONENTS__);
+        const props = await fetchServerSideProps(target, {
+          useCache: process.env.NODE_ENV == "production",
+        });
 
-        const [props, module] = await Promise.all([
-          fetchServerSideProps(target, {
-            useCache: process.env.NODE_ENV == "production",
-          }),
+        if (typeof props == "object" && props?.redirect) {
+          navigate(props.redirect as RoutesType);
+          return;
+        }
+
+        await awaitDev;
+
+        const [module, loadingComponent, errorComponent] = await Promise.all([
           import(
             firstLoad.current ? matched.value : [
               matched.value,
@@ -588,25 +609,27 @@ export const RouterHost = ({
               (process.env.NODE_ENV === "development" ? `&__BUNEXT_VERSION__=${currentVersion}` : "")
             ].join("")
           ),
+          importIfExists<() => JSX.Element>(formatSameLevelPath("loading.js", matched.value), globalThis.__LOADING_COMPONENTS__),
+          importIfExists<(error: Error) => ReactNode>(formatSameLevelPath("error.js", matched.value), globalThis.__ERROR_COMPONENTS__)
         ]);
+
+        componentsRef.current = {
+          LoadingComponent: loadingComponent?.default || null,
+          ErrorComponent: errorComponent?.default || null
+        };
 
         firstLoad.current = false;
 
-        const JsxToDisplay = await CreatePage({
-          module,
-          props,
-          currentVersion,
-          matched,
-        });
         if (currentVersion === versionRef.current) {
-          if (typeof props == "object" && props?.redirect) {
-            navigate(props.redirect as RoutesType);
-          } else {
-            onRouteUpdated?.(target);
-            setVersion(currentVersion);
-            setIsLoading(false);
-            setCurrent(JsxToDisplay);
-          }
+          onRouteUpdated?.(target);
+          setVersion(currentVersion);
+          setIsLoading(false);
+          setCurrent(await CreatePage({
+            module,
+            props,
+            currentVersion,
+            matched,
+          }));
         }
       } catch (error) {
         const routeError = error instanceof RouteError ? error : new RouteError(
@@ -617,10 +640,7 @@ export const RouterHost = ({
         console.error("Router error:", routeError);
         setIsLoading(false);
 
-        if (!ErrorBoundary) {
-          // Fallback to location.href if no error boundary
-          if (process.env?.PUBLIC_BUNEXT_DEV !== "true") location.href = target;
-        }
+        setCurrent(componentsRef.current.ErrorComponent?.(routeError) || ErrorFallback({ error: routeError }) || null);
       }
     },
     [ErrorBoundary, onRouteUpdated]
@@ -640,18 +660,19 @@ export const RouterHost = ({
     }
   }, [pathname, reload, onRouteUpdated, ErrorBoundary]);
 
+  console.log("Loading component:", componentsRef.current.LoadingComponent);
   return (
     <ReloadContext.Provider value={reload}>
       <VersionContext.Provider value={version}>
-        <ErrorBoundary>
-          <Shell>
-            {isLoading && LoadingComponent ? <LoadingComponent /> : current}
-          </Shell>
-        </ErrorBoundary>
-
-
+        <SessionProvider>
+          <ErrorBoundary fallback={componentsRef.current.ErrorComponent || undefined}>
+            <Shell>
+              {isLoading && componentsRef.current.LoadingComponent ? <componentsRef.current.LoadingComponent /> : current}
+            </Shell>
+          </ErrorBoundary>
+        </SessionProvider>
       </VersionContext.Provider>
-    </ReloadContext.Provider>
+    </ReloadContext.Provider >
   );
 };
 
@@ -668,7 +689,7 @@ export function AddOnDevRouteUpdateCallback(callback: () => Promise<void> | void
 /**
  * Enhanced development router update with better error handling
  */
-async function OnDevRouterUpdate(matched: Exclude<Match, null>): Promise<void> {
+async function OnDevRouterUpdate(): Promise<void> {
   if (process.env.NODE_ENV !== "development") return;
   //if (matched.path === __MAIN_ROUTE__) return;
 
@@ -676,7 +697,8 @@ async function OnDevRouterUpdate(matched: Exclude<Match, null>): Promise<void> {
     await fetch(window.location.href, {
       method: "PATCH",
       headers: {
-        "cache-control": "no-store"
+        "cache-control": "no-store",
+        "x-bunext-dev-router-update": "true",
       },
     });
   } catch (error) {
@@ -693,78 +715,140 @@ async function OnDevRouterUpdate(matched: Exclude<Match, null>): Promise<void> {
 
 
 /**
- * Enhanced layout stacker with better error handling and type safety.
- * Stacks layout components from parent directories to wrap the current page.
+ * Layout cache for performance optimization
+ */
+const layoutCache = new Map<string, LayoutComponent | null>();
+
+/**
+ * Build all possible layout paths from a route path.
+ * For a path like '/dashboard/users/[id]', this generates:
+ * ['/', '/dashboard', '/dashboard/users', '/dashboard/users/[id]']
  * 
- * @param page - The page JSX element to wrap with layouts
- * @param currentVersion - Version number for cache busting in development
- * @param match - The matched route object containing path and params
- * @returns Promise that resolves to the final JSX element with all layouts applied
+ * @param routePath - The route path to build layout paths from
+ * @returns Array of all possible layout paths in hierarchical order
+ */
+function buildLayoutPaths(routePath: string): string[] {
+  if (routePath === '/') return ['/'];
+
+  const segments = routePath.split('/').filter(Boolean);
+  const paths: string[] = ['/'];
+
+  let currentPath = '';
+  for (const segment of segments) {
+    currentPath += `/${segment}`;
+    paths.push(currentPath);
+  }
+
+  return paths;
+}
+
+/**
+ * Load a single layout component with caching and error handling.
+ * 
+ * @param layoutPath - The path to check for a layout
+ * @param currentVersion - Version for cache busting in development
+ * @returns Promise that resolves to the layout component or null if not found
+ */
+async function loadLayoutComponent(
+  layoutPath: string,
+  currentVersion: number
+): Promise<LayoutComponent | null> {
+  const cacheKey = `${layoutPath}:${currentVersion}`;
+
+  // Check cache first (skip cache in development for hot reloading)
+  if (process.env.NODE_ENV === 'production' && layoutCache.has(cacheKey)) {
+    return layoutCache.get(cacheKey) || null;
+  }
+
+  // Check if this path has a layout
+  if (!globalX.__LAYOUT_ROUTE__.includes(layoutPath)) {
+    layoutCache.set(cacheKey, null);
+    return null;
+  }
+
+  try {
+    const layoutModulePath = normalize(
+      `/${globalX.__PAGES_DIR__}${layoutPath}/layout.js${process.env.NODE_ENV === "development" ? `?${currentVersion}` : ""
+      }`
+    );
+
+    RouterLogger.log(`Loading layout for path: ${layoutPath}`, { modulePath: layoutModulePath });
+
+    const layoutModule = await import(layoutModulePath) as { default?: LayoutComponent };
+
+    const layoutComponent = layoutModule.default || null;
+    layoutCache.set(cacheKey, layoutComponent);
+
+    if (layoutComponent) {
+      RouterLogger.log(`Successfully loaded layout for path: ${layoutPath}`);
+    } else {
+      RouterLogger.warn(`Layout module found but no default export for path: ${layoutPath}`);
+    }
+
+    return layoutComponent;
+  } catch (error) {
+    RouterLogger.error(`Failed to load layout for path "${layoutPath}"`, error);
+    layoutCache.set(cacheKey, null);
+    return null;
+  }
+}
+
+async function LayoutGetter(match: Exclude<Match, null>, currentVersion: number) {
+  // Build all possible layout paths in hierarchical order
+  const layoutPaths = buildLayoutPaths(match.path);
+
+  // Load all layout components concurrently
+  const layoutPromises = layoutPaths.map(path =>
+    loadLayoutComponent(path, currentVersion)
+  );
+
+  const loadedLayouts = await Promise.all(layoutPromises);
+
+  // Filter out null layouts and reverse for correct nesting order
+  const layoutStack = loadedLayouts
+    .filter((layout): layout is LayoutComponent => layout !== null)
+    .reverse(); // Reverse so outermost layout is first
+
+  return layoutStack;
+}
+
+/**
+ * Recursively renders layout components in a nested structure.
+ * Each layout component wraps its children with the next layout in the stack.
+ * 
+ * @param layoutList - Array of layout components to render (outermost first)
+ * @param children - The JSX element to wrap with layouts (typically the page component)
+ * @param params - Route parameters to pass to each layout component
+ * @returns The nested layout structure with the children at the center
  * 
  * @example
- * // This function is used internally by RouterHost
- * const wrappedPage = await NextJsLayoutStacker({
- *   page: <MyPage />,
- *   currentVersion: 1,
- *   match: { path: '/dashboard/users', params: {} }
- * });
- * // Result: <RootLayout><DashboardLayout><MyPage /></DashboardLayout></RootLayout>
+ * // With layouts [RootLayout, DashboardLayout] and children <Page />
+ * // Returns: <RootLayout><DashboardLayout><Page /></DashboardLayout></RootLayout>
  */
-export async function NextJsLayoutStacker({
-  page,
-  currentVersion,
-  match,
+function LayoutStack({
+  layoutList,
+  children,
+  params
 }: {
-  page: JSX.Element;
-  currentVersion: number;
-  match: Exclude<Match, null>;
-}): Promise<JSX.Element> {
-  let currentPath = "/";
-  const layoutStack: Array<LayoutComponent> = [];
-  const formattedPath = match.path === "/" ? [""] : match.path.split("/");
-
-  for (const pathSegment of formattedPath) {
-    currentPath += pathSegment.length > 0 ? pathSegment : "";
-
-    if (globalX.__LAYOUT_ROUTE__.includes(currentPath)) {
-      try {
-        const layoutModule = await import(
-          normalize(
-            `/${globalX.__PAGES_DIR__}${currentPath}/layout.js${process.env.NODE_ENV === "development" ? "?" + currentVersion : ""
-            }`
-          )
-        );
-
-        if (layoutModule.default) {
-          layoutStack.push(layoutModule.default);
-        }
-      } catch (error) {
-        console.warn(`Failed to load layout for path "${currentPath}":`, error);
-      }
-    }
-
-    if (pathSegment.length > 0) {
-      currentPath += "/";
-    }
+  layoutList: LayoutComponent[];
+  children: JSX.Element;
+  params: RouteParams;
+}): JSX.Element {
+  if (layoutList.length === 0) {
+    return children;
   }
 
-  layoutStack.reverse();
-  let currentJsx = page;
+  const [CurrentLayout, ...remainingLayouts] = layoutList;
 
-  for (const Layout of layoutStack) {
-    try {
-      currentJsx = await Layout({
-        children: currentJsx,
-        params: match.params,
-      });
-    } catch (error) {
-      console.error("Layout rendering error:", error);
-      // Continue with previous JSX if layout fails
-    }
-  }
-
-  return currentJsx;
+  return (
+    <CurrentLayout params={params}>
+      <LayoutStack layoutList={remainingLayouts} params={params}>
+        {children}
+      </LayoutStack>
+    </CurrentLayout>
+  );
 }
+
 
 /**
  * Enhanced path normalization with better edge case handling
@@ -895,17 +979,9 @@ export function usePathname(): string {
   if (typeof window !== "undefined") {
     return location.pathname;
   }
+  const pathname = requestContext?.match?.pathname || "/";
+  return pathname;
 
-  try {
-    const url = requestContext?.request?.url;
-    if (url) {
-      return new URL(url).pathname;
-    }
-  } catch (error) {
-    console.warn("Failed to get pathname from request context:", error);
-  }
-
-  return "/";
 }
 
 
@@ -914,27 +990,28 @@ export async function CreatePage({
   matched,
   props,
   module,
-  currentVersion
+  currentVersion,
 }: {
   matched: Exclude<Match, null>,
   props?: ServerSideProps<{}> | null,
   currentVersion: number,
-  module: { default: (args: { props: unknown; params: Record<string, unknown> }) => JSX.Element }
+  module: { default: (args: { props: unknown; params: Record<string, unknown> }) => JSX.Element },
 }): Promise<JSX.Element> {
 
   if (typeof window != "undefined") globalThis.__SERVERSIDE_PROPS__ = props;
 
-  return <ErrorBoundary resetOnPropsChange={true}>
-    {
-      NextJsLayoutStacker({
-        page: module.default({
+  const layoutStack = await LayoutGetter(matched, currentVersion);
+
+  return (
+    <ErrorBoundary resetOnPropsChange={true}>
+      <LayoutStack layoutList={layoutStack} params={matched.params}>
+        {module.default({
           props,
           params: matched.params,
-        }),
-        currentVersion,
-        match: matched,
-      })
-    }</ErrorBoundary>
+        })}
+      </LayoutStack>
+    </ErrorBoundary>
+  );
 }
 
 

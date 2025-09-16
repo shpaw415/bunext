@@ -65,7 +65,7 @@ export const tailwindPlugin: BunextPlugin = {
     }
   },
 
-  build_worker: {
+  build: {
     async before_build() {
       if (process.env.NODE_ENV === "development") await compileTailwindCSS(DEFAULT_CONFIG);
     }
@@ -222,7 +222,7 @@ export function createTailwindPlugin(userConfig: Partial<TailwindConfig> = {}): 
       }
     },
 
-    build_worker: {
+    build: {
       async before_build() {
         if (process.env.NODE_ENV === "development") await compileTailwindCSS(config);
       },

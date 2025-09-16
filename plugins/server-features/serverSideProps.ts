@@ -9,7 +9,7 @@ import type { BunextPlugin } from "plugins/types";
 
 class ServerSidePropsError extends BunextError { }
 
-type ServerSidePropsTyped = ServerSideProps<{}> | null | undefined;
+export type ServerSidePropsTyped = ServerSideProps<{}> | null | undefined;
 
 
 declare global {
@@ -25,7 +25,7 @@ export type ServerSidePropsContext = {
          */
         cache: () => void;
         unCache: () => void;
-        value: ServerSidePropsTyped;
+        value: () => Promise<ServerSidePropsTyped>;
     };
 };
 
@@ -74,7 +74,7 @@ class ServerSidePropsManager {
      * Make serverSideProps for a specified filePath
      */
     async makeForPath(filePath: string, manager: RequestManagerContexted) {
-        const module = (await import(filePath)) as {
+        const module = (await import([filePath, process.env.NODE_ENV == "development" ? `?${Date.now()}` : ""].join(""))) as {
             getServerSideProps?: getServerSidePropsFunction;
         };
 
@@ -147,16 +147,24 @@ export default {
                 manager.bunextReq.isAskingHTML && manager.bunextReq.match?.filePaths.src ||
                 manager.bunextReq.isClientNavigating && manager.bunextReq.match?.filePaths.src
             ) {
-                await manager.bunextReq.getContext<SessionPluginContext>().__INIT_SESSION__();
+                let currentServerSideProps: ServerSidePropsTyped | undefined | null = undefined;
+
                 manager.bunextReq.setContext<ServerSidePropsContext>({
                     __SERVERSIDE_PROPS__: {
-                        value: (await serverSidePropsManager.getFromCache(manager)) ||
-                            await serverSidePropsManager.makeForPath(
-                                manager.serverSide?.filePath || manager.bunextReq.match?.filePaths.src as string,
-                                manager
-                            ),
-                        cache() {
-                            serverSidePropsManager.addToCache(manager, manager.bunextReq.getContext<ServerSidePropsContext>().__SERVERSIDE_PROPS__?.value);
+                        value: async () => {
+                            if (currentServerSideProps !== undefined) {
+                                return currentServerSideProps;
+                            }
+                            await manager.bunextReq.getContext<SessionPluginContext>().__INIT_SESSION__();
+                            currentServerSideProps = await (serverSidePropsManager.getFromCache(manager)) ||
+                                serverSidePropsManager.makeForPath(
+                                    manager.serverSide?.filePath || manager.bunextReq.match?.filePaths.src as string,
+                                    manager
+                                ) as ServerSidePropsTyped | null;
+                            return currentServerSideProps;
+                        },
+                        async cache() {
+                            serverSidePropsManager.addToCache(manager, await manager.bunextReq.getContext<ServerSidePropsContext>().__SERVERSIDE_PROPS__?.value());
                         },
                         unCache() {
                             serverSidePropsManager.removeFromCache(manager);
@@ -168,13 +176,14 @@ export default {
         async request(manager) {
             const props = manager.bunextReq.getContext<ServerSidePropsContext>().__SERVERSIDE_PROPS__;
             if (manager.request.headers.get("accept") == "application/vnd.server-side-props") {
-                return serveServerSideProps(manager, props?.value);
+                return serveServerSideProps(manager, await props?.value());
             } else if (manager.bunextReq.isAskingHTML) {
-                if (props?.value?.redirect) {
-                    return manager.bunextReq.setResponse(...setRedirectToPath(props.value.redirect)).sendNow();
+                const value = await props?.value();
+                if (value?.redirect) {
+                    return manager.bunextReq.setResponse(...setRedirectToPath(value.redirect)).sendNow();
                 }
                 manager.bunextReq.InjectGlobalValues({
-                    __SERVERSIDE_PROPS__: props?.value
+                    __SERVERSIDE_PROPS__: value
                 });
             }
         }

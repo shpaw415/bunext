@@ -23,7 +23,6 @@ import {
   TextColor,
   ToColor,
 } from "plugins/console";
-import { resetPath } from "./server-features/ssr-page";
 import { IPCManager } from "./utils";
 import type { MatchedRoute } from "bun";
 
@@ -42,7 +41,7 @@ declare global {
 const plugin: BunextPlugin = {
   name: "bunext-dev-plugin",
   priority: 0,
-  router: process.env.NODE_ENV === "development" && {
+  router: process.env.NODE_ENV == "development" ? {
     before_request(manager) {
       return handleDevRequest(manager);
     },
@@ -55,12 +54,16 @@ const plugin: BunextPlugin = {
         manager.bunextReq.setResponse("ok").preventRewrite().preventGlobalValuesInjection().sendNow();
       }
     },
-  } || undefined,
+  } : undefined,
   serverStart: {
     dev_main() {
       builder.clearBuildDir();
     },
-  }
+  },
+  onFileSystemChange() {
+    if (!globalThis.__DEV_PATH_MATCH__) return;
+    return buildRoute(globalThis.__DEV_PATH_MATCH__.pathname, globalThis.__DEV_PATH_MATCH__.filePath);
+  },
 };
 
 
@@ -96,14 +99,17 @@ function handleDevtoolsJson(req: BunextRequest): boolean {
  * Handles development-specific request processing
  */
 async function handleDevRequest(request: RequestManager) {
-
-  if (!request.bunextReq.isAskingHTML && !request.bunextReq.isClientNavigating) return;
-  else if (!request.bunextReq.match?.filePaths.src) return;
-  const newDevRoute = router.server.match(request.bunextReq.match.pathname)
-  if (newDevRoute?.filePath != globalThis.__DEV_PATH_MATCH__?.filePath || request.request.method === "PATCH") {
-    await buildRoute(request.bunextReq.match.route);
+  const newDevRoute = request.serverSide;
+  if (
+    newDevRoute && request.request.method == "PATCH" && request.request.headers.get("x-bunext-dev-router-update") && request.serverSide
+  ) {
+    globalThis.__DEV_PATH_MATCH__ = newDevRoute;
+    //await buildRoute(newDevRoute.pathname, newDevRoute.filePath);
+    return;
+  } else if (request.bunextReq.isAskingHTML && newDevRoute && newDevRoute?.pathname != globalThis.__DEV_PATH_MATCH__?.pathname) {
+    globalThis.__DEV_PATH_MATCH__ = newDevRoute;
+    await buildRoute(newDevRoute.pathname, newDevRoute.filePath);
   }
-  globalThis.__DEV_PATH_MATCH__ = newDevRoute;
 
 }
 /**
@@ -114,7 +120,7 @@ const ipc = IPCManager.getInstanceForCurrentProcess<"main">();
 /**
  * Builds a specific route with logging and timing
  */
-async function buildRoute(pathname: string) {
+async function buildRoute(pathname: string, filePath: string) {
   console.info(
     ToColor(
       TextColor,
@@ -129,10 +135,10 @@ async function buildRoute(pathname: string) {
         `compiled ${pathname} in ${time}ms`
       )}`,
     async () => {
-      await resetPath(pathname);
-      const res = await ipc.actions.builder.build(pathname);
+      const res = await builder.build(filePath);
+
       if (res && !res.success) {
-        console.error(ToColor("red", TerminalIcon.error), ToColor("red", res.message || "Unknown error during build"));
+        console.error(ToColor("red", TerminalIcon.error), ToColor("red", `failed to compile ${pathname}`), "\n", res.logs);
       } else if (res && res.success) {
         router.client.reload();
         router.server.reload();

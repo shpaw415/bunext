@@ -1,5 +1,5 @@
 import type { BunextPlugin } from "plugins/types";
-import { join, normalize } from "node:path";
+import { join } from "node:path";
 import { router } from "internal/server/router";
 
 declare global {

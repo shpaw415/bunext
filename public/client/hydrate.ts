@@ -1,1 +1,1 @@
-export { hydrate } from "../../internal/hydrate";
+export { hydrate } from "internal/hydrate";

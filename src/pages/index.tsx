@@ -22,7 +22,7 @@ export function TestServerElement1() {
 
 function DynamicFileImport() {
   useEffect(() => {
-    fetch("/node_modules/bunext-js/static/test.css").then(async (res) => {
+    fetch("/node_modules/css_placeholder/index.css").then(async (res) => {
       console.log(await res.text());
     });
   }, []);
@@ -56,7 +56,7 @@ export default async function Page() {
 
         <TestElement3 />
         <Bunext.router.navigate.components.link href="/other">
-          <button>Other pages</button>
+          <button>Others pages</button>
         </Bunext.router.navigate.components.link>
         <SetSessionButton />
         <DeleteSessionButton />

@@ -1,11 +1,11 @@
 "server only";
 
-import type { FileSystemRouter, MatchedRoute } from "bun";
+import type { FileSystemRouter } from "bun";
 import { CacheManagerPool } from "internal/caching";
 import { router, type RequestManager } from "internal/server/router";
-import type { ClusterMessageType, PageModule, ssrElement, SSRPage } from "internal/types";
+import type { PageModule, ssrElement, SSRPage } from "internal/types";
 import { createElement, isValidElement, type JSX } from "react";
-import { join } from "path";
+import { basename, join } from "path";
 import type { Table } from "database/class";
 import { builder } from "internal/server/build";
 import type { DBSchema } from "database/schema";
@@ -19,6 +19,7 @@ import type { BunextPlugin, PreBuildContextDefaultValues } from "plugins/types";
 import { pluginLoader } from "internal/server/plugin-loader";
 import { IPCManager } from "plugins/utils";
 import type { SessionPluginContext } from "plugins/session";
+import { initServerSide } from "internal/server/init";
 
 const Schema: DBSchema = [
     {
@@ -131,7 +132,7 @@ class SSRPageCache {
         } as ssrElement;
     }
     async getSSR(path: string) {
-        return (await this.ssr(t => t.select({ where: { path }, limit: 1 }))).at(0);
+        return (await this.ssr(t => t.select({ where: { path }, limit: 1 })))?.at(0);
     }
     async getAllSSR() {
         return (await this.ssr(t => t.select()));
@@ -175,16 +176,16 @@ export async function onRequestSSRPage(manager: RequestManager): Promise<boolean
  * Wraps the given HTML page with the necessary layout and shell.
  * @param manager The request manager.
  * @param HTMLPage The HTML page to wrap.
- * @returns The wrapped HTML page as a string.
+ * @returns The wrapped page in JSX format.
  */
-async function WrapPage(manager: RequestManager, HTMLPage: string) {
-    return manager.JSXToString(
-        await manager.WrapPageWithShell(
-            await manager.router.stackLayouts(
-                manager.serverSide as MatchedRoute,
-                HTMLJSXWrapper(HTMLPage)
-            )
-        )
+async function WrapHTMLPage(manager: RequestManager, HTMLPage: string) {
+    return manager.WrapPageWithShell(
+        await manager.router.stackLayouts({
+            pageElement: HTMLJSXWrapper(HTMLPage),
+            params: manager.bunextReq.match?.params,
+            routeName: manager.bunextReq.match?.route as string
+        }),
+        manager.bunextReq
     );
 }
 
@@ -195,7 +196,7 @@ async function getSSRDefaultPage(manager: RequestManager): Promise<string | null
     const cache = (await SSRCache.getSSRDefaultPage(manager.serverSide.name));
     if (cache) {
         if (cache.wrapped === false) {
-            const wrappedPage = await WrapPage(manager, cache.content);
+            const wrappedPage = renderToString(await WrapHTMLPage(manager, cache.content));
             await SSRCache.addSSRDefaultPage(manager.serverSide.name, wrappedPage, true);
             return wrappedPage;
         }
@@ -206,12 +207,13 @@ async function getSSRDefaultPage(manager: RequestManager): Promise<string | null
     const preRenderedPage = await getPreRenderedPage(manager);
     if (!preRenderedPage) return null;
 
-    const PageWithLayouts = await manager.router.stackLayouts(
-        manager.serverSide,
-        preRenderedPage
-    );
+    const PageWithLayouts = await manager.router.stackLayouts({
+        pageElement: preRenderedPage,
+        params: manager.bunextReq.match?.params,
+        routeName: manager.bunextReq.match?.route as string,
+    });
 
-    const shelledPage = await manager.WrapPageWithShell(PageWithLayouts);
+    const shelledPage = await manager.WrapPageWithShell(PageWithLayouts, manager.bunextReq);
     if (!shelledPage) return null;
     const stringifiedShelledPage = manager.JSXToString(shelledPage);
 
@@ -259,21 +261,12 @@ function HTMLJSXWrapper(html: string) {
 }
 
 
-export function ServerComponentsCompiler(
-    serverComponents: {
-        [key: string]: {
-            tag: string; // "<!Bunext_Element_FunctionName!>"
-            reactElement: string;
-        };
-    },
+function ServerComponentsCompiler(
+    serverComponents: Record<string, { tag: string; reactElement: string; }>,
     fileContent: string
 ) {
-    for (const _component of Object.keys(serverComponents)) {
-        const component = serverComponents[_component] as {
-            tag: string;
-            reactElement: string;
-        };
-
+    return fileContent;
+    for (const component of Object.values(serverComponents)) {
         fileContent = fileContent.replace(
             `"${component.tag}"`,
             `() => (${component.reactElement});`
@@ -360,6 +353,8 @@ class PreBuildContext {
     async preBuild(modulePath: string) {
         if (this.paths.has(modulePath) || modulePath.endsWith(".d.ts")) return;
         this.paths.add(modulePath);
+
+        await initServerSide();
 
         if (!this.MainRoute) this.MainRoute = Object.entries(router.server.routes).find(([_, route]) => route === modulePath)?.[0];
         if (!this.MainModulePath) this.MainModulePath = modulePath;
@@ -532,20 +527,20 @@ export async function preBuildAll(skip?: ssrElement[]) {
 }
 
 
-export async function resetPath(path: string) {
-    const ssr = await SSRCache.getSSR(path);
+export async function resetPath(filepPath: string) {
+    const ssr = await SSRCache.getSSR(filepPath);
     if (!ssr) {
         return false;
     }
     if (process.env.NODE_ENV == "production") {
         const extensions = ["tsx", "jsx"];
         for (const imp of new Bun.Transpiler({
-            loader: path.split(".").at(-1) as Bun.JavaScriptLoader,
+            loader: filepPath.split(".").at(-1) as Bun.JavaScriptLoader,
         })
-            .scanImports(await Bun.file(path).text())
+            .scanImports(await Bun.file(filepPath).text())
             .map((e) => e.path)) {
             if (imp.startsWith(".")) {
-                const _path = path.split("/");
+                const _path = filepPath.split("/");
                 _path.pop();
                 const resolvedPath = resolve(normalize("/" + join(..._path)), imp);
                 for await (const ext of extensions) {
@@ -602,8 +597,8 @@ type RevalidateItem = {
 };
 
 export function revalidateEvery(path: string | string[], seconde: number) {
-    const ipc = IPCManager.getInstanceForCurrentProcess<"main" | "builder">();
-    ipc.send<RevalidateItem, string>("builder", "set-revalidate-every", { path, time: seconde * 1000 });
+    const ipc = IPCManager.getInstanceForCurrentProcess<"main">();
+    ipc.send<RevalidateItem, string>("main", "set-revalidate-every", { path, time: seconde * 1000 });
 }
 
 function addInterval(path: string, time: number) {
@@ -616,15 +611,88 @@ function addInterval(path: string, time: number) {
     }, time));
 }
 
+async function ServerComponentsToTag(
+    modulePath: string,
+    _module: Record<string, unknown>
+): Promise<Record<string, { tag: string, reactElement: string; }>> {
+    // ServerComponent
+    const ssrModule = await SSRCache.getSSR(modulePath);
+    return Object.entries(_module).map(([name, func]) => {
+        if (typeof func !== "function" || func.name.startsWith("Server") || func.name == "getServerSideProps" || func.length > 0) return null;
+        const ssrElement = ssrModule?.elements.find((e) => e.tag == `<!Bunext_Element_${func.name}!>`);
+        if (!ssrElement) return null;
+        return { name, data: { tag: ssrElement.tag, reactElement: ssrElement.reactElement } };
+    })
+        .filter((e) => e != null)
+        .reduce((acc, curr) => {
+            acc[curr.name] = curr.data;
+            return acc;
+        }, {} as Record<string, { tag: string, reactElement: string; }>);
+}
+
 export default {
     name: "ssr-page-revalidate",
     serverStart: {
-        build_worker: process.env.NODE_ENV == "production" ? (ipc) => {
+        main: process.env.NODE_ENV == "production" ? (ipc) => {
             ipc.onMessage<RevalidateItem>("set-revalidate-every", (item) => {
                 for (const p of Array.isArray(item.path) ? item.path : [item.path]) {
                     addInterval(p, item.time);
                 }
             });
         } : undefined,
+    },
+    build: {
+        before_build: process.env.NODE_ENV == "development" ? async () => {
+            if (!globalThis.__DEV_PATH_MATCH__) return;
+            await resetPath(globalThis.__DEV_PATH_MATCH__.filePath);
+            await preBuild(globalThis.__DEV_PATH_MATCH__.filePath);
+
+        } : undefined,
+        partialPluginOverRide: {
+            async tsx(args, fileContent, fileDirectives) {
+                if (await fileDirectives.pathIs("use-client", args.path)) return;
+
+                const serverComponents = await ServerComponentsToTag(
+                    args.path,
+                    (await import(
+                        process.env.NODE_ENV == "production"
+                            ? args.path
+                            : args.path + `?${generateRandomString(5)}`
+                    ) as Record<string, unknown>)
+                );
+
+                if (Object.keys(serverComponents).length === 0) return;
+
+
+                const serverComponentsForTranspiler = Object.assign(
+                    {},
+                    ...[
+                        ...Object.entries(serverComponents).map(([name, component]) => ({
+                            [name]: component.tag,
+                        })),
+                    ]
+                ) as Record<string, string>;
+
+                const transpiler = new Bun.Transpiler({
+                    loader: "tsx",
+                    exports: {
+                        replace: serverComponentsForTranspiler,
+                    },
+                });
+                fileContent = ServerComponentsCompiler(serverComponents, transpiler.transformSync(fileContent));
+
+                Object.values(serverComponents).forEach((component) => {
+                    fileContent = fileContent.replace(
+                        `"${component.tag}"`,
+                        `() => (${component.reactElement});`
+                    );
+                });
+
+                return {
+                    contents: fileContent,
+                    loader: "jsx",
+                };
+            },
+        }
     }
 } as BunextPlugin;

@@ -1,7 +1,7 @@
 import type { OnLoadArgs } from "bun";
 import type { BunextRequest } from "../internal/server/bunextRequest";
 import type { RequestManager } from "../internal/server/router";
-import type { ClientIPCManager } from "./utils";
+import type { ClientIPCManager, DirectiveTool } from "./utils";
 
 /**
  * IPCManager for the main thred
@@ -13,11 +13,7 @@ type IPCMain = ClientIPCManager<"main">;
  * used for sending messages between main, cluster and builder threads
  */
 type IPCCluster = ClientIPCManager<"cluster">;
-/**
- * IPCManager for the builder thread
- * used for sending messages between main, cluster and builder threads
- */
-type IPCBuilder = ClientIPCManager<"builder">;
+
 
 export type ServerStart = Partial<{
   /**
@@ -33,29 +29,12 @@ export type ServerStart = Partial<{
    * @returns
    */
   dev_main: (ipc: IPCMain) => Promise<any> | any;
-
-  /**
-   * ***Executed on the build worker thread***
-   *
-   * @param ipc IPC manager for the builder worker
-   * @returns 
-   */
-  build_worker: (ipc: IPCBuilder) => Promise<any> | any;
-
-  /**
-   * ***Executed on the build worker thread***
-   * 
-   * **ONLY DEV MODE**
-   * 
-   * @param ipc IPC manager for the builder worker
-   */
-  dev_build_worker: (ipc: IPCBuilder) => Promise<any> | any;
   /**
  * **executed on clusters in multi-threaded mode on the clusters thread**
  * 
  * This will not share the same context as the main thread.
  * 
- * **ONLY IN MULTI-THREADED MODE**
+ * **ONLY IN MULTI-THREADED AND PRODUCTION MODE**
  * 
  * @param ipc IPC manager for the cluster thread
  * @returns
@@ -91,13 +70,18 @@ type PartialOverRideResponse = Partial<{
    * Parsed contents before Bunext processes it for internal features. 
    */
   contents: string;
+  /**
+   * Loader type for Bun's build process.
+   * Refer to Bun's documentation for available loader types.
+   */
+  loader: Bun.Loader;
 }> | undefined;
 
 type Build_Plugins = Partial<{
   plugin: Bun.BunPlugin;
   buildOptions: Partial<Bun.BuildConfig> | (() => Promise<Partial<Bun.BuildConfig>> | Partial<Bun.BuildConfig>);
   /**
-   * Add your own custom onLoad handlers for ts and tsx files in the **src/pages** directory.
+   * Add your own custom onLoad handlers for ts and tsx files in the **src/pages** or any subdirectory in process.cwd() directory.
    * 
    * use the fileContent parameter to get the content of the file and modify it to be returned after.
    * 
@@ -106,18 +90,81 @@ type Build_Plugins = Partial<{
    * **Otherwise it will break Plugin chaining**
    * 
    * @example
-   * partialPluginOverRide: {
    *  tsx: (args, fileContent) => {
    *    // modify the fileContent as needed
    *    const modifiedContent = fileContent.replace("oldValue", "newValue");
-   *    return { contents: modifiedContent };
+   *    // OR
+   *    const modifiedContent = new Bun.Transpiler({ loader: args.loader, }).transformSync(fileContent);
+   *    return { contents: modifiedContent, loader: "js" };
    *  }
-   * }
    */
   partialPluginOverRide: Partial<{
-    tsx: (args: OnLoadArgs, fileContent: string) => Promise<PartialOverRideResponse> | PartialOverRideResponse;
-    ts: (args: OnLoadArgs, fileContent: string) => Promise<PartialOverRideResponse> | PartialOverRideResponse;
-  }>
+    /**
+     * modify tsx files in the src/pages directory before Bunext processes it for internal features.
+     * 
+     * **You must modify the fileContent variable and return it as contents in the response object.**
+     * 
+     * **Otherwise it will break Plugin chaining**
+     * 
+     * @example
+     * tsx: (args, fileContent) => {
+   *    // modify the fileContent as needed
+   *    const modifiedContent = fileContent.replace("oldValue", "newValue");
+   *    // OR
+   *    const modifiedContent = new Bun.Transpiler({ loader: args.loader, }).transformSync(fileContent);
+   *    return { contents: modifiedContent, loader: "js" };
+   *  }
+     * @param args 
+     * @param fileContent 
+     * @param fileDirectives file directives tool instance for testing file directives
+     * @returns 
+     */
+    tsx: (args: OnLoadArgs, fileContent: string, fileDirectives: DirectiveTool) => Promise<PartialOverRideResponse> | PartialOverRideResponse;
+    /**
+     * modify ts files in the src/pages directory before Bunext processes it for internal features.
+     * 
+     * **You must modify the fileContent variable and return it as contents in the response object.**
+     * 
+     * **Otherwise it will break Plugin chaining**
+     * 
+     * @example
+     * tsx: (args, fileContent) => {
+   *    // modify the fileContent as needed
+   *    const modifiedContent = fileContent.replace("oldValue", "newValue");
+   *    // OR
+   *    const modifiedContent = new Bun.Transpiler({ loader: args.loader, }).transformSync(fileContent);
+   *    return { contents: modifiedContent, loader: "js" };
+   *  }
+     * @param args 
+     * @param fileContent 
+     * @param fileDirectives file directives tool instance for testing file directives
+     * @returns 
+     */
+    ts: (args: OnLoadArgs, fileContent: string, fileDirectives: DirectiveTool) => Promise<PartialOverRideResponse> | PartialOverRideResponse;
+    /**
+     * Other js like files (js, jsx, ts, tsx) somewhere else in project except src/pages directory
+     * 
+     * **You must modify the fileContent variable and return it as contents in the response object.**
+     * 
+     * **Otherwise it will break Plugin chaining**
+     * 
+     * @example
+     * others: (args, fileContent, fileDirectives) => {
+     *    // modify the fileContent as needed
+     *    const modifiedContent = fileContent.replace("oldValue", "newValue");
+     *    return { contents: modifiedContent };
+     * }
+     */
+    others: (args: OnLoadArgs, fileContent: string, fileDirectives: DirectiveTool) => Promise<PartialOverRideResponse> | PartialOverRideResponse;
+  }>;
+  /**
+ * Triggered on the **Main Thread** before the build step.
+ */
+  before_build: (ipc: IPCMain) => Promise<any> | any;
+  /**
+   * Triggered on the **Main Thread** after the build step and passes every output BuildArtifact for processing.
+   */
+  after_build: (BuildArtifact: Bun.BuildOutput, ipc: IPCMain) => Promise<any> | any;
 }>;
 
 export type PreBuildContextDefaultValues = { route: string };
@@ -161,21 +208,6 @@ export type BunextPlugin<HTMLRewrite = unknown, PreBuildContext extends Record<s
   name: string;
 }> & Partial<{
 
-  /**
-   * ***Triggered on the build worker thread***
-   *
-   * this will not share the same context as the main thread.
-   */
-  build_worker: Partial<{
-    /**
-     * Triggered on the **Build-Worker-Thread** before the build step.
-     */
-    before_build: (ipc: IPCBuilder) => Promise<any> | any;
-    /**
-     * Triggered on the **Build-Worker-Thread** after the build step and passes every output BuildArtifact for processing.
-     */
-    after_build: (BuildArtifact: Bun.BuildOutput, ipc: IPCBuilder) => Promise<any> | any;
-  }>;
   /**
    * Add Bun.build plugins and build config
    *

@@ -8,8 +8,9 @@ import type { BunextPlugin } from "../types";
 import { router, type RequestManager } from "../../internal/server/router";
 import { renderToString } from "react-dom/server";
 import type { Table } from "public/database/class";
-import { serverSidePropsManager, type ServerSidePropsContext } from "plugins/server-features/serverSideProps";
+import { serverSidePropsManager, type ServerSidePropsContext, type ServerSidePropsTyped } from "plugins/server-features/serverSideProps";
 import type { SessionPluginContext } from "plugins/session";
+import { createDynamicPage } from "plugins/server-features/dynamic-page";
 
 const staticPageCacheShema: DBSchema = [
   {
@@ -96,6 +97,7 @@ class StaticPageCache {
         },
         select: {
           page: true,
+          etag: true,
         },
       })
       .at(0) ?? undefined))
@@ -134,11 +136,25 @@ export default {
     async request(manager) {
       if (manager.bunextReq.match?.directive !== "use-static") return;
 
-      const props = manager.bunextReq.getContext<ServerSidePropsContext>().__SERVERSIDE_PROPS__;
+      if (manager.bunextReq.isAskingHTML) {
+        const page = await StaticPageCacheInstance.getStaticPage(manager.bunextReq.match.pathname);
+        if (page?.page) {
+          manager.bunextReq.setResponse(page.page, {
+            headers: {
+              "Content-Type": "text/html; charset=utf-8",
+              "Cache-Control": "public, max-age=0, must-revalidate",
+              "ETag": page.etag
+            },
+          });
+          return;
+        }
+      }
 
-      if (props?.value) {
-        props.cache();
-        await createHTMLIfNotExists(manager, props.value);
+      const props = manager.bunextReq.getContext<ServerSidePropsContext>().__SERVERSIDE_PROPS__;
+      const value = await props?.value();
+      if (value) {
+        props?.cache();
+        await createHTMLIfNotExists(manager, value);
       }
 
 
@@ -173,20 +189,16 @@ export default {
  * Make static page
  * @returns page string, props
  */
-async function MakeStaticPage(manager: RequestManager, props: ServerSideProps) {
+async function MakeStaticPage(manager: RequestManager, props: ServerSidePropsTyped) {
   if (!manager.bunextReq.match)
     throw new Error(`no matched path found for ${manager.pathname}`);
-
-  const pageJSX = await manager.makeDynamicJSXPage({
-    modulePath: manager.bunextReq.match.filePaths.src,
-    serverSideProps: props,
-  });
+  const pageJSX = await createDynamicPage(manager, { init_session: false });
 
   if (!pageJSX)
     throw Error(
       `Error Caching page JSX from path: ${manager.bunextReq.match.filePaths.src}`
     );
-  const pageString = renderToString(await manager.WrapPageWithShell(pageJSX));
+  const pageString = renderToString(await pageJSX.wrap())
 
   await manager.bunextReq.getContext<SessionPluginContext>().__INIT_SESSION__();
 
@@ -196,8 +208,7 @@ async function MakeStaticPage(manager: RequestManager, props: ServerSideProps) {
 
 
 async function handleGetHTMLPage(manager: RequestManager) {
-  const props = manager.bunextReq.getContext<ServerSidePropsContext>().__SERVERSIDE_PROPS__?.value;
-  if (!props) throw new Error("no server side props found");
+  const props = await manager.bunextReq.getContext<ServerSidePropsContext>().__SERVERSIDE_PROPS__?.value();
   const page = await createHTMLIfNotExists(manager, props);
   manager.bunextReq.setResponse(page.page || "", {
     headers: {
@@ -210,12 +221,13 @@ async function handleGetHTMLPage(manager: RequestManager) {
  * Create HTML if not exists then cache result
  * @returns pageData
  */
-async function createHTMLIfNotExists(manager: RequestManager, props: ServerSideProps): Promise<Omit<staticPage, "pathname">> {
+async function createHTMLIfNotExists(manager: RequestManager, props: ServerSidePropsTyped): Promise<Omit<staticPage, "pathname">> {
   const cache = StaticPageCacheInstance;
   const pathname = manager.bunextReq.match?.pathname as string;
   const pageData = await cache.getStaticPage(pathname);
   if (!pageData?.page) {
     const page = (await MakeStaticPage(manager, props));
+
     await cache.addStaticPage(pathname, page.page);
     return page;
   }

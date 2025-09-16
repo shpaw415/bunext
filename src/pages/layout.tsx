@@ -7,7 +7,7 @@ type LayoutProps = {
   children: JSX.Element;
 };
 
-export default async function MainLayout({ children }: LayoutProps) {
+export default function MainLayout({ children }: LayoutProps) {
   return (
     <Head data={{
       author: "shpaw415",
